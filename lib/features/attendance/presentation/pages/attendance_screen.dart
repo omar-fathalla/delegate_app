@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
@@ -71,13 +70,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               backgroundColor: const Color(0xFF0D47A1),
               foregroundColor: Colors.white,
               elevation: 0,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.qr_code),
-                  onPressed: () => _showQRGenerator(context),
-                  tooltip: 'Test QR',
-                ),
-              ],
             ),
             body: Column(
               children: [
@@ -524,25 +516,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    if (!isCheckedIn) ...[
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _checkIn(context, attendanceBloc, _selectedBranch);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: color,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: const Text('Check In Manual (Dev)'),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
                     Text(
                       'Point camera at the QR code to $action',
                       style: TextStyle(color: Colors.grey[500]),
@@ -581,57 +554,4 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  void _showQRGenerator(BuildContext context) {
-    String qrBranch = _selectedBranch;
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('Generate Branch QR'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButton<String>(
-                  value: qrBranch,
-                  isExpanded: true,
-                  items: _branches.map((String branch) {
-                    return DropdownMenuItem<String>(
-                      value: branch,
-                      child: Text(branch),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    setState(() => qrBranch = val!);
-                  },
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: QrImageView(
-                    data: '{"type":"attendance","branch":"$qrBranch"}',
-                    version: QrVersions.auto,
-                    size: 200.0,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Scan this code to check in at $qrBranch',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
 }
