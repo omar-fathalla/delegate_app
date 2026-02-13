@@ -116,26 +116,13 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   @override
   Future<List<AttendanceModel>> getHistory(String userId) async {
     try {
-      // Try with orderBy first (requires composite index)
-      QuerySnapshot<Map<String, dynamic>> querySnapshot;
-      try {
-        querySnapshot = await firestore
-            .collection('attendance')
-            .where('userId', isEqualTo: userId)
-            .orderBy('checkInTime', descending: true)
-            .get();
-      } catch (indexError) {
-        // Fallback: query without orderBy if composite index is missing
-        // Sort client-side instead
-        // ignore: avoid_print
-        print('Index not ready, falling back to client-side sort: $indexError');
-        querySnapshot = await firestore
-            .collection('attendance')
-            .where('userId', isEqualTo: userId)
-            .get();
-      }
+      final querySnapshot = await firestore
+          .collection('attendance')
+          .where('userId', isEqualTo: userId)
+          .orderBy('checkInTime', descending: true)
+          .get();
 
-      final results = querySnapshot.docs.map((doc) {
+      return querySnapshot.docs.map((doc) {
         final data = doc.data();
         return AttendanceModel(
           id: doc.id,
@@ -152,10 +139,6 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           branchName: data['branchName'],
         );
       }).toList();
-
-      // Sort client-side (in case fallback was used)
-      results.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
-      return results;
     } catch (e) {
       // ignore: avoid_print
       print('Failed to fetch history: $e');
