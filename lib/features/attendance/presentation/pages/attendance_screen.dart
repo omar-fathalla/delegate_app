@@ -19,9 +19,15 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
   DateTime _selectedMonth = DateTime.now();
-  final List<String> _branches = ['Main Branch', 'City Center', 'Nasr City'];
-  String _selectedBranch = 'Main Branch';
+  final List<String> _branches = [
+    'سموحة',
+    'الابراهيمية',
+    'عجمي ستار',
+    'الرحاب',
+  ];
+  String _selectedBranch = 'سموحة';
   bool isCheckedIn = false;
+  bool _isProcessing = false; // Guard against multiple scans
 
   @override
   Widget build(BuildContext context) {
@@ -329,44 +335,63 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   void _showQRScanner(BuildContext context) {
     final attendanceBloc = BlocProvider.of<AttendanceBloc>(context);
+    final parentContext = context; // Save parent context for SnackBars
     final action = isCheckedIn ? 'Check Out' : 'Check In';
     final color = isCheckedIn ? Colors.orange : const Color(0xFF0D47A1);
+    _isProcessing = false; // Reset guard
+
+    final scannerController = MobileScannerController();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      backgroundColor: Colors.black,
       builder: (_) => Scaffold(
+        backgroundColor: Colors.black,
         body: Stack(
           children: [
             MobileScanner(
+              controller: scannerController,
               onDetect: (capture) {
+                // Guard: only process once
+                if (_isProcessing) return;
+                _isProcessing = true;
+
                 final List<Barcode> barcodes = capture.barcodes;
                 if (barcodes.isNotEmpty) {
                   final String rawValue = barcodes.first.rawValue ?? '';
                   debugPrint('Barcode found! $rawValue');
 
-                  // Try parsing JSON
+                  // Parse branch from QR
                   String? scannedBranch;
                   try {
-final dynamic decoded = jsonDecode(rawValue);
-// التأكد من أن البيانات عبارة عن خريطة (Map) وأنها خاصة بـ 'attendance'
-if (decoded is Map<String, dynamic> && decoded['type'] == 'attendance') {
-  if (decoded.containsKey('branch') && decoded['branch'] is String) {
-    scannedBranch = decoded['branch'] as String;
+try {
+  final dynamic decoded = jsonDecode(rawValue);
+
+  // التحقق من أن البيانات عبارة عن Map وأن النوع هو attendance
+  if (decoded is Map<String, dynamic> && decoded['type'] == 'attendance') {
+    if (decoded.containsKey('branch') && decoded['branch'] is String) {
+      scannedBranch = decoded['branch'] as String;
+    }
   }
+} catch (e) {
+  // في حال فشل تحويل الـ JSON، يمكنك وضع كود احتياطي هنا أو طباعة خطأ
+  print("Error decoding JSON: $e");
 }
                     }
                   } catch (e) {
                     debugPrint('Error parsing QR: $e');
                   }
 
-                  Navigator.pop(context); // Close scanner first
+                  // Stop camera FIRST to prevent black screen
+                  scannerController.stop();
+
+                  // Close scanner bottom sheet
+                  Navigator.pop(parentContext);
 
                   if (scannedBranch != null) {
                     if (isCheckedIn) {
-                      // Check Out - Branch specific check logic can go here (e.g., must check out from same branch check-in?)
-                      // For now, just check out.
                       attendanceBloc.add(
                         CheckOutRequested(
                           attendanceId: attendanceBloc.currentAttendanceId!,
@@ -375,28 +400,29 @@ if (decoded is Map<String, dynamic> && decoded['type'] == 'attendance') {
                         ),
                       );
                     } else {
-                      // Check In to SCANNED branch
-                      _checkIn(context, attendanceBloc, scannedBranch);
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      _checkIn(parentContext, attendanceBloc, scannedBranch);
+                      ScaffoldMessenger.of(parentContext).showSnackBar(
                         SnackBar(
-                          content: Text('Checking in to $scannedBranch...'),
+                          content: Text('تسجيل حضور في $scannedBranch...'),
                         ),
                       );
                     }
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
                       const SnackBar(
                         content: Text(
-                          'Invalid QR Code. Please scan a valid Branch QR.',
+                          'QR Code غير صالح. يرجى مسح كود فرع صحيح.',
                         ),
                         backgroundColor: Colors.red,
                       ),
                     );
                   }
+                } else {
+                  _isProcessing = false; // Reset if no barcodes
                 }
               },
             ),
-            // Overlay
+            // Top Overlay
             Positioned(
               top: 0,
               left: 0,
@@ -419,7 +445,7 @@ if (decoded is Map<String, dynamic> && decoded['type'] == 'attendance') {
                 child: Column(
                   children: [
                     Text(
-                      'Scanning to $action',
+                      'مسح لـ $action',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
@@ -448,15 +474,16 @@ if (decoded is Map<String, dynamic> && decoded['type'] == 'attendance') {
                 ),
               ),
             ),
+            // Bottom Info Panel
             Positioned(
               bottom: 0,
               left: 0,
               right: 0,
               child: Container(
                 padding: const EdgeInsets.all(30),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius: const BorderRadius.only(
+                  borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(30),
                     topRight: Radius.circular(30),
                   ),
@@ -503,7 +530,7 @@ if (decoded is Map<String, dynamic> && decoded['type'] == 'attendance') {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'Point camera at the QR code to $action',
+                      'وجه الكاميرا نحو QR Code لـ $action',
                       style: TextStyle(color: Colors.grey[500]),
                     ),
                   ],
@@ -518,14 +545,20 @@ if (decoded is Map<String, dynamic> && decoded['type'] == 'attendance') {
                 backgroundColor: Colors.white.withValues(alpha: 0.3),
                 child: IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    scannerController.stop();
+                    Navigator.pop(parentContext);
+                  },
                 ),
               ),
             ),
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      scannerController.dispose();
+      _isProcessing = false;
+    });
   }
 
   void _checkIn(BuildContext context, AttendanceBloc bloc, String branchName) {
