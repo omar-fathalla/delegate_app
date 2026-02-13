@@ -366,19 +366,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   // Parse branch from QR
                   String? scannedBranch;
                   try {
-try {
-  final dynamic decoded = jsonDecode(rawValue);
+                    final dynamic decoded = jsonDecode(rawValue);
 
-  // التحقق من أن البيانات عبارة عن Map وأن النوع هو attendance
-  if (decoded is Map<String, dynamic> && decoded['type'] == 'attendance') {
-    if (decoded.containsKey('branch') && decoded['branch'] is String) {
-      scannedBranch = decoded['branch'] as String;
-    }
-  }
-} catch (e) {
-  // في حال فشل تحويل الـ JSON، يمكنك وضع كود احتياطي هنا أو طباعة خطأ
-  print("Error decoding JSON: $e");
-}
+                    // التحقق من أن البيانات عبارة عن Map وأن النوع هو attendance
+                    if (decoded is Map<String, dynamic> &&
+                        decoded['type'] == 'attendance') {
+                      if (decoded.containsKey('branch') &&
+                          decoded['branch'] is String) {
+                        scannedBranch = decoded['branch'] as String;
+                      }
                     }
                   } catch (e) {
                     debugPrint('Error parsing QR: $e');
@@ -572,5 +568,4 @@ try {
       ),
     );
   }
-
 }
