@@ -17,6 +17,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final querySnapshot = await firestore
           .collection('users')
           .where('mobile', isEqualTo: mobile)
+          .limit(1)
           .get();
 
       if (querySnapshot.docs.isEmpty) {
