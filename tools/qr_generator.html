@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code للفروع - تطبيق تسهيل</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .branch-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #1a237e;
+        }
+
+        .qr-container {
+            display: inline-block;
+            background: white;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .qr-container canvas,
+        .qr-container img {
+            display: block !important;
+        }
+
+        .download-btn {
+            display: inline-block;
+            padding: 10px 24px;
+            background: #1a237e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .download-btn:hover {
+            background: #283593;
+        }
+
+        .data-preview {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: #888;
+            direction: ltr;
+            font-family: monospace;
+        }
+
+        @media print {
+            .download-btn {
+                display: none;
+            }
+
+            .card {
+                break-inside: avoid;
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🏢 QR Code للفروع - نظام الحضور والانصراف</h1>
+    <div class="grid" id="qr-grid"></div>
+
+    <script>
+        const branches = [
+            { name: "سموحة" },
+            { name: "الابراهيمية" },
+            { name: "عجمي ستار" },
+            { name: "الرحاب" }
+        ];
+
+        const grid = document.getElementById('qr-grid');
+
+        branches.forEach((branch, index) => {
+            const qrPayload = JSON.stringify({
+                type: "attendance",
+                branch: branch.name
+            });
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div class="branch-name">فرع ${branch.name}</div>
+                <div class="qr-container" id="qr-${index}"></div>
+                <br>
+                <button class="download-btn" onclick="downloadQR(${index}, '${branch.name}')">
+                    ⬇️ تحميل الصورة
+                </button>
+                <div class="data-preview">${qrPayload}</div>
+            `;
+            grid.appendChild(card);
+
+            new QRCode(document.getElementById(`qr-${index}`), {
+                text: qrPayload,
+                width: 250,
+                height: 250,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        });
+
+        function downloadQR(index, branchName) {
+            const container = document.getElementById(`qr-${index}`);
+            const canvas = container.querySelector('canvas');
+            if (canvas) {
+                const link = document.createElement('a');
+                link.download = `qr_${branchName}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
+        }
+    </script>
+</body>
+
+</html>
