@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -348,28 +349,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   // Try parsing JSON
                   String? scannedBranch;
                   try {
-                    // Simple regex or string check if strictly JSON,
-                    // or just import dart:convert and jsonDecode
-                    if (rawValue.contains('"branch":')) {
-                      // Initial quick validation
-                      // We will need to properly decode it.
-                      // For now, assuming format: {"type":"attendance","branch":"BRANCH_NAME"}
-                      // Quick hack parse to avoid heavyweight import changes if avoiding logic
-                      // But better to use proper logic.
-
-                      // NOTE: We need dart:convert for jsonDecode.
-                      // I will add the import in a subsequent edit or assume it's there?
-                      // It's not there. I will use a simple substring extraction for this MVP
-                      // to avoid 'import' mess-ups in replace_file_content if top of file is far away.
-                      // ...Actually, I should add the import.
-
-                      // Let's rely on the user confirming the "professional" approach.
-                      // Using a safe extraction:
-                      final RegExp branchRegex = RegExp(r'"branch":"([^"]+)"');
-                      final match = branchRegex.firstMatch(rawValue);
-                      if (match != null) {
-                        scannedBranch = match.group(1);
-                      }
+                    final Map<String, dynamic> data = jsonDecode(rawValue);
+                    if (data['type'] == 'attendance') {
+                      scannedBranch = data['branch'] as String?;
                     }
                   } catch (e) {
                     debugPrint('Error parsing QR: $e');
