@@ -349,9 +349,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   // Try parsing JSON
                   String? scannedBranch;
                   try {
-                    final Map<String, dynamic> data = jsonDecode(rawValue);
-                    if (data['type'] == 'attendance') {
-                      scannedBranch = data['branch'] as String?;
+final dynamic decoded = jsonDecode(rawValue);
+// التأكد من أن البيانات عبارة عن خريطة (Map) وأنها خاصة بـ 'attendance'
+if (decoded is Map<String, dynamic> && decoded['type'] == 'attendance') {
+  if (decoded.containsKey('branch') && decoded['branch'] is String) {
+    scannedBranch = decoded['branch'] as String;
+  }
+}
                     }
                   } catch (e) {
                     debugPrint('Error parsing QR: $e');
