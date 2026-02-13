@@ -1,5 +1,5 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
@@ -77,13 +77,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               backgroundColor: const Color(0xFF0D47A1),
               foregroundColor: Colors.white,
               elevation: 0,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.qr_code),
-                  onPressed: () => _showQRGenerator(context),
-                  tooltip: 'Test QR',
-                ),
-              ],
             ),
             body: Column(
               children: [
@@ -373,12 +366,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   // Parse branch from QR
                   String? scannedBranch;
                   try {
-                    if (rawValue.contains('"branch":')) {
-                      final RegExp branchRegex = RegExp(r'"branch":"([^"]+)"');
-                      final match = branchRegex.firstMatch(rawValue);
-                      if (match != null) {
-                        scannedBranch = match.group(1);
-                      }
+try {
+  final dynamic decoded = jsonDecode(rawValue);
+
+  // التحقق من أن البيانات عبارة عن Map وأن النوع هو attendance
+  if (decoded is Map<String, dynamic> && decoded['type'] == 'attendance') {
+    if (decoded.containsKey('branch') && decoded['branch'] is String) {
+      scannedBranch = decoded['branch'] as String;
+    }
+  }
+} catch (e) {
+  // في حال فشل تحويل الـ JSON، يمكنك وضع كود احتياطي هنا أو طباعة خطأ
+  print("Error decoding JSON: $e");
+}
                     }
                   } catch (e) {
                     debugPrint('Error parsing QR: $e');
@@ -573,57 +573,4 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  void _showQRGenerator(BuildContext context) {
-    String qrBranch = _selectedBranch;
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('Generate Branch QR'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButton<String>(
-                  value: qrBranch,
-                  isExpanded: true,
-                  items: _branches.map((String branch) {
-                    return DropdownMenuItem<String>(
-                      value: branch,
-                      child: Text(branch),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    setState(() => qrBranch = val!);
-                  },
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: QrImageView(
-                    data: '{"type":"attendance","branch":"$qrBranch"}',
-                    version: QrVersions.auto,
-                    size: 200.0,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Scan this code to check in at $qrBranch',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
 }
