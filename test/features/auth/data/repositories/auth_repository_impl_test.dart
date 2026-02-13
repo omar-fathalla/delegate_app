@@ -45,7 +45,7 @@ void main() {
       'should return remote data when the call to remote data source is successful',
       () async {
         // arrange
-        mockRemoteDataSource.loginStub = (_, __) async => tUserModel;
+        mockRemoteDataSource.loginStub = (_, _) async => tUserModel;
         // act
         final result = await repository.login(tMobile, tMotherName);
         // assert
@@ -61,7 +61,7 @@ void main() {
       () async {
         // arrange
         const tFailure = AuthFailure('Invalid credentials');
-        mockRemoteDataSource.loginStub = (_, __) => throw tFailure;
+        mockRemoteDataSource.loginStub = (_, _) => throw tFailure;
         // act
         final result = await repository.login(tMobile, tMotherName);
         // assert
@@ -75,7 +75,7 @@ void main() {
       () async {
         // arrange
         const tFailure = ServerFailure('Server Error');
-        mockRemoteDataSource.loginStub = (_, __) => throw tFailure;
+        mockRemoteDataSource.loginStub = (_, _) => throw tFailure;
         // act
         final result = await repository.login(tMobile, tMotherName);
         // assert
@@ -88,7 +88,8 @@ void main() {
       'should return ServerFailure when the call to remote data source throws an unexpected exception',
       () async {
         // arrange
-        mockRemoteDataSource.loginStub = (_, __) => throw Exception('Unexpected error');
+        mockRemoteDataSource.loginStub = (_, _) =>
+            throw Exception('Unexpected error');
         // act
         final result = await repository.login(tMobile, tMotherName);
         // assert
