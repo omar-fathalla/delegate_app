@@ -14,6 +14,11 @@ import 'package:delegate_app/features/attendance/domain/usecases/get_history.dar
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:delegate_app/features/profile/data/datasources/profile_remote_data_source.dart';
+import 'package:delegate_app/features/profile/data/repositories/profile_repository_impl.dart';
+import 'package:delegate_app/features/profile/domain/repositories/profile_repository.dart';
+import 'package:delegate_app/features/profile/domain/usecases/get_delegate_profile.dart';
+import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:get_it/get_it.dart';
 
 final sl = GetIt.instance;
@@ -40,6 +45,23 @@ Future<void> init() async {
   // sl.registerLazySingleton<AuthRemoteDataSource>(() => MockAuthDataSource());
   sl.registerLazySingleton<AuthRemoteDataSource>(
     () => AuthRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  // ! Features - Profile
+  // Bloc
+  sl.registerFactory(() => ProfileBloc(getDelegateProfile: sl()));
+
+  // Use cases
+  sl.registerLazySingleton(() => GetDelegateProfile(sl()));
+
+  // Repository
+  sl.registerLazySingleton<ProfileRepository>(
+    () => ProfileRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data sources
+  sl.registerLazySingleton<ProfileRemoteDataSource>(
+    () => ProfileRemoteDataSourceImpl(firestore: sl()),
   );
 
   // ! Features - Attendance

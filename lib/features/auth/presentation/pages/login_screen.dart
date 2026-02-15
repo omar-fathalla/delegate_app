@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:delegate_app/features/home/presentation/pages/main_screen.dart';
+import 'package:go_router/go_router.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: BlocProvider(
         create: (context) => sl<AuthBloc>(),
@@ -31,14 +33,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               );
             } else if (state is AuthAuthenticated) {
-              // Navigate to Home
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => MainScreen(user: state.user)),
-              );
+              context.go('/home', extra: state.user);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Login Successful!'),
+                SnackBar(
+                  content: Text(l10n.loginSuccessful),
                   backgroundColor: Colors.green,
                 ),
               );
@@ -69,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Tasheel Delegate',
+                              l10n.appTitle,
                               style: Theme.of(context).textTheme.headlineMedium
                                   ?.copyWith(
                                     fontWeight: FontWeight.bold,
@@ -78,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              'Login to continue',
+                              l10n.loginToContinue,
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(color: Colors.grey),
                             ),
@@ -86,13 +84,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             TextFormField(
                               controller: _mobileController,
                               keyboardType: TextInputType.phone,
-                              decoration: const InputDecoration(
-                                labelText: 'Mobile Number',
-                                prefixIcon: Icon(Icons.phone),
+                              decoration: InputDecoration(
+                                labelText: l10n.mobileNumber,
+                                prefixIcon: const Icon(Icons.phone),
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Please enter mobile number';
+                                  return l10n.enterMobileNumber;
                                 }
                                 return null;
                               },
@@ -100,14 +98,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(height: 20),
                             TextFormField(
                               controller: _motherNameController,
-                              decoration: const InputDecoration(
-                                labelText: "Mother's Name",
-                                prefixIcon: Icon(Icons.lock),
+                              decoration: InputDecoration(
+                                labelText: l10n.motherName,
+                                prefixIcon: const Icon(Icons.lock),
                               ),
                               obscureText: true,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return "Please enter mother's name";
+                                  return l10n.enterMotherName;
                                 }
                                 return null;
                               },
@@ -140,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : const Text('LOGIN'),
+                                    : Text(l10n.loginButton),
                               ),
                             ),
                           ],

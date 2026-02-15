@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/auth/domain/entities/user.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -19,18 +21,13 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
   DateTime _selectedMonth = DateTime.now();
-  final List<String> _branches = [
-    'سموحة',
-    'الابراهيمية',
-    'عجمي ستار',
-    'الرحاب',
-  ];
-  String _selectedBranch = 'سموحة';
+
   bool isCheckedIn = false;
   bool _isProcessing = false; // Guard against multiple scans
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return BlocProvider(
       create: (context) =>
           sl<AttendanceBloc>()..add(HistoryRequested(userId: widget.user.id)),
@@ -39,16 +36,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           if (state is AttendanceCheckedIn) {
             setState(() => isCheckedIn = true);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Checked In Successfully'),
+              SnackBar(
+                content: Text(l10n.checkedInSuccessfully),
                 backgroundColor: Colors.green,
               ),
             );
           } else if (state is AttendanceCheckedOut) {
             setState(() => isCheckedIn = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Checked Out Successfully'),
+              SnackBar(
+                content: Text(l10n.checkedOutSuccessfully),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -71,13 +68,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         },
         builder: (context, state) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Attendance'),
-              centerTitle: true,
-              backgroundColor: const Color(0xFF0D47A1),
-              foregroundColor: Colors.white,
-              elevation: 0,
-            ),
             body: Column(
               children: [
                 _buildHeader(context),
@@ -91,7 +81,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   : const Color(0xFF0D47A1),
               icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
               label: Text(
-                isCheckedIn ? 'Scan to Check Out' : 'Scan to Check In',
+                isCheckedIn ? l10n.scanToCheckOut : l10n.scanToCheckIn,
                 style: const TextStyle(color: Colors.white),
               ),
             ),
@@ -104,82 +94,48 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final locale = Localizations.localeOf(context).languageCode;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
-        color: Color(0xFF0D47A1),
+        color: Color(0xFF42A5F5),
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(20),
           bottomRight: Radius.circular(20),
         ),
       ),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Month Selector
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                onPressed: () {
-                  setState(() {
-                    _selectedMonth = DateTime(
-                      _selectedMonth.year,
-                      _selectedMonth.month - 1,
-                    );
-                    // Trigger refresh of history based on month (Implementation needed in Logic)
-                  });
-                },
-              ),
-              Text(
-                DateFormat('MMMM yyyy').format(_selectedMonth),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
-                onPressed: () {
-                  setState(() {
-                    _selectedMonth = DateTime(
-                      _selectedMonth.year,
-                      _selectedMonth.month + 1,
-                    );
-                  });
-                },
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _selectedMonth = DateTime(
+                  _selectedMonth.year,
+                  _selectedMonth.month - 1,
+                );
+              });
+            },
           ),
-          const SizedBox(height: 16),
-          // Branch Selector
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+          Text(
+            DateFormat('MMMM yyyy', locale).format(_selectedMonth),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedBranch,
-                dropdownColor: const Color(0xFF0D47A1),
-                isExpanded: true,
-                icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-                items: _branches.map((String branch) {
-                  return DropdownMenuItem<String>(
-                    value: branch,
-                    child: Text(branch),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedBranch = newValue!;
-                  });
-                },
-              ),
-            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _selectedMonth = DateTime(
+                  _selectedMonth.year,
+                  _selectedMonth.month + 1,
+                );
+              });
+            },
           ),
         ],
       ),
@@ -187,10 +143,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Widget _buildBody(BuildContext context, AttendanceState state) {
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context).languageCode;
+
     if (state is AttendanceLoading) {
       return const Center(child: CircularProgressIndicator());
     } else if (state is AttendanceHistoryLoaded) {
-      // Filter history by selected Month (Logic usually should be in Bloc, but simplistic here)
+      // Filter history by selected month
       final history = state.history.where((attendance) {
         return attendance.checkInTime.month == _selectedMonth.month &&
             attendance.checkInTime.year == _selectedMonth.year;
@@ -204,7 +163,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               Icon(Icons.calendar_today, size: 64, color: Colors.grey[300]),
               const SizedBox(height: 16),
               Text(
-                'No attendance records for ${DateFormat('MMMM').format(_selectedMonth)}',
+                l10n.noRecordsForMonth(
+                  DateFormat('MMMM', locale).format(_selectedMonth),
+                ),
                 style: TextStyle(color: Colors.grey[600]),
               ),
             ],
@@ -212,131 +173,245 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         );
       }
 
+      // Sort records by date (newest first)
+      history.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
+
+      // Group records by day
+      final Map<String, List<Attendance>> groupedByDay = {};
+      for (final item in history) {
+        final dayKey = DateFormat('yyyy-MM-dd').format(item.checkInTime);
+        groupedByDay.putIfAbsent(dayKey, () => []).add(item);
+      }
+      final dayKeys = groupedByDay.keys.toList();
+
       return ListView.builder(
-        padding: const EdgeInsets.only(
+        padding: const EdgeInsetsDirectional.only(
           top: 16,
           bottom: 80,
-          left: 16,
-          right: 16,
+          start: 16,
+          end: 16,
         ),
-        itemCount: history.length,
-        itemBuilder: (context, index) {
-          final item = history[index];
-          final dateStr = DateFormat('dd').format(item.checkInTime);
-          final dayStr = DateFormat('EEE').format(item.checkInTime);
-          final inTime = DateFormat(
-            'hh:mm a',
-          ).format(item.checkInTime); // 12h format
-          final outTime = item.checkOutTime != null
-              ? DateFormat('hh:mm a').format(item.checkOutTime!)
-              : '--:--';
+        itemCount: dayKeys.length,
+        itemBuilder: (context, dayIndex) {
+          final dayKey = dayKeys[dayIndex];
+          final records = groupedByDay[dayKey] ?? [];
+          final dayDate = records.first.checkInTime;
+          final fullDateStr = DateFormat(
+            'EEEE، d MMMM yyyy',
+            locale,
+          ).format(dayDate);
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.1),
-                  blurRadius: 5,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        dateStr,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Day header
+              Padding(
+                padding: const EdgeInsetsDirectional.only(bottom: 8, top: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D47A1).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.calendar_today_rounded,
+                        size: 18,
+                        color: Color(0xFF0D47A1),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        fullDateStr,
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF0D47A1),
                         ),
                       ),
-                      Text(
-                        dayStr,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
                       ),
-                    ],
-                  ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${records.length}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF0D47A1),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.login,
-                            size: 16,
-                            color: Colors.green,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'In: $inTime',
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.logout,
-                            size: 16,
-                            color: Colors.orange,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Out: $outTime',
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
+              ),
+              // Records for this day
+              ...records.map((item) {
+                final inTime = DateFormat(
+                  'hh:mm a',
+                  locale,
+                ).format(item.checkInTime);
+                final outTime = item.checkOutTime != null
+                    ? DateFormat('hh:mm a', locale).format(item.checkOutTime!)
+                    : '--:--';
+                final branchName = item.branchName ?? l10n.unspecifiedBranch;
+
+                // Calculate duration
+                String durationStr;
+                if (item.checkOutTime != null) {
+                  final diff = item.checkOutTime!.difference(item.checkInTime);
+                  final hours = diff.inHours;
+                  final minutes = diff.inMinutes.remainder(60);
+                  durationStr = l10n.duration('$hours', '$minutes');
+                } else {
+                  durationStr = l10n.inProgress;
+                }
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    _selectedBranch,
-                    style: const TextStyle(fontSize: 10, color: Colors.blue),
+                  child: Row(
+                    children: [
+                      // In/Out times column
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Branch name
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on_rounded,
+                                  size: 14,
+                                  color: Colors.grey[500],
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  branchName,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.login,
+                                  size: 16,
+                                  color: Colors.green,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  l10n.inLabel(inTime),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.logout,
+                                  size: 16,
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  l10n.outLabel(outTime),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            // Duration
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.timer_outlined,
+                                  size: 14,
+                                  color: item.checkOutTime != null
+                                      ? const Color(0xFF0D47A1)
+                                      : Colors.grey[400],
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  durationStr,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: item.checkOutTime != null
+                                        ? const Color(0xFF0D47A1)
+                                        : Colors.grey[400],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Active indicator
+                      if (item.checkOutTime == null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            l10n.active,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-              ],
-            ),
+                );
+              }),
+              if (dayIndex < dayKeys.length - 1) const Divider(height: 24),
+            ],
           );
         },
       );
     }
-    return const Center(child: Text('Something went wrong'));
+    return Center(child: Text(l10n.somethingWentWrong));
   }
 
   void _showQRScanner(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final attendanceBloc = BlocProvider.of<AttendanceBloc>(context);
     final parentContext = context; // Save parent context for SnackBars
-    final action = isCheckedIn ? 'Check Out' : 'Check In';
+    final action = isCheckedIn ? l10n.checkOut : l10n.checkIn;
     final color = isCheckedIn ? Colors.orange : const Color(0xFF0D47A1);
     _isProcessing = false; // Reset guard
 
@@ -368,7 +443,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   try {
                     final dynamic decoded = jsonDecode(rawValue);
 
-                    // التحقق من أن البيانات عبارة عن Map وأن النوع هو attendance
                     if (decoded is Map<String, dynamic> &&
                         decoded['type'] == 'attendance') {
                       if (decoded.containsKey('branch') &&
@@ -399,16 +473,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       _checkIn(parentContext, attendanceBloc, scannedBranch);
                       ScaffoldMessenger.of(parentContext).showSnackBar(
                         SnackBar(
-                          content: Text('تسجيل حضور في $scannedBranch...'),
+                          content: Text(l10n.checkingInAt(scannedBranch)),
                         ),
                       );
                     }
                   } else {
                     ScaffoldMessenger.of(parentContext).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'QR Code غير صالح. يرجى مسح كود فرع صحيح.',
-                        ),
+                      SnackBar(
+                        content: Text(l10n.invalidQRCode),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -441,29 +513,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 child: Column(
                   children: [
                     Text(
-                      'مسح لـ $action',
+                      l10n.scanForAction(action),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.8),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _selectedBranch,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
                       ),
                     ),
                   ],
@@ -494,14 +548,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              DateFormat('EEEE, d MMMM').format(DateTime.now()),
+                              DateFormat(
+                                'EEEE, d MMMM',
+                                Localizations.localeOf(
+                                  parentContext,
+                                ).languageCode,
+                              ).format(DateTime.now()),
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: 14,
                               ),
                             ),
                             Text(
-                              DateFormat('hh:mm a').format(DateTime.now()),
+                              DateFormat(
+                                'hh:mm a',
+                                Localizations.localeOf(
+                                  parentContext,
+                                ).languageCode,
+                              ).format(DateTime.now()),
                               style: const TextStyle(
                                 color: Colors.black87,
                                 fontSize: 32,
@@ -526,7 +590,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'وجه الكاميرا نحو QR Code لـ $action',
+                      l10n.pointCameraToQR(action),
                       style: TextStyle(color: Colors.grey[500]),
                     ),
                   ],
