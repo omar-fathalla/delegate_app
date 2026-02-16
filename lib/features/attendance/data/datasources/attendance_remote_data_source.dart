@@ -38,13 +38,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'branchName': branchName,
       });
 
-      final doc = await docRef.get();
       // We need to construct the model manually here because serverTimestamp
       // might be null immediately after write in some offline scenarios,
-      // but for now we trust the read.
+      // and we want to avoid an extra read.
       // A safer approach for UI is to return a local object with DateTime.now()
       return AttendanceModel(
-        id: doc.id,
+        id: docRef.id,
         userId: userId,
         checkInTime: DateTime.now(), // Use local time for immediate UI feedback
         latitude: lat,
