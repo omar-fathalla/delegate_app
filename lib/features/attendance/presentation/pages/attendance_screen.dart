@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/auth/domain/entities/user.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -353,7 +354,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           children: [
             MobileScanner(
               controller: scannerController,
-              onDetect: (capture) {
+              onDetect: (capture) async {
                 // Guard: only process once
                 if (_isProcessing) return;
                 _isProcessing = true;
@@ -387,21 +388,38 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   Navigator.pop(parentContext);
 
                   if (scannedBranch != null) {
-                    if (isCheckedIn) {
-                      attendanceBloc.add(
-                        CheckOutRequested(
-                          attendanceId: attendanceBloc.currentAttendanceId!,
-                          lat: 30.0444,
-                          long: 31.2357,
-                        ),
-                      );
-                    } else {
-                      _checkIn(parentContext, attendanceBloc, scannedBranch);
-                      ScaffoldMessenger.of(parentContext).showSnackBar(
-                        SnackBar(
-                          content: Text('تسجيل حضور في $scannedBranch...'),
-                        ),
-                      );
+                    // Show loading for location
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('Fetching location...'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+
+                    final position = await _getCurrentLocation(parentContext);
+                    if (position != null && parentContext.mounted) {
+                      if (isCheckedIn) {
+                        attendanceBloc.add(
+                          CheckOutRequested(
+                            attendanceId: attendanceBloc.currentAttendanceId!,
+                            lat: position.latitude,
+                            long: position.longitude,
+                          ),
+                        );
+                      } else {
+                        await _checkIn(
+                          attendanceBloc,
+                          scannedBranch,
+                          position,
+                        );
+                        if (parentContext.mounted) {
+                          ScaffoldMessenger.of(parentContext).showSnackBar(
+                            SnackBar(
+                              content: Text('تسجيل حضور في $scannedBranch...'),
+                            ),
+                          );
+                        }
+                      }
                     }
                   } else {
                     ScaffoldMessenger.of(parentContext).showSnackBar(
@@ -557,14 +575,77 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
   }
 
-  void _checkIn(BuildContext context, AttendanceBloc bloc, String branchName) {
+  Future<void> _checkIn(
+    AttendanceBloc bloc,
+    String branchName,
+    Position position,
+  ) async {
     bloc.add(
       CheckInRequested(
         userId: widget.user.id,
-        lat:
-            30.0444, // Mock location for now, or use real location if available
-        long: 31.2357,
+        lat: position.latitude,
+        long: position.longitude,
         branchName: branchName,
+      ),
+    );
+  }
+
+  Future<Position?> _getCurrentLocation(BuildContext context) async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Test if location services are enabled.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Location services are disabled. Please enable them.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permissions are denied'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return null;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Location permissions are permanently denied, we cannot request permissions.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
+    }
+
+    // When we reach here, permissions are granted and we can
+    // continue accessing the position of the device.
+    // Using high accuracy as per requirements
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
       ),
     );
   }
