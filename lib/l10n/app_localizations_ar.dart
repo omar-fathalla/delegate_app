@@ -277,4 +277,36 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get retry => 'إعادة المحاولة';
+
+  @override
+  String get gender => 'الجنس';
+
+  @override
+  String get male => 'ذكر';
+
+  @override
+  String get female => 'أنثى';
+
+  @override
+  String get joinDate => 'تاريخ الانضمام';
+
+  @override
+  String get employmentDetails => 'تفاصيل العمل';
+
+  @override
+  String get statusReason => 'سبب الحالة';
+
+  @override
+  String get profileComplete => 'الملف مكتمل';
+
+  @override
+  String get profileIncomplete => 'الملف غير مكتمل';
+
+  @override
+  String reviewedBy(String name) {
+    return 'تمت المراجعة بواسطة: $name';
+  }
+
+  @override
+  String get notProvidedStatus => 'لم يتم تقديمها';
 }

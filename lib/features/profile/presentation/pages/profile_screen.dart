@@ -35,7 +35,7 @@ class _ProfileBody extends StatelessWidget {
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             SliverToBoxAdapter(
-              child: _buildProfileHeader(context, primaryColor),
+              child: _buildProfileHeader(context, primaryColor, l10n),
             ),
             SliverPersistentHeader(
               pinned: true,
@@ -70,7 +70,11 @@ class _ProfileBody extends StatelessWidget {
   }
 
   // ─── Profile Header ─────────────────────────────────────────────
-  Widget _buildProfileHeader(BuildContext context, Color primaryColor) {
+  Widget _buildProfileHeader(
+    BuildContext context,
+    Color primaryColor,
+    AppLocalizations l10n,
+  ) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -107,8 +111,19 @@ class _ProfileBody extends StatelessWidget {
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
+          // Public ID
+          Text(
+            '${l10n.delegateId}: ${delegate.delegatePublicId}',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withValues(alpha: 0.8),
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 10),
           // Position badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -149,9 +164,21 @@ class _ProfileBody extends StatelessWidget {
               value: delegate.fullName,
             ),
             _InfoRow(
+              icon: Icons.credit_card_outlined,
+              label: l10n.nationalId,
+              value: delegate.nationalityID,
+            ),
+            _InfoRow(
               icon: Icons.family_restroom_rounded,
               label: l10n.motherName,
               value: delegate.motherName,
+            ),
+            _InfoRow(
+              icon: Icons.wc_outlined,
+              label: l10n.gender,
+              value: delegate.gender == DelegateGender.male
+                  ? l10n.male
+                  : l10n.female,
             ),
             _InfoRow(
               icon: Icons.phone_outlined,
@@ -172,25 +199,45 @@ class _ProfileBody extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        // Organization card
+        // Employment Details Card
         _SectionCard(
-          title: l10n.organizationAndCompany,
-          icon: Icons.business_outlined,
+          title: l10n.employmentDetails,
+          icon: Icons.work_outline_rounded,
           children: [
             _InfoRow(
               icon: Icons.corporate_fare_outlined,
               label: l10n.organizationLabel,
-              value: delegate.organizationUID,
+              value: delegate.organizationName.isNotEmpty
+                  ? delegate.organizationName
+                  : delegate.organizationUID,
             ),
             _InfoRow(
-              icon: Icons.factory_outlined,
+              icon: Icons.store_mall_directory_outlined,
               label: l10n.companyLabel,
-              value: delegate.companyUID,
+              value: delegate.companyName.isNotEmpty
+                  ? delegate.companyName
+                  : delegate.companyUID,
             ),
             _InfoRow(
-              icon: Icons.work_outline_rounded,
-              label: l10n.positionLabel,
-              value: delegate.position.name.toUpperCase(),
+              icon: Icons.date_range_outlined,
+              label: l10n.joinDate,
+              value: dateFormat.format(delegate.createdAt),
+            ),
+            if (delegate.statusReason != null &&
+                delegate.statusReason!.isNotEmpty)
+              _InfoRow(
+                icon: Icons.info_outline,
+                label: l10n.statusReason,
+                value: delegate.statusReason!,
+              ),
+            _InfoRow(
+              icon: delegate.isProfileComplete
+                  ? Icons.check_circle_outline
+                  : Icons.warning_amber_rounded,
+              label: 'Profile Status',
+              value: delegate.isProfileComplete
+                  ? l10n.profileComplete
+                  : l10n.profileIncomplete,
               showDivider: false,
             ),
           ],
@@ -394,27 +441,25 @@ class _DocumentCard extends StatelessWidget {
     final Color statusColor = _getStatusColor(document.documentStatus);
     final IconData statusIcon = _getStatusIcon(document.documentStatus);
     final String statusText = _getStatusText(document.documentStatus, l10n);
+    final dateFormat = DateFormat('yyyy/MM/dd HH:mm');
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(
-          color: statusColor.withValues(alpha: 0.3),
-          width: 1.5,
-        ),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3), width: 1),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           onTap: () async {
             if (document.documentURL.isEmpty) return;
             final uri = Uri.parse(document.documentURL);
@@ -429,42 +474,101 @@ class _DocumentCard extends StatelessWidget {
             }
           },
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: statusColor, size: 24),
-                ),
-                const Spacer(),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A2E),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(icon, color: statusColor, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A2E),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(statusIcon, size: 14, color: statusColor),
-                    const SizedBox(width: 4),
-                    Text(
-                      statusText,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: statusColor,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, size: 12, color: statusColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            statusText,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: statusColor,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ],
+                ),
+                if (document.rejectionReason != null &&
+                    document.documentStatus == DocumentStatus.rejected) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Text(
+                      document.rejectionReason!,
+                      style: TextStyle(fontSize: 12, color: Colors.red[800]),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                Divider(height: 1, color: Colors.grey.withValues(alpha: 0.1)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (document.uploadedAt != null)
+                      Text(
+                        l10n.uploadedOn(
+                          dateFormat.format(document.uploadedAt!),
+                        ),
+                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                      ),
                   ],
                 ),
               ],
@@ -517,6 +621,8 @@ class _DocumentCard extends StatelessWidget {
         return const Color(0xFFF44336);
       case DocumentStatus.pending:
         return const Color(0xFFFF9800);
+      case DocumentStatus.not_provided:
+        return Colors.grey;
     }
   }
 
@@ -528,6 +634,8 @@ class _DocumentCard extends StatelessWidget {
         return Icons.error_outline;
       case DocumentStatus.pending:
         return Icons.access_time;
+      case DocumentStatus.not_provided:
+        return Icons.remove_circle_outline;
     }
   }
 
@@ -539,11 +647,12 @@ class _DocumentCard extends StatelessWidget {
         return l10n.rejectedStatus;
       case DocumentStatus.pending:
         return l10n.pendingStatus;
+      case DocumentStatus.not_provided:
+        return l10n.notProvidedStatus;
     }
   }
 }
 
-// ─── Tab Bar Delegate ─────────────────────────────────────────────
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
 

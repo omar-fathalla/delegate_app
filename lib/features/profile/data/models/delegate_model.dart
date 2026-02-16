@@ -16,8 +16,26 @@ class DelegateModel extends Delegate {
     required super.position,
     required super.birthDate,
     required super.organizationUID,
+    required super.organizationName,
     required super.companyUID,
+    required super.companyName,
     required super.status,
+    super.statusReason,
+    required super.delegatePublicId,
+    required super.allReceiptCodes,
+    required super.createdAt,
+    required super.createdBy,
+    required super.hasPendingUpdate,
+    required super.isDeductedFromCompany,
+    required super.isPrinted,
+    required super.isProfileComplete,
+    super.latestRequestId,
+    required super.numberOfDocuments,
+    required super.paymentAmount,
+    super.receiptCode,
+    super.updatedAt,
+    super.updatedBy,
+    required super.version,
     required super.documents,
   });
 
@@ -26,6 +44,13 @@ class DelegateModel extends Delegate {
       if (date is Timestamp) return date.toDate();
       if (date is String) return DateTime.parse(date);
       return DateTime.now();
+    }
+
+    DateTime? parseNullableDate(dynamic date) {
+      if (date == null) return null;
+      if (date is Timestamp) return date.toDate();
+      if (date is String) return DateTime.parse(date);
+      return null;
     }
 
     DelegateGender parseGender(String? gender) {
@@ -41,11 +66,17 @@ class DelegateModel extends Delegate {
     DelegateStatus parseStatus(String? status) {
       switch (status) {
         case 'Approved':
+        case 'approved':
           return DelegateStatus.approved;
         case 'Suspended':
+        case 'suspended':
           return DelegateStatus.suspended;
         case 'Rejected':
+        case 'rejected':
           return DelegateStatus.rejected;
+        case 'Active':
+        case 'active':
+          return DelegateStatus.active;
         default:
           return DelegateStatus.pending;
       }
@@ -65,8 +96,28 @@ class DelegateModel extends Delegate {
       position: parsePosition(json['position']),
       birthDate: parseDate(json['birthDate']),
       organizationUID: json['organizationUID'] ?? '',
+      organizationName: json['organizationName'] ?? '',
       companyUID: json['companyUID'] ?? '',
+      companyName: json['companyName'] ?? '',
       status: parseStatus(json['status']),
+      statusReason: json['statusReason'],
+      delegatePublicId: json['delegatePublicId'] ?? '',
+      allReceiptCodes: (json['allReceiptCodes'] as List? ?? [])
+          .map((e) => e.toString())
+          .toList(),
+      createdAt: parseDate(json['createdAt']),
+      createdBy: json['createdBy'] ?? '',
+      hasPendingUpdate: json['hasPendingUpdate'] ?? false,
+      isDeductedFromCompany: json['isDeductedFromCompany'] ?? false,
+      isPrinted: json['isPrinted'] ?? false,
+      isProfileComplete: json['isProfileComplete'] ?? false,
+      latestRequestId: json['latestRequestId'],
+      numberOfDocuments: json['numberOfDocuments'] ?? 0,
+      paymentAmount: json['paymentAmount'] ?? 0,
+      receiptCode: json['receiptCode'],
+      updatedAt: parseNullableDate(json['updatedAt']),
+      updatedBy: json['updatedBy'],
+      version: json['version'] ?? 1,
       documents: (json['documents'] as List? ?? [])
           .map(
             (doc) =>
@@ -90,13 +141,15 @@ class DelegateModel extends Delegate {
     String statusToString(DelegateStatus status) {
       switch (status) {
         case DelegateStatus.approved:
-          return 'Approved';
+          return 'approved';
         case DelegateStatus.suspended:
-          return 'Suspended';
+          return 'suspended';
         case DelegateStatus.rejected:
-          return 'Rejected';
+          return 'rejected';
         case DelegateStatus.pending:
-          return 'Pending';
+          return 'pending';
+        case DelegateStatus.active:
+          return 'active';
       }
     }
 
@@ -114,8 +167,26 @@ class DelegateModel extends Delegate {
       'position': positionToString(position),
       'birthDate': Timestamp.fromDate(birthDate),
       'organizationUID': organizationUID,
+      'organizationName': organizationName,
       'companyUID': companyUID,
+      'companyName': companyName,
       'status': statusToString(status),
+      'statusReason': statusReason,
+      'delegatePublicId': delegatePublicId,
+      'allReceiptCodes': allReceiptCodes,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'createdBy': createdBy,
+      'hasPendingUpdate': hasPendingUpdate,
+      'isDeductedFromCompany': isDeductedFromCompany,
+      'isPrinted': isPrinted,
+      'isProfileComplete': isProfileComplete,
+      'latestRequestId': latestRequestId,
+      'numberOfDocuments': numberOfDocuments,
+      'paymentAmount': paymentAmount,
+      'receiptCode': receiptCode,
+      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
+      'updatedBy': updatedBy,
+      'version': version,
       'documents': documents
           .map((doc) => (doc as DelegateDocumentModel).toJson())
           .toList(),
@@ -129,6 +200,11 @@ class DelegateDocumentModel extends DelegateDocument {
     required super.documentStatus,
     required super.documentURL,
     super.rejectionReason,
+    super.reviewedAt,
+    super.reviewedBy,
+    super.uploadedAt,
+    super.receiptCode,
+    super.secondaryURL,
   });
 
   factory DelegateDocumentModel.fromJson(Map<String, dynamic> json) {
@@ -154,12 +230,23 @@ class DelegateDocumentModel extends DelegateDocument {
     DocumentStatus parseStatus(String? status) {
       switch (status) {
         case 'Approved':
+        case 'approved':
           return DocumentStatus.approved;
         case 'Rejected':
+        case 'rejected':
           return DocumentStatus.rejected;
+        case 'not_provided':
+          return DocumentStatus.not_provided;
         default:
           return DocumentStatus.pending;
       }
+    }
+
+    DateTime? parseNullableDate(dynamic date) {
+      if (date == null) return null;
+      if (date is Timestamp) return date.toDate();
+      if (date is String) return DateTime.parse(date);
+      return null;
     }
 
     return DelegateDocumentModel(
@@ -167,6 +254,11 @@ class DelegateDocumentModel extends DelegateDocument {
       documentStatus: parseStatus(json['documentStatus']),
       documentURL: json['documentURL'] ?? '',
       rejectionReason: json['rejectionReason'],
+      reviewedAt: parseNullableDate(json['reviewedAt']),
+      reviewedBy: json['reviewedBy'],
+      uploadedAt: parseNullableDate(json['uploadedAt']),
+      receiptCode: json['receiptCode'],
+      secondaryURL: json['secondaryURL'],
     );
   }
 
@@ -191,11 +283,13 @@ class DelegateDocumentModel extends DelegateDocument {
     String statusToString(DocumentStatus status) {
       switch (status) {
         case DocumentStatus.approved:
-          return 'Approved';
+          return 'approved';
         case DocumentStatus.rejected:
-          return 'Rejected';
+          return 'rejected';
         case DocumentStatus.pending:
-          return 'Pending';
+          return 'pending';
+        case DocumentStatus.not_provided:
+          return 'not_provided';
       }
     }
 
@@ -204,6 +298,11 @@ class DelegateDocumentModel extends DelegateDocument {
       'documentStatus': statusToString(documentStatus),
       'documentURL': documentURL,
       'rejectionReason': rejectionReason,
+      'reviewedAt': reviewedAt != null ? Timestamp.fromDate(reviewedAt!) : null,
+      'reviewedBy': reviewedBy,
+      'uploadedAt': uploadedAt != null ? Timestamp.fromDate(uploadedAt!) : null,
+      'receiptCode': receiptCode,
+      'secondaryURL': secondaryURL,
     };
   }
 }

@@ -589,6 +589,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry'**
   String get retry;
+
+  /// Gender label
+  ///
+  /// In en, this message translates to:
+  /// **'Gender'**
+  String get gender;
+
+  /// Male gender
+  ///
+  /// In en, this message translates to:
+  /// **'Male'**
+  String get male;
+
+  /// Female gender
+  ///
+  /// In en, this message translates to:
+  /// **'Female'**
+  String get female;
+
+  /// Join date label
+  ///
+  /// In en, this message translates to:
+  /// **'Join Date'**
+  String get joinDate;
+
+  /// Employment details section title
+  ///
+  /// In en, this message translates to:
+  /// **'Employment Details'**
+  String get employmentDetails;
+
+  /// Status reason label
+  ///
+  /// In en, this message translates to:
+  /// **'Status Reason'**
+  String get statusReason;
+
+  /// Profile complete status
+  ///
+  /// In en, this message translates to:
+  /// **'Profile Complete'**
+  String get profileComplete;
+
+  /// Profile incomplete status
+  ///
+  /// In en, this message translates to:
+  /// **'Profile Incomplete'**
+  String get profileIncomplete;
+
+  /// Reviewer name label
+  ///
+  /// In en, this message translates to:
+  /// **'Reviewed By: {name}'**
+  String reviewedBy(String name);
+
+  /// Not provided document status
+  ///
+  /// In en, this message translates to:
+  /// **'Not Provided'**
+  String get notProvidedStatus;
 }
 
 class _AppLocalizationsDelegate

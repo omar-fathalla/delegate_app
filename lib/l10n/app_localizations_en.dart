@@ -278,4 +278,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get retry => 'Retry';
+
+  @override
+  String get gender => 'Gender';
+
+  @override
+  String get male => 'Male';
+
+  @override
+  String get female => 'Female';
+
+  @override
+  String get joinDate => 'Join Date';
+
+  @override
+  String get employmentDetails => 'Employment Details';
+
+  @override
+  String get statusReason => 'Status Reason';
+
+  @override
+  String get profileComplete => 'Profile Complete';
+
+  @override
+  String get profileIncomplete => 'Profile Incomplete';
+
+  @override
+  String reviewedBy(String name) {
+    return 'Reviewed By: $name';
+  }
+
+  @override
+  String get notProvidedStatus => 'Not Provided';
 }

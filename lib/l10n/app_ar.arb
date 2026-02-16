@@ -393,5 +393,50 @@
     "retry": "إعادة المحاولة",
     "@retry": {
         "description": "Retry button text"
+    },
+    "gender": "الجنس",
+    "@gender": {
+        "description": "Gender label"
+    },
+    "male": "ذكر",
+    "@male": {
+        "description": "Male gender"
+    },
+    "female": "أنثى",
+    "@female": {
+        "description": "Female gender"
+    },
+    "joinDate": "تاريخ الانضمام",
+    "@joinDate": {
+        "description": "Join date label"
+    },
+    "employmentDetails": "تفاصيل العمل",
+    "@employmentDetails": {
+        "description": "Employment details section title"
+    },
+    "statusReason": "سبب الحالة",
+    "@statusReason": {
+        "description": "Status reason label"
+    },
+    "profileComplete": "الملف مكتمل",
+    "@profileComplete": {
+        "description": "Profile complete status"
+    },
+    "profileIncomplete": "الملف غير مكتمل",
+    "@profileIncomplete": {
+        "description": "Profile incomplete status"
+    },
+    "reviewedBy": "تمت المراجعة بواسطة: {name}",
+    "@reviewedBy": {
+        "description": "Reviewer name label",
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "notProvidedStatus": "لم يتم تقديمها",
+    "@notProvidedStatus": {
+        "description": "Not provided document status"
     }
 }

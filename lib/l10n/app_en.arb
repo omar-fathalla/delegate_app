@@ -393,5 +393,50 @@
     "retry": "Retry",
     "@retry": {
         "description": "Retry button text"
+    },
+    "gender": "Gender",
+    "@gender": {
+        "description": "Gender label"
+    },
+    "male": "Male",
+    "@male": {
+        "description": "Male gender"
+    },
+    "female": "Female",
+    "@female": {
+        "description": "Female gender"
+    },
+    "joinDate": "Join Date",
+    "@joinDate": {
+        "description": "Join date label"
+    },
+    "employmentDetails": "Employment Details",
+    "@employmentDetails": {
+        "description": "Employment details section title"
+    },
+    "statusReason": "Status Reason",
+    "@statusReason": {
+        "description": "Status reason label"
+    },
+    "profileComplete": "Profile Complete",
+    "@profileComplete": {
+        "description": "Profile complete status"
+    },
+    "profileIncomplete": "Profile Incomplete",
+    "@profileIncomplete": {
+        "description": "Profile incomplete status"
+    },
+    "reviewedBy": "Reviewed By: {name}",
+    "@reviewedBy": {
+        "description": "Reviewer name label",
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "notProvidedStatus": "Not Provided",
+    "@notProvidedStatus": {
+        "description": "Not provided document status"
     }
 }
