@@ -17,6 +17,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _motherNameController = TextEditingController();
 
   @override
+  void dispose() {
+    _mobileController.dispose();
+    _motherNameController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: BlocProvider(
