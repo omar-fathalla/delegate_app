@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/auth/domain/entities/user.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/core/utils/qr_parser.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -364,21 +364,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   debugPrint('Barcode found! $rawValue');
 
                   // Parse branch from QR
-                  String? scannedBranch;
-                  try {
-                    final dynamic decoded = jsonDecode(rawValue);
-
-                    // التحقق من أن البيانات عبارة عن Map وأن النوع هو attendance
-                    if (decoded is Map<String, dynamic> &&
-                        decoded['type'] == 'attendance') {
-                      if (decoded.containsKey('branch') &&
-                          decoded['branch'] is String) {
-                        scannedBranch = decoded['branch'] as String;
-                      }
-                    }
-                  } catch (e) {
-                    debugPrint('Error parsing QR: $e');
-                  }
+                  final String? scannedBranch = parseBranchFromQr(rawValue);
 
                   // Stop camera FIRST to prevent black screen
                   scannerController.stop();
