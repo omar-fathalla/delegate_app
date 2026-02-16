@@ -120,6 +120,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
+                tooltip: 'Previous Month',
                 icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
                 onPressed: () {
                   setState(() {
@@ -140,6 +141,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 ),
               ),
               IconButton(
+                tooltip: 'Next Month',
                 icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
                 onPressed: () {
                   setState(() {
@@ -540,6 +542,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               child: CircleAvatar(
                 backgroundColor: Colors.white.withValues(alpha: 0.3),
                 child: IconButton(
+                  tooltip: 'Close Scanner',
                   icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () {
                     scannerController.stop();
