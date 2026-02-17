@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
-import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/l10n/app_localizations.dart'; // تم الاحتفاظ بها
+import 'package:geolocator/geolocator.dart'; // تم الاحتفاظ بها
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -30,8 +30,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final l10n = AppLocalizations.of(context)!;
     return BlocProvider(
       create: (context) =>
-          sl<AttendanceBloc>()
-            ..add(HistoryRequested(userId: widget.delegate.uid)),
+          sl<AttendanceBloc>()..add(HistoryRequested(userId: widget.delegate.uid)),
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
@@ -58,7 +57,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               ),
             );
           } else if (state is AttendanceHistoryLoaded) {
-            // Check if there is an active check-in (no check-out time)
             final hasActiveCheckIn = state.history.any(
               (element) => element.checkOutTime == null,
             );
@@ -77,9 +75,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ),
             floatingActionButton: FloatingActionButton.extended(
               onPressed: () => _showQRScanner(context),
-              backgroundColor: isCheckedIn
-                  ? Colors.orange
-                  : const Color(0xFF0D47A1),
+              backgroundColor:
+                  isCheckedIn ? Colors.orange : const Color(0xFF0D47A1),
               icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
               label: Text(
                 isCheckedIn ? l10n.scanToCheckOut : l10n.scanToCheckIn,
@@ -109,6 +106,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
+            tooltip: 'Previous Month',
             icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
             onPressed: () {
               setState(() {
@@ -128,6 +126,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ),
           ),
           IconButton(
+            tooltip: 'Next Month',
             icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
             onPressed: () {
               setState(() {
@@ -150,7 +149,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (state is AttendanceLoading) {
       return const Center(child: CircularProgressIndicator());
     } else if (state is AttendanceHistoryLoaded) {
-      // Filter history by selected month
       final history = state.history.where((attendance) {
         return attendance.checkInTime.month == _selectedMonth.month &&
             attendance.checkInTime.year == _selectedMonth.year;
@@ -174,10 +172,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         );
       }
 
-      // Sort records by date (newest first)
       history.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
 
-      // Group records by day
       final Map<String, List<Attendance>> groupedByDay = {};
       for (final item in history) {
         final dayKey = DateFormat('yyyy-MM-dd').format(item.checkInTime);
@@ -205,7 +201,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Day header
               Padding(
                 padding: const EdgeInsetsDirectional.only(bottom: 8, top: 8),
                 child: Row(
@@ -213,7 +208,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0D47A1).withValues(alpha: 0.1),
+                        color: const Color(0xFF0D47A1).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -253,7 +248,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   ],
                 ),
               ),
-              // Records for this day
               ...records.map((item) {
                 final inTime = DateFormat(
                   'hh:mm a',
@@ -264,7 +258,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     : '--:--';
                 final branchName = item.branchName ?? l10n.unspecifiedBranch;
 
-                // Calculate duration
                 String durationStr;
                 if (item.checkOutTime != null) {
                   final diff = item.checkOutTime!.difference(item.checkInTime);
@@ -283,7 +276,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withValues(alpha: 0.1),
+                        color: Colors.grey.withOpacity(0.1),
                         blurRadius: 5,
                         offset: const Offset(0, 2),
                       ),
@@ -291,12 +284,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   ),
                   child: Row(
                     children: [
-                      // In/Out times column
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Branch name
                             Row(
                               children: [
                                 Icon(
@@ -349,7 +340,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                               ],
                             ),
                             const SizedBox(height: 6),
-                            // Duration
                             Row(
                               children: [
                                 Icon(
@@ -375,7 +365,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           ],
                         ),
                       ),
-                      // Active indicator
                       if (item.checkOutTime == null)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -411,10 +400,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   void _showQRScanner(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final attendanceBloc = BlocProvider.of<AttendanceBloc>(context);
-    final parentContext = context; // Save parent context for SnackBars
+    final parentContext = context;
     final action = isCheckedIn ? l10n.checkOut : l10n.checkIn;
     final color = isCheckedIn ? Colors.orange : const Color(0xFF0D47A1);
-    _isProcessing = false; // Reset guard
+    _isProcessing = false;
 
     final scannerController = MobileScannerController();
 
@@ -429,8 +418,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           children: [
             MobileScanner(
               controller: scannerController,
-              onDetect: (capture) {
-                // Guard: only process once
+              onDetect: (capture) async {
                 if (_isProcessing) return;
                 _isProcessing = true;
 
@@ -439,7 +427,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   final String rawValue = barcodes.first.rawValue ?? '';
                   debugPrint('Barcode found! $rawValue');
 
-                  // Parse branch from QR
                   String? scannedBranch;
                   try {
                     final dynamic decoded = jsonDecode(rawValue);
@@ -455,28 +442,41 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     debugPrint('Error parsing QR: $e');
                   }
 
-                  // Stop camera FIRST to prevent black screen
                   scannerController.stop();
-
-                  // Close scanner bottom sheet
                   Navigator.pop(parentContext);
 
                   if (scannedBranch != null) {
-                    if (isCheckedIn) {
-                      attendanceBloc.add(
-                        CheckOutRequested(
-                          attendanceId: attendanceBloc.currentAttendanceId!,
-                          lat: 30.0444,
-                          long: 31.2357,
-                        ),
-                      );
-                    } else {
-                      _checkIn(parentContext, attendanceBloc, scannedBranch);
-                      ScaffoldMessenger.of(parentContext).showSnackBar(
-                        SnackBar(
-                          content: Text(l10n.checkingInAt(scannedBranch)),
-                        ),
-                      );
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('Fetching location...'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+
+                    final position = await _getCurrentLocation(parentContext);
+                    if (position != null && parentContext.mounted) {
+                      if (isCheckedIn) {
+                        attendanceBloc.add(
+                          CheckOutRequested(
+                            attendanceId: attendanceBloc.currentAttendanceId!,
+                            lat: position.latitude,
+                            long: position.longitude,
+                          ),
+                        );
+                      } else {
+                        await _checkIn(
+                          attendanceBloc,
+                          scannedBranch,
+                          position,
+                        );
+                        if (parentContext.mounted) {
+                          ScaffoldMessenger.of(parentContext).showSnackBar(
+                            SnackBar(
+                              content: Text('تسجيل حضور في $scannedBranch...'),
+                            ),
+                          );
+                        }
+                      }
                     }
                   } else {
                     ScaffoldMessenger.of(parentContext).showSnackBar(
@@ -487,11 +487,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     );
                   }
                 } else {
-                  _isProcessing = false; // Reset if no barcodes
+                  _isProcessing = false;
                 }
               },
             ),
-            // Top Overlay
             Positioned(
               top: 0,
               left: 0,
@@ -504,7 +503,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.black.withValues(alpha: 0.7),
+                      Colors.black.withOpacity(0.7),
                       Colors.transparent,
                     ],
                     begin: Alignment.topCenter,
@@ -525,7 +524,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 ),
               ),
             ),
-            // Bottom Info Panel
             Positioned(
               bottom: 0,
               left: 0,
@@ -578,7 +576,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.1),
+                            color: color.withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -598,13 +596,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 ),
               ),
             ),
-            // Close Button
             Positioned(
               top: 40,
               left: 20,
               child: CircleAvatar(
-                backgroundColor: Colors.white.withValues(alpha: 0.3),
+                backgroundColor: Colors.white.withOpacity(0.3),
                 child: IconButton(
+                  tooltip: 'Close Scanner',
                   icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () {
                     scannerController.stop();
@@ -622,14 +620,73 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
   }
 
-  void _checkIn(BuildContext context, AttendanceBloc bloc, String branchName) {
+  Future<void> _checkIn(
+    AttendanceBloc bloc,
+    String branchName,
+    Position position,
+  ) async {
     bloc.add(
       CheckInRequested(
-        userId: widget.delegate.uid,
-        lat:
-            30.0444, // Mock location for now, or use real location if available
-        long: 31.2357,
+        userId: widget.delegate.uid, // ✅ تصحيح اسم المتغير
+        lat: position.latitude, // ✅ استخدام الموقع الحقيقي
+        long: position.longitude,
         branchName: branchName,
+      ),
+    );
+  }
+
+  Future<Position?> _getCurrentLocation(BuildContext context) async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Location services are disabled. Please enable them.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permissions are denied'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return null;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Location permissions are permanently denied, we cannot request permissions.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
+    }
+
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
       ),
     );
   }

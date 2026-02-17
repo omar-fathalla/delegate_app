@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 
@@ -15,10 +15,14 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  
+  // Controllers & Variables from Master Branch (The Clean Design)
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
   bool _obscurePassword = true;
+  
+  // Animation Controllers
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -26,23 +30,29 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
+    // Setup Animations
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
+    
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
       ),
     );
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-          ),
-        );
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
+    
     _animationController.forward();
   }
 
@@ -57,6 +67,7 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    
     return Scaffold(
       body: BlocProvider(
         create: (context) => sl<AuthBloc>(),
@@ -119,14 +130,12 @@ class _LoginScreenState extends State<LoginScreen>
                               color: Colors.white,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.2),
+                                  color: Colors.black.withOpacity(0.2),
                                   blurRadius: 20,
                                   offset: const Offset(0, 8),
                                 ),
                                 BoxShadow(
-                                  color: const Color(
-                                    0xFF64B5F6,
-                                  ).withValues(alpha: 0.3),
+                                  color: const Color(0xFF64B5F6).withOpacity(0.3),
                                   blurRadius: 40,
                                   spreadRadius: 5,
                                 ),
@@ -138,12 +147,18 @@ class _LoginScreenState extends State<LoginScreen>
                                 child: Image.asset(
                                   'assets/images/logo.png',
                                   fit: BoxFit.contain,
+                                  errorBuilder: (c, e, s) => const Icon(
+                                    Icons.local_shipping_rounded,
+                                    size: 60,
+                                    color: Color(0xFF1565C0),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(height: 16),
+                        
                         // ---- App Name ----
                         FadeTransition(
                           opacity: _fadeAnimation,
@@ -164,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen>
                             l10n.loginToContinue,
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.white.withValues(alpha: 0.75),
+                              color: Colors.white.withOpacity(0.75),
                             ),
                           ),
                         ),
@@ -181,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 borderRadius: BorderRadius.circular(24),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.15),
+                                    color: Colors.black.withOpacity(0.15),
                                     blurRadius: 30,
                                     offset: const Offset(0, 15),
                                   ),
@@ -206,25 +221,15 @@ class _LoginScreenState extends State<LoginScreen>
                                             color: Color(0xFF1565C0),
                                           ),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFFE0E0E0),
-                                            ),
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
                                           ),
                                           enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFFE0E0E0),
-                                            ),
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
                                           ),
                                           focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
+                                            borderRadius: BorderRadius.circular(14),
                                             borderSide: const BorderSide(
                                               color: Color(0xFF1565C0),
                                               width: 2,
@@ -261,31 +266,20 @@ class _LoginScreenState extends State<LoginScreen>
                                             ),
                                             onPressed: () {
                                               setState(() {
-                                                _obscurePassword =
-                                                    !_obscurePassword;
+                                                _obscurePassword = !_obscurePassword;
                                               });
                                             },
                                           ),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFFE0E0E0),
-                                            ),
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
                                           ),
                                           enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFFE0E0E0),
-                                            ),
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
                                           ),
                                           focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
+                                            borderRadius: BorderRadius.circular(14),
                                             borderSide: const BorderSide(
                                               color: Color(0xFF1565C0),
                                               width: 2,
@@ -317,12 +311,9 @@ class _LoginScreenState extends State<LoginScreen>
                                                   _rememberMe = value ?? false;
                                                 });
                                               },
-                                              activeColor: const Color(
-                                                0xFF1565C0,
-                                              ),
+                                              activeColor: const Color(0xFF1565C0),
                                               shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
+                                                borderRadius: BorderRadius.circular(6),
                                               ),
                                             ),
                                           ),
@@ -346,46 +337,33 @@ class _LoginScreenState extends State<LoginScreen>
                                           onPressed: state is AuthLoading
                                               ? null
                                               : () {
-                                                  if (_formKey.currentState!
-                                                      .validate()) {
-                                                    BlocProvider.of<AuthBloc>(
-                                                      context,
-                                                    ).add(
+                                                  if (_formKey.currentState!.validate()) {
+                                                    BlocProvider.of<AuthBloc>(context).add(
                                                       LoginRequested(
-                                                        phoneNumber:
-                                                            _phoneController
-                                                                .text,
-                                                        password:
-                                                            _passwordController
-                                                                .text,
+                                                        phoneNumber: _phoneController.text,
+                                                        password: _passwordController.text,
                                                         rememberMe: _rememberMe,
                                                       ),
                                                     );
                                                   }
                                                 },
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(
-                                              0xFF1565C0,
-                                            ),
+                                            backgroundColor: const Color(0xFF1565C0),
                                             foregroundColor: Colors.white,
                                             shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
+                                              borderRadius: BorderRadius.circular(14),
                                             ),
                                             elevation: 4,
-                                            shadowColor: const Color(
-                                              0xFF1565C0,
-                                            ).withValues(alpha: 0.4),
+                                            shadowColor: const Color(0xFF1565C0).withOpacity(0.4),
                                           ),
                                           child: state is AuthLoading
                                               ? const SizedBox(
                                                   height: 22,
                                                   width: 22,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        color: Colors.white,
-                                                        strokeWidth: 2.5,
-                                                      ),
+                                                  child: CircularProgressIndicator(
+                                                    color: Colors.white,
+                                                    strokeWidth: 2.5,
+                                                  ),
                                                 )
                                               : Text(
                                                   l10n.loginButton,
