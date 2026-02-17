@@ -15,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _mobileController = TextEditingController();
   final _motherNameController = TextEditingController();
+  bool _isPasswordVisible = false;
 
   @override
   void dispose() {
@@ -107,11 +108,26 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(height: 20),
                             TextFormField(
                               controller: _motherNameController,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: "Mother's Name",
-                                prefixIcon: Icon(Icons.lock),
+                                prefixIcon: const Icon(Icons.lock),
+                                suffixIcon: IconButton(
+                                  tooltip: _isPasswordVisible
+                                      ? 'Hide password'
+                                      : 'Show password',
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordVisible = !_isPasswordVisible;
+                                    });
+                                  },
+                                ),
                               ),
-                              obscureText: true,
+                              obscureText: !_isPasswordVisible,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return "Please enter mother's name";
