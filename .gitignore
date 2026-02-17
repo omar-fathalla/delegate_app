@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Node dependencies
+node_modules/
+**/node_modules/
+package-lock.json
+
+# Local env files
+.env*

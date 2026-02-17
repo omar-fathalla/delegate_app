@@ -8,13 +8,20 @@ abstract class AuthEvent extends Equatable {
 }
 
 class LoginRequested extends AuthEvent {
-  final String mobile;
-  final String motherName;
+  final String phoneNumber;
+  final String password;
+  final bool rememberMe;
 
-  const LoginRequested({required this.mobile, required this.motherName});
+  const LoginRequested({
+    required this.phoneNumber,
+    required this.password,
+    this.rememberMe = false,
+  });
 
   @override
-  List<Object> get props => [mobile, motherName];
+  List<Object> get props => [phoneNumber, password, rememberMe];
 }
+
+class CheckAutoLoginRequested extends AuthEvent {}
 
 class LogoutRequested extends AuthEvent {}

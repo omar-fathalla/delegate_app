@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
-import 'package:delegate_app/features/auth/domain/entities/user.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
-  final User user;
+  final Delegate delegate;
 
-  const HomeScreen({super.key, required this.user});
+  const HomeScreen({super.key, required this.delegate});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -19,9 +20,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return BlocProvider(
       create: (context) =>
-          sl<AttendanceBloc>()..add(HistoryRequested(userId: widget.user.id)),
+          sl<AttendanceBloc>()
+            ..add(HistoryRequested(userId: widget.delegate.uid)),
       child: Scaffold(
         backgroundColor: Colors.grey[50], // Light professional background
         appBar: AppBar(
@@ -33,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
               CircleAvatar(
                 backgroundColor: const Color(0xFF0D47A1),
                 child: Text(
-                  widget.user.name[0].toUpperCase(),
+                  widget.delegate.firstName.isNotEmpty ? widget.delegate.firstName[0].toUpperCase() : '?',
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
@@ -42,16 +45,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Hello, ${widget.user.name}',
+                    l10n.helloUser(widget.delegate.firstName),
                     style: const TextStyle(
                       color: Colors.black87,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const Text(
-                    'Delegate',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  Text(
+                    l10n.delegateRole,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ],
               ),
@@ -79,16 +82,16 @@ class _HomeScreenState extends State<HomeScreen> {
             } else if (state is AttendanceCheckedIn) {
               setState(() => isCheckedIn = true);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Checked In Successfully'),
+                SnackBar(
+                  content: Text(l10n.checkedInSuccessfully),
                   backgroundColor: Colors.green,
                 ),
               );
             } else if (state is AttendanceCheckedOut) {
               setState(() => isCheckedIn = false);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Checked Out Successfully'),
+                SnackBar(
+                  content: Text(l10n.checkedOutSuccessfully),
                   backgroundColor: Colors.orange,
                 ),
               );
@@ -129,13 +132,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: Column(
                       children: [
-                        const Text(
-                          'Current Status',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        Text(
+                          l10n.currentStatus,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          isCheckedIn ? 'ONLINE' : 'OFFLINE',
+                          isCheckedIn ? l10n.online : l10n.offline,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 28,
@@ -147,6 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           DateFormat(
                             'EEEE, MMM d, yyyy',
+                            Localizations.localeOf(context).languageCode,
                           ).format(DateTime.now()),
                           style: const TextStyle(
                             color: Colors.white70,
@@ -178,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             } else {
                               BlocProvider.of<AttendanceBloc>(context).add(
                                 CheckInRequested(
-                                  userId: widget.user.id,
+                                  userId: widget.delegate.uid,
                                   lat: 30.0,
                                   long: 31.0,
                                 ),
@@ -222,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    isCheckedIn ? 'CHECK OUT' : 'CHECK IN',
+                                    isCheckedIn ? l10n.checkOut : l10n.checkIn,
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -238,9 +245,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
 
                   const SizedBox(height: 40),
-                  const Text(
-                    'Recent History',
-                    style: TextStyle(
+                  Text(
+                    l10n.recentHistory,
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
@@ -278,7 +285,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ).format(item.checkInTime),
                                   ),
                                   subtitle: Text(
-                                    'In: ${DateFormat('HH:mm').format(item.checkInTime)} - Out: ${item.checkOutTime != null ? DateFormat('HH:mm').format(item.checkOutTime!) : 'Active'}',
+                                    l10n.historyInOut(
+                                      DateFormat(
+                                        'HH:mm',
+                                      ).format(item.checkInTime),
+                                      item.checkOutTime != null
+                                          ? DateFormat(
+                                              'HH:mm',
+                                            ).format(item.checkOutTime!)
+                                          : l10n.active,
+                                    ),
                                   ),
                                   trailing: item.checkOutTime == null
                                       ? const Icon(
@@ -295,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               );
                             },
                           )
-                        : const Center(child: Text("No history available")),
+                        : Center(child: Text(l10n.noHistoryAvailable)),
                   ),
                 ],
               ),
@@ -306,3 +322,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
