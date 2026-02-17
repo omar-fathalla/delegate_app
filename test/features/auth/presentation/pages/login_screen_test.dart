@@ -38,4 +38,45 @@ void main() {
 
     // No specific assertion for disposal here as we are relying on no exceptions being thrown.
   });
+
+  testWidgets('LoginScreen toggles password visibility',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+
+    // Find the Mother's Name text field (it's the second TextFormField)
+    final motherNameFieldFinder = find.byType(TextFormField).at(1);
+    final motherNameTextFieldFinder =
+        find.descendant(of: motherNameFieldFinder, matching: find.byType(TextField));
+
+    // Verify initial state: obscured
+    TextField motherNameTextField = tester.widget(motherNameTextFieldFinder);
+    expect(motherNameTextField.obscureText, isTrue);
+
+    // Verify initial tooltip "Show password"
+    final showPasswordTooltip = find.byTooltip('Show password');
+    expect(showPasswordTooltip, findsOneWidget);
+
+    // Tap the visibility toggle button (found via tooltip)
+    await tester.tap(showPasswordTooltip);
+    await tester.pump();
+
+    // Verify state: visible
+    motherNameTextField = tester.widget(motherNameTextFieldFinder);
+    expect(motherNameTextField.obscureText, isFalse);
+
+    // Verify tooltip changed to "Hide password"
+    final hidePasswordTooltip = find.byTooltip('Hide password');
+    expect(hidePasswordTooltip, findsOneWidget);
+
+    // Tap the visibility toggle button again (found via new tooltip)
+    await tester.tap(hidePasswordTooltip);
+    await tester.pump();
+
+    // Verify state: obscured again
+    motherNameTextField = tester.widget(motherNameTextFieldFinder);
+    expect(motherNameTextField.obscureText, isTrue);
+
+    // Verify tooltip changed back to "Show password"
+    expect(find.byTooltip('Show password'), findsOneWidget);
+  });
 }
