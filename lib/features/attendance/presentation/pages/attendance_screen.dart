@@ -5,8 +5,8 @@ import 'package:delegate_app/features/attendance/domain/entities/attendance.dart
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
-import 'package:delegate_app/l10n/app_localizations.dart'; // تم الاحتفاظ بها
-import 'package:geolocator/geolocator.dart'; // تم الاحتفاظ بها
+import 'package:delegate_app/l10n/app_localizations.dart'; // ✅ تم الاحتفاظ بها
+import 'package:geolocator/geolocator.dart'; // ✅ تم الاحتفاظ بها
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -429,6 +429,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
                   String? scannedBranch;
                   try {
+                    // ✅ استخدام الكود اليدوي بدلاً من دالة helper لضمان العمل
                     final dynamic decoded = jsonDecode(rawValue);
 
                     if (decoded is Map<String, dynamic> &&
@@ -627,8 +628,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   ) async {
     bloc.add(
       CheckInRequested(
-        userId: widget.delegate.uid, // ✅ تصحيح اسم المتغير
-        lat: position.latitude, // ✅ استخدام الموقع الحقيقي
+        userId: widget.delegate.uid,
+        lat: position.latitude,
         long: position.longitude,
         branchName: branchName,
       ),
