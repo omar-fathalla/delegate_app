@@ -7,7 +7,7 @@ import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart'
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
-import 'package:delegate_app/features/auth/domain/entities/user.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart'; // Import Delegate
 import 'package:delegate_app/injection_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -74,19 +74,45 @@ void main() {
     sl.reset();
   });
 
-  const tUser = User(
-    id: '1',
-    name: 'Test User',
-    mobile: '1234567890',
-    motherName: 'Mother',
-    role: 'delegate',
+  // Create tDelegate instead of tUser
+  final tDelegate = Delegate(
+    uid: '1',
+    firstName: 'Test',
+    middleName: 'User',
+    lastName: 'Name',
+    fullName: 'Test User Name',
+    nationalityID: '1234567890',
+    motherName: 'Mother Name',
+    city: 'City',
+    phoneNumber: '1234567890',
+    gender: DelegateGender.male,
+    position: DelegatePosition.promoter,
+    birthDate: DateTime(1990, 1, 1),
+    organizationUID: 'org1',
+    organizationName: 'Org Name',
+    companyUID: 'comp1',
+    companyName: 'Comp Name',
+    status: DelegateStatus.active,
+    delegatePublicId: 'DEL-123',
+    allReceiptCodes: const [],
+    createdAt: DateTime.now(),
+    createdBy: 'admin',
+    hasPendingUpdate: false,
+    isDeductedFromCompany: false,
+    isPrinted: false,
+    isProfileComplete: true,
+    numberOfDocuments: 0,
+    paymentAmount: 0,
+    version: 1,
+    documents: const [],
   );
 
   testWidgets('AttendanceScreen has accessible icon buttons', (
     WidgetTester tester,
   ) async {
+    // Pass delegate instead of user
     await tester.pumpWidget(
-      const MaterialApp(home: AttendanceScreen(user: tUser)),
+      MaterialApp(home: AttendanceScreen(delegate: tDelegate)),
     );
     await tester.pumpAndSettle();
 

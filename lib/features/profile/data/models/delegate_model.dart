@@ -303,7 +303,7 @@ class DelegateDocumentModel extends DelegateDocument {
         case 'rejected':
           return DocumentStatus.rejected;
         case 'not_provided':
-          return DocumentStatus.not_provided;
+          return DocumentStatus.notProvided;
         default:
           return DocumentStatus.pending;
       }
@@ -355,7 +355,7 @@ class DelegateDocumentModel extends DelegateDocument {
           return 'rejected';
         case DocumentStatus.pending:
           return 'pending';
-        case DocumentStatus.not_provided:
+        case DocumentStatus.notProvided:
           return 'not_provided';
       }
     }
@@ -400,7 +400,7 @@ class DelegateDocumentModel extends DelegateDocument {
           return 'rejected';
         case DocumentStatus.pending:
           return 'pending';
-        case DocumentStatus.not_provided:
+        case DocumentStatus.notProvided:
           return 'not_provided';
       }
     }

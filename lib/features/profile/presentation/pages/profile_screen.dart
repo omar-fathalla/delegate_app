@@ -621,7 +621,7 @@ class _DocumentCard extends StatelessWidget {
         return const Color(0xFFF44336);
       case DocumentStatus.pending:
         return const Color(0xFFFF9800);
-      case DocumentStatus.not_provided:
+      case DocumentStatus.notProvided:
         return Colors.grey;
     }
   }
@@ -634,7 +634,7 @@ class _DocumentCard extends StatelessWidget {
         return Icons.error_outline;
       case DocumentStatus.pending:
         return Icons.access_time;
-      case DocumentStatus.not_provided:
+      case DocumentStatus.notProvided:
         return Icons.remove_circle_outline;
     }
   }
@@ -647,7 +647,7 @@ class _DocumentCard extends StatelessWidget {
         return l10n.rejectedStatus;
       case DocumentStatus.pending:
         return l10n.pendingStatus;
-      case DocumentStatus.not_provided:
+      case DocumentStatus.notProvided:
         return l10n.notProvidedStatus;
     }
   }

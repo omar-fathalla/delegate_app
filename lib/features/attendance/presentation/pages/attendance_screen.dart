@@ -30,7 +30,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final l10n = AppLocalizations.of(context)!;
     return BlocProvider(
       create: (context) =>
-          sl<AttendanceBloc>()..add(HistoryRequested(userId: widget.delegate.uid)),
+          sl<AttendanceBloc>()
+            ..add(HistoryRequested(userId: widget.delegate.uid)),
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
@@ -75,8 +76,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ),
             floatingActionButton: FloatingActionButton.extended(
               onPressed: () => _showQRScanner(context),
-              backgroundColor:
-                  isCheckedIn ? Colors.orange : const Color(0xFF0D47A1),
+              backgroundColor: isCheckedIn
+                  ? Colors.orange
+                  : const Color(0xFF0D47A1),
               icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
               label: Text(
                 isCheckedIn ? l10n.scanToCheckOut : l10n.scanToCheckIn,
@@ -208,7 +210,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0D47A1).withOpacity(0.1),
+                        color: const Color(0xFF0D47A1).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -276,7 +278,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
+                        color: Colors.grey.withValues(alpha: 0.1),
                         blurRadius: 5,
                         offset: const Offset(0, 2),
                       ),
@@ -464,11 +466,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           ),
                         );
                       } else {
-                        await _checkIn(
-                          attendanceBloc,
-                          scannedBranch,
-                          position,
-                        );
+                        await _checkIn(attendanceBloc, scannedBranch, position);
                         if (parentContext.mounted) {
                           ScaffoldMessenger.of(parentContext).showSnackBar(
                             SnackBar(
@@ -503,7 +501,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.black.withOpacity(0.7),
+                      Colors.black.withValues(alpha: 0.7),
                       Colors.transparent,
                     ],
                     begin: Alignment.topCenter,
@@ -576,7 +574,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
+                            color: color.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -600,7 +598,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               top: 40,
               left: 20,
               child: CircleAvatar(
-                backgroundColor: Colors.white.withOpacity(0.3),
+                backgroundColor: Colors.white.withValues(alpha: 0.3),
                 child: IconButton(
                   tooltip: 'Close Scanner',
                   icon: const Icon(Icons.close, color: Colors.white),
@@ -685,9 +683,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
 
     return await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-      ),
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
   }
 }

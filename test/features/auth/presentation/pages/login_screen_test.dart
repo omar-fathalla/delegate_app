@@ -4,6 +4,8 @@ import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart'
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
+import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
 import 'package:delegate_app/injection_container.dart';
 
 // Manual mock for AuthBloc
@@ -12,6 +14,12 @@ class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
 
   @override
   Login get loginUseCase => throw UnimplementedError();
+
+  @override
+  CheckAutoLogin get checkAutoLoginUseCase => throw UnimplementedError();
+
+  @override
+  Logout get logoutUseCase => throw UnimplementedError();
 }
 
 void main() {
@@ -27,11 +35,11 @@ void main() {
 
     // Interact with text fields to ensure controllers are active
     await tester.enterText(find.byType(TextFormField).at(0), '1234567890');
-    await tester.enterText(find.byType(TextFormField).at(1), 'MotherName');
+    await tester.enterText(find.byType(TextFormField).at(1), 'password123');
 
     // Verify text is entered
     expect(find.text('1234567890'), findsOneWidget);
-    expect(find.text('MotherName'), findsOneWidget);
+    expect(find.text('password123'), findsOneWidget);
 
     // Pump another widget to trigger disposal of LoginScreen
     await tester.pumpWidget(const SizedBox());
@@ -39,18 +47,20 @@ void main() {
     // No specific assertion for disposal here as we are relying on no exceptions being thrown.
   });
 
-  testWidgets('LoginScreen toggles password visibility',
-      (WidgetTester tester) async {
+  testWidgets('LoginScreen toggles password visibility', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
 
-    // Find the Mother's Name text field (it's the second TextFormField)
-    final motherNameFieldFinder = find.byType(TextFormField).at(1);
-    final motherNameTextFieldFinder =
-        find.descendant(of: motherNameFieldFinder, matching: find.byType(TextField));
+    final passwordFieldFinder = find.byType(TextFormField).at(1);
+    final passwordTextFieldFinder = find.descendant(
+      of: passwordFieldFinder,
+      matching: find.byType(TextField),
+    );
 
     // Verify initial state: obscured
-    TextField motherNameTextField = tester.widget(motherNameTextFieldFinder);
-    expect(motherNameTextField.obscureText, isTrue);
+    TextField passwordTextField = tester.widget(passwordTextFieldFinder);
+    expect(passwordTextField.obscureText, isTrue);
 
     // Verify initial tooltip "Show password"
     final showPasswordTooltip = find.byTooltip('Show password');
@@ -61,8 +71,8 @@ void main() {
     await tester.pump();
 
     // Verify state: visible
-    motherNameTextField = tester.widget(motherNameTextFieldFinder);
-    expect(motherNameTextField.obscureText, isFalse);
+    passwordTextField = tester.widget(passwordTextFieldFinder);
+    expect(passwordTextField.obscureText, isFalse);
 
     // Verify tooltip changed to "Hide password"
     final hidePasswordTooltip = find.byTooltip('Hide password');
@@ -73,8 +83,8 @@ void main() {
     await tester.pump();
 
     // Verify state: obscured again
-    motherNameTextField = tester.widget(motherNameTextFieldFinder);
-    expect(motherNameTextField.obscureText, isTrue);
+    passwordTextField = tester.widget(passwordTextFieldFinder);
+    expect(passwordTextField.obscureText, isTrue);
 
     // Verify tooltip changed back to "Show password"
     expect(find.byTooltip('Show password'), findsOneWidget);

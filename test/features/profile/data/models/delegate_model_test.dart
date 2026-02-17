@@ -68,7 +68,7 @@ void main() {
       expect(delegate.documents[0].documentKey, DocumentKey.personalPhoto);
       expect(delegate.documents[0].documentStatus, DocumentStatus.approved);
       expect(delegate.documents[1].documentKey, DocumentKey.healthCertificate);
-      expect(delegate.documents[1].documentStatus, DocumentStatus.not_provided);
+      expect(delegate.documents[1].documentStatus, DocumentStatus.notProvided);
       expect(delegate.firstName, "نادية");
       expect(delegate.fullName, "نادية مصطفى مصطفى");
       expect(delegate.gender, DelegateGender.female);

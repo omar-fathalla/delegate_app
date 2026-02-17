@@ -15,7 +15,7 @@ enum DocumentKey {
   paymentReceipt,
 }
 
-enum DocumentStatus { pending, approved, rejected, not_provided }
+enum DocumentStatus { pending, approved, rejected, notProvided }
 
 class Delegate extends Equatable {
   final String uid;
