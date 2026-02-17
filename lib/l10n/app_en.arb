@@ -1,0 +1,450 @@
+{
+    "@@locale": "en",
+    "appTitle": "Tashil - Delegate",
+    "@appTitle": {
+        "description": "App title"
+    },
+    "login": "Login",
+    "@login": {
+        "description": "Login label"
+    },
+    "logout": "Logout",
+    "@logout": {
+        "description": "Logout label"
+    },
+    "loginToContinue": "Login to continue",
+    "@loginToContinue": {
+        "description": "Login subtitle"
+    },
+    "loginSuccessful": "Login Successful!",
+    "@loginSuccessful": {
+        "description": "Login success snackbar"
+    },
+    "loginButton": "LOGIN",
+    "@loginButton": {
+        "description": "Login button text"
+    },
+    "mobileNumber": "Mobile Number",
+    "@mobileNumber": {
+        "description": "Mobile number field label"
+    },
+    "password": "Password",
+    "@password": {
+        "description": "Password field label"
+    },
+    "motherName": "Mother's Name",
+    "@motherName": {
+        "description": "Mother name field label"
+    },
+    "enterMobileNumber": "Please enter mobile number",
+    "@enterMobileNumber": {
+        "description": "Mobile validation error"
+    },
+    "enterPassword": "Please enter password",
+    "@enterPassword": {
+        "description": "Password validation error"
+    },
+    "rememberMe": "Remember Me",
+    "@rememberMe": {
+        "description": "Remember me checkbox label"
+    },
+    "home": "Home",
+    "@home": {
+        "description": "Home nav label"
+    },
+    "profile": "Profile",
+    "@profile": {
+        "description": "Profile nav label"
+    },
+    "attendance": "Attendance",
+    "@attendance": {
+        "description": "Attendance nav label"
+    },
+    "myProfile": "My Profile",
+    "@myProfile": {
+        "description": "Profile screen title"
+    },
+    "personalInformation": "Personal Information",
+    "@personalInformation": {
+        "description": "Personal info section title"
+    },
+    "delegateId": "Delegate ID",
+    "@delegateId": {
+        "description": "Delegate ID label"
+    },
+    "delegateRole": "Delegate",
+    "@delegateRole": {
+        "description": "Delegate role label"
+    },
+    "checkIn": "Check In",
+    "@checkIn": {
+        "description": "Check in action"
+    },
+    "checkOut": "Check Out",
+    "@checkOut": {
+        "description": "Check out action"
+    },
+    "checkedInSuccessfully": "Checked In Successfully",
+    "@checkedInSuccessfully": {
+        "description": "Check in success message"
+    },
+    "checkedOutSuccessfully": "Checked Out Successfully",
+    "@checkedOutSuccessfully": {
+        "description": "Check out success message"
+    },
+    "scanToCheckIn": "Scan to Check In",
+    "@scanToCheckIn": {
+        "description": "FAB label for check in"
+    },
+    "scanToCheckOut": "Scan to Check Out",
+    "@scanToCheckOut": {
+        "description": "FAB label for check out"
+    },
+    "scanForAction": "Scan for {action}",
+    "@scanForAction": {
+        "description": "QR scanner title",
+        "placeholders": {
+            "action": {
+                "type": "String"
+            }
+        }
+    },
+    "pointCameraToQR": "Point camera at QR Code for {action}",
+    "@pointCameraToQR": {
+        "description": "QR scanner instruction",
+        "placeholders": {
+            "action": {
+                "type": "String"
+            }
+        }
+    },
+    "checkingInAt": "Checking in at {branch}...",
+    "@checkingInAt": {
+        "description": "Check in at branch snackbar",
+        "placeholders": {
+            "branch": {
+                "type": "String"
+            }
+        }
+    },
+    "invalidQRCode": "Invalid QR Code. Please scan a valid branch code.",
+    "@invalidQRCode": {
+        "description": "Invalid QR error"
+    },
+    "currentStatus": "Current Status",
+    "@currentStatus": {
+        "description": "Status card title"
+    },
+    "online": "ONLINE",
+    "@online": {
+        "description": "Online status"
+    },
+    "offline": "OFFLINE",
+    "@offline": {
+        "description": "Offline status"
+    },
+    "active": "Active",
+    "@active": {
+        "description": "Active check-in indicator"
+    },
+    "inLabel": "In: {time}",
+    "@inLabel": {
+        "description": "Check in time label",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "outLabel": "Out: {time}",
+    "@outLabel": {
+        "description": "Check out time label",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "noRecordsForMonth": "No attendance records for {month}",
+    "@noRecordsForMonth": {
+        "description": "Empty month message",
+        "placeholders": {
+            "month": {
+                "type": "String"
+            }
+        }
+    },
+    "recentHistory": "Recent History",
+    "@recentHistory": {
+        "description": "History section title"
+    },
+    "noHistoryAvailable": "No history available",
+    "@noHistoryAvailable": {
+        "description": "Empty history message"
+    },
+    "somethingWentWrong": "Something went wrong",
+    "@somethingWentWrong": {
+        "description": "Generic error message"
+    },
+    "unspecifiedBranch": "Unspecified",
+    "@unspecifiedBranch": {
+        "description": "Fallback branch name"
+    },
+    "helloUser": "Hello, {name}",
+    "@helloUser": {
+        "description": "Greeting with user name",
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "historyInOut": "In: {inTime} - Out: {outTime}",
+    "@historyInOut": {
+        "description": "History row in/out label",
+        "placeholders": {
+            "inTime": {
+                "type": "String"
+            },
+            "outTime": {
+                "type": "String"
+            }
+        }
+    },
+    "errorGeneral": "An error occurred. Please try again.",
+    "@errorGeneral": {
+        "description": "General error"
+    },
+    "errorNetwork": "No internet connection.",
+    "@errorNetwork": {
+        "description": "Network error"
+    },
+    "errorLocation": "Could not determine your location.",
+    "@errorLocation": {
+        "description": "Location error"
+    },
+    "errorOutOfRange": "You are outside the worksite range.",
+    "@errorOutOfRange": {
+        "description": "Out of range error"
+    },
+    "errorMockLocation": "Mock location detected. Cannot check in.",
+    "@errorMockLocation": {
+        "description": "Mock location error"
+    },
+    "errorAuth": "Invalid credentials.",
+    "@errorAuth": {
+        "description": "Auth error"
+    },
+    "success": "Operation completed successfully",
+    "@success": {
+        "description": "Success message"
+    },
+    "loading": "Loading...",
+    "@loading": {
+        "description": "Loading indicator"
+    },
+    "pendingSync": "Pending sync",
+    "@pendingSync": {
+        "description": "Pending sync indicator"
+    },
+    "settings": "Settings",
+    "@settings": {
+        "description": "Settings menu title"
+    },
+    "language": "Language",
+    "@language": {
+        "description": "Language menu item"
+    },
+    "changeLanguage": "Change Language",
+    "@changeLanguage": {
+        "description": "Change language menu item"
+    },
+    "arabic": "العربية",
+    "@arabic": {
+        "description": "Arabic language name"
+    },
+    "english": "English",
+    "@english": {
+        "description": "English language name"
+    },
+    "languageChangedTo": "Language changed to {language}",
+    "@languageChangedTo": {
+        "description": "Language changed confirmation",
+        "placeholders": {
+            "language": {
+                "type": "String"
+            }
+        }
+    },
+    "duration": "Duration: {hours}h {minutes}m",
+    "@duration": {
+        "description": "Duration in hours and minutes",
+        "placeholders": {
+            "hours": {
+                "type": "String"
+            },
+            "minutes": {
+                "type": "String"
+            }
+        }
+    },
+    "inProgress": "In progress...",
+    "@inProgress": {
+        "description": "Ongoing session indicator"
+    },
+    "fullName": "Full Name",
+    "@fullName": {
+        "description": "Full name label"
+    },
+    "phoneNumber": "Phone Number",
+    "@phoneNumber": {
+        "description": "Phone number label"
+    },
+    "birthDate": "Date of Birth",
+    "@birthDate": {
+        "description": "Birth date label"
+    },
+    "cityLabel": "City",
+    "@cityLabel": {
+        "description": "City label"
+    },
+    "organizationAndCompany": "Organization & Company",
+    "@organizationAndCompany": {
+        "description": "Organization and company section title"
+    },
+    "organizationLabel": "Organization",
+    "@organizationLabel": {
+        "description": "Organization label"
+    },
+    "companyLabel": "Company",
+    "@companyLabel": {
+        "description": "Company label"
+    },
+    "positionLabel": "Position",
+    "@positionLabel": {
+        "description": "Position label"
+    },
+    "documents": "Documents",
+    "@documents": {
+        "description": "Documents tab label"
+    },
+    "requestHistory": "Request History",
+    "@requestHistory": {
+        "description": "Request history tab label"
+    },
+    "personalPhoto": "Personal Photo",
+    "@personalPhoto": {
+        "description": "Personal photo document"
+    },
+    "nationalId": "National ID",
+    "@nationalId": {
+        "description": "National ID document"
+    },
+    "authorizationLetter": "Authorization Letter",
+    "@authorizationLetter": {
+        "description": "Authorization letter document"
+    },
+    "insuranceLetter": "Insurance Letter",
+    "@insuranceLetter": {
+        "description": "Insurance letter document"
+    },
+    "healthCertificate": "Health Certificate",
+    "@healthCertificate": {
+        "description": "Health certificate document"
+    },
+    "paymentReceipt": "Payment Receipt",
+    "@paymentReceipt": {
+        "description": "Payment receipt document"
+    },
+    "pendingStatus": "Pending",
+    "@pendingStatus": {
+        "description": "Pending status label"
+    },
+    "uploadedOn": "Uploaded: {date}",
+    "@uploadedOn": {
+        "description": "Upload date label",
+        "placeholders": {
+            "date": {
+                "type": "String"
+            }
+        }
+    },
+    "clickToView": "Click to View",
+    "@clickToView": {
+        "description": "Click to view link"
+    },
+    "receiptCode": "Receipt Code: {code}",
+    "@receiptCode": {
+        "description": "Receipt code label",
+        "placeholders": {
+            "code": {
+                "type": "String"
+            }
+        }
+    },
+    "noRequestsYet": "No requests yet",
+    "@noRequestsYet": {
+        "description": "Empty request history message"
+    },
+    "approvedStatus": "Approved",
+    "@approvedStatus": {
+        "description": "Approved status label"
+    },
+    "rejectedStatus": "Rejected",
+    "@rejectedStatus": {
+        "description": "Rejected status label"
+    },
+    "noDocumentsUploaded": "No documents uploaded",
+    "@noDocumentsUploaded": {
+        "description": "Empty documents message"
+    },
+    "retry": "Retry",
+    "@retry": {
+        "description": "Retry button text"
+    },
+    "gender": "Gender",
+    "@gender": {
+        "description": "Gender label"
+    },
+    "male": "Male",
+    "@male": {
+        "description": "Male gender"
+    },
+    "female": "Female",
+    "@female": {
+        "description": "Female gender"
+    },
+    "joinDate": "Join Date",
+    "@joinDate": {
+        "description": "Join date label"
+    },
+    "employmentDetails": "Employment Details",
+    "@employmentDetails": {
+        "description": "Employment details section title"
+    },
+    "statusReason": "Status Reason",
+    "@statusReason": {
+        "description": "Status reason label"
+    },
+    "profileComplete": "Profile Complete",
+    "@profileComplete": {
+        "description": "Profile complete status"
+    },
+    "profileIncomplete": "Profile Incomplete",
+    "@profileIncomplete": {
+        "description": "Profile incomplete status"
+    },
+    "reviewedBy": "Reviewed By: {name}",
+    "@reviewedBy": {
+        "description": "Reviewer name label",
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "notProvidedStatus": "Not Provided",
+    "@notProvidedStatus": {
+        "description": "Not provided document status"
+    }
+}

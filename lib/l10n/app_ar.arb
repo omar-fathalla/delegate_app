@@ -1,0 +1,450 @@
+{
+    "@@locale": "ar",
+    "appTitle": "تسهيل - المندوب",
+    "@appTitle": {
+        "description": "App title"
+    },
+    "login": "تسجيل الدخول",
+    "@login": {
+        "description": "Login label"
+    },
+    "logout": "تسجيل الخروج",
+    "@logout": {
+        "description": "Logout label"
+    },
+    "loginToContinue": "سجّل دخولك للمتابعة",
+    "@loginToContinue": {
+        "description": "Login subtitle"
+    },
+    "loginSuccessful": "تم تسجيل الدخول بنجاح!",
+    "@loginSuccessful": {
+        "description": "Login success snackbar"
+    },
+    "loginButton": "دخول",
+    "@loginButton": {
+        "description": "Login button text"
+    },
+    "mobileNumber": "رقم الموبايل",
+    "@mobileNumber": {
+        "description": "Mobile number field label"
+    },
+    "password": "كلمة المرور",
+    "@password": {
+        "description": "Password field label"
+    },
+    "motherName": "اسم الأم",
+    "@motherName": {
+        "description": "Mother name field label"
+    },
+    "enterMobileNumber": "يرجى إدخال رقم الموبايل",
+    "@enterMobileNumber": {
+        "description": "Mobile validation error"
+    },
+    "enterPassword": "يرجى إدخال كلمة المرور",
+    "@enterPassword": {
+        "description": "Password validation error"
+    },
+    "rememberMe": "تذكرني",
+    "@rememberMe": {
+        "description": "Remember me checkbox label"
+    },
+    "home": "الرئيسية",
+    "@home": {
+        "description": "Home nav label"
+    },
+    "profile": "الملف الشخصي",
+    "@profile": {
+        "description": "Profile nav label"
+    },
+    "attendance": "الحضور",
+    "@attendance": {
+        "description": "Attendance nav label"
+    },
+    "myProfile": "ملفي الشخصي",
+    "@myProfile": {
+        "description": "Profile screen title"
+    },
+    "personalInformation": "المعلومات الشخصية",
+    "@personalInformation": {
+        "description": "Personal info section title"
+    },
+    "delegateId": "رقم المندوب",
+    "@delegateId": {
+        "description": "Delegate ID label"
+    },
+    "delegateRole": "مندوب",
+    "@delegateRole": {
+        "description": "Delegate role label"
+    },
+    "checkIn": "تسجيل الحضور",
+    "@checkIn": {
+        "description": "Check in action"
+    },
+    "checkOut": "تسجيل الانصراف",
+    "@checkOut": {
+        "description": "Check out action"
+    },
+    "checkedInSuccessfully": "تم تسجيل الحضور بنجاح",
+    "@checkedInSuccessfully": {
+        "description": "Check in success message"
+    },
+    "checkedOutSuccessfully": "تم تسجيل الانصراف بنجاح",
+    "@checkedOutSuccessfully": {
+        "description": "Check out success message"
+    },
+    "scanToCheckIn": "مسح لتسجيل الحضور",
+    "@scanToCheckIn": {
+        "description": "FAB label for check in"
+    },
+    "scanToCheckOut": "مسح لتسجيل الانصراف",
+    "@scanToCheckOut": {
+        "description": "FAB label for check out"
+    },
+    "scanForAction": "مسح لـ {action}",
+    "@scanForAction": {
+        "description": "QR scanner title",
+        "placeholders": {
+            "action": {
+                "type": "String"
+            }
+        }
+    },
+    "pointCameraToQR": "وجه الكاميرا نحو QR Code لـ {action}",
+    "@pointCameraToQR": {
+        "description": "QR scanner instruction",
+        "placeholders": {
+            "action": {
+                "type": "String"
+            }
+        }
+    },
+    "checkingInAt": "تسجيل حضور في {branch}...",
+    "@checkingInAt": {
+        "description": "Check in at branch snackbar",
+        "placeholders": {
+            "branch": {
+                "type": "String"
+            }
+        }
+    },
+    "invalidQRCode": "QR Code غير صالح. يرجى مسح كود فرع صحيح.",
+    "@invalidQRCode": {
+        "description": "Invalid QR error"
+    },
+    "currentStatus": "الحالة الحالية",
+    "@currentStatus": {
+        "description": "Status card title"
+    },
+    "online": "متصل",
+    "@online": {
+        "description": "Online status"
+    },
+    "offline": "غير متصل",
+    "@offline": {
+        "description": "Offline status"
+    },
+    "active": "نشط",
+    "@active": {
+        "description": "Active check-in indicator"
+    },
+    "inLabel": "دخول: {time}",
+    "@inLabel": {
+        "description": "Check in time label",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "outLabel": "خروج: {time}",
+    "@outLabel": {
+        "description": "Check out time label",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "noRecordsForMonth": "لا توجد سجلات حضور لشهر {month}",
+    "@noRecordsForMonth": {
+        "description": "Empty month message",
+        "placeholders": {
+            "month": {
+                "type": "String"
+            }
+        }
+    },
+    "recentHistory": "السجل الأخير",
+    "@recentHistory": {
+        "description": "History section title"
+    },
+    "noHistoryAvailable": "لا يوجد سجل حضور",
+    "@noHistoryAvailable": {
+        "description": "Empty history message"
+    },
+    "somethingWentWrong": "حدث خطأ",
+    "@somethingWentWrong": {
+        "description": "Generic error message"
+    },
+    "unspecifiedBranch": "غير محدد",
+    "@unspecifiedBranch": {
+        "description": "Fallback branch name"
+    },
+    "helloUser": "مرحباً، {name}",
+    "@helloUser": {
+        "description": "Greeting with user name",
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "historyInOut": "دخول: {inTime} - خروج: {outTime}",
+    "@historyInOut": {
+        "description": "History row in/out label",
+        "placeholders": {
+            "inTime": {
+                "type": "String"
+            },
+            "outTime": {
+                "type": "String"
+            }
+        }
+    },
+    "errorGeneral": "حدث خطأ. يرجى المحاولة مرة أخرى.",
+    "@errorGeneral": {
+        "description": "General error"
+    },
+    "errorNetwork": "لا يوجد اتصال بالإنترنت.",
+    "@errorNetwork": {
+        "description": "Network error"
+    },
+    "errorLocation": "لم يتم العثور على موقعك.",
+    "@errorLocation": {
+        "description": "Location error"
+    },
+    "errorOutOfRange": "أنت خارج نطاق موقع العمل.",
+    "@errorOutOfRange": {
+        "description": "Out of range error"
+    },
+    "errorMockLocation": "تم اكتشاف موقع وهمي. لا يمكن تسجيل الحضور.",
+    "@errorMockLocation": {
+        "description": "Mock location error"
+    },
+    "errorAuth": "بيانات الدخول غير صحيحة.",
+    "@errorAuth": {
+        "description": "Auth error"
+    },
+    "success": "تمت العملية بنجاح",
+    "@success": {
+        "description": "Success message"
+    },
+    "loading": "جاري التحميل...",
+    "@loading": {
+        "description": "Loading indicator"
+    },
+    "pendingSync": "في انتظار المزامنة",
+    "@pendingSync": {
+        "description": "Pending sync indicator"
+    },
+    "settings": "الإعدادات",
+    "@settings": {
+        "description": "Settings menu title"
+    },
+    "language": "اللغة",
+    "@language": {
+        "description": "Language menu item"
+    },
+    "changeLanguage": "تغيير اللغة",
+    "@changeLanguage": {
+        "description": "Change language menu item"
+    },
+    "arabic": "العربية",
+    "@arabic": {
+        "description": "Arabic language name"
+    },
+    "english": "English",
+    "@english": {
+        "description": "English language name"
+    },
+    "languageChangedTo": "تم تغيير اللغة إلى {language}",
+    "@languageChangedTo": {
+        "description": "Language changed confirmation",
+        "placeholders": {
+            "language": {
+                "type": "String"
+            }
+        }
+    },
+    "duration": "المدة: {hours} س {minutes} د",
+    "@duration": {
+        "description": "Duration in hours and minutes",
+        "placeholders": {
+            "hours": {
+                "type": "String"
+            },
+            "minutes": {
+                "type": "String"
+            }
+        }
+    },
+    "inProgress": "جاري...",
+    "@inProgress": {
+        "description": "Ongoing session indicator"
+    },
+    "fullName": "الاسم الكامل",
+    "@fullName": {
+        "description": "Full name label"
+    },
+    "phoneNumber": "رقم الهاتف",
+    "@phoneNumber": {
+        "description": "Phone number label"
+    },
+    "birthDate": "تاريخ الميلاد",
+    "@birthDate": {
+        "description": "Birth date label"
+    },
+    "cityLabel": "المدينة",
+    "@cityLabel": {
+        "description": "City label"
+    },
+    "organizationAndCompany": "المنظمة والشركة",
+    "@organizationAndCompany": {
+        "description": "Organization and company section title"
+    },
+    "organizationLabel": "المنظمة",
+    "@organizationLabel": {
+        "description": "Organization label"
+    },
+    "companyLabel": "الشركة",
+    "@companyLabel": {
+        "description": "Company label"
+    },
+    "positionLabel": "المنصب",
+    "@positionLabel": {
+        "description": "Position label"
+    },
+    "documents": "المستندات",
+    "@documents": {
+        "description": "Documents tab label"
+    },
+    "requestHistory": "سجل الطلبات",
+    "@requestHistory": {
+        "description": "Request history tab label"
+    },
+    "personalPhoto": "الصورة الشخصية",
+    "@personalPhoto": {
+        "description": "Personal photo document"
+    },
+    "nationalId": "رقم الهوية الوطنية",
+    "@nationalId": {
+        "description": "National ID document"
+    },
+    "authorizationLetter": "خطاب التفويض",
+    "@authorizationLetter": {
+        "description": "Authorization letter document"
+    },
+    "insuranceLetter": "خطاب التأمين",
+    "@insuranceLetter": {
+        "description": "Insurance letter document"
+    },
+    "healthCertificate": "شهادة صحية",
+    "@healthCertificate": {
+        "description": "Health certificate document"
+    },
+    "paymentReceipt": "إيصال الدفع",
+    "@paymentReceipt": {
+        "description": "Payment receipt document"
+    },
+    "pendingStatus": "قيد الانتظار",
+    "@pendingStatus": {
+        "description": "Pending status label"
+    },
+    "uploadedOn": "تم التحميل: {date}",
+    "@uploadedOn": {
+        "description": "Upload date label",
+        "placeholders": {
+            "date": {
+                "type": "String"
+            }
+        }
+    },
+    "clickToView": "انقر للعرض",
+    "@clickToView": {
+        "description": "Click to view link"
+    },
+    "receiptCode": "رمز الإيصال: {code}",
+    "@receiptCode": {
+        "description": "Receipt code label",
+        "placeholders": {
+            "code": {
+                "type": "String"
+            }
+        }
+    },
+    "noRequestsYet": "لا توجد طلبات حتى الآن",
+    "@noRequestsYet": {
+        "description": "Empty request history message"
+    },
+    "approvedStatus": "مقبول",
+    "@approvedStatus": {
+        "description": "Approved status label"
+    },
+    "rejectedStatus": "مرفوض",
+    "@rejectedStatus": {
+        "description": "Rejected status label"
+    },
+    "noDocumentsUploaded": "لا توجد مستندات مرفوعة",
+    "@noDocumentsUploaded": {
+        "description": "Empty documents message"
+    },
+    "retry": "إعادة المحاولة",
+    "@retry": {
+        "description": "Retry button text"
+    },
+    "gender": "الجنس",
+    "@gender": {
+        "description": "Gender label"
+    },
+    "male": "ذكر",
+    "@male": {
+        "description": "Male gender"
+    },
+    "female": "أنثى",
+    "@female": {
+        "description": "Female gender"
+    },
+    "joinDate": "تاريخ الانضمام",
+    "@joinDate": {
+        "description": "Join date label"
+    },
+    "employmentDetails": "تفاصيل العمل",
+    "@employmentDetails": {
+        "description": "Employment details section title"
+    },
+    "statusReason": "سبب الحالة",
+    "@statusReason": {
+        "description": "Status reason label"
+    },
+    "profileComplete": "الملف مكتمل",
+    "@profileComplete": {
+        "description": "Profile complete status"
+    },
+    "profileIncomplete": "الملف غير مكتمل",
+    "@profileIncomplete": {
+        "description": "Profile incomplete status"
+    },
+    "reviewedBy": "تمت المراجعة بواسطة: {name}",
+    "@reviewedBy": {
+        "description": "Reviewer name label",
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "notProvidedStatus": "لم يتم تقديمها",
+    "@notProvidedStatus": {
+        "description": "Not provided document status"
+    }
+}

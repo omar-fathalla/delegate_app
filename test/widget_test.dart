@@ -4,6 +4,8 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
+import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
+import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
 
 // Manual mock for AuthBloc to avoid complex dependency injection in smoke test
 class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
@@ -11,6 +13,12 @@ class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
 
   @override
   Login get loginUseCase => throw UnimplementedError();
+
+  @override
+  CheckAutoLogin get checkAutoLoginUseCase => throw UnimplementedError();
+
+  @override
+  Logout get logoutUseCase => throw UnimplementedError();
 }
 
 void main() {
