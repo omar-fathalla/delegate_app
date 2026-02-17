@@ -28,6 +28,10 @@
     "@mobileNumber": {
         "description": "Mobile number field label"
     },
+    "password": "كلمة المرور",
+    "@password": {
+        "description": "Password field label"
+    },
     "motherName": "اسم الأم",
     "@motherName": {
         "description": "Mother name field label"
@@ -36,9 +40,13 @@
     "@enterMobileNumber": {
         "description": "Mobile validation error"
     },
-    "enterMotherName": "يرجى إدخال اسم الأم",
-    "@enterMotherName": {
-        "description": "Mother name validation error"
+    "enterPassword": "يرجى إدخال كلمة المرور",
+    "@enterPassword": {
+        "description": "Password validation error"
+    },
+    "rememberMe": "تذكرني",
+    "@rememberMe": {
+        "description": "Remember me checkbox label"
     },
     "home": "الرئيسية",
     "@home": {

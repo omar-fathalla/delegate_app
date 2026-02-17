@@ -2,23 +2,48 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
-import 'package:delegate_app/features/auth/data/models/user_model.dart';
+import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'dart:io';
 
 class MockAuthDataSource implements AuthRemoteDataSource {
   @override
-  Future<UserModel> login(String mobile, String motherName) async {
+  Future<DelegateModel?> getDelegateByPhone(String phoneNumber) async {
     await Future.delayed(const Duration(seconds: 1)); // Simulate network
-    if (mobile == '01000000000' && motherName == 'Mona') {
-      return const UserModel(
-        id: '1',
-        name: 'Ahmed Delegate',
-        mobile: '01000000000',
-        motherName: 'Mona',
-        role: 'delegate',
+    if (phoneNumber == '01000000000') {
+      return DelegateModel(
+        uid: '1',
+        firstName: 'أحمد',
+        middleName: 'محمد',
+        lastName: 'علي',
+        fullName: 'أحمد محمد علي',
+        nationalityID: '12345678901234',
+        motherName: 'منى',
+        city: 'القاهرة',
+        phoneNumber: '01000000000',
+        gender: DelegateGender.male,
+        position: DelegatePosition.promoter,
+        birthDate: DateTime(1995, 1, 1),
+        organizationUID: 'org1',
+        organizationName: 'منظمة تسهيل',
+        companyUID: 'comp1',
+        companyName: 'شركة تسهيل',
+        status: DelegateStatus.active,
+        delegatePublicId: 'DEL-001',
+        allReceiptCodes: const [],
+        createdAt: DateTime(2024, 1, 1),
+        createdBy: 'admin',
+        hasPendingUpdate: false,
+        isDeductedFromCompany: false,
+        isPrinted: false,
+        isProfileComplete: true,
+        numberOfDocuments: 0,
+        paymentAmount: 0,
+        version: 1,
+        documents: const [],
       );
     } else {
-      throw const AuthFailure('Invalid credentials (Try: 01000000000 / Mona)');
+      return null;
     }
   }
 }

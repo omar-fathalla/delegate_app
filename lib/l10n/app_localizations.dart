@@ -140,6 +140,12 @@ abstract class AppLocalizations {
   /// **'Mobile Number'**
   String get mobileNumber;
 
+  /// Password field label
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get password;
+
   /// Mother name field label
   ///
   /// In en, this message translates to:
@@ -152,11 +158,17 @@ abstract class AppLocalizations {
   /// **'Please enter mobile number'**
   String get enterMobileNumber;
 
-  /// Mother name validation error
+  /// Password validation error
   ///
   /// In en, this message translates to:
-  /// **'Please enter mother\'s name'**
-  String get enterMotherName;
+  /// **'Please enter password'**
+  String get enterPassword;
+
+  /// Remember me checkbox label
+  ///
+  /// In en, this message translates to:
+  /// **'Remember Me'**
+  String get rememberMe;
 
   /// Home nav label
   ///

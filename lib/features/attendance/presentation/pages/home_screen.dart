@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
-import 'package:delegate_app/features/auth/domain/entities/user.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
-  final User user;
+  final Delegate delegate;
 
-  const HomeScreen({super.key, required this.user});
+  const HomeScreen({super.key, required this.delegate});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -23,7 +23,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final l10n = AppLocalizations.of(context)!;
     return BlocProvider(
       create: (context) =>
-          sl<AttendanceBloc>()..add(HistoryRequested(userId: widget.user.id)),
+          sl<AttendanceBloc>()
+            ..add(HistoryRequested(userId: widget.delegate.uid)),
       child: Scaffold(
         backgroundColor: Colors.grey[50], // Light professional background
         appBar: AppBar(
@@ -35,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
               CircleAvatar(
                 backgroundColor: const Color(0xFF0D47A1),
                 child: Text(
-                  widget.user.name[0].toUpperCase(),
+                  widget.delegate.firstName.isNotEmpty ? widget.delegate.firstName[0].toUpperCase() : '?',
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
@@ -44,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l10n.helloUser(widget.user.name),
+                    l10n.helloUser(widget.delegate.firstName),
                     style: const TextStyle(
                       color: Colors.black87,
                       fontSize: 16,
@@ -184,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             } else {
                               BlocProvider.of<AttendanceBloc>(context).add(
                                 CheckInRequested(
-                                  userId: widget.user.id,
+                                  userId: widget.delegate.uid,
                                   lat: 30.0,
                                   long: 31.0,
                                 ),
@@ -321,3 +322,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+

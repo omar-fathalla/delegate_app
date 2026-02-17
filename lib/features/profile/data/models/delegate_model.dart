@@ -192,6 +192,73 @@ class DelegateModel extends Delegate {
           .toList(),
     };
   }
+
+  /// JSON for local caching (uses ISO strings instead of Firestore Timestamps)
+  Map<String, dynamic> toLocalJson() {
+    String genderToString(DelegateGender gender) {
+      return gender == DelegateGender.female ? 'Female' : 'Male';
+    }
+
+    String positionToString(DelegatePosition position) {
+      return position == DelegatePosition.supervisor
+          ? 'Supervisor'
+          : 'Promoter';
+    }
+
+    String statusToString(DelegateStatus status) {
+      switch (status) {
+        case DelegateStatus.approved:
+          return 'approved';
+        case DelegateStatus.suspended:
+          return 'suspended';
+        case DelegateStatus.rejected:
+          return 'rejected';
+        case DelegateStatus.pending:
+          return 'pending';
+        case DelegateStatus.active:
+          return 'active';
+      }
+    }
+
+    return {
+      'uid': uid,
+      'firstName': firstName,
+      'middleName': middleName,
+      'lastName': lastName,
+      'fullName': fullName,
+      'nationalityID': nationalityID,
+      'motherName': motherName,
+      'city': city,
+      'phoneNumber': phoneNumber,
+      'gender': genderToString(gender),
+      'position': positionToString(position),
+      'birthDate': birthDate.toIso8601String(),
+      'organizationUID': organizationUID,
+      'organizationName': organizationName,
+      'companyUID': companyUID,
+      'companyName': companyName,
+      'status': statusToString(status),
+      'statusReason': statusReason,
+      'delegatePublicId': delegatePublicId,
+      'allReceiptCodes': allReceiptCodes,
+      'createdAt': createdAt.toIso8601String(),
+      'createdBy': createdBy,
+      'hasPendingUpdate': hasPendingUpdate,
+      'isDeductedFromCompany': isDeductedFromCompany,
+      'isPrinted': isPrinted,
+      'isProfileComplete': isProfileComplete,
+      'latestRequestId': latestRequestId,
+      'numberOfDocuments': numberOfDocuments,
+      'paymentAmount': paymentAmount,
+      'receiptCode': receiptCode,
+      'updatedAt': updatedAt?.toIso8601String(),
+      'updatedBy': updatedBy,
+      'version': version,
+      'documents': documents
+          .map((doc) => (doc as DelegateDocumentModel).toLocalJson())
+          .toList(),
+    };
+  }
 }
 
 class DelegateDocumentModel extends DelegateDocument {
@@ -301,6 +368,51 @@ class DelegateDocumentModel extends DelegateDocument {
       'reviewedAt': reviewedAt != null ? Timestamp.fromDate(reviewedAt!) : null,
       'reviewedBy': reviewedBy,
       'uploadedAt': uploadedAt != null ? Timestamp.fromDate(uploadedAt!) : null,
+      'receiptCode': receiptCode,
+      'secondaryURL': secondaryURL,
+    };
+  }
+
+  /// JSON for local caching (uses ISO strings instead of Firestore Timestamps)
+  Map<String, dynamic> toLocalJson() {
+    String keyToString(DocumentKey key) {
+      switch (key) {
+        case DocumentKey.personalPhoto:
+          return 'personalPhoto';
+        case DocumentKey.nationalityId:
+          return 'nationalityId';
+        case DocumentKey.authorizationLetter:
+          return 'authorizationLetter';
+        case DocumentKey.insuranceLetter:
+          return 'insuranceLetter';
+        case DocumentKey.healthCertificate:
+          return 'healthCertificate';
+        case DocumentKey.paymentReceipt:
+          return 'paymentReceipt';
+      }
+    }
+
+    String statusToString(DocumentStatus status) {
+      switch (status) {
+        case DocumentStatus.approved:
+          return 'approved';
+        case DocumentStatus.rejected:
+          return 'rejected';
+        case DocumentStatus.pending:
+          return 'pending';
+        case DocumentStatus.not_provided:
+          return 'not_provided';
+      }
+    }
+
+    return {
+      'documentKey': keyToString(documentKey),
+      'documentStatus': statusToString(documentStatus),
+      'documentURL': documentURL,
+      'rejectionReason': rejectionReason,
+      'reviewedAt': reviewedAt?.toIso8601String(),
+      'reviewedBy': reviewedBy,
+      'uploadedAt': uploadedAt?.toIso8601String(),
       'receiptCode': receiptCode,
       'secondaryURL': secondaryURL,
     };

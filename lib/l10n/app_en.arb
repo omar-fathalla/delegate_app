@@ -28,6 +28,10 @@
     "@mobileNumber": {
         "description": "Mobile number field label"
     },
+    "password": "Password",
+    "@password": {
+        "description": "Password field label"
+    },
     "motherName": "Mother's Name",
     "@motherName": {
         "description": "Mother name field label"
@@ -36,9 +40,13 @@
     "@enterMobileNumber": {
         "description": "Mobile validation error"
     },
-    "enterMotherName": "Please enter mother's name",
-    "@enterMotherName": {
-        "description": "Mother name validation error"
+    "enterPassword": "Please enter password",
+    "@enterPassword": {
+        "description": "Password validation error"
+    },
+    "rememberMe": "Remember Me",
+    "@rememberMe": {
+        "description": "Remember me checkbox label"
     },
     "home": "Home",
     "@home": {

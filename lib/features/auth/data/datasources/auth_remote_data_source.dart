@@ -1,9 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/failures.dart';
-import 'package:delegate_app/features/auth/data/models/user_model.dart';
+import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 
 abstract class AuthRemoteDataSource {
-  Future<UserModel> login(String mobile, String motherName);
+  Future<DelegateModel?> getDelegateByPhone(String phoneNumber);
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -12,29 +12,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   AuthRemoteDataSourceImpl({required this.firestore});
 
   @override
-  Future<UserModel> login(String mobile, String motherName) async {
+  Future<DelegateModel?> getDelegateByPhone(String phoneNumber) async {
     try {
       final querySnapshot = await firestore
-          .collection('users')
-          .where('mobile', isEqualTo: mobile)
+          .collectionGroup('delegates')
+          .where('phoneNumber', isEqualTo: phoneNumber)
           .limit(1)
           .get();
 
-      if (querySnapshot.docs.isEmpty) {
-        throw const AuthFailure('User not found');
+      if (querySnapshot.docs.isNotEmpty) {
+        final doc = querySnapshot.docs.first;
+        return DelegateModel.fromJson(doc.data(), doc.id);
+      } else {
+        return null;
       }
-
-      final doc = querySnapshot.docs.first;
-      final userData = doc.data();
-
-      if (userData['motherName'] != motherName) {
-        throw const AuthFailure('Invalid credentials');
-      }
-
-      return UserModel.fromJson(userData, doc.id);
     } catch (e) {
-      if (e is AuthFailure) rethrow; // Pass specific failures
-      throw const ServerFailure('Login failed due to server error');
+      throw ServerFailure('فشل في الاتصال بالخادم: $e');
     }
   }
 }

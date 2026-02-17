@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:delegate_app/features/auth/domain/entities/user.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:go_router/go_router.dart';
 
 class SettingsScreen extends StatelessWidget {
-  final User user;
+  final Delegate delegate;
 
-  const SettingsScreen({super.key, required this.user});
+  const SettingsScreen({super.key, required this.delegate});
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +235,7 @@ class SettingsScreen extends StatelessWidget {
             ),
             onPressed: () {
               Navigator.pop(dialogContext);
-              context.go('/');
+              context.go('/login');
             },
             child: Text(l10n.logout),
           ),

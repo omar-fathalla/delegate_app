@@ -4,16 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
-import 'package:delegate_app/features/auth/domain/entities/user.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class AttendanceScreen extends StatefulWidget {
-  final User user;
+  final Delegate delegate;
 
-  const AttendanceScreen({super.key, required this.user});
+  const AttendanceScreen({super.key, required this.delegate});
 
   @override
   State<AttendanceScreen> createState() => _AttendanceScreenState();
@@ -30,7 +30,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final l10n = AppLocalizations.of(context)!;
     return BlocProvider(
       create: (context) =>
-          sl<AttendanceBloc>()..add(HistoryRequested(userId: widget.user.id)),
+          sl<AttendanceBloc>()
+            ..add(HistoryRequested(userId: widget.delegate.uid)),
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
@@ -624,7 +625,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   void _checkIn(BuildContext context, AttendanceBloc bloc, String branchName) {
     bloc.add(
       CheckInRequested(
-        userId: widget.user.id,
+        userId: widget.delegate.uid,
         lat:
             30.0444, // Mock location for now, or use real location if available
         long: 31.2357,
