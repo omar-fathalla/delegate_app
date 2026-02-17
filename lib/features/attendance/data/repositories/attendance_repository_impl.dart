@@ -8,12 +8,10 @@ import 'package:delegate_app/features/attendance/domain/repositories/attendance_
 class AttendanceRepositoryImpl implements AttendanceRepository {
   final AttendanceRemoteDataSource remoteDataSource;
   final AttendanceLocalDataSource localDataSource;
-  final bool isDemoMode;
 
   AttendanceRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
-    this.isDemoMode = true,
   });
 
   @override
@@ -30,9 +28,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         long,
         branchName: branchName,
       );
-      if (isDemoMode) {
-        await localDataSource.cacheAttendance(result);
-      }
+      // Always cache attendance after successful remote write
+      await localDataSource.cacheAttendance(result);
       return Right(result);
     } on Failure catch (e) {
       return Left(e);
@@ -47,9 +44,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   ) async {
     try {
       final result = await remoteDataSource.checkOut(attendanceId, lat, long);
-      if (isDemoMode) {
-        await localDataSource.updateAttendance(result);
-      }
+      // Always update local cache after successful checkout
+      await localDataSource.updateAttendance(result);
       return Right(result);
     } on Failure catch (e) {
       return Left(e);
@@ -59,13 +55,28 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   @override
   Future<Either<Failure, List<Attendance>>> getHistory(String userId) async {
     try {
-      if (isDemoMode) {
+      final result = await remoteDataSource.getHistory(userId);
+      return Right(result);
+    } on Failure catch (e) {
+      // On network error, fallback to local cache
+      try {
         final localHistory = await localDataSource.getLastAttendanceHistory();
         if (localHistory.isNotEmpty) {
           return Right(localHistory);
         }
+      } catch (_) {
+        // If local also fails, return the original remote failure
       }
-      final result = await remoteDataSource.getHistory(userId);
+      return Left(e);
+    }
+  }
+
+  @override
+  Future<Either<Failure, Attendance?>> findActiveAttendance(
+    String userId,
+  ) async {
+    try {
+      final result = await remoteDataSource.findActiveAttendance(userId);
       return Right(result);
     } on Failure catch (e) {
       return Left(e);

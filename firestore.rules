@@ -3,20 +3,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection: delegates can only read their own document
-    match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if false; // Admin only via Dashboard
+    // Global rule: allow all authenticated users (Web Dashboard)
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
 
-    // Attendance collection: delegates can read/write their own records
+    // Delegates collectionGroup: allow unauthenticated read for mobile app login
+    match /{path=**}/delegates/{delegateId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Attendance: allow unauthenticated access for mobile app
     match /attendance/{attendanceId} {
-      allow read: if request.auth != null
-                  && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null
-                    && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null
-                    && resource.data.userId == request.auth.uid;
+      allow read, create, update: if true;
       allow delete: if false;
     }
   }

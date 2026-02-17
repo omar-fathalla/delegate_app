@@ -15,4 +15,7 @@ abstract class AttendanceRepository {
     double long,
   );
   Future<Either<Failure, List<Attendance>>> getHistory(String userId);
+
+  /// Finds the active attendance session (no checkOutTime) for the delegate.
+  Future<Either<Failure, Attendance?>> findActiveAttendance(String userId);
 }

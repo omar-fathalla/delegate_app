@@ -50,6 +50,13 @@ class MockAttendanceRepository implements AttendanceRepository {
   Future<Either<Failure, List<Attendance>>> getHistory(String userId) async {
     return const Right([]);
   }
+
+  @override
+  Future<Either<Failure, Attendance?>> findActiveAttendance(
+    String userId,
+  ) async {
+    return const Right(null);
+  }
 }
 
 void main() {

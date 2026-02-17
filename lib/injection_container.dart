@@ -91,11 +91,8 @@ Future<void> init() async {
 
   // Repository
   sl.registerLazySingleton<AttendanceRepository>(
-    () => AttendanceRepositoryImpl(
-      remoteDataSource: sl(),
-      localDataSource: sl(),
-      isDemoMode: false,
-    ),
+    () =>
+        AttendanceRepositoryImpl(remoteDataSource: sl(), localDataSource: sl()),
   );
 
   // Data sources

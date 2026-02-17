@@ -24,6 +24,15 @@ class AuthRepositoryImpl implements AuthRepository {
       if (delegate == null) {
         return const Left(AuthFailure('رقم الهاتف غير مسجل'));
       }
+
+      // Validate delegate status — block Suspended/Rejected accounts
+      if (delegate.status == DelegateStatus.suspended) {
+        return const Left(AuthFailure('تم تعليق حسابك. تواصل مع الإدارة.'));
+      }
+      if (delegate.status == DelegateStatus.rejected) {
+        return const Left(AuthFailure('تم رفض حسابك. تواصل مع الإدارة.'));
+      }
+
       return Right(delegate);
     } on Failure catch (failure) {
       return Left(failure);

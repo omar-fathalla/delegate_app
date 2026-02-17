@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -86,22 +87,8 @@ class _ProfileBody extends StatelessWidget {
       padding: const EdgeInsetsDirectional.fromSTEB(20, 30, 20, 24),
       child: Column(
         children: [
-          // Avatar
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.5),
-                width: 3,
-              ),
-            ),
-            child: CircleAvatar(
-              radius: 45,
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
-              child: const Icon(Icons.person, size: 50, color: Colors.white),
-            ),
-          ),
+          // Avatar — use personal photo if available
+          _buildProfileAvatar(),
           const SizedBox(height: 14),
           // Name
           Text(
@@ -144,6 +131,44 @@ class _ProfileBody extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildProfileAvatar() {
+    final personalPhotoUrl = _getPersonalPhotoUrl();
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.5),
+          width: 3,
+        ),
+      ),
+      child: personalPhotoUrl != null
+          ? CircleAvatar(
+              radius: 45,
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              backgroundImage: CachedNetworkImageProvider(personalPhotoUrl),
+            )
+          : CircleAvatar(
+              radius: 45,
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              child: const Icon(Icons.person, size: 50, color: Colors.white),
+            ),
+    );
+  }
+
+  String? _getPersonalPhotoUrl() {
+    try {
+      final photoDoc = delegate.documents.firstWhere(
+        (doc) =>
+            doc.documentKey == DocumentKey.personalPhoto &&
+            doc.documentURL.isNotEmpty,
+      );
+      return photoDoc.documentURL;
+    } catch (_) {
+      return null;
+    }
   }
 
   // ─── Tab 1: Personal Information ────────────────────────────────
@@ -274,7 +299,7 @@ class _ProfileBody extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 14,
         crossAxisSpacing: 14,
-        childAspectRatio: 0.85,
+        childAspectRatio: 0.72,
       ),
       itemCount: delegate.documents.length,
       itemBuilder: (context, index) {
@@ -437,144 +462,231 @@ class _DocumentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String title = _getDocumentTitle(document.documentKey, l10n);
-    final IconData icon = _getDocumentIcon(document.documentKey);
     final Color statusColor = _getStatusColor(document.documentStatus);
     final IconData statusIcon = _getStatusIcon(document.documentStatus);
     final String statusText = _getStatusText(document.documentStatus, l10n);
-    final dateFormat = DateFormat('yyyy/MM/dd HH:mm');
+    final bool hasImage = document.documentURL.isNotEmpty;
 
     return Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(color: statusColor.withValues(alpha: 0.3), width: 1),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () async {
-            if (document.documentURL.isEmpty) return;
-            final uri = Uri.parse(document.documentURL);
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri);
-            } else {
-              if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(l10n.errorGeneral)));
-              }
-            }
+          onTap: () {
+            if (!hasImage) return;
+            _showFullScreenImage(context, title);
           },
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Image Thumbnail ──
+              Expanded(
+                flex: 3,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                    // Image or placeholder
+                    hasImage
+                        ? CachedNetworkImage(
+                            imageUrl: document.documentURL,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: const Color(0xFFF0F4FF),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Color(0xFF0D47A1),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              color: const Color(0xFFF0F4FF),
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.broken_image_outlined,
+                                    size: 32,
+                                    color: Color(0xFFB0BEC5),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'فشل التحميل',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Color(0xFFB0BEC5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : Container(
+                            color: const Color(0xFFF0F4FF),
+                            child: Icon(
+                              _getDocumentIcon(document.documentKey),
+                              size: 40,
+                              color: const Color(0xFFB0BEC5),
+                            ),
+                          ),
+                    // Status badge overlay
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: statusColor.withValues(alpha: 0.4),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(statusIcon, size: 10, color: Colors.white),
+                            const SizedBox(width: 3),
+                            Text(
+                              statusText,
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Icon(icon, color: statusColor, size: 20),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
+                    // Zoom icon overlay
+                    if (hasImage)
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.zoom_in_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // ── Bottom Info ──
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                         title,
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1A1A2E),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(statusIcon, size: 12, color: statusColor),
-                          const SizedBox(width: 4),
-                          Text(
-                            statusText,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: statusColor,
-                            ),
+                      const Spacer(),
+                      if (document.rejectionReason != null &&
+                          document.documentStatus ==
+                              DocumentStatus.rejected) ...[
+                        Text(
+                          document.rejectionReason!,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.red[700],
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (document.rejectionReason != null &&
-                    document.documentStatus == DocumentStatus.rejected) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.red.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Text(
-                      document.rejectionReason!,
-                      style: TextStyle(fontSize: 12, color: Colors.red[800]),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                Divider(height: 1, color: Colors.grey.withValues(alpha: 0.1)),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (document.uploadedAt != null)
-                      Text(
-                        l10n.uploadedOn(
-                          dateFormat.format(document.uploadedAt!),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                      ),
-                  ],
+                      ] else if (document.uploadedAt != null) ...[
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 11,
+                              color: Colors.grey[500],
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                DateFormat(
+                                  'yyyy/MM/dd',
+                                ).format(document.uploadedAt!),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[500],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, String title) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierDismissible: true,
+        barrierColor: Colors.black87,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return _FullScreenImageViewer(
+            imageUrl: document.documentURL,
+            title: title,
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
       ),
     );
   }
@@ -629,11 +741,11 @@ class _DocumentCard extends StatelessWidget {
   IconData _getStatusIcon(DocumentStatus status) {
     switch (status) {
       case DocumentStatus.approved:
-        return Icons.check_circle_outline;
+        return Icons.check_circle;
       case DocumentStatus.rejected:
-        return Icons.error_outline;
+        return Icons.cancel;
       case DocumentStatus.pending:
-        return Icons.access_time;
+        return Icons.schedule;
       case DocumentStatus.notProvided:
         return Icons.remove_circle_outline;
     }
@@ -650,6 +762,78 @@ class _DocumentCard extends StatelessWidget {
       case DocumentStatus.notProvided:
         return l10n.notProvidedStatus;
     }
+  }
+}
+
+// ─── Full-Screen Image Viewer ─────────────────────────────────────
+class _FullScreenImageViewer extends StatelessWidget {
+  final String imageUrl;
+  final String title;
+
+  const _FullScreenImageViewer({required this.imageUrl, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.open_in_new_rounded, color: Colors.white),
+            tooltip: 'Open in browser',
+            onPressed: () async {
+              final uri = Uri.parse(imageUrl);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+          ),
+        ],
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: CachedNetworkImage(
+            imageUrl: imageUrl,
+            fit: BoxFit.contain,
+            placeholder: (context, url) => const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+            errorWidget: (context, url, error) => const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.broken_image_outlined,
+                  size: 64,
+                  color: Colors.white54,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'فشل تحميل الصورة',
+                  style: TextStyle(color: Colors.white54, fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

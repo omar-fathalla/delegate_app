@@ -100,4 +100,16 @@ class MockAttendanceDataSource implements AttendanceRemoteDataSource {
     await Future.delayed(const Duration(seconds: 1));
     return _history.where((element) => element.userId == userId).toList();
   }
+
+  @override
+  Future<AttendanceModel?> findActiveAttendance(String userId) async {
+    await Future.delayed(const Duration(seconds: 1));
+    try {
+      return _history.firstWhere(
+        (element) => element.userId == userId && element.checkOutTime == null,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 }

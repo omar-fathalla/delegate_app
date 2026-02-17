@@ -47,29 +47,30 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBryG9yxpqT8v9fA4gzJwv2ROK6O-G1XcU',
-    appId: '1:339676746959:web:a196328657b849ff45d3ba',
-    messagingSenderId: '339676746959',
-    projectId: 'delegate-app-ee931',
-    authDomain: 'delegate-app-ee931.firebaseapp.com',
-    storageBucket: 'delegate-app-ee931.firebasestorage.app',
-    measurementId: 'G-F22WP7V7T6',
+    apiKey: 'AIzaSyC3IAfxOSBzBsir0d9silrqHQK5b3dcEJQ',
+    appId: '1:564223619997:web:382c753c3b586f52233574',
+    messagingSenderId: '564223619997',
+    projectId: 'practice-firebase-72df1',
+    authDomain: 'practice-firebase-72df1.firebaseapp.com',
+    storageBucket: 'practice-firebase-72df1.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDtJBV6tydjpW2FqZFB1xTu77_B4aReKDE',
-    appId: '1:339676746959:android:ce3471d96eb6582445d3ba',
-    messagingSenderId: '339676746959',
-    projectId: 'delegate-app-ee931',
-    storageBucket: 'delegate-app-ee931.firebasestorage.app',
+    apiKey: 'AIzaSyAdPKLrk8zh93k6IQMs1l3wwHqPlv7tlsc',
+    appId: '1:564223619997:android:170b65e4929f759d233574',
+    messagingSenderId: '564223619997',
+    projectId: 'practice-firebase-72df1',
+    storageBucket: 'practice-firebase-72df1.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCv74UwkdhUM9-tJBzGf1VSIMMKForVHac',
-    appId: '1:339676746959:ios:80192bd90c8ff5f545d3ba',
-    messagingSenderId: '339676746959',
-    projectId: 'delegate-app-ee931',
-    storageBucket: 'delegate-app-ee931.firebasestorage.app',
+    apiKey: 'AIzaSyAi6ryBU40avvR0X6xwk7DAeyvNlrYhpgc',
+    appId: '1:564223619997:ios:b9d69e6cf6fe5d87233574',
+    messagingSenderId: '564223619997',
+    projectId: 'practice-firebase-72df1',
+    storageBucket: 'practice-firebase-72df1.firebasestorage.app',
+    iosClientId: '564223619997-n7bfrj732fs10j5g3ar1e18sdgru5d90.apps.googleusercontent.com',
     iosBundleId: 'com.example.delegateApp',
   );
+
 }
