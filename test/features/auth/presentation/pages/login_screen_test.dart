@@ -3,8 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
+import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
+import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 // Manual mock for AuthBloc
 class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
@@ -12,6 +15,12 @@ class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
 
   @override
   Login get loginUseCase => throw UnimplementedError();
+
+  @override
+  CheckAutoLogin get checkAutoLoginUseCase => throw UnimplementedError();
+
+  @override
+  Logout get logoutUseCase => throw UnimplementedError();
 }
 
 void main() {
@@ -23,7 +32,14 @@ void main() {
   });
 
   testWidgets('LoginScreen disposes correctly', (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: LoginScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
     // Interact with text fields to ensure controllers are active
     await tester.enterText(find.byType(TextFormField).at(0), '1234567890');
@@ -41,7 +57,14 @@ void main() {
 
   testWidgets('LoginScreen toggles password visibility',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: LoginScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
     // Find the Mother's Name text field (it's the second TextFormField)
     final motherNameFieldFinder = find.byType(TextFormField).at(1);
