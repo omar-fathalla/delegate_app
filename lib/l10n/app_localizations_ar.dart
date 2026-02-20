@@ -315,4 +315,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get notProvidedStatus => 'لم يتم تقديمها';
+
+  @override
+  String get showPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
 }

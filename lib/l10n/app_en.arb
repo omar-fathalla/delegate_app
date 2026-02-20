@@ -446,5 +446,13 @@
     "notProvidedStatus": "Not Provided",
     "@notProvidedStatus": {
         "description": "Not provided document status"
+    },
+    "showPassword": "Show password",
+    "@showPassword": {
+        "description": "Tooltip for show password icon"
+    },
+    "hidePassword": "Hide password",
+    "@hidePassword": {
+        "description": "Tooltip for hide password icon"
     }
 }
