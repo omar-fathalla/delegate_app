@@ -18,6 +18,9 @@ class MockAttendanceRepository implements AttendanceRepository {
     String userId,
     double lat,
     double long, {
+    required String companyId,
+    required String organizationId,
+    required String deviceInfo,
     String? branchName,
   }) async {
     return Right(

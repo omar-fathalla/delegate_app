@@ -36,47 +36,10 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       String? organizationUID = userData['organizationUID'];
       String? companyUID = userData['companyUID'];
 
-      // AUTO-FIX: If Org/Comp IDs are missing, create default data
       if (organizationUID == null || companyUID == null) {
-        debugPrint(
-          'Missing Organization/Company IDs for user $uid. Attempting auto-fix...',
+        throw ServerException(
+          'User profile incomplete (Missing Org/Company ID). Please contact admin.',
         );
-
-        const defaultOrgId = 'fathalla_market';
-        const defaultCompId = 'main_branch';
-
-        // 1. Update User Document
-        await firestore.collection('users').doc(uid).update({
-          'organizationUID': defaultOrgId,
-          'companyUID': defaultCompId,
-        });
-
-        // 2. Ensure Organization Exists
-        final orgRef = firestore.collection('organizations').doc(defaultOrgId);
-        final orgDoc = await orgRef.get();
-        if (!orgDoc.exists) {
-          await orgRef.set({
-            'uid': defaultOrgId,
-            'name': 'Fathalla Market',
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        // 3. Ensure Company Exists
-        final compRef = orgRef.collection('companies').doc(defaultCompId);
-        final compDoc = await compRef.get();
-        if (!compDoc.exists) {
-          await compRef.set({
-            'uid': defaultCompId,
-            'name': 'Main Branch',
-            'organizationUID': defaultOrgId,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        // 4. Update local variables to proceed
-        organizationUID = defaultOrgId;
-        companyUID = defaultCompId;
       }
 
       // 2. Fetch Delegate Data using the constructed path
@@ -91,39 +54,9 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final delegateDoc = await delegateRef.get();
 
       if (!delegateDoc.exists) {
-        debugPrint('Delegate profile not found for $uid. Creating default...');
-        // AUTO-FIX: Create Default Delegate Profile
-        final defaultDelegateData = {
-          'uid': uid,
-          'firstName': userData['firstName'] ?? 'Delegate',
-          'middleName': '',
-          'lastName': '',
-          'fullName': userData['fullName'] ?? 'Delegate User',
-          'nationalityID': '',
-          'motherName': '',
-          'city': '',
-          'phoneNumber': userData['phoneNumber'] ?? '',
-          'gender': 'Male',
-          'position': 'Promoter',
-          'birthDate': Timestamp.now(),
-          'organizationUID': organizationUID,
-          'companyUID': companyUID,
-          'status': 'Pending',
-          'documents': [],
-          'createdAt': FieldValue.serverTimestamp(),
-        };
-
-        await delegateRef.set(defaultDelegateData);
-
-        // Return the newly created model
-        // Note: we can't use fromJson immediate because some fields like timestamps might need fetch
-        // But for speed, we construct it manually or re-fetch.
-        // Let's re-fetch to be safe and consistent.
-        final newDoc = await delegateRef.get();
-        if (!newDoc.exists || newDoc.data() == null) {
-          throw ServerException('Failed to create default delegate profile');
-        }
-        return DelegateModel.fromJson(newDoc.data()!, uid);
+        throw ServerException(
+          'Delegate profile not found in Organization records.',
+        );
       }
 
       final delegateData = delegateDoc.data();

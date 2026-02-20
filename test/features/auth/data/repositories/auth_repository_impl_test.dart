@@ -21,6 +21,15 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     }
     throw UnimplementedError();
   }
+
+  Future<void> Function()? signInAnonymouslyStub;
+
+  @override
+  Future<void> signInAnonymously() async {
+    if (signInAnonymouslyStub != null) {
+      return signInAnonymouslyStub!();
+    }
+  }
 }
 
 class MockAuthLocalDataSource implements AuthLocalDataSource {

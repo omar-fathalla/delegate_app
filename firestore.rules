@@ -14,10 +14,30 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Attendance: allow unauthenticated access for mobile app
-    match /attendance/{attendanceId} {
-      allow read, create, update: if true;
-      allow delete: if false;
+    // --- Delegate App Rules ---
+
+    // 1. Attendance Logs (New System) - Authenticated, Append-Only
+    match /attendance_logs/{document=**} {
+      allow read, create: if request.auth != null;
+      allow update, delete: if false;
     }
+
+    // 2. Testing Logs (Dev Environment)
+    match /attendance_logs_testing/{document=**} {
+      allow read, create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    // 3. Delegate Profile (Read-Only)
+    match /users/{userId} {
+      allow read: if request.auth != null;
+    }
+
+    // 4. Organization/Company Data (Read-Only)
+    match /organizations/{orgId}/companies/{compId}/delegates/{userId} {
+      allow read: if request.auth != null;
+    }
+    
+    // --- End Delegate App Rules ---
   }
 }

@@ -7,6 +7,9 @@ abstract class AttendanceRepository {
     String userId,
     double lat,
     double long, {
+    required String companyId,
+    required String organizationId,
+    required String deviceInfo,
     String? branchName,
   });
   Future<Either<Failure, Attendance>> checkOut(

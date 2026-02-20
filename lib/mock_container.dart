@@ -4,7 +4,6 @@ import 'package:delegate_app/features/attendance/data/models/attendance_model.da
 import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'dart:io';
 
 class MockAuthDataSource implements AuthRemoteDataSource {
   @override
@@ -46,6 +45,11 @@ class MockAuthDataSource implements AuthRemoteDataSource {
       return null;
     }
   }
+
+  @override
+  Future<void> signInAnonymously() async {
+    await Future.delayed(const Duration(seconds: 1));
+  }
 }
 
 class MockAttendanceDataSource implements AttendanceRemoteDataSource {
@@ -56,8 +60,10 @@ class MockAttendanceDataSource implements AttendanceRemoteDataSource {
     String userId,
     double lat,
     double long, {
-    File? image,
     String? branchName,
+    required String companyId,
+    required String deviceInfo,
+    required String organizationId,
   }) async {
     await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
     final attendance = AttendanceModel(

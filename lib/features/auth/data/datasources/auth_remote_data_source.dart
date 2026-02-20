@@ -1,12 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 abstract class AuthRemoteDataSource {
   /// Queries the `delegates` collectionGroup by phone number.
   /// Returns [DelegateModel] if found, `null` if not.
   Future<DelegateModel?> getDelegateByPhone(String phoneNumber);
+
+  /// Signs in the user anonymously to satisfy Firestore rules.
+  Future<void> signInAnonymously();
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -52,7 +56,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
     } on FirebaseException catch (e) {
       debugPrint(
-        'AuthRemoteDataSource.getDelegateByPhone FirebaseException: ${e.code}',
+        'AuthRemoteDataSource.getDelegateByPhone FirebaseException: Code: ${e.code}, Message: ${e.message}',
       );
       throw const ServerFailure(
         'فشل في الاتصال بقاعدة البيانات. حاول مرة أخرى.',
@@ -60,6 +64,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e) {
       debugPrint('AuthRemoteDataSource.getDelegateByPhone error: $e');
       throw const ServerFailure('حدث خطأ غير متوقع أثناء تسجيل الدخول.');
+    }
+  }
+
+  @override
+  Future<void> signInAnonymously() async {
+    try {
+      await FirebaseAuth.instance.signInAnonymously();
+    } catch (e) {
+      debugPrint('AuthRemoteDataSource.signInAnonymously error: $e');
+      throw const ServerFailure('فشل في تهيئة جلسة المستخدم.');
     }
   }
 }

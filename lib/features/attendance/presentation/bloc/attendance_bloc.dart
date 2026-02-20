@@ -35,6 +35,9 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     final result = await checkIn(
       CheckInParams(
         userId: event.userId,
+        companyId: event.companyId,
+        organizationId: event.organizationId,
+        deviceInfo: event.deviceInfo,
         lat: event.lat,
         long: event.long,
         branchName: event.branchName,

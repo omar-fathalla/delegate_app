@@ -19,6 +19,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     String userId,
     double lat,
     double long, {
+    required String companyId,
+    required String organizationId,
+    required String deviceInfo,
     String? branchName,
   }) async {
     try {
@@ -26,6 +29,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         userId,
         lat,
         long,
+        companyId: companyId,
+        organizationId: organizationId,
+        deviceInfo: deviceInfo,
         branchName: branchName,
       );
       // Always cache attendance after successful remote write

@@ -8,6 +8,8 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart'; // تم الاحتفاظ بها
 import 'package:geolocator/geolocator.dart'; // تم الاحتفاظ بها
 import 'package:intl/intl.dart';
+import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -148,8 +150,35 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final l10n = AppLocalizations.of(context)!;
     final locale = Localizations.localeOf(context).languageCode;
 
-    if (state is AttendanceLoading) {
+    if (state is AttendanceLoading ||
+        state is AttendanceInitial ||
+        state is AttendanceCheckedIn ||
+        state is AttendanceCheckedOut) {
       return const Center(child: CircularProgressIndicator());
+    } else if (state is AttendanceError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              state.message,
+              style: TextStyle(color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                context.read<AttendanceBloc>().add(
+                  HistoryRequested(userId: widget.delegate.uid),
+                );
+              },
+              child: Text(l10n.retry),
+            ),
+          ],
+        ),
+      );
     } else if (state is AttendanceHistoryLoaded) {
       final history = state.history.where((attendance) {
         return attendance.checkInTime.month == _selectedMonth.month &&
@@ -161,13 +190,31 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.calendar_today, size: 64, color: Colors.grey[300]),
-              const SizedBox(height: 16),
-              Text(
-                l10n.noRecordsForMonth(
-                  DateFormat('MMMM', locale).format(_selectedMonth),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D47A1).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
-                style: TextStyle(color: Colors.grey[600]),
+                child: const Icon(
+                  Icons.verified_user_outlined,
+                  size: 64,
+                  color: Color(0xFF0D47A1),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                l10n.noHistoryAvailable,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.scanToCheckIn,
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
               ),
             ],
           ),
@@ -623,10 +670,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     String branchName,
     Position position,
   ) async {
+    final deviceInfo = await _getDeviceInfo();
+
     bloc.add(
       CheckInRequested(
-        userId: widget.delegate.uid, // ✅ تصحيح اسم المتغير
-        lat: position.latitude, // ✅ استخدام الموقع الحقيقي
+        userId: widget.delegate.uid,
+        companyId: widget.delegate.companyUID,
+        organizationId: widget.delegate.organizationUID,
+        deviceInfo: deviceInfo,
+        lat: position.latitude,
         long: position.longitude,
         branchName: branchName,
       ),
@@ -685,5 +737,21 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
+  }
+
+  Future<String> _getDeviceInfo() async {
+    final deviceInfoPlugin = DeviceInfoPlugin();
+    try {
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfoPlugin.androidInfo;
+        return '${androidInfo.brand} ${androidInfo.model}';
+      } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfoPlugin.iosInfo;
+        return '${iosInfo.name} ${iosInfo.systemName} ${iosInfo.systemVersion}';
+      }
+    } catch (e) {
+      debugPrint('Error getting device info: $e');
+    }
+    return 'Unknown Device';
   }
 }

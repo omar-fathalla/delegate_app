@@ -9,19 +9,33 @@ abstract class AttendanceEvent extends Equatable {
 
 class CheckInRequested extends AttendanceEvent {
   final String userId;
+  final String companyId;
+  final String organizationId;
+  final String deviceInfo;
   final double lat;
   final double long;
   final String? branchName;
 
   const CheckInRequested({
     required this.userId,
+    required this.companyId,
+    required this.organizationId,
+    required this.deviceInfo,
     required this.lat,
     required this.long,
     this.branchName,
   });
 
   @override
-  List<Object?> get props => [userId, lat, long, branchName];
+  List<Object?> get props => [
+    userId,
+    companyId,
+    organizationId,
+    deviceInfo,
+    lat,
+    long,
+    branchName,
+  ];
 }
 
 class CheckOutRequested extends AttendanceEvent {

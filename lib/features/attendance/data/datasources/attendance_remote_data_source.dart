@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
 import 'package:flutter/foundation.dart';
@@ -8,6 +9,9 @@ abstract class AttendanceRemoteDataSource {
     String userId,
     double lat,
     double long, {
+    required String companyId,
+    required String organizationId,
+    required String deviceInfo,
     String? branchName,
   });
   Future<AttendanceModel> checkOut(
@@ -32,20 +36,23 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     String userId,
     double lat,
     double long, {
+    required String companyId,
+    required String organizationId,
+    required String deviceInfo,
     String? branchName,
   }) async {
     try {
-      final docRef = await firestore.collection('attendance').add({
-        'userId': userId,
-        'checkInTime': FieldValue.serverTimestamp(),
-        'latitude': lat,
-        'longitude': long,
-        'location': {'lat': lat, 'long': long},
+      final docRef = await firestore.collection(kAttendanceCollection).add({
+        'delegateId': userId,
+        'companyId': companyId,
+        'organizationId': organizationId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'check_in',
+        'location': {'latitude': lat, 'longitude': long},
+        'deviceInfo': deviceInfo,
         'branchName': branchName,
       });
 
-      // Return a local object with DateTime.now() for immediate UI feedback.
-      // The server timestamp will be set asynchronously by Firestore.
       return AttendanceModel(
         id: docRef.id,
         userId: userId,
@@ -72,31 +79,53 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     double long,
   ) async {
     try {
-      await firestore.collection('attendance').doc(attendanceId).update({
-        'checkOutTime': FieldValue.serverTimestamp(),
-        'checkOutLat': lat,
-        'checkOutLong': long,
-      });
+      // NOTE: We don't have easy access to company/org ID here without fetching user again.
+      // However, for check-out we mostly need userId and timestamp.
+      // For consistency, we might want to fetch the check-in doc, but that's in the log list now.
+      // COMPROMISE: We will proceed with minimal check-out info.
+      // Ideally, the Bloc should pass the full context.
+      // But for now, let's look up the LAST check-in to get the Organization info if needed.
+      // OR, since we are just logging, maybe we can skip orgId for check-out if the backend correlates them?
+      // No, let's fetch the last check-in to copy the IDs.
 
-      final doc = await firestore
-          .collection('attendance')
+      final lastCheckInSnapshot = await firestore
+          .collection(kAttendanceCollection)
+          //.where('userId', isEqualTo: ...) // userId is not passed cleanly here, assumes attendanceId is enough?
+          // BUT attendanceId was the DOC ID in the old system.
+          // In the new system, we actually need the USER ID to find the last log.
+          // The current signature takes `attendanceId`.
+          // Implementation Detail: In the new system, `attendanceId` returned by checkIn is the ID of the 'check_in' log doc.
+          // So we CAN fetch that doc to get metadata.
           .doc(attendanceId)
           .get();
 
-      final data = doc.data()!;
+      if (!lastCheckInSnapshot.exists) {
+        throw const ServerFailure('سجل الحضور غير موجود.');
+      }
+      final lastData = lastCheckInSnapshot.data()!;
+      final userId = lastData['delegateId'];
+      final companyId = lastData['companyId'];
+      final organizationId = lastData['organizationId'];
+
+      await firestore.collection(kAttendanceCollection).add({
+        'delegateId': userId,
+        'companyId': companyId,
+        'organizationId': organizationId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'check_out',
+        'location': {'latitude': lat, 'longitude': long},
+        'relatedCheckInId': attendanceId, // Link to the check-in
+      });
+
+      // Return a model representing the closed session
       return AttendanceModel(
-        id: doc.id,
-        userId: data['userId'] ?? '',
-        checkInTime: data['checkInTime'] != null
-            ? (data['checkInTime'] as Timestamp).toDate()
-            : DateTime.now(),
-        checkOutTime: data['checkOutTime'] != null
-            ? (data['checkOutTime'] as Timestamp).toDate()
-            : DateTime.now(),
-        latitude: (data['latitude'] as num?)?.toDouble() ?? 0.0,
-        longitude: (data['longitude'] as num?)?.toDouble() ?? 0.0,
-        imageUrl: data['imageUrl'],
-        branchName: data['branchName'],
+        id: attendanceId,
+        userId: userId,
+        checkInTime: (lastData['timestamp'] as Timestamp).toDate(),
+        checkOutTime: DateTime.now(),
+        latitude: (lastData['location']['latitude'] as num).toDouble(),
+        longitude: (lastData['location']['longitude'] as num).toDouble(),
+        branchName: lastData['branchName'],
       );
     } on FirebaseException catch (e) {
       debugPrint(
@@ -113,31 +142,62 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   Future<List<AttendanceModel>> getHistory(String userId) async {
     try {
       final querySnapshot = await firestore
-          .collection('attendance')
-          .where('userId', isEqualTo: userId)
-          .orderBy('checkInTime', descending: true)
+          .collection(kAttendanceCollection)
+          .where('delegateId', isEqualTo: userId)
+          .orderBy('timestamp', descending: false) // Process chronologically
           .get();
 
-      return querySnapshot.docs.map((doc) {
+      final List<AttendanceModel> history = [];
+      final Map<String, AttendanceModel> openSessions = {};
+
+      for (var doc in querySnapshot.docs) {
         final data = doc.data();
-        return AttendanceModel(
-          id: doc.id,
-          userId: data['userId'] ?? '',
-          checkInTime: data['checkInTime'] != null
-              ? (data['checkInTime'] as Timestamp).toDate()
-              : DateTime.now(),
-          checkOutTime: data['checkOutTime'] != null
-              ? (data['checkOutTime'] as Timestamp).toDate()
-              : null,
-          latitude: (data['latitude'] as num?)?.toDouble() ?? 0.0,
-          longitude: (data['longitude'] as num?)?.toDouble() ?? 0.0,
-          imageUrl: data['imageUrl'],
-          branchName: data['branchName'],
-        );
-      }).toList();
+        final type = data['type'] as String?;
+
+        if (type == 'check_in') {
+          final model = AttendanceModel(
+            id: doc.id,
+            userId: data['delegateId'] ?? '',
+            checkInTime: data['timestamp'] != null
+                ? (data['timestamp'] as Timestamp).toDate()
+                : DateTime.now(),
+            latitude: (data['location']['latitude'] as num?)?.toDouble() ?? 0.0,
+            longitude:
+                (data['location']['longitude'] as num?)?.toDouble() ?? 0.0,
+            branchName: data['branchName'],
+          );
+          openSessions[doc.id] = model;
+        } else if (type == 'check_out') {
+          final relatedId = data['relatedCheckInId'] as String?;
+          if (relatedId != null && openSessions.containsKey(relatedId)) {
+            final checkInModel = openSessions.remove(relatedId)!;
+            final completedSession = AttendanceModel(
+              id: checkInModel.id,
+              userId: checkInModel.userId,
+              checkInTime: checkInModel.checkInTime,
+              checkOutTime: data['timestamp'] != null
+                  ? (data['timestamp'] as Timestamp).toDate()
+                  : DateTime.now(),
+              latitude: checkInModel.latitude,
+              longitude: checkInModel.longitude,
+              branchName: checkInModel.branchName,
+              // We could store check-out location too if model supports it
+            );
+            history.add(completedSession);
+          }
+        }
+      }
+
+      // Add any remaining open sessions (active check-ins)
+      history.addAll(openSessions.values);
+
+      // Sort by check-in time descending for the UI
+      history.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
+
+      return history;
     } on FirebaseException catch (e) {
       debugPrint(
-        'AttendanceRemoteDataSource.getHistory FirebaseException: ${e.code}',
+        'AttendanceRemoteDataSource.getHistory FirebaseException: Code: ${e.code}, Message: ${e.message}, Plugin: ${e.plugin}',
       );
       throw const ServerFailure('فشل في تحميل سجل الحضور.');
     } catch (e) {
@@ -149,29 +209,36 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   @override
   Future<AttendanceModel?> findActiveAttendance(String userId) async {
     try {
+      // Get the single most recent log for this user
       final querySnapshot = await firestore
-          .collection('attendance')
-          .where('userId', isEqualTo: userId)
-          .where('checkOutTime', isNull: true)
-          .orderBy('checkInTime', descending: true)
+          .collection(kAttendanceCollection)
+          .where('delegateId', isEqualTo: userId)
+          .orderBy('timestamp', descending: true)
           .limit(1)
           .get();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final doc = querySnapshot.docs.first;
-        final data = doc.data();
+      if (querySnapshot.docs.isEmpty) {
+        return null;
+      }
+
+      final doc = querySnapshot.docs.first;
+      final data = doc.data();
+
+      // If the last log is 'check_in', then the user is currently checked in.
+      if (data['type'] == 'check_in') {
         return AttendanceModel(
           id: doc.id,
-          userId: data['userId'] ?? '',
-          checkInTime: data['checkInTime'] != null
-              ? (data['checkInTime'] as Timestamp).toDate()
+          userId: data['delegateId'] ?? '',
+          checkInTime: data['timestamp'] != null
+              ? (data['timestamp'] as Timestamp).toDate()
               : DateTime.now(),
-          latitude: (data['latitude'] as num?)?.toDouble() ?? 0.0,
-          longitude: (data['longitude'] as num?)?.toDouble() ?? 0.0,
-          imageUrl: data['imageUrl'],
+          latitude: (data['location']['latitude'] as num?)?.toDouble() ?? 0.0,
+          longitude: (data['location']['longitude'] as num?)?.toDouble() ?? 0.0,
           branchName: data['branchName'],
         );
       }
+
+      // If the last log is 'check_out', then there is no active session.
       return null;
     } on FirebaseException catch (e) {
       debugPrint(

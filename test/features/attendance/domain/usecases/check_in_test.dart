@@ -10,6 +10,9 @@ class MockAttendanceRepository implements AttendanceRepository {
     String,
     double,
     double, {
+    required String companyId,
+    required String organizationId,
+    required String deviceInfo,
     String? branchName,
   })?
   checkInStub;
@@ -19,10 +22,21 @@ class MockAttendanceRepository implements AttendanceRepository {
     String userId,
     double lat,
     double long, {
+    required String companyId,
+    required String organizationId,
+    required String deviceInfo,
     String? branchName,
   }) async {
     if (checkInStub != null) {
-      return checkInStub!(userId, lat, long, branchName: branchName);
+      return checkInStub!(
+        userId,
+        lat,
+        long,
+        companyId: companyId,
+        organizationId: organizationId,
+        deviceInfo: deviceInfo,
+        branchName: branchName,
+      );
     }
     throw UnimplementedError();
   }
@@ -57,6 +71,9 @@ void main() {
   });
 
   const tUserId = 'testUser';
+  const tCompanyId = 'testCompany';
+  const tOrganizationId = 'testOrg';
+  const tDeviceInfo = 'testDevice';
   const tLat = 12.34;
   const tLong = 56.78;
   const tBranchName = 'TestBranch';
@@ -73,10 +90,21 @@ void main() {
   test('should get attendance from the repository', () async {
     // arrange
     mockAttendanceRepository.checkInStub =
-        (userId, lat, long, {branchName}) async {
+        (
+          userId,
+          lat,
+          long, {
+          required companyId,
+          required organizationId,
+          required deviceInfo,
+          branchName,
+        }) async {
           if (userId == tUserId &&
               lat == tLat &&
               long == tLong &&
+              companyId == tCompanyId &&
+              organizationId == tOrganizationId &&
+              deviceInfo == tDeviceInfo &&
               branchName == tBranchName) {
             return Right(tAttendance);
           }
@@ -89,6 +117,9 @@ void main() {
         userId: tUserId,
         lat: tLat,
         long: tLong,
+        companyId: tCompanyId,
+        organizationId: tOrganizationId,
+        deviceInfo: tDeviceInfo,
         branchName: tBranchName,
       ),
     );
@@ -101,7 +132,15 @@ void main() {
     // arrange
     const tFailure = ServerFailure('Server Error');
     mockAttendanceRepository.checkInStub =
-        (userId, lat, long, {branchName}) async {
+        (
+          userId,
+          lat,
+          long, {
+          required companyId,
+          required organizationId,
+          required deviceInfo,
+          branchName,
+        }) async {
           return const Left(tFailure);
         };
 
@@ -111,6 +150,9 @@ void main() {
         userId: tUserId,
         lat: tLat,
         long: tLong,
+        companyId: tCompanyId,
+        organizationId: tOrganizationId,
+        deviceInfo: tDeviceInfo,
         branchName: tBranchName,
       ),
     );

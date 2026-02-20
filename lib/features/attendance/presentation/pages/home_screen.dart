@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
@@ -36,7 +38,9 @@ class _HomeScreenState extends State<HomeScreen> {
               CircleAvatar(
                 backgroundColor: const Color(0xFF0D47A1),
                 child: Text(
-                  widget.delegate.firstName.isNotEmpty ? widget.delegate.firstName[0].toUpperCase() : '?',
+                  widget.delegate.firstName.isNotEmpty
+                      ? widget.delegate.firstName[0].toUpperCase()
+                      : '?',
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
@@ -170,22 +174,42 @@ class _HomeScreenState extends State<HomeScreen> {
                   GestureDetector(
                     onTap: state is AttendanceLoading
                         ? null
-                        : () {
-                            // Mock Location for now (30.0, 31.0)
+                        : () async {
                             if (isCheckedIn) {
-                              // Need attendance ID properly, simplified for demonstration
-                              // In real logic, we should fetch current active attendance
                               BlocProvider.of<AttendanceBloc>(context).add(
                                 const CheckOutRequested(
-                                  attendanceId: 'temp_id',
+                                  attendanceId:
+                                      'temp_id', // Needs fix in real app
                                   lat: 30.0,
                                   long: 31.0,
                                 ),
                               );
                             } else {
+                              final deviceInfoPlugin = DeviceInfoPlugin();
+                              String deviceInfoStr = 'Unknown Device';
+                              try {
+                                if (Platform.isAndroid) {
+                                  final androidInfo =
+                                      await deviceInfoPlugin.androidInfo;
+                                  deviceInfoStr =
+                                      '${androidInfo.brand} ${androidInfo.model}';
+                                } else if (Platform.isIOS) {
+                                  final iosInfo =
+                                      await deviceInfoPlugin.iosInfo;
+                                  deviceInfoStr =
+                                      '${iosInfo.name} ${iosInfo.systemName} ${iosInfo.systemVersion}';
+                                }
+                              } catch (_) {}
+
+                              if (!context.mounted) return;
+
                               BlocProvider.of<AttendanceBloc>(context).add(
                                 CheckInRequested(
                                   userId: widget.delegate.uid,
+                                  companyId: widget.delegate.companyUID,
+                                  organizationId:
+                                      widget.delegate.organizationUID,
+                                  deviceInfo: deviceInfoStr,
                                   lat: 30.0,
                                   long: 31.0,
                                 ),
@@ -322,4 +346,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
