@@ -11,6 +11,9 @@ class AttendanceModel extends Attendance {
     super.longitude,
     super.imageUrl,
     super.branchName,
+    super.isSynced = true,
+    super.localCheckInTime,
+    super.localCheckOutTime,
   });
 
   factory AttendanceModel.fromJson(Map<String, dynamic> json, String id) {
@@ -31,6 +34,13 @@ class AttendanceModel extends Attendance {
       longitude: json['longitude']?.toDouble(),
       imageUrl: json['imageUrl'],
       branchName: json['branchName'],
+      isSynced: json['isSynced'] ?? true,
+      localCheckInTime: json['localCheckInTime'] != null
+          ? parseDate(json['localCheckInTime'])
+          : null,
+      localCheckOutTime: json['localCheckOutTime'] != null
+          ? parseDate(json['localCheckOutTime'])
+          : null,
     );
   }
 
@@ -43,6 +53,9 @@ class AttendanceModel extends Attendance {
       'longitude': longitude,
       'imageUrl': imageUrl,
       'branchName': branchName,
+      'isSynced': isSynced,
+      'localCheckInTime': localCheckInTime?.toIso8601String(),
+      'localCheckOutTime': localCheckOutTime?.toIso8601String(),
     };
   }
 }

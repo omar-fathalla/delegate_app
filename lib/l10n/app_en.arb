@@ -446,5 +446,101 @@
     "notProvidedStatus": "Not Provided",
     "@notProvidedStatus": {
         "description": "Not provided document status"
+    },
+    "adminDashboard": "Admin Dashboard",
+    "@adminDashboard": {
+        "description": "Admin dashboard title"
+    },
+    "addBranch": "Add New Branch",
+    "@addBranch": {
+        "description": "Add new branch title"
+    },
+    "branchName": "Branch Name",
+    "@branchName": {
+        "description": "Branch name label"
+    },
+    "branchLocation": "Branch Location",
+    "@branchLocation": {
+        "description": "Branch location label"
+    },
+    "geofenceRadius": "Attendance Radius (Meters)",
+    "@geofenceRadius": {
+        "description": "Geofence radius label"
+    },
+    "saveBranch": "Save Branch",
+    "@saveBranch": {
+        "description": "Save branch button"
+    },
+    "branchAddedSuccessfully": "Branch Added Successfully",
+    "@branchAddedSuccessfully": {
+        "description": "Branch added success message"
+    },
+    "pleaseEnterBranchName": "Please enter branch name",
+    "@pleaseEnterBranchName": {
+        "description": "Branch name required validation"
+    },
+    "pleaseSelectLocation": "Please select a location on the map",
+    "@pleaseSelectLocation": {
+        "description": "Location required validation"
+    },
+    "searchCityOrRegion": "Search city or region...",
+    "@searchCityOrRegion": {
+        "description": "Search bar hint"
+    },
+    "branches": "Branches",
+    "@branches": {
+        "description": "Label for the branches tab in the admin dashboard navigation."
+    },
+    "admin": "Admin",
+    "@admin": {
+        "description": "Label for the admin dashboard title."
+    },
+    "myLocation": "My Location",
+    "@myLocation": {
+        "description": "Label for the fetch current location button."
+    },
+    "locationServicesDisabled": "Location services are disabled.",
+    "@locationServicesDisabled": {
+        "description": "Error when GPS is disabled."
+    },
+    "locationPermissionDenied": "Location permission denied.",
+    "@locationPermissionDenied": {
+        "description": "Error when location permission is denied."
+    },
+    "errorFetchingLocation": "Error fetching location.",
+    "@errorFetchingLocation": {
+        "description": "Generic error when fetching location fails."
+    },
+    "branchDetails": "Branch Details",
+    "@branchDetails": {
+        "description": "Title for the branch details screen."
+    },
+    "downloadQR": "Download QR",
+    "@downloadQR": {
+        "description": "Button to download the QR code."
+    },
+    "qrSavedToGallery": "QR Code saved to gallery successfully!",
+    "@qrSavedToGallery": {
+        "description": "Message shown when QR is saved to gallery"
+    },
+    "editName": "Edit Name",
+    "@editName": {
+        "description": "Button to edit the branch name."
+    },
+    "deleteBranch": "Delete Branch",
+    "@deleteBranch": {
+        "description": "Button to delete the branch."
+    },
+    "deleteBranchConfirmation": "Are you sure you want to delete this branch?",
+    "@deleteBranchConfirmation": {
+        "description": "Confirmation message before deleting a branch."
+    },
+    "branchDeletedSuccessfully": "Branch deleted successfully.",
+    "@branchDeletedSuccessfully": {
+        "description": "Success message after deleting a branch."
+    },
+    "saveChanges": "Save Changes",
+    "@saveChanges": {
+        "description": "Button to save edited branch name."
     }
 }

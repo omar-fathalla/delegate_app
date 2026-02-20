@@ -24,6 +24,9 @@ abstract class AttendanceRemoteDataSource {
   /// Finds the active attendance record (where checkOutTime is null)
   /// for the given [userId]. Returns `null` if no active session exists.
   Future<AttendanceModel?> findActiveAttendance(String userId);
+
+  /// Syncs an offline queue of attendance actions to Firestore.
+  Future<void> syncOfflineQueue(List<Map<String, dynamic>> queue);
 }
 
 class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
@@ -248,6 +251,47 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     } catch (e) {
       debugPrint('AttendanceRemoteDataSource.findActiveAttendance error: $e');
       throw const ServerFailure('حدث خطأ غير متوقع.');
+    }
+  }
+
+  @override
+  Future<void> syncOfflineQueue(List<Map<String, dynamic>> queue) async {
+    try {
+      final batch = firestore.batch();
+      for (var action in queue) {
+        // We write directly to Firestore using serverTimestamp
+        final newDocRef = firestore.collection(kAttendanceCollection).doc();
+        final Map<String, dynamic> data = {
+          'delegateId': action['delegateId'],
+          'companyId': action['companyId'],
+          'organizationId': action['organizationId'],
+          'timestamp': FieldValue.serverTimestamp(),
+          'type': action['type'],
+          'location': action['location'],
+        };
+
+        if (action['deviceInfo'] != null) {
+          data['deviceInfo'] = action['deviceInfo'];
+        }
+        if (action['branchName'] != null) {
+          data['branchName'] = action['branchName'];
+        }
+        if (action['relatedCheckInId'] != null) {
+          data['relatedCheckInId'] = action['relatedCheckInId'];
+        }
+
+        batch.set(newDocRef, data);
+      }
+
+      await batch.commit();
+    } on FirebaseException catch (e) {
+      debugPrint(
+        'AttendanceRemoteDataSource.syncOfflineQueue FirebaseException: ${e.code}',
+      );
+      throw const ServerFailure('فشل في مزامنة البيانات المؤجلة.');
+    } catch (e) {
+      debugPrint('AttendanceRemoteDataSource.syncOfflineQueue error: $e');
+      throw const ServerFailure('حدث خطأ غير متوقع أثناء المزامنة.');
     }
   }
 }

@@ -9,6 +9,9 @@ class Attendance extends Equatable {
   final double? longitude;
   final String? imageUrl;
   final String? branchName;
+  final bool isSynced;
+  final DateTime? localCheckInTime;
+  final DateTime? localCheckOutTime;
 
   const Attendance({
     required this.id,
@@ -19,6 +22,9 @@ class Attendance extends Equatable {
     this.longitude,
     this.imageUrl,
     this.branchName,
+    this.isSynced = true,
+    this.localCheckInTime,
+    this.localCheckOutTime,
   });
 
   @override
@@ -31,5 +37,8 @@ class Attendance extends Equatable {
     longitude,
     imageUrl,
     branchName,
+    isSynced,
+    localCheckInTime,
+    localCheckOutTime,
   ];
 }

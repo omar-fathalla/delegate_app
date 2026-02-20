@@ -316,4 +316,77 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notProvidedStatus => 'Not Provided';
+
+  @override
+  String get adminDashboard => 'Admin Dashboard';
+
+  @override
+  String get addBranch => 'Add New Branch';
+
+  @override
+  String get branchName => 'Branch Name';
+
+  @override
+  String get branchLocation => 'Branch Location';
+
+  @override
+  String get geofenceRadius => 'Attendance Radius (Meters)';
+
+  @override
+  String get saveBranch => 'Save Branch';
+
+  @override
+  String get branchAddedSuccessfully => 'Branch Added Successfully';
+
+  @override
+  String get pleaseEnterBranchName => 'Please enter branch name';
+
+  @override
+  String get pleaseSelectLocation => 'Please select a location on the map';
+
+  @override
+  String get searchCityOrRegion => 'Search city or region...';
+
+  @override
+  String get branches => 'Branches';
+
+  @override
+  String get admin => 'Admin';
+
+  @override
+  String get myLocation => 'My Location';
+
+  @override
+  String get locationServicesDisabled => 'Location services are disabled.';
+
+  @override
+  String get locationPermissionDenied => 'Location permission denied.';
+
+  @override
+  String get errorFetchingLocation => 'Error fetching location.';
+
+  @override
+  String get branchDetails => 'Branch Details';
+
+  @override
+  String get downloadQR => 'Download QR';
+
+  @override
+  String get qrSavedToGallery => 'QR Code saved to gallery successfully!';
+
+  @override
+  String get editName => 'Edit Name';
+
+  @override
+  String get deleteBranch => 'Delete Branch';
+
+  @override
+  String get deleteBranchConfirmation =>
+      'Are you sure you want to delete this branch?';
+
+  @override
+  String get branchDeletedSuccessfully => 'Branch deleted successfully.';
+
+  @override
+  String get saveChanges => 'Save Changes';
 }

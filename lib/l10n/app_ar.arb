@@ -446,5 +446,101 @@
     "notProvidedStatus": "لم يتم تقديمها",
     "@notProvidedStatus": {
         "description": "Not provided document status"
+    },
+    "adminDashboard": "لوحة الإدارة",
+    "@adminDashboard": {
+        "description": "Admin dashboard title"
+    },
+    "addBranch": "إضافة فرع جديد",
+    "@addBranch": {
+        "description": "Add new branch title"
+    },
+    "branchName": "اسم الفرع",
+    "@branchName": {
+        "description": "Branch name label"
+    },
+    "branchLocation": "موقع الفرع",
+    "@branchLocation": {
+        "description": "Branch location label"
+    },
+    "geofenceRadius": "نطاق الحضور (بالأمتار)",
+    "@geofenceRadius": {
+        "description": "Geofence radius label"
+    },
+    "saveBranch": "حفظ الفرع",
+    "@saveBranch": {
+        "description": "Save branch button"
+    },
+    "branchAddedSuccessfully": "تمت إضافة الفرع بنجاح",
+    "@branchAddedSuccessfully": {
+        "description": "Branch added success message"
+    },
+    "pleaseEnterBranchName": "يرجى إدخال اسم الفرع",
+    "@pleaseEnterBranchName": {
+        "description": "Branch name required validation"
+    },
+    "pleaseSelectLocation": "يرجى تحديد الموقع على الخريطة",
+    "@pleaseSelectLocation": {
+        "description": "Location required validation"
+    },
+    "searchCityOrRegion": "ابحث عن مدينة أو منطقة...",
+    "@searchCityOrRegion": {
+        "description": "Search bar hint"
+    },
+    "branches": "الفروع",
+    "@branches": {
+        "description": "Label for the branches tab in the admin dashboard navigation."
+    },
+    "admin": "المدير",
+    "@admin": {
+        "description": "Label for the admin dashboard title."
+    },
+    "myLocation": "موقعي الحالي",
+    "@myLocation": {
+        "description": "Label for the fetch current location button."
+    },
+    "locationServicesDisabled": "خدمات الموقع معطلة.",
+    "@locationServicesDisabled": {
+        "description": "Error when GPS is disabled."
+    },
+    "locationPermissionDenied": "تم رفض صلاحية الموقع.",
+    "@locationPermissionDenied": {
+        "description": "Error when location permission is denied."
+    },
+    "errorFetchingLocation": "حدث خطأ أثناء جلب الموقع.",
+    "@errorFetchingLocation": {
+        "description": "Generic error when fetching location fails."
+    },
+    "branchDetails": "تفاصيل الفرع",
+    "@branchDetails": {
+        "description": "Title for the branch details screen."
+    },
+    "downloadQR": "تحميل كصورة",
+    "@downloadQR": {
+        "description": "Button to download the QR code."
+    },
+    "qrSavedToGallery": "تم حفظ رمز QR في المعرض بنجاح!",
+    "@qrSavedToGallery": {
+        "description": "Message shown when QR is saved to gallery"
+    },
+    "editName": "تعديل الاسم",
+    "@editName": {
+        "description": "Button to edit the branch name."
+    },
+    "deleteBranch": "مسح الفرع",
+    "@deleteBranch": {
+        "description": "Button to delete the branch."
+    },
+    "deleteBranchConfirmation": "هل أنت متأكد من مسح هذا الفرع بالكامل؟",
+    "@deleteBranchConfirmation": {
+        "description": "Confirmation message before deleting a branch."
+    },
+    "branchDeletedSuccessfully": "تم مسح الفرع بنجاح.",
+    "@branchDeletedSuccessfully": {
+        "description": "Success message after deleting a branch."
+    },
+    "saveChanges": "حفظ التعديلات",
+    "@saveChanges": {
+        "description": "Button to save edited branch name."
     }
 }

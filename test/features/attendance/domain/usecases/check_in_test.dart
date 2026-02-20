@@ -59,6 +59,11 @@ class MockAttendanceRepository implements AttendanceRepository {
   Future<Either<Failure, Attendance?>> findActiveAttendance(String userId) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<Either<Failure, void>> syncPendingAttendance() async {
+    return const Right(null);
+  }
 }
 
 void main() {

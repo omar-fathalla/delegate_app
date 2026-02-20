@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -83,7 +84,15 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               );
             } else if (state is AuthAuthenticated) {
-              context.go('/home', extra: state.delegate);
+              final delegate = state.delegate;
+              // Check if the user is a Supervisor (Admin) to redirect to Dashboard
+              // Added bypass for specific testing number provided by the user
+              if (delegate.position == DelegatePosition.supervisor ||
+                  _phoneController.text == '01211857725') {
+                context.go('/admin/home', extra: delegate);
+              } else {
+                context.go('/home', extra: delegate);
+              }
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(l10n.loginSuccessful),

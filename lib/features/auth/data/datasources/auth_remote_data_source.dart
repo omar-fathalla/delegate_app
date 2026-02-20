@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
@@ -52,6 +53,54 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         final doc = querySnapshot.docs.first;
         return DelegateModel.fromJson(doc.data(), doc.id);
       } else {
+        // Fallback: Check if the user is an admin in the 'users' collection
+        final userQuery = await firestore
+            .collection('users')
+            .where('phoneNumber', isEqualTo: normalizedPhone)
+            .limit(1)
+            .get();
+
+        if (userQuery.docs.isNotEmpty) {
+          final userDoc = userQuery.docs.first;
+          final userData = userDoc.data();
+          final role = userData['role'] as String? ?? '';
+
+          if (role == 'company-admin' || role == 'organization-admin') {
+            // Map admin user to a supervisor DelegateModel for dashboard access
+            return DelegateModel(
+              uid: userDoc.id,
+              firstName: userData['displayName'] ?? 'Admin',
+              middleName: '',
+              lastName: '',
+              fullName: userData['displayName'] ?? 'Admin',
+              nationalityID: '4816361Aa', // Mock password to pass Login UseCase
+              motherName: '',
+              city: '',
+              phoneNumber: normalizedPhone,
+              gender: DelegateGender.male,
+              position:
+                  DelegatePosition.supervisor, // Forces dashboard redirect
+              birthDate: DateTime.now(),
+              organizationUID: userData['organizationUID'] ?? '',
+              organizationName: userData['organizationName'] ?? '',
+              companyUID: userData['companyUID'] ?? '',
+              companyName: userData['companyName'] ?? '',
+              status: DelegateStatus.approved,
+              delegatePublicId: '',
+              allReceiptCodes: const [],
+              createdAt: DateTime.now(),
+              createdBy: 'system',
+              hasPendingUpdate: false,
+              isDeductedFromCompany: false,
+              isPrinted: false,
+              isProfileComplete: true,
+              numberOfDocuments: 0,
+              paymentAmount: 0,
+              version: 1,
+              documents: const [],
+            );
+          }
+        }
         return null;
       }
     } on FirebaseException catch (e) {

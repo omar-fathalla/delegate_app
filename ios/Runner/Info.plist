@@ -51,5 +51,7 @@
 	<string>We need access to your photo library to upload profile pictures.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We need access to your location to verify your attendance check-in at the correct branch.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We need permission to save the generated QR code to your photo library.</string>
 </dict>
 </plist>

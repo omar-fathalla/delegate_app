@@ -118,4 +118,9 @@ class MockAttendanceDataSource implements AttendanceRemoteDataSource {
       return null;
     }
   }
+
+  @override
+  Future<void> syncOfflineQueue(List<Map<String, dynamic>> queue) async {
+    await Future.delayed(const Duration(seconds: 1));
+  }
 }

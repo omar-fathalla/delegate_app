@@ -21,4 +21,7 @@ abstract class AttendanceRepository {
 
   /// Finds the active attendance session (no checkOutTime) for the delegate.
   Future<Either<Failure, Attendance?>> findActiveAttendance(String userId);
+
+  /// Synchronizes offline attendance records with the remote server.
+  Future<Either<Failure, void>> syncPendingAttendance();
 }

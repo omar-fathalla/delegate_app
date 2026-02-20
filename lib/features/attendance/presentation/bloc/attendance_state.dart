@@ -46,3 +46,16 @@ class AttendanceError extends AttendanceState {
   @override
   List<Object> get props => [message];
 }
+
+class AttendanceSyncInProgress extends AttendanceState {}
+
+class AttendanceSyncSuccess extends AttendanceState {}
+
+class AttendanceSyncFailed extends AttendanceState {
+  final String message;
+
+  const AttendanceSyncFailed({required this.message});
+
+  @override
+  List<Object> get props => [message];
+}

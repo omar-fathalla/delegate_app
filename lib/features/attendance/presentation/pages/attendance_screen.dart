@@ -31,9 +31,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return BlocProvider(
-      create: (context) =>
-          sl<AttendanceBloc>()
-            ..add(HistoryRequested(userId: widget.delegate.uid)),
+      create: (context) => sl<AttendanceBloc>()
+        ..add(HistoryRequested(userId: widget.delegate.uid))
+        ..add(const SyncRequested()),
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
@@ -66,6 +66,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             setState(() {
               isCheckedIn = hasActiveCheckIn;
             });
+          } else if (state is AttendanceSyncSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('تمت مزامنة البيانات المحفوظة بنجاح'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            context.read<AttendanceBloc>().add(
+              HistoryRequested(userId: widget.delegate.uid),
+            );
           }
         },
         builder: (context, state) {
@@ -230,217 +240,236 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       }
       final dayKeys = groupedByDay.keys.toList();
 
-      return ListView.builder(
-        padding: const EdgeInsetsDirectional.only(
-          top: 16,
-          bottom: 80,
-          start: 16,
-          end: 16,
-        ),
-        itemCount: dayKeys.length,
-        itemBuilder: (context, dayIndex) {
-          final dayKey = dayKeys[dayIndex];
-          final records = groupedByDay[dayKey] ?? [];
-          final dayDate = records.first.checkInTime;
-          final fullDateStr = DateFormat(
-            'EEEE، d MMMM yyyy',
-            locale,
-          ).format(dayDate);
+      return RefreshIndicator(
+        onRefresh: () async {
+          context.read<AttendanceBloc>().add(const SyncRequested());
+          context.read<AttendanceBloc>().add(
+            HistoryRequested(userId: widget.delegate.uid),
+          );
+        },
+        child: ListView.builder(
+          padding: const EdgeInsetsDirectional.only(
+            top: 16,
+            bottom: 80,
+            start: 16,
+            end: 16,
+          ),
+          itemCount: dayKeys.length,
+          itemBuilder: (context, dayIndex) {
+            final dayKey = dayKeys[dayIndex];
+            final records = groupedByDay[dayKey] ?? [];
+            final dayDate = records.first.checkInTime;
+            final fullDateStr = DateFormat(
+              'EEEE، d MMMM yyyy',
+              locale,
+            ).format(dayDate);
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsetsDirectional.only(bottom: 8, top: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0D47A1).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.calendar_today_rounded,
-                        size: 18,
-                        color: Color(0xFF0D47A1),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        fullDateStr,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(bottom: 8, top: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D47A1).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.calendar_today_rounded,
+                          size: 18,
                           color: Color(0xFF0D47A1),
                         ),
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${records.length}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF0D47A1),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          fullDateStr,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0D47A1),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              ...records.map((item) {
-                final inTime = DateFormat(
-                  'hh:mm a',
-                  locale,
-                ).format(item.checkInTime);
-                final outTime = item.checkOutTime != null
-                    ? DateFormat('hh:mm a', locale).format(item.checkOutTime!)
-                    : '--:--';
-                final branchName = item.branchName ?? l10n.unspecifiedBranch;
-
-                String durationStr;
-                if (item.checkOutTime != null) {
-                  final diff = item.checkOutTime!.difference(item.checkInTime);
-                  final hours = diff.inHours;
-                  final minutes = diff.inMinutes.remainder(60);
-                  durationStr = l10n.duration('$hours', '$minutes');
-                } else {
-                  durationStr = l10n.inProgress;
-                }
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withValues(alpha: 0.1),
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${records.length}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF0D47A1),
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on_rounded,
-                                  size: 14,
-                                  color: Colors.grey[500],
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  branchName,
-                                  style: TextStyle(
-                                    fontSize: 12,
+                ),
+                ...records.map((item) {
+                  final inTime = DateFormat(
+                    'hh:mm a',
+                    locale,
+                  ).format(item.checkInTime);
+                  final outTime = item.checkOutTime != null
+                      ? DateFormat('hh:mm a', locale).format(item.checkOutTime!)
+                      : '--:--';
+                  final branchName = item.branchName ?? l10n.unspecifiedBranch;
+
+                  String durationStr;
+                  if (item.checkOutTime != null) {
+                    final diff = item.checkOutTime!.difference(
+                      item.checkInTime,
+                    );
+                    final hours = diff.inHours;
+                    final minutes = diff.inMinutes.remainder(60);
+                    durationStr = l10n.duration('$hours', '$minutes');
+                  } else {
+                    durationStr = l10n.inProgress;
+                  }
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withValues(alpha: 0.1),
+                          blurRadius: 5,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on_rounded,
+                                    size: 14,
                                     color: Colors.grey[500],
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.login,
-                                  size: 16,
-                                  color: Colors.green,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  l10n.inLabel(inTime),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    branchName,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[500],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.logout,
-                                  size: 16,
-                                  color: Colors.orange,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  l10n.outLabel(outTime),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.login,
+                                    size: 16,
+                                    color: Colors.green,
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.timer_outlined,
-                                  size: 14,
-                                  color: item.checkOutTime != null
-                                      ? const Color(0xFF0D47A1)
-                                      : Colors.grey[400],
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  durationStr,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    l10n.inLabel(inTime),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.logout,
+                                    size: 16,
+                                    color: Colors.orange,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    l10n.outLabel(outTime),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.timer_outlined,
+                                    size: 14,
                                     color: item.checkOutTime != null
                                         ? const Color(0xFF0D47A1)
                                         : Colors.grey[400],
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (item.checkOutTime == null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green[50],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            l10n.active,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
-                            ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    durationStr,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: item.checkOutTime != null
+                                          ? const Color(0xFF0D47A1)
+                                          : Colors.grey[400],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                    ],
-                  ),
-                );
-              }),
-              if (dayIndex < dayKeys.length - 1) const Divider(height: 24),
-            ],
-          );
-        },
+                        if (!item.isSynced)
+                          const Padding(
+                            padding: EdgeInsetsDirectional.only(end: 8.0),
+                            child: Icon(
+                              Icons.cloud_off,
+                              color: Colors.orange,
+                              size: 20,
+                            ),
+                          ),
+                        if (item.checkOutTime == null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green[50],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              l10n.active,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.green,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
+                if (dayIndex < dayKeys.length - 1) const Divider(height: 24),
+              ],
+            );
+          },
+        ),
       );
     }
     return Center(child: Text(l10n.somethingWentWrong));

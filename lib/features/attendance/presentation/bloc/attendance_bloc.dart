@@ -4,6 +4,8 @@ import 'package:delegate_app/features/attendance/domain/entities/attendance.dart
 import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
+import 'package:delegate_app/core/usecases/usecase.dart';
 
 part 'attendance_event.dart';
 part 'attendance_state.dart';
@@ -12,6 +14,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   final CheckIn checkIn;
   final CheckOut checkOut;
   final GetHistory getHistory;
+  final SyncAttendance syncAttendance;
 
   // Temporary state to hold current attendance ID for checkout
   // In a real app, strict session management or local storage persistence is needed.
@@ -21,10 +24,12 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     required this.checkIn,
     required this.checkOut,
     required this.getHistory,
+    required this.syncAttendance,
   }) : super(AttendanceInitial()) {
     on<CheckInRequested>(_onCheckIn);
     on<CheckOutRequested>(_onCheckOut);
     on<HistoryRequested>(_onGetHistory);
+    on<SyncRequested>(_onSyncRequested);
   }
 
   Future<void> _onCheckIn(
@@ -97,5 +102,17 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       }
       emit(AttendanceHistoryLoaded(history: history));
     });
+  }
+
+  Future<void> _onSyncRequested(
+    SyncRequested event,
+    Emitter<AttendanceState> emit,
+  ) async {
+    emit(AttendanceSyncInProgress());
+    final result = await syncAttendance(NoParams());
+    result.fold(
+      (failure) => emit(AttendanceSyncFailed(message: failure.message)),
+      (_) => emit(AttendanceSyncSuccess()),
+    );
   }
 }

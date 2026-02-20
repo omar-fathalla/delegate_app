@@ -61,3 +61,7 @@ class HistoryRequested extends AttendanceEvent {
   @override
   List<Object> get props => [userId];
 }
+
+class SyncRequested extends AttendanceEvent {
+  const SyncRequested();
+}

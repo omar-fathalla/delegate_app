@@ -315,4 +315,77 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get notProvidedStatus => 'لم يتم تقديمها';
+
+  @override
+  String get adminDashboard => 'لوحة الإدارة';
+
+  @override
+  String get addBranch => 'إضافة فرع جديد';
+
+  @override
+  String get branchName => 'اسم الفرع';
+
+  @override
+  String get branchLocation => 'موقع الفرع';
+
+  @override
+  String get geofenceRadius => 'نطاق الحضور (بالأمتار)';
+
+  @override
+  String get saveBranch => 'حفظ الفرع';
+
+  @override
+  String get branchAddedSuccessfully => 'تمت إضافة الفرع بنجاح';
+
+  @override
+  String get pleaseEnterBranchName => 'يرجى إدخال اسم الفرع';
+
+  @override
+  String get pleaseSelectLocation => 'يرجى تحديد الموقع على الخريطة';
+
+  @override
+  String get searchCityOrRegion => 'ابحث عن مدينة أو منطقة...';
+
+  @override
+  String get branches => 'الفروع';
+
+  @override
+  String get admin => 'المدير';
+
+  @override
+  String get myLocation => 'موقعي الحالي';
+
+  @override
+  String get locationServicesDisabled => 'خدمات الموقع معطلة.';
+
+  @override
+  String get locationPermissionDenied => 'تم رفض صلاحية الموقع.';
+
+  @override
+  String get errorFetchingLocation => 'حدث خطأ أثناء جلب الموقع.';
+
+  @override
+  String get branchDetails => 'تفاصيل الفرع';
+
+  @override
+  String get downloadQR => 'تحميل كصورة';
+
+  @override
+  String get qrSavedToGallery => 'تم حفظ رمز QR في المعرض بنجاح!';
+
+  @override
+  String get editName => 'تعديل الاسم';
+
+  @override
+  String get deleteBranch => 'مسح الفرع';
+
+  @override
+  String get deleteBranchConfirmation =>
+      'هل أنت متأكد من مسح هذا الفرع بالكامل؟';
+
+  @override
+  String get branchDeletedSuccessfully => 'تم مسح الفرع بنجاح.';
+
+  @override
+  String get saveChanges => 'حفظ التعديلات';
 }

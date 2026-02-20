@@ -661,6 +661,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not Provided'**
   String get notProvidedStatus;
+
+  /// Admin dashboard title
+  ///
+  /// In en, this message translates to:
+  /// **'Admin Dashboard'**
+  String get adminDashboard;
+
+  /// Add new branch title
+  ///
+  /// In en, this message translates to:
+  /// **'Add New Branch'**
+  String get addBranch;
+
+  /// Branch name label
+  ///
+  /// In en, this message translates to:
+  /// **'Branch Name'**
+  String get branchName;
+
+  /// Branch location label
+  ///
+  /// In en, this message translates to:
+  /// **'Branch Location'**
+  String get branchLocation;
+
+  /// Geofence radius label
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance Radius (Meters)'**
+  String get geofenceRadius;
+
+  /// Save branch button
+  ///
+  /// In en, this message translates to:
+  /// **'Save Branch'**
+  String get saveBranch;
+
+  /// Branch added success message
+  ///
+  /// In en, this message translates to:
+  /// **'Branch Added Successfully'**
+  String get branchAddedSuccessfully;
+
+  /// Branch name required validation
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter branch name'**
+  String get pleaseEnterBranchName;
+
+  /// Location required validation
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a location on the map'**
+  String get pleaseSelectLocation;
+
+  /// Search bar hint
+  ///
+  /// In en, this message translates to:
+  /// **'Search city or region...'**
+  String get searchCityOrRegion;
+
+  /// Label for the branches tab in the admin dashboard navigation.
+  ///
+  /// In en, this message translates to:
+  /// **'Branches'**
+  String get branches;
+
+  /// Label for the admin dashboard title.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get admin;
+
+  /// Label for the fetch current location button.
+  ///
+  /// In en, this message translates to:
+  /// **'My Location'**
+  String get myLocation;
+
+  /// Error when GPS is disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Location services are disabled.'**
+  String get locationServicesDisabled;
+
+  /// Error when location permission is denied.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission denied.'**
+  String get locationPermissionDenied;
+
+  /// Generic error when fetching location fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Error fetching location.'**
+  String get errorFetchingLocation;
+
+  /// Title for the branch details screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch Details'**
+  String get branchDetails;
+
+  /// Button to download the QR code.
+  ///
+  /// In en, this message translates to:
+  /// **'Download QR'**
+  String get downloadQR;
+
+  /// Message shown when QR is saved to gallery
+  ///
+  /// In en, this message translates to:
+  /// **'QR Code saved to gallery successfully!'**
+  String get qrSavedToGallery;
+
+  /// Button to edit the branch name.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Name'**
+  String get editName;
+
+  /// Button to delete the branch.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Branch'**
+  String get deleteBranch;
+
+  /// Confirmation message before deleting a branch.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this branch?'**
+  String get deleteBranchConfirmation;
+
+  /// Success message after deleting a branch.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch deleted successfully.'**
+  String get branchDeletedSuccessfully;
+
+  /// Button to save edited branch name.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Changes'**
+  String get saveChanges;
 }
 
 class _AppLocalizationsDelegate

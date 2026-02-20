@@ -5,6 +5,7 @@ import 'package:delegate_app/features/attendance/domain/repositories/attendance_
 import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart'; // Import Delegate
@@ -60,6 +61,11 @@ class MockAttendanceRepository implements AttendanceRepository {
   ) async {
     return const Right(null);
   }
+
+  @override
+  Future<Either<Failure, void>> syncPendingAttendance() async {
+    return const Right(null);
+  }
 }
 
 void main() {
@@ -73,10 +79,16 @@ void main() {
     sl.registerFactory(() => CheckIn(mockAttendanceRepository));
     sl.registerFactory(() => CheckOut(mockAttendanceRepository));
     sl.registerFactory(() => GetHistory(mockAttendanceRepository));
+    sl.registerFactory(() => SyncAttendance(mockAttendanceRepository));
 
     // Register Bloc
     sl.registerFactory(
-      () => AttendanceBloc(checkIn: sl(), checkOut: sl(), getHistory: sl()),
+      () => AttendanceBloc(
+        checkIn: sl(),
+        checkOut: sl(),
+        getHistory: sl(),
+        syncAttendance: sl(),
+      ),
     );
   });
 

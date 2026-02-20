@@ -11,9 +11,11 @@ import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
 import 'package:delegate_app/features/attendance/data/repositories/attendance_repository_impl.dart';
 import 'package:delegate_app/features/attendance/domain/repositories/attendance_repository.dart';
+import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -81,23 +83,35 @@ Future<void> init() async {
   // ! Features - Attendance
   // Bloc
   sl.registerFactory(
-    () => AttendanceBloc(checkIn: sl(), checkOut: sl(), getHistory: sl()),
+    () => AttendanceBloc(
+      checkIn: sl(),
+      checkOut: sl(),
+      getHistory: sl(),
+      syncAttendance: sl(),
+    ),
   );
 
   // Use cases
   sl.registerLazySingleton(() => CheckIn(sl()));
   sl.registerLazySingleton(() => CheckOut(sl()));
   sl.registerLazySingleton(() => GetHistory(sl()));
+  sl.registerLazySingleton(() => SyncAttendance(sl()));
 
   // Repository
   sl.registerLazySingleton<AttendanceRepository>(
-    () =>
-        AttendanceRepositoryImpl(remoteDataSource: sl(), localDataSource: sl()),
+    () => AttendanceRepositoryImpl(
+      remoteDataSource: sl(),
+      localDataSource: sl(),
+      offlineQueue: sl(),
+    ),
   );
 
   // Data sources
   sl.registerLazySingleton<AttendanceLocalDataSource>(
     () => AttendanceLocalDataSourceImpl(sharedPreferences: sl()),
+  );
+  sl.registerLazySingleton<AttendanceOfflineQueue>(
+    () => AttendanceOfflineQueueImpl(sharedPreferences: sl()),
   );
   // USE MOCKS FOR DEMO
   // sl.registerLazySingleton<AttendanceRemoteDataSource>(
