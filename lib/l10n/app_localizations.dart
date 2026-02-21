@@ -661,6 +661,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not Provided'**
   String get notProvidedStatus;
+
+  /// Tooltip for showing password
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// Tooltip for hiding password
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
 }
 
 class _AppLocalizationsDelegate

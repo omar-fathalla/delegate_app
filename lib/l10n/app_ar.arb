@@ -446,5 +446,13 @@
     "notProvidedStatus": "لم يتم تقديمها",
     "@notProvidedStatus": {
         "description": "Not provided document status"
+    },
+    "showPassword": "إظهار كلمة المرور",
+    "@showPassword": {
+        "description": "Tooltip for showing password"
+    },
+    "hidePassword": "إخفاء كلمة المرور",
+    "@hidePassword": {
+        "description": "Tooltip for hiding password"
     }
 }

@@ -213,6 +213,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       TextFormField(
                                         controller: _phoneController,
                                         keyboardType: TextInputType.phone,
+                                        textInputAction: TextInputAction.next,
                                         textDirection: TextDirection.ltr,
                                         decoration: InputDecoration(
                                           labelText: l10n.mobileNumber,
@@ -250,6 +251,19 @@ class _LoginScreenState extends State<LoginScreen>
                                       // Password field
                                       TextFormField(
                                         controller: _passwordController,
+                                        textInputAction: TextInputAction.done,
+                                        onFieldSubmitted: (_) {
+                                          if (state is! AuthLoading &&
+                                              _formKey.currentState!.validate()) {
+                                            BlocProvider.of<AuthBloc>(context).add(
+                                              LoginRequested(
+                                                phoneNumber: _phoneController.text,
+                                                password: _passwordController.text,
+                                                rememberMe: _rememberMe,
+                                              ),
+                                            );
+                                          }
+                                        },
                                         textDirection: TextDirection.ltr,
                                         decoration: InputDecoration(
                                           labelText: l10n.password,
@@ -258,6 +272,9 @@ class _LoginScreenState extends State<LoginScreen>
                                             color: Color(0xFF1565C0),
                                           ),
                                           suffixIcon: IconButton(
+                                            tooltip: _obscurePassword
+                                                ? l10n.showPassword
+                                                : l10n.hidePassword,
                                             icon: Icon(
                                               _obscurePassword
                                                   ? Icons.visibility_off_rounded
@@ -299,33 +316,43 @@ class _LoginScreenState extends State<LoginScreen>
                                       const SizedBox(height: 8),
 
                                       // Remember Me
-                                      Row(
-                                        children: [
-                                          SizedBox(
-                                            height: 28,
-                                            width: 28,
-                                            child: Checkbox(
-                                              value: _rememberMe,
-                                              onChanged: (value) {
-                                                setState(() {
-                                                  _rememberMe = value ?? false;
-                                                });
-                                              },
-                                              activeColor: const Color(0xFF1565C0),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(6),
+                                      GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            _rememberMe = !_rememberMe;
+                                          });
+                                        },
+                                        child: Row(
+                                          children: [
+                                            SizedBox(
+                                              height: 28,
+                                              width: 28,
+                                              child: Checkbox(
+                                                value: _rememberMe,
+                                                onChanged: (value) {
+                                                  setState(() {
+                                                    _rememberMe =
+                                                        value ?? false;
+                                                  });
+                                                },
+                                                activeColor:
+                                                    const Color(0xFF1565C0),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            l10n.rememberMe,
-                                            style: TextStyle(
-                                              color: Colors.grey.shade700,
-                                              fontSize: 14,
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              l10n.rememberMe,
+                                              style: TextStyle(
+                                                color: Colors.grey.shade700,
+                                                fontSize: 14,
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                       const SizedBox(height: 24),
 
