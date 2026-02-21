@@ -51,3 +51,7 @@ package-lock.json
 
 # Local env files
 .env*
+
+# Keystore files
+android/key.properties
+android/app/upload-keystore.jks

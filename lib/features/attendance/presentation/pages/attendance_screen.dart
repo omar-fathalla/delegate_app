@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final Delegate delegate;
@@ -87,7 +88,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               ],
             ),
             floatingActionButton: FloatingActionButton.extended(
-              onPressed: () => _showQRScanner(context),
+              onPressed:
+                  (state is AttendanceLoading ||
+                      state is AttendanceSyncInProgress)
+                  ? null
+                  : () => _showQRScanner(context),
               backgroundColor: isCheckedIn
                   ? Colors.orange
                   : const Color(0xFF0D47A1),
@@ -107,6 +112,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Widget _buildHeader(BuildContext context) {
     final locale = Localizations.localeOf(context).languageCode;
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
@@ -116,39 +123,113 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           bottomRight: Radius.circular(20),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
         children: [
-          IconButton(
-            tooltip: 'Previous Month',
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _selectedMonth = DateTime(
-                  _selectedMonth.year,
-                  _selectedMonth.month - 1,
-                );
-              });
-            },
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                tooltip: 'Previous Month',
+                icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                onPressed: () {
+                  setState(() {
+                    _selectedMonth = DateTime(
+                      _selectedMonth.year,
+                      _selectedMonth.month - 1,
+                    );
+                  });
+                },
+              ),
+              Text(
+                DateFormat('MMMM yyyy', locale).format(_selectedMonth),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Next Month',
+                icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
+                onPressed: () {
+                  setState(() {
+                    _selectedMonth = DateTime(
+                      _selectedMonth.year,
+                      _selectedMonth.month + 1,
+                    );
+                  });
+                },
+              ),
+            ],
           ),
-          Text(
-            DateFormat('MMMM yyyy', locale).format(_selectedMonth),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Next Month',
-            icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _selectedMonth = DateTime(
-                  _selectedMonth.year,
-                  _selectedMonth.month + 1,
+          const SizedBox(height: 8),
+          StreamBuilder<List<ConnectivityResult>>(
+            stream: Connectivity().onConnectivityChanged,
+            builder: (context, snapshot) {
+              final isOffline =
+                  snapshot.data?.contains(ConnectivityResult.none) ?? false;
+
+              if (isOffline) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.cloud_off,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        l10n.networkStatusOffline,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 );
-              });
+              }
+
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.cloud_done_outlined,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      l10n.networkStatusOnline,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              );
             },
           ),
         ],

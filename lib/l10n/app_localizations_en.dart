@@ -389,4 +389,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get saveChanges => 'Save Changes';
+
+  @override
+  String get networkStatusOffline => 'Offline';
+
+  @override
+  String get networkStatusOnline => 'Online';
 }

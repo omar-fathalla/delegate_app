@@ -7,6 +7,7 @@ import 'package:delegate_app/features/attendance/domain/repositories/attendance_
 import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
 import 'package:uuid/uuid.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class AttendanceRepositoryImpl implements AttendanceRepository {
   final AttendanceRemoteDataSource remoteDataSource;
@@ -19,6 +20,15 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required this.offlineQueue,
   });
 
+  Future<bool> _hasConnection() async {
+    try {
+      final result = await Connectivity().checkConnectivity();
+      return !result.contains(ConnectivityResult.none);
+    } catch (_) {
+      return true; // Default to true if check fails
+    }
+  }
+
   @override
   Future<Either<Failure, Attendance>> checkIn(
     String userId,
@@ -30,6 +40,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     String? branchName,
   }) async {
     try {
+      if (!await _hasConnection()) {
+        throw const ServerFailure('No internet connection (offline mode)');
+      }
       final result = await remoteDataSource.checkIn(
         userId,
         lat,
@@ -82,6 +95,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     double long,
   ) async {
     try {
+      if (!await _hasConnection()) {
+        throw const ServerFailure('No internet connection (offline mode)');
+      }
       final result = await remoteDataSource.checkOut(attendanceId, lat, long);
       // Always update local cache after successful checkout
       await localDataSource.updateAttendance(result);
@@ -128,8 +144,35 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   @override
   Future<Either<Failure, List<Attendance>>> getHistory(String userId) async {
     try {
-      final result = await remoteDataSource.getHistory(userId);
-      return Right(result);
+      if (!await _hasConnection()) {
+        throw const ServerFailure('No internet connection (offline mode)');
+      }
+      final remoteHistory = await remoteDataSource.getHistory(userId);
+
+      // Combine with local unsynced items
+      try {
+        final localHistory = await localDataSource.getLastAttendanceHistory();
+        final unsyncedItems = localHistory.where((e) => !e.isSynced).toList();
+
+        final List<AttendanceModel> combined = List.from(remoteHistory);
+        for (var local in unsyncedItems) {
+          // If it's not already in remote history
+          if (!combined.any((r) => r.id == local.id)) {
+            combined.add(local);
+          }
+        }
+
+        // Sort combined descending by checkInTime
+        combined.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
+
+        // Update local cache so next time we have the freshest list
+        await localDataSource.overwriteHistory(combined);
+
+        return Right(combined);
+      } catch (_) {
+        // If combining fails, just return remote history
+        return Right(remoteHistory);
+      }
     } on Failure catch (e) {
       // On network error, fallback to local cache
       try {
@@ -149,6 +192,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     String userId,
   ) async {
     try {
+      if (!await _hasConnection()) {
+        throw const ServerFailure('No internet connection (offline mode)');
+      }
       final result = await remoteDataSource.findActiveAttendance(userId);
       return Right(result);
     } on Failure catch (e) {

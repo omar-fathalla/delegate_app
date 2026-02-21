@@ -805,6 +805,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save Changes'**
   String get saveChanges;
+
+  /// Offline network status indicator
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get networkStatusOffline;
+
+  /// Online network status indicator
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get networkStatusOnline;
 }
 
 class _AppLocalizationsDelegate

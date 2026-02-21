@@ -6,6 +6,7 @@ abstract class AttendanceLocalDataSource {
   Future<void> cacheAttendance(AttendanceModel attendanceToCache);
   Future<List<AttendanceModel>> getLastAttendanceHistory();
   Future<void> updateAttendance(AttendanceModel attendanceToUpdate);
+  Future<void> overwriteHistory(List<AttendanceModel> history);
 }
 
 const cachedAttendance = 'cachedAttendance';
@@ -49,5 +50,11 @@ class AttendanceLocalDataSourceImpl implements AttendanceLocalDataSource {
       final jsonList = history.map((e) => json.encode(e.toJson())).toList();
       await sharedPreferences.setStringList(cachedAttendance, jsonList);
     }
+  }
+
+  @override
+  Future<void> overwriteHistory(List<AttendanceModel> history) async {
+    final jsonList = history.map((e) => json.encode(e.toJson())).toList();
+    await sharedPreferences.setStringList(cachedAttendance, jsonList);
   }
 }

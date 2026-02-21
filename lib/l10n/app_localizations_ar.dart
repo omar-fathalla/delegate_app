@@ -388,4 +388,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get saveChanges => 'حفظ التعديلات';
+
+  @override
+  String get networkStatusOffline => 'غير متصل بالشبكة';
+
+  @override
+  String get networkStatusOnline => 'متصل بالشبكة';
 }

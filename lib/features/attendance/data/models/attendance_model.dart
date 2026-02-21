@@ -46,6 +46,7 @@ class AttendanceModel extends Attendance {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'userId': userId,
       'checkInTime': checkInTime.toIso8601String(),
       'checkOutTime': checkOutTime?.toIso8601String(),

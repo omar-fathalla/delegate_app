@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/failures.dart';
@@ -45,16 +46,19 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     String? branchName,
   }) async {
     try {
-      final docRef = await firestore.collection(kAttendanceCollection).add({
-        'delegateId': userId,
-        'companyId': companyId,
-        'organizationId': organizationId,
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': 'check_in',
-        'location': {'latitude': lat, 'longitude': long},
-        'deviceInfo': deviceInfo,
-        'branchName': branchName,
-      });
+      final docRef = await firestore
+          .collection(kAttendanceCollection)
+          .add({
+            'delegateId': userId,
+            'companyId': companyId,
+            'organizationId': organizationId,
+            'timestamp': FieldValue.serverTimestamp(),
+            'type': 'check_in',
+            'location': {'latitude': lat, 'longitude': long},
+            'deviceInfo': deviceInfo,
+            'branchName': branchName,
+          })
+          .timeout(const Duration(seconds: 5));
 
       return AttendanceModel(
         id: docRef.id,
@@ -69,6 +73,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'AttendanceRemoteDataSource.checkIn FirebaseException: ${e.code}',
       );
       throw const ServerFailure('فشل في تسجيل الحضور. حاول مرة أخرى.');
+    } on TimeoutException {
+      throw const ServerFailure(
+        'انتهت مهلة الاتصال بالخادم. يرجى التحقق من الإنترنت.',
+      );
     } catch (e) {
       debugPrint('AttendanceRemoteDataSource.checkIn error: $e');
       throw const ServerFailure('حدث خطأ غير متوقع أثناء تسجيل الحضور.');
@@ -100,7 +108,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           // Implementation Detail: In the new system, `attendanceId` returned by checkIn is the ID of the 'check_in' log doc.
           // So we CAN fetch that doc to get metadata.
           .doc(attendanceId)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 5));
 
       if (!lastCheckInSnapshot.exists) {
         throw const ServerFailure('سجل الحضور غير موجود.');
@@ -110,15 +119,18 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final companyId = lastData['companyId'];
       final organizationId = lastData['organizationId'];
 
-      await firestore.collection(kAttendanceCollection).add({
-        'delegateId': userId,
-        'companyId': companyId,
-        'organizationId': organizationId,
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': 'check_out',
-        'location': {'latitude': lat, 'longitude': long},
-        'relatedCheckInId': attendanceId, // Link to the check-in
-      });
+      await firestore
+          .collection(kAttendanceCollection)
+          .add({
+            'delegateId': userId,
+            'companyId': companyId,
+            'organizationId': organizationId,
+            'timestamp': FieldValue.serverTimestamp(),
+            'type': 'check_out',
+            'location': {'latitude': lat, 'longitude': long},
+            'relatedCheckInId': attendanceId, // Link to the check-in
+          })
+          .timeout(const Duration(seconds: 5));
 
       // Return a model representing the closed session
       return AttendanceModel(
@@ -135,6 +147,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'AttendanceRemoteDataSource.checkOut FirebaseException: ${e.code}',
       );
       throw const ServerFailure('فشل في تسجيل الانصراف. حاول مرة أخرى.');
+    } on TimeoutException {
+      throw const ServerFailure(
+        'انتهت مهلة الاتصال بالخادم. يرجى التحقق من الإنترنت.',
+      );
     } catch (e) {
       debugPrint('AttendanceRemoteDataSource.checkOut error: $e');
       throw const ServerFailure('حدث خطأ غير متوقع أثناء تسجيل الانصراف.');
@@ -148,7 +164,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           .collection(kAttendanceCollection)
           .where('delegateId', isEqualTo: userId)
           .orderBy('timestamp', descending: false) // Process chronologically
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 5));
 
       final List<AttendanceModel> history = [];
       final Map<String, AttendanceModel> openSessions = {};
@@ -203,6 +220,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'AttendanceRemoteDataSource.getHistory FirebaseException: Code: ${e.code}, Message: ${e.message}, Plugin: ${e.plugin}',
       );
       throw const ServerFailure('فشل في تحميل سجل الحضور.');
+    } on TimeoutException {
+      throw const ServerFailure('انتهت مهلة الاتصال بالخادم.');
     } catch (e) {
       debugPrint('AttendanceRemoteDataSource.getHistory error: $e');
       throw const ServerFailure('حدث خطأ غير متوقع أثناء تحميل السجل.');
@@ -218,7 +237,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           .where('delegateId', isEqualTo: userId)
           .orderBy('timestamp', descending: true)
           .limit(1)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 5));
 
       if (querySnapshot.docs.isEmpty) {
         return null;
@@ -248,6 +268,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'AttendanceRemoteDataSource.findActiveAttendance FirebaseException: ${e.code}',
       );
       throw const ServerFailure('فشل في البحث عن جلسة الحضور النشطة.');
+    } on TimeoutException {
+      throw const ServerFailure('انتهت مهلة الاتصال بالخادم.');
     } catch (e) {
       debugPrint('AttendanceRemoteDataSource.findActiveAttendance error: $e');
       throw const ServerFailure('حدث خطأ غير متوقع.');
@@ -283,12 +305,14 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         batch.set(newDocRef, data);
       }
 
-      await batch.commit();
+      await batch.commit().timeout(const Duration(seconds: 10));
     } on FirebaseException catch (e) {
       debugPrint(
         'AttendanceRemoteDataSource.syncOfflineQueue FirebaseException: ${e.code}',
       );
       throw const ServerFailure('فشل في مزامنة البيانات المؤجلة.');
+    } on TimeoutException {
+      throw const ServerFailure('انتهت مهلة الاتصال بالخادم أثناء المزامنة.');
     } catch (e) {
       debugPrint('AttendanceRemoteDataSource.syncOfflineQueue error: $e');
       throw const ServerFailure('حدث خطأ غير متوقع أثناء المزامنة.');

@@ -542,5 +542,13 @@
     "saveChanges": "حفظ التعديلات",
     "@saveChanges": {
         "description": "Button to save edited branch name."
+    },
+    "networkStatusOffline": "غير متصل بالشبكة",
+    "@networkStatusOffline": {
+        "description": "Offline network status indicator"
+    },
+    "networkStatusOnline": "متصل بالشبكة",
+    "@networkStatusOnline": {
+        "description": "Online network status indicator"
     }
 }

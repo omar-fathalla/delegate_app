@@ -40,6 +40,42 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:564223619997:android:cf0fadb7ec4ebf13233574",
+        "android_client_info": {
+          "package_name": "com.tashil.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "564223619997-7hidft01he74ndjl6j5cjr08ubm1elts.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdPKLrk8zh93k6IQMs1l3wwHqPlv7tlsc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "564223619997-7hidft01he74ndjl6j5cjr08ubm1elts.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "564223619997-n7bfrj732fs10j5g3ar1e18sdgru5d90.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.delegateApp"
+              }
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

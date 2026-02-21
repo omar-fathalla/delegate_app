@@ -542,5 +542,13 @@
     "saveChanges": "Save Changes",
     "@saveChanges": {
         "description": "Button to save edited branch name."
+    },
+    "networkStatusOffline": "Offline",
+    "@networkStatusOffline": {
+        "description": "Offline network status indicator"
+    },
+    "networkStatusOnline": "Online",
+    "@networkStatusOnline": {
+        "description": "Online network status indicator"
     }
 }
