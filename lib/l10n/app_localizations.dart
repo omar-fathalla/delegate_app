@@ -817,6 +817,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Online'**
   String get networkStatusOnline;
+
+  /// Tooltip for show password button
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// Tooltip for hide password button
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
 }
 
 class _AppLocalizationsDelegate
