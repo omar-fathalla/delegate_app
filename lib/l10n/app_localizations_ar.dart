@@ -394,4 +394,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get networkStatusOnline => 'متصل بالشبكة';
+
+  @override
+  String get showPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
 }

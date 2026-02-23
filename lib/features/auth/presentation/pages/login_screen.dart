@@ -55,6 +55,20 @@ class _LoginScreenState extends State<LoginScreen>
     _animationController.forward();
   }
 
+  void _submitLogin() {
+    if (_formKey.currentState!.validate()) {
+      BlocProvider.of<AuthBloc>(
+        context,
+      ).add(
+        LoginRequested(
+          phoneNumber: _phoneController.text,
+          password: _passwordController.text,
+          rememberMe: _rememberMe,
+        ),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -222,6 +236,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       TextFormField(
                                         controller: _phoneController,
                                         keyboardType: TextInputType.phone,
+                                        textInputAction: TextInputAction.next,
                                         textDirection: TextDirection.ltr,
                                         decoration: InputDecoration(
                                           labelText: l10n.mobileNumber,
@@ -270,6 +285,8 @@ class _LoginScreenState extends State<LoginScreen>
                                       TextFormField(
                                         controller: _passwordController,
                                         textDirection: TextDirection.ltr,
+                                        textInputAction: TextInputAction.done,
+                                        onFieldSubmitted: (_) => _submitLogin(),
                                         decoration: InputDecoration(
                                           labelText: l10n.password,
                                           prefixIcon: const Icon(
@@ -283,6 +300,9 @@ class _LoginScreenState extends State<LoginScreen>
                                                   : Icons.visibility_rounded,
                                               color: Colors.grey,
                                             ),
+                                            tooltip: _obscurePassword
+                                                ? l10n.showPassword
+                                                : l10n.hidePassword,
                                             onPressed: () {
                                               setState(() {
                                                 _obscurePassword =
@@ -369,24 +389,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         child: ElevatedButton(
                                           onPressed: state is AuthLoading
                                               ? null
-                                              : () {
-                                                  if (_formKey.currentState!
-                                                      .validate()) {
-                                                    BlocProvider.of<AuthBloc>(
-                                                      context,
-                                                    ).add(
-                                                      LoginRequested(
-                                                        phoneNumber:
-                                                            _phoneController
-                                                                .text,
-                                                        password:
-                                                            _passwordController
-                                                                .text,
-                                                        rememberMe: _rememberMe,
-                                                      ),
-                                                    );
-                                                  }
-                                                },
+                                              : _submitLogin,
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: const Color(
                                               0xFF1565C0,

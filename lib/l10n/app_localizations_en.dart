@@ -395,4 +395,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get networkStatusOnline => 'Online';
+
+  @override
+  String get showPassword => 'Show Password';
+
+  @override
+  String get hidePassword => 'Hide Password';
 }
