@@ -5,3 +5,7 @@
 ## 2024-05-22 - [Auth] Password Visibility Toggle
 **Learning:** Obscured text fields without a visibility toggle frustrate users who need to verify complex passwords or names.
 **Action:** Always include a suffix icon toggle for `obscureText` fields, ensuring the icon state (eye vs slashed eye) matches the *action* (Show vs Hide) or *state* (Visible vs Hidden) consistently with the design system.
+
+## 2026-02-18 - [Accessibility] Missing Tooltips on Interactive Icons
+**Learning:** Interactive icons like password visibility toggles and modal close buttons often get overlooked for tooltips, making them inaccessible to screen readers.
+**Action:** Always add a `tooltip` property to `IconButton` widgets, using localized strings for actions like "Show password", "Hide password", and "Close".

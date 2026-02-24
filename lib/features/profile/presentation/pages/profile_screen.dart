@@ -774,6 +774,7 @@ class _FullScreenImageViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -787,6 +788,7 @@ class _FullScreenImageViewer extends StatelessWidget {
           ),
         ),
         leading: IconButton(
+          tooltip: l10n.close,
           icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
           onPressed: () => Navigator.of(context).pop(),
         ),

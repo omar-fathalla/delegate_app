@@ -550,5 +550,17 @@
     "networkStatusOnline": "متصل بالشبكة",
     "@networkStatusOnline": {
         "description": "Online network status indicator"
+    },
+    "showPassword": "إظهار كلمة المرور",
+    "@showPassword": {
+        "description": "Tooltip for show password button"
+    },
+    "hidePassword": "إخفاء كلمة المرور",
+    "@hidePassword": {
+        "description": "Tooltip for hide password button"
+    },
+    "close": "إغلاق",
+    "@close": {
+        "description": "Tooltip for close button"
     }
 }

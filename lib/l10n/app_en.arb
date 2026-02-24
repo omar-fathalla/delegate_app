@@ -550,5 +550,17 @@
     "networkStatusOnline": "Online",
     "@networkStatusOnline": {
         "description": "Online network status indicator"
+    },
+    "showPassword": "Show password",
+    "@showPassword": {
+        "description": "Tooltip for show password button"
+    },
+    "hidePassword": "Hide password",
+    "@hidePassword": {
+        "description": "Tooltip for hide password button"
+    },
+    "close": "Close",
+    "@close": {
+        "description": "Tooltip for close button"
     }
 }
