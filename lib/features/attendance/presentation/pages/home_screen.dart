@@ -7,6 +7,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
+import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends StatefulWidget {
   final Delegate delegate;
@@ -175,13 +176,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: state is AttendanceLoading
                         ? null
                         : () async {
+                            final position = await _getCurrentLocation(context);
+                            if (position == null || !context.mounted) return;
+
                             if (isCheckedIn) {
-                              BlocProvider.of<AttendanceBloc>(context).add(
-                                const CheckOutRequested(
-                                  attendanceId:
-                                      'temp_id', // Needs fix in real app
-                                  lat: 30.0,
-                                  long: 31.0,
+                              final activeId = context
+                                  .read<AttendanceBloc>()
+                                  .currentAttendanceId;
+                              if (activeId == null) return;
+
+                              context.read<AttendanceBloc>().add(
+                                CheckOutRequested(
+                                  attendanceId: activeId,
+                                  userId: widget.delegate.uid,
+                                  lat: position.latitude,
+                                  long: position.longitude,
                                 ),
                               );
                             } else {
@@ -203,15 +212,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
                               if (!context.mounted) return;
 
-                              BlocProvider.of<AttendanceBloc>(context).add(
+                              context.read<AttendanceBloc>().add(
                                 CheckInRequested(
                                   userId: widget.delegate.uid,
                                   companyId: widget.delegate.companyUID,
                                   organizationId:
                                       widget.delegate.organizationUID,
                                   deviceInfo: deviceInfoStr,
-                                  lat: 30.0,
-                                  long: 31.0,
+                                  lat: position.latitude,
+                                  long: position.longitude,
+                                  branchName:
+                                      'الفرع الرئيسي', // Default for manual button in Home
                                 ),
                               );
                             }
@@ -343,6 +354,47 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       ),
+    );
+  }
+
+  Future<Position?> _getCurrentLocation(BuildContext context) async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('خدمات الموقع معطلة. يرجى تفعيلها.')),
+        );
+      }
+      return null;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم رفض إذن الوصول للموقع')),
+          );
+        }
+        return null;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('إذن الموقع مرفوض بشكل دائم.')),
+        );
+      }
+      return null;
+    }
+
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
   }
 }

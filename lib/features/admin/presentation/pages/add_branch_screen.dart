@@ -25,6 +25,17 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   final _searchController = TextEditingController();
   GoogleMapController? _mapController;
   bool _isSearching = false;
+  bool _isMapReady = false;
+
+  // Default fallback location (Riyadh) — will be replaced by GPS on init
+  LatLng _initialLocation = const LatLng(24.7136, 46.6753);
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-detect user's GPS location on screen load
+    _fetchInitialLocation();
+  }
 
   @override
   void dispose() {
@@ -32,6 +43,43 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     _radiusController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Fetches the user's current GPS position and updates the map.
+  Future<void> _fetchInitialLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+      if (permission == LocationPermission.deniedForever) return;
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      final userLatLng = LatLng(position.latitude, position.longitude);
+
+      if (mounted) {
+        setState(() {
+          _initialLocation = userLatLng;
+        });
+
+        // If map is already created, animate to user's location
+        _mapController?.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: userLatLng, zoom: 14),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching initial location: $e');
+    }
   }
 
   Future<void> _searchLocation(String query) async {
@@ -220,7 +268,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    const initialLocation = LatLng(24.7136, 46.6753); // Default location
     final radius = double.tryParse(_radiusController.text) ?? 100.0;
 
     return Scaffold(
@@ -248,7 +295,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                         start: BorderSide(color: Colors.grey.shade300),
                       ),
                     ),
-                    child: _buildMap(initialLocation, radius, l10n),
+                    child: _buildMap(_initialLocation, radius, l10n),
                   ),
                 ),
               ],
@@ -260,7 +307,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 // Top half: Map
                 Expanded(
                   flex: 4,
-                  child: _buildMap(initialLocation, radius, l10n),
+                  child: _buildMap(_initialLocation, radius, l10n),
                 ),
                 // Bottom half: Form
                 Expanded(
@@ -407,7 +454,12 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           myLocationEnabled: true,
           myLocationButtonEnabled: true,
           zoomControlsEnabled: true,
-          onMapCreated: (controller) => _mapController = controller,
+          onMapCreated: (controller) {
+            _mapController = controller;
+            if (!_isMapReady) {
+              setState(() => _isMapReady = true);
+            }
+          },
           onTap: (LatLng position) {
             setState(() {
               _selectedActionPoint = position;
@@ -440,6 +492,35 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 }
               : {},
         ),
+        // --- Performance: Show placeholder while map loads ---
+        if (!_isMapReady)
+          Positioned.fill(
+            child: Container(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF0D47A1),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.searchCityOrRegion,
+                      style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         Positioned(
           top: 16,
           left: 16,

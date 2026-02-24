@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -5,8 +6,8 @@ import 'package:delegate_app/features/attendance/domain/entities/attendance.dart
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
-import 'package:delegate_app/l10n/app_localizations.dart'; // تم الاحتفاظ بها
-import 'package:geolocator/geolocator.dart'; // تم الاحتفاظ بها
+import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -22,14 +23,64 @@ class AttendanceScreen extends StatefulWidget {
   State<AttendanceScreen> createState() => _AttendanceScreenState();
 }
 
-class _AttendanceScreenState extends State<AttendanceScreen> {
+class _AttendanceScreenState extends State<AttendanceScreen>
+    with AutomaticKeepAliveClientMixin {
   DateTime _selectedMonth = DateTime.now();
 
   bool isCheckedIn = false;
   bool _isProcessing = false; // Guard against multiple scans
 
+  // --- Performance: Cache connectivity state instead of StreamBuilder ---
+  bool _isOffline = false;
+  late final StreamSubscription<List<ConnectivityResult>> _connectivitySub;
+
+  // --- Performance: Cache filtered/grouped history ---
+  List<Attendance> _rawHistory = [];
+  List<Attendance> _filteredHistory = [];
+  Map<String, List<Attendance>> _groupedByDay = {};
+  List<String> _dayKeys = [];
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Subscribe to connectivity changes once
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      final offline = results.contains(ConnectivityResult.none);
+      if (offline != _isOffline) {
+        setState(() => _isOffline = offline);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub.cancel();
+    super.dispose();
+  }
+
+  /// Recomputes filtered/grouped data only when source data or month changes.
+  void _recomputeFilteredHistory() {
+    _filteredHistory = _rawHistory.where((attendance) {
+      return attendance.checkInTime.month == _selectedMonth.month &&
+          attendance.checkInTime.year == _selectedMonth.year;
+    }).toList();
+
+    _filteredHistory.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
+
+    _groupedByDay = {};
+    for (final item in _filteredHistory) {
+      final dayKey = DateFormat('yyyy-MM-dd').format(item.checkInTime);
+      _groupedByDay.putIfAbsent(dayKey, () => []).add(item);
+    }
+    _dayKeys = _groupedByDay.keys.toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final l10n = AppLocalizations.of(context)!;
     return BlocProvider(
       create: (context) => sl<AttendanceBloc>()
@@ -61,6 +112,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               ),
             );
           } else if (state is AttendanceHistoryLoaded) {
+            // --- Performance: cache + compute only when data changes ---
+            _rawHistory = state.history;
+            _recomputeFilteredHistory();
             final hasActiveCheckIn = state.history.any(
               (element) => element.checkOutTime == null,
             );
@@ -74,9 +128,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 backgroundColor: Colors.green,
               ),
             );
-            context.read<AttendanceBloc>().add(
-              HistoryRequested(userId: widget.delegate.uid),
-            );
+            Future.delayed(const Duration(seconds: 1), () {
+              if (context.mounted) {
+                context.read<AttendanceBloc>().add(
+                  HistoryRequested(userId: widget.delegate.uid),
+                );
+              }
+            });
           }
         },
         builder: (context, state) {
@@ -137,6 +195,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       _selectedMonth.year,
                       _selectedMonth.month - 1,
                     );
+                    // Recompute when month changes
+                    _recomputeFilteredHistory();
                   });
                 },
               ),
@@ -157,80 +217,65 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       _selectedMonth.year,
                       _selectedMonth.month + 1,
                     );
+                    // Recompute when month changes
+                    _recomputeFilteredHistory();
                   });
                 },
               ),
             ],
           ),
           const SizedBox(height: 8),
-          StreamBuilder<List<ConnectivityResult>>(
-            stream: Connectivity().onConnectivityChanged,
-            builder: (context, snapshot) {
-              final isOffline =
-                  snapshot.data?.contains(ConnectivityResult.none) ?? false;
+          // --- Performance: Use cached _isOffline instead of StreamBuilder ---
+          _buildConnectivityBadge(l10n),
+        ],
+      ),
+    );
+  }
 
-              if (isOffline) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orange,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.cloud_off,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        l10n.networkStatusOffline,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
+  Widget _buildConnectivityBadge(AppLocalizations l10n) {
+    if (_isOffline) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.orange,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              l10n.networkStatusOffline,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.cloud_done_outlined,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      l10n.networkStatusOnline,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.green,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_done_outlined, color: Colors.white, size: 16),
+          const SizedBox(width: 8),
+          Text(
+            l10n.networkStatusOnline,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -243,9 +288,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     if (state is AttendanceLoading ||
         state is AttendanceInitial ||
-        state is AttendanceCheckedIn ||
-        state is AttendanceCheckedOut) {
-      return const Center(child: CircularProgressIndicator());
+        state is AttendanceSyncInProgress) {
+      return _buildShimmerSkeleton();
     } else if (state is AttendanceError) {
       return Center(
         child: Column(
@@ -271,12 +315,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ),
       );
     } else if (state is AttendanceHistoryLoaded) {
-      final history = state.history.where((attendance) {
-        return attendance.checkInTime.month == _selectedMonth.month &&
-            attendance.checkInTime.year == _selectedMonth.year;
-      }).toList();
-
-      if (history.isEmpty) {
+      // --- Performance: Use pre-computed cached data ---
+      if (_filteredHistory.isEmpty) {
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -312,15 +352,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         );
       }
 
-      history.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
-
-      final Map<String, List<Attendance>> groupedByDay = {};
-      for (final item in history) {
-        final dayKey = DateFormat('yyyy-MM-dd').format(item.checkInTime);
-        groupedByDay.putIfAbsent(dayKey, () => []).add(item);
-      }
-      final dayKeys = groupedByDay.keys.toList();
-
       return RefreshIndicator(
         onRefresh: () async {
           context.read<AttendanceBloc>().add(const SyncRequested());
@@ -335,10 +366,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             start: 16,
             end: 16,
           ),
-          itemCount: dayKeys.length,
+          itemCount: _dayKeys.length,
           itemBuilder: (context, dayIndex) {
-            final dayKey = dayKeys[dayIndex];
-            final records = groupedByDay[dayKey] ?? [];
+            final dayKey = _dayKeys[dayIndex];
+            final records = _groupedByDay[dayKey] ?? [];
             final dayDate = records.first.checkInTime;
             final fullDateStr = DateFormat(
               'EEEE، d MMMM yyyy',
@@ -515,12 +546,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           ),
                         ),
                         if (!item.isSynced)
-                          const Padding(
-                            padding: EdgeInsetsDirectional.only(end: 8.0),
-                            child: Icon(
-                              Icons.cloud_off,
-                              color: Colors.orange,
-                              size: 20,
+                          Padding(
+                            padding: const EdgeInsetsDirectional.only(end: 8.0),
+                            child: Tooltip(
+                              message: l10n.pendingSync,
+                              child: const Icon(
+                                Icons.cloud_off,
+                                color: Colors.orange,
+                                size: 20,
+                              ),
                             ),
                           ),
                         if (item.checkOutTime == null)
@@ -546,7 +580,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ),
                   );
                 }),
-                if (dayIndex < dayKeys.length - 1) const Divider(height: 24),
+                if (dayIndex < _dayKeys.length - 1) const Divider(height: 24),
               ],
             );
           },
@@ -618,6 +652,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         attendanceBloc.add(
                           CheckOutRequested(
                             attendanceId: attendanceBloc.currentAttendanceId!,
+                            userId: widget.delegate.uid,
                             lat: position.latitude,
                             long: position.longitude,
                           ),
@@ -863,5 +898,110 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       debugPrint('Error getting device info: $e');
     }
     return 'Unknown Device';
+  }
+
+  /// Shimmer skeleton that mimics the attendance history cards while loading.
+  Widget _buildShimmerSkeleton() {
+    return ListView.builder(
+      padding: const EdgeInsetsDirectional.only(
+        top: 16,
+        bottom: 80,
+        start: 16,
+        end: 16,
+      ),
+      itemCount: 5,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _ShimmerCard(),
+        );
+      },
+    );
+  }
+}
+
+/// Animated shimmer card that mimics attendance history card layout.
+class _ShimmerCard extends StatefulWidget {
+  @override
+  State<_ShimmerCard> createState() => _ShimmerCardState();
+}
+
+class _ShimmerCardState extends State<_ShimmerCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withValues(alpha: 0.1),
+                blurRadius: 5,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildShimmerBar(width: 120, height: 12),
+              const SizedBox(height: 12),
+              _buildShimmerBar(width: 180, height: 14),
+              const SizedBox(height: 8),
+              _buildShimmerBar(width: 160, height: 14),
+              const SizedBox(height: 8),
+              _buildShimmerBar(width: 100, height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildShimmerBar({required double width, required double height}) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            gradient: LinearGradient(
+              colors: [Colors.grey[300]!, Colors.grey[100]!, Colors.grey[300]!],
+              stops: [
+                (_controller.value - 0.3).clamp(0.0, 1.0),
+                _controller.value,
+                (_controller.value + 0.3).clamp(0.0, 1.0),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        );
+      },
+    );
   }
 }

@@ -17,16 +17,13 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
+  /// Tracks which tabs have been visited so we only build them once.
+  final Set<int> _initializedTabs = {0}; // Tab 0 (Attendance) loads first
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
-
-    final screens = [
-      AttendanceScreen(delegate: delegate),
-      ProfileScreen(delegate: delegate),
-      SettingsScreen(delegate: delegate),
-    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -74,7 +71,7 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
-      body: IndexedStack(index: _currentIndex, children: screens),
+      body: _buildBody(delegate),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -90,6 +87,7 @@ class _MainScreenState extends State<MainScreen> {
           onTap: (index) {
             setState(() {
               _currentIndex = index;
+              _initializedTabs.add(index); // Mark tab as visited
             });
           },
           selectedItemColor: Colors.white,
@@ -114,6 +112,30 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Lazy-builds tabs: only creates a tab widget when it's first visited,
+  /// then keeps it alive via IndexedStack so it isn't destroyed on tab switch.
+  Widget _buildBody(Delegate delegate) {
+    return IndexedStack(
+      index: _currentIndex,
+      children: [
+        // Tab 0: Attendance (always initialized)
+        AttendanceScreen(delegate: delegate),
+
+        // Tab 1: Profile — only build if visited
+        if (_initializedTabs.contains(1))
+          ProfileScreen(delegate: delegate)
+        else
+          const SizedBox.shrink(),
+
+        // Tab 2: Settings — only build if visited
+        if (_initializedTabs.contains(2))
+          SettingsScreen(delegate: delegate)
+        else
+          const SizedBox.shrink(),
+      ],
     );
   }
 }

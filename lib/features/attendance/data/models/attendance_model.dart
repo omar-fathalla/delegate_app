@@ -59,4 +59,32 @@ class AttendanceModel extends Attendance {
       'localCheckOutTime': localCheckOutTime?.toIso8601String(),
     };
   }
+
+  AttendanceModel copyWith({
+    String? id,
+    String? userId,
+    DateTime? checkInTime,
+    DateTime? checkOutTime,
+    double? latitude,
+    double? longitude,
+    String? imageUrl,
+    String? branchName,
+    bool? isSynced,
+    DateTime? localCheckInTime,
+    DateTime? localCheckOutTime,
+  }) {
+    return AttendanceModel(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      checkInTime: checkInTime ?? this.checkInTime,
+      checkOutTime: checkOutTime ?? this.checkOutTime,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      imageUrl: imageUrl ?? this.imageUrl,
+      branchName: branchName ?? this.branchName,
+      isSynced: isSynced ?? this.isSynced,
+      localCheckInTime: localCheckInTime ?? this.localCheckInTime,
+      localCheckOutTime: localCheckOutTime ?? this.localCheckOutTime,
+    );
+  }
 }

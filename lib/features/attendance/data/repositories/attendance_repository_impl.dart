@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
@@ -6,8 +7,8 @@ import 'package:delegate_app/features/attendance/domain/entities/attendance.dart
 import 'package:delegate_app/features/attendance/domain/repositories/attendance_repository.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
-import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:geolocator/geolocator.dart';
 
 class AttendanceRepositoryImpl implements AttendanceRepository {
   final AttendanceRemoteDataSource remoteDataSource;
@@ -43,6 +44,48 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       if (!await _hasConnection()) {
         throw const ServerFailure('No internet connection (offline mode)');
       }
+
+      // --- Anti-Fraud Geofencing ---
+      if (branchName != null) {
+        final branchData = await remoteDataSource.getBranchByName(branchName);
+        if (branchData == null) {
+          throw const ServerFailure(
+            'لم يتم العثور على بيانات الفرع الممسوح. يرجى التأكد من الرمز.',
+          );
+        }
+
+        final latVal = branchData['latitude'];
+        final longVal = branchData['longitude'];
+        final radiusVal = branchData['geofenceRadius'];
+
+        if (latVal != null && longVal != null && radiusVal != null) {
+          final double branchLat = (latVal as num).toDouble();
+          final double branchLong = (longVal as num).toDouble();
+          final double radius = (radiusVal as num).toDouble();
+
+          final double distance = Geolocator.distanceBetween(
+            lat,
+            long,
+            branchLat,
+            branchLong,
+          );
+
+          if (distance > radius) {
+            throw ServerFailure(
+              'أنت خارج نطاق الفرع (${distance.toInt()} متر). يرجى التواجد داخل نطاق $radius متر.',
+            );
+          }
+        } else {
+          // Log coordinates to help admin set up the branch
+          debugPrint(
+            'DEBUG: Current Location for $branchName: Lat $lat, Long $long',
+          );
+          throw ServerFailure(
+            'بيانات إحداثيات الفرع ($branchName) غير مكتملة في النظام. يرجى إبلاغ الإدارة.',
+          );
+        }
+      }
+
       final result = await remoteDataSource.checkIn(
         userId,
         lat,
@@ -56,34 +99,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       await localDataSource.cacheAttendance(result);
       return Right(result);
     } on Failure catch (e) {
-      if (e is ServerFailure) {
-        final localId = 'offline_${const Uuid().v4()}';
-        final now = DateTime.now();
-        await offlineQueue.addToQueue({
-          'delegateId': userId,
-          'companyId': companyId,
-          'organizationId': organizationId,
-          'deviceInfo': deviceInfo,
-          'type': 'check_in',
-          'location': {'latitude': lat, 'longitude': long},
-          'branchName': branchName,
-          'timestamp': now.toIso8601String(),
-        });
-
-        final localModel = AttendanceModel(
-          id: localId,
-          userId: userId,
-          checkInTime: now,
-          localCheckInTime: now,
-          latitude: lat,
-          longitude: long,
-          branchName: branchName,
-          isSynced: false,
-        );
-
-        await localDataSource.cacheAttendance(localModel);
-        return Right(localModel);
-      }
+      // We removed the offline fallback here to satisfy the "internet required" for anti-fraud
       return Left(e);
     }
   }
@@ -92,52 +108,66 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   Future<Either<Failure, Attendance>> checkOut(
     String attendanceId,
     double lat,
-    double long,
-  ) async {
+    double long, {
+    required String userId,
+  }) async {
     try {
       if (!await _hasConnection()) {
         throw const ServerFailure('No internet connection (offline mode)');
       }
-      final result = await remoteDataSource.checkOut(attendanceId, lat, long);
-      // Always update local cache after successful checkout
-      await localDataSource.updateAttendance(result);
-      return Right(result);
-    } on Failure catch (e) {
-      if (e is ServerFailure) {
-        final now = DateTime.now();
-        await offlineQueue.addToQueue({
-          'type': 'check_out',
-          'relatedCheckInId': attendanceId,
-          'location': {'latitude': lat, 'longitude': long},
-          'timestamp': now.toIso8601String(),
-        });
 
-        final history = await localDataSource.getLastAttendanceHistory();
-        final index = history.indexWhere(
-          (element) => element.id == attendanceId,
-        );
-        if (index != -1) {
-          final oldModel = history[index];
-          final localModel = AttendanceModel(
-            id: oldModel.id,
-            userId: oldModel.userId,
-            checkInTime: oldModel.checkInTime,
-            checkOutTime: now,
-            localCheckOutTime: now,
-            latitude: oldModel.latitude,
-            longitude: oldModel.longitude,
-            branchName: oldModel.branchName,
-            isSynced: false,
+      // --- Anti-Fraud Geofencing for Check-Out ---
+      if (userId.isNotEmpty) {
+        try {
+          final activeAttendance = await remoteDataSource.findActiveAttendance(
+            userId,
           );
-          await localDataSource.updateAttendance(localModel);
-          return Right(localModel);
-        } else {
-          return const Left(
-            ServerFailure('تعذر العثور على سجل الحضور محلياً.'),
+          if (activeAttendance != null && activeAttendance.branchName != null) {
+            final branchData = await remoteDataSource.getBranchByName(
+              activeAttendance.branchName!,
+            );
+            if (branchData != null) {
+              final latVal = branchData['latitude'];
+              final longVal = branchData['longitude'];
+              final radiusVal = branchData['geofenceRadius'];
+
+              if (latVal != null && longVal != null && radiusVal != null) {
+                final double branchLat = (latVal as num).toDouble();
+                final double branchLong = (longVal as num).toDouble();
+                final double radius = (radiusVal as num).toDouble();
+
+                final double distance = Geolocator.distanceBetween(
+                  lat,
+                  long,
+                  branchLat,
+                  branchLong,
+                );
+
+                if (distance > radius) {
+                  throw ServerFailure(
+                    'أنت خارج نطاق الفرع (${distance.toInt()} متر). يرجى التواجد داخل نطاق $radius متر لتسجيل الانصراف.',
+                  );
+                }
+              }
+            }
+          }
+        } catch (e) {
+          if (e is Failure) rethrow;
+          debugPrint(
+            'Geofencing check-out error ignored to prevent freeze: $e',
           );
         }
       }
-      return Left(e);
+
+      final result = await remoteDataSource.checkOut(attendanceId, lat, long);
+      await localDataSource.updateAttendance(result);
+      return Right(result);
+    } catch (e) {
+      if (e is Failure) return Left(e);
+      debugPrint('Unexpected error in AttendanceRepository.checkOut: $e');
+      return const Left(
+        ServerFailure('حدث خطأ غير متوقع أثناء تسجيل الانصراف.'),
+      );
     }
   }
 
@@ -152,15 +182,28 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       // Combine with local unsynced items
       try {
         final localHistory = await localDataSource.getLastAttendanceHistory();
-        final unsyncedItems = localHistory.where((e) => !e.isSynced).toList();
+        final Map<String, AttendanceModel> mergedMap = {};
 
-        final List<AttendanceModel> combined = List.from(remoteHistory);
-        for (var local in unsyncedItems) {
-          // If it's not already in remote history
-          if (!combined.any((r) => r.id == local.id)) {
-            combined.add(local);
+        // 1. Start with remote results
+        for (var remote in remoteHistory) {
+          mergedMap[remote.id] = remote;
+        }
+
+        // 2. Merge with local (prefer local if it has check-out and remote doesn't)
+        for (var local in localHistory) {
+          if (mergedMap.containsKey(local.id)) {
+            final remote = mergedMap[local.id]!;
+            if (local.checkOutTime != null && remote.checkOutTime == null) {
+              // Local is fresher (just checked out locally, remote still stale)
+              mergedMap[local.id] = local.copyWith(isSynced: false);
+            }
+          } else {
+            // Local item not in remote yet (recently opened or offline)
+            mergedMap[local.id] = local;
           }
         }
+
+        final List<AttendanceModel> combined = mergedMap.values.toList();
 
         // Sort combined descending by checkInTime
         combined.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
@@ -217,6 +260,34 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       return Left(e);
     } catch (e) {
       return const Left(ServerFailure('خطأ غير متوقع أثناء المزامنة.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> saveBranch({
+    required String branchName,
+    required double latitude,
+    required double longitude,
+    required double geofenceRadius,
+  }) async {
+    try {
+      if (!await _hasConnection()) {
+        throw const ServerFailure('No internet connection');
+      }
+      await remoteDataSource.saveBranch(
+        branchName: branchName,
+        latitude: latitude,
+        longitude: longitude,
+        geofenceRadius: geofenceRadius,
+      );
+      return const Right(null);
+    } on Failure catch (e) {
+      return Left(e);
+    } catch (e) {
+      debugPrint('AttendanceRepository.saveBranch error: $e');
+      return const Left(
+        ServerFailure('حدث خطأ غير متوقع أثناء حفظ بيانات الفرع.'),
+      );
     }
   }
 }

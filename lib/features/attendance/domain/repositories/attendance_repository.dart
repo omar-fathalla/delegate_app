@@ -15,8 +15,9 @@ abstract class AttendanceRepository {
   Future<Either<Failure, Attendance>> checkOut(
     String attendanceId,
     double lat,
-    double long,
-  );
+    double long, {
+    required String userId,
+  });
   Future<Either<Failure, List<Attendance>>> getHistory(String userId);
 
   /// Finds the active attendance session (no checkOutTime) for the delegate.
@@ -24,4 +25,12 @@ abstract class AttendanceRepository {
 
   /// Synchronizes offline attendance records with the remote server.
   Future<Either<Failure, void>> syncPendingAttendance();
+
+  /// Saves or updates a branch with its geofence data.
+  Future<Either<Failure, void>> saveBranch({
+    required String branchName,
+    required double latitude,
+    required double longitude,
+    required double geofenceRadius,
+  });
 }

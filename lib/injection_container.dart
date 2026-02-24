@@ -24,6 +24,7 @@ import 'package:delegate_app/features/profile/data/repositories/profile_reposito
 import 'package:delegate_app/features/profile/domain/repositories/profile_repository.dart';
 import 'package:delegate_app/features/profile/domain/usecases/get_delegate_profile.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
+import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:get_it/get_it.dart';
 
 final sl = GetIt.instance;
@@ -32,6 +33,7 @@ Future<void> init() async {
   // ! Core
   final sharedPreferences = await SharedPreferences.getInstance();
   sl.registerLazySingleton(() => sharedPreferences);
+  sl.registerLazySingleton(() => LocaleProvider(sharedPreferences));
 
   // ! Features - Auth
   // Bloc

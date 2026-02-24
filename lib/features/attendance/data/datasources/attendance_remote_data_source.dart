@@ -28,6 +28,17 @@ abstract class AttendanceRemoteDataSource {
 
   /// Syncs an offline queue of attendance actions to Firestore.
   Future<void> syncOfflineQueue(List<Map<String, dynamic>> queue);
+
+  /// Fetches branch details by name.
+  Future<Map<String, dynamic>?> getBranchByName(String branchName);
+
+  /// Saves or updates a branch with its geofence data.
+  Future<void> saveBranch({
+    required String branchName,
+    required double latitude,
+    required double longitude,
+    required double geofenceRadius,
+  });
 }
 
 class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
@@ -316,6 +327,73 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     } catch (e) {
       debugPrint('AttendanceRemoteDataSource.syncOfflineQueue error: $e');
       throw const ServerFailure('حدث خطأ غير متوقع أثناء المزامنة.');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getBranchByName(String branchName) async {
+    try {
+      final querySnapshot = await firestore
+          .collection('branches')
+          .where('branchName', isEqualTo: branchName)
+          .limit(1)
+          .get()
+          .timeout(const Duration(seconds: 5));
+
+      if (querySnapshot.docs.isEmpty) {
+        return null;
+      }
+
+      return querySnapshot.docs.first.data();
+    } catch (e) {
+      debugPrint('AttendanceRemoteDataSource.getBranchByName error: $e');
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveBranch({
+    required String branchName,
+    required double latitude,
+    required double longitude,
+    required double geofenceRadius,
+  }) async {
+    try {
+      final querySnapshot = await firestore
+          .collection('branches')
+          .where('branchName', isEqualTo: branchName)
+          .limit(1)
+          .get()
+          .timeout(const Duration(seconds: 5));
+
+      final Map<String, dynamic> data = {
+        'branchName': branchName,
+        'latitude': latitude,
+        'longitude': longitude,
+        'geofenceRadius': geofenceRadius,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (querySnapshot.docs.isEmpty) {
+        // Create new
+        await firestore
+            .collection('branches')
+            .add(data)
+            .timeout(const Duration(seconds: 5));
+      } else {
+        // Update existing
+        await querySnapshot.docs.first.reference
+            .update(data)
+            .timeout(const Duration(seconds: 5));
+      }
+    } on FirebaseException catch (e) {
+      debugPrint(
+        'AttendanceRemoteDataSource.saveBranch FirebaseException: ${e.code}',
+      );
+      throw const ServerFailure('فشل في حفظ بيانات الفرع.');
+    } catch (e) {
+      debugPrint('AttendanceRemoteDataSource.saveBranch error: $e');
+      throw const ServerFailure('حدث خطأ غير متوقع أثناء حفظ بيانات الفرع.');
     }
   }
 }

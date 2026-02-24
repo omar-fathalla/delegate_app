@@ -65,6 +65,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     final result = await checkOut(
       CheckOutParams(
         attendanceId: event.attendanceId,
+        userId: event.userId,
         lat: event.lat,
         long: event.long,
       ),

@@ -123,4 +123,24 @@ class MockAttendanceDataSource implements AttendanceRemoteDataSource {
   Future<void> syncOfflineQueue(List<Map<String, dynamic>> queue) async {
     await Future.delayed(const Duration(seconds: 1));
   }
+
+  @override
+  Future<Map<String, dynamic>?> getBranchByName(String branchName) async {
+    return {
+      'branchName': branchName,
+      'latitude': 30.0444,
+      'longitude': 31.2357,
+      'geofenceRadius': 200.0,
+    };
+  }
+
+  @override
+  Future<void> saveBranch({
+    required String branchName,
+    required double latitude,
+    required double longitude,
+    required double geofenceRadius,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
 }

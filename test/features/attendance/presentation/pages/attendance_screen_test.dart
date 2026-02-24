@@ -38,8 +38,9 @@ class MockAttendanceRepository implements AttendanceRepository {
   Future<Either<Failure, Attendance>> checkOut(
     String attendanceId,
     double lat,
-    double long,
-  ) async {
+    double long, {
+    required String userId,
+  }) async {
     return Right(
       Attendance(
         id: attendanceId,
@@ -64,6 +65,16 @@ class MockAttendanceRepository implements AttendanceRepository {
 
   @override
   Future<Either<Failure, void>> syncPendingAttendance() async {
+    return const Right(null);
+  }
+
+  @override
+  Future<Either<Failure, void>> saveBranch({
+    required String branchName,
+    required double latitude,
+    required double longitude,
+    required double geofenceRadius,
+  }) async {
     return const Right(null);
   }
 }
