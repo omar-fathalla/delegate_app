@@ -5,3 +5,7 @@
 ## 2024-05-22 - [Auth] Password Visibility Toggle
 **Learning:** Obscured text fields without a visibility toggle frustrate users who need to verify complex passwords or names.
 **Action:** Always include a suffix icon toggle for `obscureText` fields, ensuring the icon state (eye vs slashed eye) matches the *action* (Show vs Hide) or *state* (Visible vs Hidden) consistently with the design system.
+
+## 2026-02-25 - [Profile] Image Viewer Tooltips
+**Learning:** The full-screen image viewer's close and open-in-browser buttons lacked localized tooltips, which is a barrier for screen reader users and non-English speakers.
+**Action:** When adding icon-only buttons (especially in custom overlays or dialogs), always ensure they have localized 'tooltip' properties.

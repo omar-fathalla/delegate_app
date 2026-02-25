@@ -774,6 +774,7 @@ class _FullScreenImageViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -788,12 +789,13 @@ class _FullScreenImageViewer extends StatelessWidget {
         ),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+          tooltip: l10n.close,
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.open_in_new_rounded, color: Colors.white),
-            tooltip: 'Open in browser',
+            tooltip: l10n.openInBrowser,
             onPressed: () async {
               final uri = Uri.parse(imageUrl);
               if (await canLaunchUrl(uri)) {

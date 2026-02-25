@@ -550,5 +550,13 @@
     "networkStatusOnline": "Online",
     "@networkStatusOnline": {
         "description": "Online network status indicator"
+    },
+    "close": "Close",
+    "@close": {
+        "description": "Close button tooltip"
+    },
+    "openInBrowser": "Open in browser",
+    "@openInBrowser": {
+        "description": "Open in browser tooltip"
     }
 }

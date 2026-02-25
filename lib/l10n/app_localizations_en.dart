@@ -395,4 +395,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get networkStatusOnline => 'Online';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get openInBrowser => 'Open in browser';
 }

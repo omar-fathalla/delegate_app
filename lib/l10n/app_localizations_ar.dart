@@ -394,4 +394,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get networkStatusOnline => 'متصل بالشبكة';
+
+  @override
+  String get close => 'إغلاق';
+
+  @override
+  String get openInBrowser => 'فتح في المتصفح';
 }

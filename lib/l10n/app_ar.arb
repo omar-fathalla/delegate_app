@@ -550,5 +550,13 @@
     "networkStatusOnline": "متصل بالشبكة",
     "@networkStatusOnline": {
         "description": "Online network status indicator"
+    },
+    "close": "إغلاق",
+    "@close": {
+        "description": "Close button tooltip"
+    },
+    "openInBrowser": "فتح في المتصفح",
+    "@openInBrowser": {
+        "description": "Open in browser tooltip"
     }
 }
