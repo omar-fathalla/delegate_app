@@ -6,7 +6,8 @@ import 'package:delegate_app/features/attendance/data/datasources/attendance_rem
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/domain/repositories/attendance_repository.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
-import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
+
+import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -30,6 +31,50 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     }
   }
 
+  /// Validates that the user is within the geofence radius of the given branch.
+  /// Uses [BranchModel.fromMap] for data parsing (Separation of Concerns).
+  Future<void> _verifyGeofence({
+    required double userLat,
+    required double userLong,
+    required String branchName,
+    required bool isCheckIn,
+  }) async {
+    final branchData = await remoteDataSource.getBranchByName(branchName);
+    if (branchData == null) {
+      throw const ServerFailure(
+        'لم يتم العثور على بيانات الفرع. يرجى التأكد من الرمز.',
+      );
+    }
+
+    // Model handles data structure variations (nested vs top-level)
+    final branch = BranchModel.fromMap(branchData);
+
+    if (branch.latitude == 0.0 && branch.longitude == 0.0) {
+      debugPrint(
+        'DEBUG: Missing coordinates for $branchName — '
+        'lat: ${branch.latitude}, long: ${branch.longitude}',
+      );
+      throw ServerFailure(
+        'بيانات إحداثيات الفرع ($branchName) غير مكتملة في النظام. يرجى إبلاغ الإدارة.',
+      );
+    }
+
+    final double distance = Geolocator.distanceBetween(
+      userLat,
+      userLong,
+      branch.latitude,
+      branch.longitude,
+    );
+
+    if (distance > branch.geofenceRadius) {
+      final action = isCheckIn ? 'تسجيل الحضور' : 'تسجيل الانصراف';
+      throw ServerFailure(
+        'أنت خارج نطاق الفرع (${distance.toInt()} متر). '
+        'النطاق المسموح: ${branch.geofenceRadius.toInt()} متر لـ$action.',
+      );
+    }
+  }
+
   @override
   Future<Either<Failure, Attendance>> checkIn(
     String userId,
@@ -47,43 +92,12 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
       // --- Anti-Fraud Geofencing ---
       if (branchName != null) {
-        final branchData = await remoteDataSource.getBranchByName(branchName);
-        if (branchData == null) {
-          throw const ServerFailure(
-            'لم يتم العثور على بيانات الفرع الممسوح. يرجى التأكد من الرمز.',
-          );
-        }
-
-        final latVal = branchData['latitude'];
-        final longVal = branchData['longitude'];
-        final radiusVal = branchData['geofenceRadius'];
-
-        if (latVal != null && longVal != null && radiusVal != null) {
-          final double branchLat = (latVal as num).toDouble();
-          final double branchLong = (longVal as num).toDouble();
-          final double radius = (radiusVal as num).toDouble();
-
-          final double distance = Geolocator.distanceBetween(
-            lat,
-            long,
-            branchLat,
-            branchLong,
-          );
-
-          if (distance > radius) {
-            throw ServerFailure(
-              'أنت خارج نطاق الفرع (${distance.toInt()} متر). يرجى التواجد داخل نطاق $radius متر.',
-            );
-          }
-        } else {
-          // Log coordinates to help admin set up the branch
-          debugPrint(
-            'DEBUG: Current Location for $branchName: Lat $lat, Long $long',
-          );
-          throw ServerFailure(
-            'بيانات إحداثيات الفرع ($branchName) غير مكتملة في النظام. يرجى إبلاغ الإدارة.',
-          );
-        }
+        await _verifyGeofence(
+          userLat: lat,
+          userLong: long,
+          branchName: branchName,
+          isCheckIn: true,
+        );
       }
 
       final result = await remoteDataSource.checkIn(
@@ -116,46 +130,29 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         throw const ServerFailure('No internet connection (offline mode)');
       }
 
-      // --- Anti-Fraud Geofencing for Check-Out ---
+      // --- Anti-Fraud Geofencing for Check-Out (Non-Blocking) ---
+      // Geofencing errors should NOT prevent check-out, only warn.
+      // Only actual "out of range" violations should block.
       if (userId.isNotEmpty) {
         try {
           final activeAttendance = await remoteDataSource.findActiveAttendance(
             userId,
           );
           if (activeAttendance != null && activeAttendance.branchName != null) {
-            final branchData = await remoteDataSource.getBranchByName(
-              activeAttendance.branchName!,
+            await _verifyGeofence(
+              userLat: lat,
+              userLong: long,
+              branchName: activeAttendance.branchName!,
+              isCheckIn: false,
             );
-            if (branchData != null) {
-              final latVal = branchData['latitude'];
-              final longVal = branchData['longitude'];
-              final radiusVal = branchData['geofenceRadius'];
-
-              if (latVal != null && longVal != null && radiusVal != null) {
-                final double branchLat = (latVal as num).toDouble();
-                final double branchLong = (longVal as num).toDouble();
-                final double radius = (radiusVal as num).toDouble();
-
-                final double distance = Geolocator.distanceBetween(
-                  lat,
-                  long,
-                  branchLat,
-                  branchLong,
-                );
-
-                if (distance > radius) {
-                  throw ServerFailure(
-                    'أنت خارج نطاق الفرع (${distance.toInt()} متر). يرجى التواجد داخل نطاق $radius متر لتسجيل الانصراف.',
-                  );
-                }
-              }
-            }
           }
         } catch (e) {
-          if (e is Failure) rethrow;
-          debugPrint(
-            'Geofencing check-out error ignored to prevent freeze: $e',
-          );
+          // Only rethrow actual geofencing violations (out of range)
+          if (e is ServerFailure && e.message.contains('خارج نطاق')) {
+            rethrow;
+          }
+          // All other errors (missing index, network, etc.) → log and continue
+          debugPrint('Geofencing check-out skipped (non-blocking): $e');
         }
       }
 
@@ -177,51 +174,25 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       if (!await _hasConnection()) {
         throw const ServerFailure('No internet connection (offline mode)');
       }
+
+      // Firestore is the single source of truth (already filtered by delegateId)
       final remoteHistory = await remoteDataSource.getHistory(userId);
 
-      // Combine with local unsynced items
+      // Cache this delegate's data for offline fallback
       try {
-        final localHistory = await localDataSource.getLastAttendanceHistory();
-        final Map<String, AttendanceModel> mergedMap = {};
-
-        // 1. Start with remote results
-        for (var remote in remoteHistory) {
-          mergedMap[remote.id] = remote;
-        }
-
-        // 2. Merge with local (prefer local if it has check-out and remote doesn't)
-        for (var local in localHistory) {
-          if (mergedMap.containsKey(local.id)) {
-            final remote = mergedMap[local.id]!;
-            if (local.checkOutTime != null && remote.checkOutTime == null) {
-              // Local is fresher (just checked out locally, remote still stale)
-              mergedMap[local.id] = local.copyWith(isSynced: false);
-            }
-          } else {
-            // Local item not in remote yet (recently opened or offline)
-            mergedMap[local.id] = local;
-          }
-        }
-
-        final List<AttendanceModel> combined = mergedMap.values.toList();
-
-        // Sort combined descending by checkInTime
-        combined.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
-
-        // Update local cache so next time we have the freshest list
-        await localDataSource.overwriteHistory(combined);
-
-        return Right(combined);
+        await localDataSource.overwriteHistory(remoteHistory);
       } catch (_) {
-        // If combining fails, just return remote history
-        return Right(remoteHistory);
+        // Cache failure is non-critical
       }
+
+      return Right(remoteHistory);
     } on Failure catch (e) {
-      // On network error, fallback to local cache
+      // Offline fallback: use local cache but filter by userId
       try {
         final localHistory = await localDataSource.getLastAttendanceHistory();
-        if (localHistory.isNotEmpty) {
-          return Right(localHistory);
+        final filtered = localHistory.where((a) => a.userId == userId).toList();
+        if (filtered.isNotEmpty) {
+          return Right(filtered);
         }
       } catch (_) {
         // If local also fails, return the original remote failure

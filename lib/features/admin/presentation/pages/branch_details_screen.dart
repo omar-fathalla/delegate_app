@@ -180,7 +180,19 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.branchDetails)),
+      appBar: AppBar(
+        title: Text(l10n.branchDetails),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (GoRouter.of(context).canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+        ),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(

@@ -23,6 +23,25 @@ class BranchModel extends Branch {
     );
   }
 
+  /// Creates a [BranchModel] from a raw Firestore map (without doc reference).
+  /// Supports both nested (`location.latitude`) and top-level (`latitude`) formats
+  /// for backwards compatibility with older branch documents.
+  factory BranchModel.fromMap(Map<String, dynamic> map, {String id = ''}) {
+    final location = map['location'] as Map<String, dynamic>?;
+
+    return BranchModel(
+      id: id,
+      branchName: map['branchName'] as String? ?? '',
+      latitude:
+          ((location?['latitude'] ?? map['latitude']) as num?)?.toDouble() ??
+          0.0,
+      longitude:
+          ((location?['longitude'] ?? map['longitude']) as num?)?.toDouble() ??
+          0.0,
+      geofenceRadius: (map['geofenceRadius'] as num?)?.toDouble() ?? 100.0,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'branchName': branchName,

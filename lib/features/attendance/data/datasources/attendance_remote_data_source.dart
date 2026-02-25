@@ -276,7 +276,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       return null;
     } on FirebaseException catch (e) {
       debugPrint(
-        'AttendanceRemoteDataSource.findActiveAttendance FirebaseException: ${e.code}',
+        'AttendanceRemoteDataSource.findActiveAttendance FirebaseException: '
+        'code=${e.code}, message=${e.message}',
       );
       throw const ServerFailure('فشل في البحث عن جلسة الحضور النشطة.');
     } on TimeoutException {
