@@ -248,6 +248,12 @@ abstract class AppLocalizations {
   /// **'Scan to Check Out'**
   String get scanToCheckOut;
 
+  /// Instruction to scan QR on empty history screen
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the QR code located in the marketing office.'**
+  String get scanQrInstruction;
+
   /// QR scanner title
   ///
   /// In en, this message translates to:

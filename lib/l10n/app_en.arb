@@ -100,6 +100,10 @@
     "@scanToCheckOut": {
         "description": "FAB label for check out"
     },
+    "scanQrInstruction": "Scan the QR code located in the marketing office.",
+    "@scanQrInstruction": {
+        "description": "Instruction to scan QR on empty history screen"
+    },
     "scanForAction": "Scan for {action}",
     "@scanForAction": {
         "description": "QR scanner title",

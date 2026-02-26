@@ -84,6 +84,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get scanToCheckOut => 'مسح لتسجيل الانصراف';
 
   @override
+  String get scanQrInstruction =>
+      'اعمل اسكان لـ QR Code المتواجد في مكتب التسويق.';
+
+  @override
   String scanForAction(String action) {
     return 'مسح لـ $action';
   }

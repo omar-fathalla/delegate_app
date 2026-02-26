@@ -139,11 +139,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         },
         builder: (context, state) {
           return Scaffold(
-            body: Column(
-              children: [
-                _buildHeader(context),
-                Expanded(child: _buildBody(context, state)),
-              ],
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildHeader(context),
+                    Expanded(child: _buildBody(context, state)),
+                  ],
+                ),
+              ),
             ),
             floatingActionButton: FloatingActionButton.extended(
               onPressed:
@@ -174,12 +180,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF42A5F5),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
-        ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF42A5F5),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         children: [
@@ -337,15 +340,44 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               Text(
                 l10n.noHistoryAvailable,
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: Color(0xFF0D47A1),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.scanToCheckIn,
-                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.blue.shade100),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.qr_code_scanner,
+                      color: Color(0xFF0D47A1),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Text(
+                        l10n.scanQrInstruction,
+                        style: const TextStyle(
+                          color: Color(0xFF0D47A1),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -360,12 +392,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           );
         },
         child: ListView.builder(
-          padding: const EdgeInsetsDirectional.only(
-            top: 16,
-            bottom: 80,
-            start: 16,
-            end: 16,
-          ),
+          padding: const EdgeInsetsDirectional.only(top: 16, bottom: 80),
           itemCount: _dayKeys.length,
           itemBuilder: (context, dayIndex) {
             final dayKey = _dayKeys[dayIndex];

@@ -84,6 +84,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scanToCheckOut => 'Scan to Check Out';
 
   @override
+  String get scanQrInstruction =>
+      'Scan the QR code located in the marketing office.';
+
+  @override
   String scanForAction(String action) {
     return 'Scan for $action';
   }

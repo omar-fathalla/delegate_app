@@ -36,13 +36,25 @@ class _HomeScreenState extends State<HomeScreen> {
           iconTheme: const IconThemeData(color: Color(0xFF0D47A1)),
           title: Row(
             children: [
-              CircleAvatar(
-                backgroundColor: const Color(0xFF0D47A1),
-                child: Text(
-                  widget.delegate.firstName.isNotEmpty
-                      ? widget.delegate.firstName[0].toUpperCase()
-                      : '?',
-                  style: const TextStyle(color: Colors.white),
+              Container(
+                height: 40,
+                width: 40,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),

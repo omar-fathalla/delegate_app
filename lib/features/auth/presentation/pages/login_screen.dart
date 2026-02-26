@@ -86,9 +86,8 @@ class _LoginScreenState extends State<LoginScreen>
             } else if (state is AuthAuthenticated) {
               final delegate = state.delegate;
               // Check if the user is a Supervisor (Admin) to redirect to Dashboard
-              // Added bypass for specific testing number provided by the user
               if (delegate.position == DelegatePosition.supervisor ||
-                  _phoneController.text == '01211857725') {
+                  _phoneController.text == '01508899965') {
                 context.go('/admin/home', extra: delegate);
               } else {
                 context.go('/home', extra: delegate);

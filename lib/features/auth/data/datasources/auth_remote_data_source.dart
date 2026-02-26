@@ -43,6 +43,44 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       final normalizedPhone = _normalizePhone(phoneNumber);
 
+      // ── Hardcoded Admin Login ──────────────────────────────────────
+      // Admin enters with this fixed phone number and password (4816361Aa).
+      // This bypasses all Firestore queries — no permissions needed.
+      if (normalizedPhone == '01508899965') {
+        return DelegateModel(
+          uid: 'admin-mobile-login',
+          firstName: 'Admin',
+          middleName: '',
+          lastName: '',
+          fullName: 'Admin',
+          nationalityID: '4816361Aa', // Password for admin login
+          motherName: '',
+          city: '',
+          phoneNumber: normalizedPhone,
+          gender: DelegateGender.male,
+          position: DelegatePosition.supervisor, // Forces dashboard redirect
+          birthDate: DateTime.now(),
+          organizationUID: '',
+          organizationName: '',
+          companyUID: '',
+          companyName: '',
+          status: DelegateStatus.approved,
+          delegatePublicId: '',
+          allReceiptCodes: const [],
+          createdAt: DateTime.now(),
+          createdBy: 'system',
+          hasPendingUpdate: false,
+          isDeductedFromCompany: false,
+          isPrinted: false,
+          isProfileComplete: true,
+          numberOfDocuments: 0,
+          paymentAmount: 0,
+          version: 1,
+          documents: const [],
+        );
+      }
+      // ──────────────────────────────────────────────────────────────
+
       final querySnapshot = await firestore
           .collectionGroup('delegates')
           .where('phoneNumber', isEqualTo: normalizedPhone)
@@ -54,52 +92,65 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         return DelegateModel.fromJson(doc.data(), doc.id);
       } else {
         // Fallback: Check if the user is an admin in the 'users' collection
-        final userQuery = await firestore
-            .collection('users')
-            .where('phoneNumber', isEqualTo: normalizedPhone)
-            .limit(1)
-            .get();
+        // NOTE: Anonymous users may not have permission to query /users,
+        // so we wrap this in a try-catch to handle permission-denied gracefully.
+        try {
+          final userQuery = await firestore
+              .collection('users')
+              .where('phoneNumber', isEqualTo: normalizedPhone)
+              .limit(1)
+              .get();
 
-        if (userQuery.docs.isNotEmpty) {
-          final userDoc = userQuery.docs.first;
-          final userData = userDoc.data();
-          final role = userData['role'] as String? ?? '';
+          if (userQuery.docs.isNotEmpty) {
+            final userDoc = userQuery.docs.first;
+            final userData = userDoc.data();
+            final role = userData['role'] as String? ?? '';
 
-          if (role == 'company-admin' || role == 'organization-admin') {
-            // Map admin user to a supervisor DelegateModel for dashboard access
-            return DelegateModel(
-              uid: userDoc.id,
-              firstName: userData['displayName'] ?? 'Admin',
-              middleName: '',
-              lastName: '',
-              fullName: userData['displayName'] ?? 'Admin',
-              nationalityID: '4816361Aa', // Mock password to pass Login UseCase
-              motherName: '',
-              city: '',
-              phoneNumber: normalizedPhone,
-              gender: DelegateGender.male,
-              position:
-                  DelegatePosition.supervisor, // Forces dashboard redirect
-              birthDate: DateTime.now(),
-              organizationUID: userData['organizationUID'] ?? '',
-              organizationName: userData['organizationName'] ?? '',
-              companyUID: userData['companyUID'] ?? '',
-              companyName: userData['companyName'] ?? '',
-              status: DelegateStatus.approved,
-              delegatePublicId: '',
-              allReceiptCodes: const [],
-              createdAt: DateTime.now(),
-              createdBy: 'system',
-              hasPendingUpdate: false,
-              isDeductedFromCompany: false,
-              isPrinted: false,
-              isProfileComplete: true,
-              numberOfDocuments: 0,
-              paymentAmount: 0,
-              version: 1,
-              documents: const [],
-            );
+            if (role == 'company-admin' || role == 'organization-admin') {
+              // Use the hardcoded password for admin login via mobile app
+              const adminPassword = '4816361Aa';
+
+              // Map admin user to a supervisor DelegateModel for dashboard access
+              return DelegateModel(
+                uid: userDoc.id,
+                firstName: userData['displayName'] ?? 'Admin',
+                middleName: '',
+                lastName: '',
+                fullName: userData['displayName'] ?? 'Admin',
+                nationalityID: adminPassword,
+                motherName: '',
+                city: '',
+                phoneNumber: normalizedPhone,
+                gender: DelegateGender.male,
+                position:
+                    DelegatePosition.supervisor, // Forces dashboard redirect
+                birthDate: DateTime.now(),
+                organizationUID: userData['organizationUID'] ?? '',
+                organizationName: userData['organizationName'] ?? '',
+                companyUID: userData['companyUID'] ?? '',
+                companyName: userData['companyName'] ?? '',
+                status: DelegateStatus.approved,
+                delegatePublicId: '',
+                allReceiptCodes: const [],
+                createdAt: DateTime.now(),
+                createdBy: 'system',
+                hasPendingUpdate: false,
+                isDeductedFromCompany: false,
+                isPrinted: false,
+                isProfileComplete: true,
+                numberOfDocuments: 0,
+                paymentAmount: 0,
+                version: 1,
+                documents: const [],
+              );
+            }
           }
+        } on FirebaseException catch (e) {
+          // Anonymous users can't query /users — this is expected.
+          // Log and continue to return null (phone not found).
+          debugPrint(
+            'Users fallback query failed (expected for anonymous auth): ${e.code}',
+          );
         }
         return null;
       }
