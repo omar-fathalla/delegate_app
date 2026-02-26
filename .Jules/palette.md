@@ -5,3 +5,7 @@
 ## 2024-05-22 - [Auth] Password Visibility Toggle
 **Learning:** Obscured text fields without a visibility toggle frustrate users who need to verify complex passwords or names.
 **Action:** Always include a suffix icon toggle for `obscureText` fields, ensuring the icon state (eye vs slashed eye) matches the *action* (Show vs Hide) or *state* (Visible vs Hidden) consistently with the design system.
+
+## 2025-02-17 - [Forms] Keyboard Navigation & Autofill
+**Learning:** Mobile users rely on keyboard actions ("Next", "Done") and system autofill for smooth login experiences. Missing these attributes forces manual field switching and typing.
+**Action:** Always add `textInputAction` (Next/Done), `onFieldSubmitted`, and `autofillHints` to all `TextFormField` widgets in authentication flows.

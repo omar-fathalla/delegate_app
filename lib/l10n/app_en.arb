@@ -48,6 +48,14 @@
     "@rememberMe": {
         "description": "Remember me checkbox label"
     },
+    "showPassword": "Show Password",
+    "@showPassword": {
+        "description": "Show password tooltip"
+    },
+    "hidePassword": "Hide Password",
+    "@hidePassword": {
+        "description": "Hide password tooltip"
+    },
     "home": "Home",
     "@home": {
         "description": "Home nav label"

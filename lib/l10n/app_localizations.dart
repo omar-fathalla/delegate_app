@@ -170,6 +170,18 @@ abstract class AppLocalizations {
   /// **'Remember Me'**
   String get rememberMe;
 
+  /// Show password tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Show Password'**
+  String get showPassword;
+
+  /// Hide password tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Password'**
+  String get hidePassword;
+
   /// Home nav label
   ///
   /// In en, this message translates to:

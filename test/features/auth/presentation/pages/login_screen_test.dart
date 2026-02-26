@@ -7,6 +7,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 // Manual mock for AuthBloc
 class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
@@ -30,8 +32,22 @@ void main() {
     }
   });
 
+  Widget createWidgetUnderTest() {
+    return const MaterialApp(
+      localizationsDelegates: [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: LoginScreen(),
+    );
+  }
+
   testWidgets('LoginScreen disposes correctly', (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    await tester.pumpWidget(createWidgetUnderTest());
+    await tester.pumpAndSettle();
 
     // Interact with text fields to ensure controllers are active
     await tester.enterText(find.byType(TextFormField).at(0), '1234567890');
@@ -50,7 +66,8 @@ void main() {
   testWidgets('LoginScreen toggles password visibility', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    await tester.pumpWidget(createWidgetUnderTest());
+    await tester.pumpAndSettle();
 
     final passwordFieldFinder = find.byType(TextFormField).at(1);
     final passwordTextFieldFinder = find.descendant(
@@ -62,8 +79,8 @@ void main() {
     TextField passwordTextField = tester.widget(passwordTextFieldFinder);
     expect(passwordTextField.obscureText, isTrue);
 
-    // Verify initial tooltip "Show password"
-    final showPasswordTooltip = find.byTooltip('Show password');
+    // Verify initial tooltip "Show Password"
+    final showPasswordTooltip = find.byTooltip('Show Password');
     expect(showPasswordTooltip, findsOneWidget);
 
     // Tap the visibility toggle button (found via tooltip)
@@ -74,8 +91,8 @@ void main() {
     passwordTextField = tester.widget(passwordTextFieldFinder);
     expect(passwordTextField.obscureText, isFalse);
 
-    // Verify tooltip changed to "Hide password"
-    final hidePasswordTooltip = find.byTooltip('Hide password');
+    // Verify tooltip changed to "Hide Password"
+    final hidePasswordTooltip = find.byTooltip('Hide Password');
     expect(hidePasswordTooltip, findsOneWidget);
 
     // Tap the visibility toggle button again (found via new tooltip)
@@ -86,7 +103,34 @@ void main() {
     passwordTextField = tester.widget(passwordTextFieldFinder);
     expect(passwordTextField.obscureText, isTrue);
 
-    // Verify tooltip changed back to "Show password"
-    expect(find.byTooltip('Show password'), findsOneWidget);
+    // Verify tooltip changed back to "Show Password"
+    expect(find.byTooltip('Show Password'), findsOneWidget);
+  });
+
+  testWidgets('Clicking Remember Me text toggles checkbox', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createWidgetUnderTest());
+    await tester.pumpAndSettle();
+
+    final checkboxFinder = find.byType(Checkbox);
+    final textFinder = find.text('Remember Me');
+
+    // Initial state: unchecked
+    expect(tester.widget<Checkbox>(checkboxFinder).value, isFalse);
+
+    // Tap text
+    await tester.tap(textFinder);
+    await tester.pump();
+
+    // New state: checked
+    expect(tester.widget<Checkbox>(checkboxFinder).value, isTrue);
+
+    // Tap text again
+    await tester.tap(textFinder);
+    await tester.pump();
+
+    // Back to unchecked
+    expect(tester.widget<Checkbox>(checkboxFinder).value, isFalse);
   });
 }
