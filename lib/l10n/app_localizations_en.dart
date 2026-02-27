@@ -9,7 +9,10 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Tashil - Delegate';
+  String get appTitle => 'Tashil';
+
+  @override
+  String get delegateApp => 'Delegate App';
 
   @override
   String get login => 'Login';
@@ -18,16 +21,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logout => 'Logout';
 
   @override
-  String get loginToContinue => 'Login to continue';
+  String get loginToContinue => 'Welcome back, please enter your details';
 
   @override
   String get loginSuccessful => 'Login Successful!';
 
   @override
-  String get loginButton => 'LOGIN';
+  String get loginButton => 'Login';
 
   @override
-  String get mobileNumber => 'Mobile Number';
+  String get mobileNumber => 'Phone Number';
 
   @override
   String get password => 'Password';
@@ -399,4 +402,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get networkStatusOnline => 'Online';
+
+  @override
+  String get noAccountContact =>
+      'Don\'t have an account? Contact the following number';
+
+  @override
+  String get contactNumber => '01211857725';
+
+  @override
+  String get darkMode => 'Dark Mode';
+
+  @override
+  String get privacyPolicy => 'Privacy Policy';
+
+  @override
+  String get helpCenter => 'Help Center';
+
+  @override
+  String version(String version) {
+    return 'Tashil Representative - Version $version';
+  }
+
+  @override
+  String get account => 'Account';
 }

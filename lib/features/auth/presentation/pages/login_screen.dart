@@ -5,6 +5,8 @@ import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/main.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,14 +18,10 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-
-  // Controllers & Variables from Master Branch (The Clean Design)
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _rememberMe = false;
   bool _obscurePassword = true;
 
-  // Animation Controllers
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -31,10 +29,9 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
-    // Setup Animations
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1000),
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -45,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
 
     _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+        Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero).animate(
           CurvedAnimation(
             parent: _animationController,
             curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
@@ -63,11 +60,19 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
+  // ---- Constants ----
+  static const _primaryBlue = Color(0xFF0D47A1);
+  static const _lightBlue = Color(0xFF1565C0);
+  static const _textDark = Color(0xFF1A1D21);
+  static const _textMuted = Color(0xFF6B7280);
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isArabic = localeProvider.isArabic;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: BlocProvider(
         create: (context) => sl<AuthBloc>(),
         child: BlocConsumer<AuthBloc, AuthState>(
@@ -85,7 +90,6 @@ class _LoginScreenState extends State<LoginScreen>
               );
             } else if (state is AuthAuthenticated) {
               final delegate = state.delegate;
-              // Check if the user is a Supervisor (Admin) to redirect to Dashboard
               if (delegate.position == DelegatePosition.supervisor ||
                   _phoneController.text == '01508899965') {
                 context.go('/admin/home', extra: delegate);
@@ -105,330 +109,317 @@ class _LoginScreenState extends State<LoginScreen>
             }
           },
           builder: (context, state) {
-            return Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF0D47A1),
-                    Color(0xFF1565C0),
-                    Color(0xFF002171),
-                  ],
-                  stops: [0.0, 0.5, 1.0],
-                ),
-              ),
-              child: SafeArea(
-                child: Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsetsDirectional.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // ---- Logo Section ----
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.2),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
+            return SafeArea(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: 28.0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 16),
+
+                      // ---- Language Toggle ----
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () {
+                                localeProvider.toggleLocale();
+                              },
+                              child: Container(
+                                padding: const EdgeInsetsDirectional.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
                                 ),
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF64B5F6,
-                                  ).withValues(alpha: 0.3),
-                                  blurRadius: 40,
-                                  spreadRadius: 5,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD3E3FD),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.language_rounded,
+                                      size: 18,
+                                      color: _textDark,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      isArabic ? 'English' : 'العربية',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: _textDark,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // ---- Logo ----
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          clipBehavior: Clip.antiAlias,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                          ),
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ---- App Title ----
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Text(
+                          l10n.appTitle,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // ---- Subtitle ----
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Text(
+                          l10n.delegateApp,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF4A4A4A),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 36),
+
+                      // ---- Login Text ----
+                      SlideTransition(
+                        position: _slideAnimation,
+                        child: FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.login,
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w400,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  l10n.loginToContinue,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF4A4A4A),
+                                  ),
                                 ),
                               ],
                             ),
-                            child: ClipOval(
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Image.asset(
-                                  'assets/images/logo.png',
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (c, e, s) => const Icon(
-                                    Icons.local_shipping_rounded,
-                                    size: 60,
-                                    color: Color(0xFF1565C0),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      // ---- Login Form ----
+                      SlideTransition(
+                        position: _slideAnimation,
+                        child: FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Phone field
+                                TextFormField(
+                                  controller: _phoneController,
+                                  keyboardType: TextInputType.phone,
+                                  textDirection: TextDirection.ltr,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: _textDark,
                                   ),
+                                  decoration: _inputDecoration(
+                                    hintText: l10n.mobileNumber,
+                                    prefixIcon: Icons.phone_android_rounded,
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return l10n.enterMobileNumber;
+                                    }
+                                    return null;
+                                  },
                                 ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
 
-                        // ---- App Name ----
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Text(
-                            l10n.appTitle,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Text(
-                            l10n.loginToContinue,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white.withValues(alpha: 0.75),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 36),
+                                const SizedBox(height: 16),
 
-                        // ---- Login Card ----
-                        SlideTransition(
-                          position: _slideAnimation,
-                          child: FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(24),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.15),
-                                    blurRadius: 30,
-                                    offset: const Offset(0, 15),
+                                // Password field
+                                TextFormField(
+                                  controller: _passwordController,
+                                  textDirection: TextDirection.ltr,
+                                  obscureText: _obscurePassword,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: _textDark,
                                   ),
-                                ],
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsetsDirectional.all(28.0),
-                                child: Form(
-                                  key: _formKey,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      // Phone field
-                                      TextFormField(
-                                        controller: _phoneController,
-                                        keyboardType: TextInputType.phone,
-                                        textDirection: TextDirection.ltr,
-                                        decoration: InputDecoration(
-                                          labelText: l10n.mobileNumber,
-                                          prefixIcon: const Icon(
-                                            Icons.phone_android_rounded,
-                                            color: Color(0xFF1565C0),
-                                          ),
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFFE0E0E0),
-                                            ),
-                                          ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFFE0E0E0),
-                                            ),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFF1565C0),
-                                              width: 2,
-                                            ),
-                                          ),
-                                          filled: true,
-                                          fillColor: const Color(0xFFF8F9FE),
-                                        ),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return l10n.enterMobileNumber;
-                                          }
-                                          return null;
-                                        },
+                                  decoration: _inputDecoration(
+                                    hintText: l10n.password,
+                                    prefixIcon: Icons.lock_rounded,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                        color: _textMuted,
+                                        size: 22,
                                       ),
-                                      const SizedBox(height: 18),
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return l10n.enterPassword;
+                                    }
+                                    return null;
+                                  },
+                                ),
 
-                                      // Password field
-                                      TextFormField(
-                                        controller: _passwordController,
-                                        textDirection: TextDirection.ltr,
-                                        decoration: InputDecoration(
-                                          labelText: l10n.password,
-                                          prefixIcon: const Icon(
-                                            Icons.lock_rounded,
-                                            color: Color(0xFF1565C0),
-                                          ),
-                                          suffixIcon: IconButton(
-                                            icon: Icon(
-                                              _obscurePassword
-                                                  ? Icons.visibility_off_rounded
-                                                  : Icons.visibility_rounded,
-                                              color: Colors.grey,
-                                            ),
-                                            onPressed: () {
-                                              setState(() {
-                                                _obscurePassword =
-                                                    !_obscurePassword;
-                                              });
-                                            },
-                                          ),
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFFE0E0E0),
-                                            ),
-                                          ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFFE0E0E0),
-                                            ),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFF1565C0),
-                                              width: 2,
-                                            ),
-                                          ),
-                                          filled: true,
-                                          fillColor: const Color(0xFFF8F9FE),
-                                        ),
-                                        obscureText: _obscurePassword,
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return l10n.enterPassword;
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                      const SizedBox(height: 8),
+                                const SizedBox(height: 32),
 
-                                      // Remember Me
-                                      Row(
-                                        children: [
-                                          SizedBox(
-                                            height: 28,
-                                            width: 28,
-                                            child: Checkbox(
-                                              value: _rememberMe,
-                                              onChanged: (value) {
-                                                setState(() {
-                                                  _rememberMe = value ?? false;
-                                                });
-                                              },
-                                              activeColor: const Color(
-                                                0xFF1565C0,
-                                              ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            l10n.rememberMe,
-                                            style: TextStyle(
-                                              color: Colors.grey.shade700,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 24),
-
-                                      // Login Button
-                                      SizedBox(
-                                        width: double.infinity,
-                                        height: 52,
-                                        child: ElevatedButton(
-                                          onPressed: state is AuthLoading
-                                              ? null
-                                              : () {
-                                                  if (_formKey.currentState!
-                                                      .validate()) {
-                                                    BlocProvider.of<AuthBloc>(
-                                                      context,
-                                                    ).add(
-                                                      LoginRequested(
-                                                        phoneNumber:
-                                                            _phoneController
-                                                                .text,
-                                                        password:
-                                                            _passwordController
-                                                                .text,
-                                                        rememberMe: _rememberMe,
-                                                      ),
-                                                    );
-                                                  }
-                                                },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(
-                                              0xFF1565C0,
-                                            ),
-                                            foregroundColor: Colors.white,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                            ),
-                                            elevation: 4,
-                                            shadowColor: const Color(
-                                              0xFF1565C0,
-                                            ).withValues(alpha: 0.4),
-                                          ),
-                                          child: state is AuthLoading
-                                              ? const SizedBox(
-                                                  height: 22,
-                                                  width: 22,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        color: Colors.white,
-                                                        strokeWidth: 2.5,
-                                                      ),
-                                                )
-                                              : Text(
-                                                  l10n.loginButton,
-                                                  style: const TextStyle(
-                                                    fontSize: 17,
-                                                    fontWeight: FontWeight.w600,
-                                                    letterSpacing: 0.5,
-                                                  ),
+                                // Login Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton(
+                                    onPressed: state is AuthLoading
+                                        ? null
+                                        : () {
+                                            if (_formKey.currentState!
+                                                .validate()) {
+                                              BlocProvider.of<AuthBloc>(
+                                                context,
+                                              ).add(
+                                                LoginRequested(
+                                                  phoneNumber:
+                                                      _phoneController.text,
+                                                  password:
+                                                      _passwordController.text,
+                                                  rememberMe: false,
                                                 ),
-                                        ),
+                                              );
+                                            }
+                                          },
+                                    style: FilledButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(64),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
                                       ),
-                                    ],
+                                      backgroundColor: _primaryBlue,
+                                      foregroundColor: Colors.white,
+                                      disabledBackgroundColor: _primaryBlue
+                                          .withValues(alpha: 0.6),
+                                      shape: const StadiumBorder(),
+                                      textStyle: const TextStyle(
+                                        fontFamily: 'Cairo', // Fallback
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    child: state is AuthLoading
+                                        ? const SizedBox(
+                                            height: 22,
+                                            width: 22,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2.5,
+                                            ),
+                                          )
+                                        : Text(
+                                            l10n.loginButton,
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+
+                      const SizedBox(height: 40),
+
+                      // ---- Contact Section ----
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: GestureDetector(
+                          onTap: () {
+                            _launchPhoneDialer(l10n.contactNumber);
+                          },
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: '${l10n.noAccountContact} ',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF4A4A4A),
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: l10n.contactNumber,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: _lightBlue,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+                    ],
                   ),
                 ),
               ),
@@ -436,6 +427,35 @@ class _LoginScreenState extends State<LoginScreen>
           },
         ),
       ),
+    );
+  }
+
+  // ---- Helper: Launch Phone Dialer ----
+  Future<void> _launchPhoneDialer(String phoneNumber) async {
+    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    final uri = Uri.parse('tel:$cleanPhone');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        debugPrint('Cannot launch phone dialer for: $cleanPhone');
+      }
+    } catch (e) {
+      debugPrint('Could not launch phone dialer: $e');
+    }
+  }
+
+  // ---- Helper: Input decoration ----
+  InputDecoration _inputDecoration({
+    required String hintText,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(color: Color(0xFF6B7280)),
+      prefixIcon: Icon(prefixIcon, color: const Color(0xFF4A4A4A), size: 22),
+      suffixIcon: suffixIcon,
     );
   }
 }

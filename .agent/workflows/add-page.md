@@ -88,6 +88,7 @@ context.pushNamed('feature');
 - ✅ Wrap text in localization functions
 - ✅ Use Material 3 components: `FilledButton`, `OutlinedButton`, `Card.filled()`
 - ✅ Use `Theme.of(context).colorScheme` for colors
+- ✅ **CRITICAL FOR ARABIC FONTS:** When using `GoogleFonts.cairo` inside buttons or constrained height widgets, ALWAYS set `height: 1.2` (or similar) in the `TextStyle` to prevent the text from being vertically clipped or hidden.
 
 ## 5. Verify
 

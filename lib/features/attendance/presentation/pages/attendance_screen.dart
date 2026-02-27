@@ -306,7 +306,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
+            FilledButton(
               onPressed: () {
                 context.read<AttendanceBloc>().add(
                   HistoryRequested(userId: widget.delegate.uid),
@@ -631,9 +631,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.black,
       builder: (_) => Scaffold(
-        backgroundColor: Colors.black,
         body: Stack(
           children: [
             MobileScanner(

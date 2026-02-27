@@ -9,7 +9,10 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get appTitle => 'تسهيل - المندوب';
+  String get appTitle => 'تسهيل';
+
+  @override
+  String get delegateApp => 'تطبيق المندوب';
 
   @override
   String get login => 'تسجيل الدخول';
@@ -18,16 +21,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get logout => 'تسجيل الخروج';
 
   @override
-  String get loginToContinue => 'سجّل دخولك للمتابعة';
+  String get loginToContinue => 'مرحباً بعودتك، يرجى إدخال بياناتك';
 
   @override
   String get loginSuccessful => 'تم تسجيل الدخول بنجاح!';
 
   @override
-  String get loginButton => 'دخول';
+  String get loginButton => 'تسجيل الدخول';
 
   @override
-  String get mobileNumber => 'رقم الموبايل';
+  String get mobileNumber => 'رقم الجوال';
 
   @override
   String get password => 'كلمة المرور';
@@ -398,4 +401,27 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get networkStatusOnline => 'متصل بالشبكة';
+
+  @override
+  String get noAccountContact => 'ليس لديك حساب؟ تواصل على الرقم التالي';
+
+  @override
+  String get contactNumber => '01211857725';
+
+  @override
+  String get darkMode => 'الوضع الداكن';
+
+  @override
+  String get privacyPolicy => 'سياسة الخصوصية';
+
+  @override
+  String get helpCenter => 'مركز المساعدة';
+
+  @override
+  String version(String version) {
+    return 'مندوب تسهيل - الإصدار $version';
+  }
+
+  @override
+  String get account => 'الحساب';
 }

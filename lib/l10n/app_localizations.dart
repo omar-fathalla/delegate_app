@@ -101,8 +101,14 @@ abstract class AppLocalizations {
   /// App title
   ///
   /// In en, this message translates to:
-  /// **'Tashil - Delegate'**
+  /// **'Tashil'**
   String get appTitle;
+
+  /// Delegate app subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate App'**
+  String get delegateApp;
 
   /// Login label
   ///
@@ -119,7 +125,7 @@ abstract class AppLocalizations {
   /// Login subtitle
   ///
   /// In en, this message translates to:
-  /// **'Login to continue'**
+  /// **'Welcome back, please enter your details'**
   String get loginToContinue;
 
   /// Login success snackbar
@@ -131,13 +137,13 @@ abstract class AppLocalizations {
   /// Login button text
   ///
   /// In en, this message translates to:
-  /// **'LOGIN'**
+  /// **'Login'**
   String get loginButton;
 
   /// Mobile number field label
   ///
   /// In en, this message translates to:
-  /// **'Mobile Number'**
+  /// **'Phone Number'**
   String get mobileNumber;
 
   /// Password field label
@@ -823,6 +829,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Online'**
   String get networkStatusOnline;
+
+  /// No account contact text on login screen
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t have an account? Contact the following number'**
+  String get noAccountContact;
+
+  /// Contact phone number
+  ///
+  /// In en, this message translates to:
+  /// **'01211857725'**
+  String get contactNumber;
+
+  /// Dark mode setting label
+  ///
+  /// In en, this message translates to:
+  /// **'Dark Mode'**
+  String get darkMode;
+
+  /// Privacy policy setting label
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get privacyPolicy;
+
+  /// Help center setting label
+  ///
+  /// In en, this message translates to:
+  /// **'Help Center'**
+  String get helpCenter;
+
+  /// App version label in settings
+  ///
+  /// In en, this message translates to:
+  /// **'Tashil Representative - Version {version}'**
+  String version(String version);
+
+  /// Account section header
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get account;
 }
 
 class _AppLocalizationsDelegate

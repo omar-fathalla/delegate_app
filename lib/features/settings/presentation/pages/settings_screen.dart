@@ -15,75 +15,173 @@ class SettingsScreen extends StatelessWidget {
     final isArabic = localeProvider.isArabic;
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: SingleChildScrollView(
-        padding: const EdgeInsetsDirectional.only(
-          start: 20,
-          end: 20,
-          top: 20,
-          bottom: 80,
-        ),
+      backgroundColor: const Color(0xFFF4F6F9), // Light grayish-blue background
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section: General
-            _buildSectionHeader(l10n.settings),
-            const SizedBox(height: 12),
-
-            // Language Toggle
-            _buildSettingsTile(
-              context: context,
-              icon: Icons.translate_rounded,
-              title: l10n.changeLanguage,
-              subtitle: isArabic ? l10n.arabic : l10n.english,
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0D47A1).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: const Color(0xFF0D47A1).withValues(alpha: 0.3),
+            // Custom App Bar Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.notifications_rounded,
+                      color: Color(0xFF334155),
+                    ),
+                    onPressed: () {},
                   ),
+                  Text(
+                    l10n.settings,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.orange.shade200,
+                    child: Icon(Icons.person, color: Colors.orange.shade800),
+                  ),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      isArabic ? 'EN' : 'ع',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0D47A1),
+                    // Section: Settings
+                    _buildSectionHeader(l10n.settings),
+                    const SizedBox(height: 12),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildSettingsTile(
+                            context: context,
+                            icon: Icons.translate_rounded,
+                            title: l10n.language,
+                            subtitle: isArabic ? l10n.arabic : l10n.english,
+                            trailing: GestureDetector(
+                              onTap: () => _toggleLanguage(context),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD3E3FD),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  isArabic ? 'English' : 'العربية',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF041E49),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Divider(
+                            height: 1,
+                            color: Colors.grey.shade200,
+                            indent: 64,
+                          ),
+                          _buildSettingsTile(
+                            context: context,
+                            icon: Icons.dark_mode_rounded,
+                            title: l10n.darkMode,
+                            subtitle:
+                                'Off', // Optional: translate "Off" if desired, or skip
+                            trailing: Switch(
+                              value: false,
+                              onChanged: (val) {},
+                              activeTrackColor: const Color(
+                                0xFF0D47A1,
+                              ).withValues(alpha: 0.5),
+                              activeThumbColor: const Color(0xFF0D47A1),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.swap_horiz_rounded,
-                      size: 18,
-                      color: Color(0xFF0D47A1),
+                    const SizedBox(height: 32),
+
+                    // Section: Account
+                    _buildSectionHeader(l10n.account),
+                    const SizedBox(height: 12),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildSettingsTile(
+                            context: context,
+                            icon: Icons.privacy_tip_outlined,
+                            title: l10n.privacyPolicy,
+                            onTap: () {},
+                          ),
+                          Divider(
+                            height: 1,
+                            color: Colors.grey.shade200,
+                            indent: 64,
+                          ),
+                          _buildSettingsTile(
+                            context: context,
+                            icon: Icons.help_outline_rounded,
+                            title: l10n.helpCenter,
+                            onTap: () {},
+                          ),
+                          Divider(
+                            height: 1,
+                            color: Colors.grey.shade200,
+                            indent: 64,
+                          ),
+                          _buildSettingsTile(
+                            context: context,
+                            icon: Icons.logout_rounded,
+                            title: l10n.logout,
+                            iconColor: Colors.red,
+                            titleColor: Colors.red,
+                            onTap: () => _showLogoutConfirmation(context),
+                            hideTrailingIcon: true,
+                          ),
+                        ],
+                      ),
                     ),
+
+                    const SizedBox(height: 48),
+                    // Version Text
+                    Center(
+                      child: Text(
+                        l10n.version('2.4.0'),
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-              onTap: () => _toggleLanguage(context),
-            ),
-            const SizedBox(height: 40),
-
-            // Section: Account
-            _buildSectionHeader(isArabic ? 'الحساب' : 'Account'),
-            const SizedBox(height: 12),
-
-            // Logout
-            _buildSettingsTile(
-              context: context,
-              icon: Icons.logout_rounded,
-              title: l10n.logout,
-              iconColor: Colors.red,
-              titleColor: Colors.red,
-              onTap: () => _showLogoutConfirmation(context),
             ),
           ],
         ),
@@ -97,7 +195,7 @@ class SettingsScreen extends StatelessWidget {
       child: Text(
         title,
         style: const TextStyle(
-          fontSize: 18,
+          fontSize: 14,
           fontWeight: FontWeight.bold,
           color: Color(0xFF0D47A1),
         ),
@@ -111,91 +209,53 @@ class SettingsScreen extends StatelessWidget {
     required String title,
     String? subtitle,
     Widget? trailing,
-    Color iconColor = const Color(0xFF0D47A1),
-    Color titleColor = Colors.black87,
-    required VoidCallback onTap,
+    Color iconColor = const Color(0xFF475569),
+    Color titleColor = const Color(0xFF1E293B),
+    VoidCallback? onTap,
+    bool hideTrailingIcon = false,
   }) {
-    return Material(
-      color: Colors.white,
+    return InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      elevation: 1,
-      shadowColor: Colors.grey.withValues(alpha: 0.15),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: iconColor, size: 24),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: titleColor,
-                      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 28),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: titleColor,
                     ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-                      ),
-                    ],
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    ),
                   ],
-                ),
+                ],
               ),
-              if (trailing != null) trailing,
-              if (trailing == null)
-                Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
-            ],
-          ),
+            ),
+            if (trailing != null) trailing,
+            if (trailing == null && !hideTrailingIcon)
+              Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
+          ],
         ),
       ),
     );
   }
 
   void _toggleLanguage(BuildContext context) {
-    final messenger = ScaffoldMessenger.of(context);
     localeProvider.toggleLocale();
-
-    Future.delayed(const Duration(milliseconds: 300), () {
-      final newLangName = localeProvider.isArabic ? 'العربية' : 'English';
-      messenger.showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                localeProvider.isArabic
-                    ? 'تم تغيير اللغة إلى $newLangName'
-                    : 'Language changed to $newLangName',
-              ),
-            ],
-          ),
-          backgroundColor: const Color(0xFF0D47A1),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    });
   }
 
   void _showLogoutConfirmation(BuildContext context) {
@@ -225,8 +285,8 @@ class SettingsScreen extends StatelessWidget {
               style: const TextStyle(color: Colors.grey),
             ),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
+          FilledButton(
+            style: FilledButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(

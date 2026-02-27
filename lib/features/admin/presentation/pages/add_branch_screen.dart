@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../data/models/branch_model.dart';
 
 class AddBranchScreen extends StatefulWidget {
@@ -268,325 +269,319 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final radius = double.tryParse(_radiusController.text) ?? 100.0;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.addBranch)),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWideScreen = constraints.maxWidth > 800;
-
-          if (isWideScreen) {
-            // Web / Tablet Layout (Side by Side)
-            return Row(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  flex: 1,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: _buildForm(l10n),
+                // Branch Name Field
+                TextFormField(
+                  controller: _nameController,
+                  style: const TextStyle(fontSize: 16, color: Colors.black),
+                  decoration: InputDecoration(
+                    labelText: l10n.branchName,
+                    labelStyle: TextStyle(color: Colors.grey.shade600),
+                    prefixIcon: const Icon(
+                      Icons.storefront_outlined,
+                      color: Colors.black54,
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFE8EAF6),
+                    border: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black87),
+                    ),
+                    enabledBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black87),
+                    ),
+                    focusedBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF0D47A1)),
+                    ),
                   ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return l10n.pleaseEnterBranchName;
+                    }
+                    return null;
+                  },
                 ),
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: BorderDirectional(
-                        start: BorderSide(color: Colors.grey.shade300),
+                const SizedBox(height: 24),
+
+                // Search Location Field
+                TextFormField(
+                  controller: _searchController,
+                  textInputAction: TextInputAction.search,
+                  onFieldSubmitted: _searchLocation,
+                  style: const TextStyle(fontSize: 16, color: Colors.black),
+                  decoration: InputDecoration(
+                    labelText: l10n.searchCityOrRegion,
+                    labelStyle: TextStyle(color: Colors.grey.shade600),
+                    prefixIcon: const Icon(
+                      Icons.search_outlined,
+                      color: Colors.black54,
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFE8EAF6),
+                    border: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black87),
+                    ),
+                    enabledBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black87),
+                    ),
+                    focusedBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF0D47A1)),
+                    ),
+                    suffixIcon: _isSearching
+                        ? const Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : (_searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.clear,
+                                    color: Colors.grey,
+                                  ),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    FocusScope.of(context).unfocus();
+                                    setState(() {});
+                                  },
+                                )
+                              : null),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 16),
+
+                // Current Location Pill Button
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: FilledButton.icon(
+                    onPressed: _isLoading ? null : _getCurrentLocation,
+                    icon: const Icon(Icons.my_location, size: 18),
+                    label: Text(
+                      l10n.myLocation,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFD3E3FD),
+                      foregroundColor: const Color(0xFF041E49),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-                    child: _buildMap(_initialLocation, radius, l10n),
                   ),
                 ),
-              ],
-            );
-          } else {
-            // Mobile Layout (Stacked)
-            return Column(
-              children: [
-                // Top half: Map
-                Expanded(
-                  flex: 4,
-                  child: _buildMap(_initialLocation, radius, l10n),
-                ),
-                // Bottom half: Form
-                Expanded(
-                  flex: 6,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, -5),
-                        ),
-                      ],
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(24),
-                      ),
-                    ),
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24.0),
-                      child: _buildForm(l10n),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }
-        },
-      ),
-    );
-  }
+                const SizedBox(height: 32),
 
-  Widget _buildForm(AppLocalizations l10n) {
-    return Form(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            l10n.adminDashboard,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 24),
-          TextFormField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              labelText: l10n.branchName,
-              border: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(12)),
-              ),
-              filled: true,
-              fillColor: Colors.grey.withValues(alpha: 0.05),
-            ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return l10n.pleaseEnterBranchName;
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _radiusController,
-            decoration: InputDecoration(
-              labelText: l10n.geofenceRadius,
-              border: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(12)),
-              ),
-              filled: true,
-              fillColor: Colors.grey.withValues(alpha: 0.05),
-              suffixText: 'm', // Meters indicator
-            ),
-            keyboardType: TextInputType.number,
-            onChanged: (_) {
-              setState(() {});
-            },
-          ),
-          const SizedBox(height: 24),
-          if (_selectedActionPoint != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on, color: Colors.blue),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${l10n.branchLocation}:\n${_selectedActionPoint!.latitude.toStringAsFixed(4)}, ${_selectedActionPoint!.longitude.toStringAsFixed(4)}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                // Geofence Radius Slider
+                Text(
+                  isArabic
+                      ? 'نطاق السياج الجغرافي: ${radius.toInt()} متر'
+                      : 'Geofence Radius: ${radius.toInt()}m',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: const Color(0xFF0D47A1),
+                    inactiveTrackColor: const Color(0xFFD3E3FD),
+                    trackHeight: 4,
+                    thumbColor: const Color(0xFF0D47A1),
+                    overlayColor: const Color(
+                      0xFF0D47A1,
+                    ).withValues(alpha: 0.1),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 20,
+                    ),
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 10,
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-          ElevatedButton(
-            onPressed: _isLoading ? null : _saveBranch,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 0,
-            ),
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    l10n.saveBranch,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMap(
-    LatLng initialLocation,
-    double radius,
-    AppLocalizations l10n,
-  ) {
-    return Stack(
-      children: [
-        GoogleMap(
-          initialCameraPosition: CameraPosition(
-            target: _selectedActionPoint ?? initialLocation,
-            zoom: _selectedActionPoint == null ? 12 : 16,
-          ),
-          myLocationEnabled: true,
-          myLocationButtonEnabled: true,
-          zoomControlsEnabled: true,
-          onMapCreated: (controller) {
-            _mapController = controller;
-            if (!_isMapReady) {
-              setState(() => _isMapReady = true);
-            }
-          },
-          onTap: (LatLng position) {
-            setState(() {
-              _selectedActionPoint = position;
-            });
-          },
-          markers: _selectedActionPoint != null
-              ? {
-                  Marker(
-                    markerId: const MarkerId('branch_location'),
-                    position: _selectedActionPoint!,
-                    draggable: true,
-                    onDragEnd: (newPosition) {
+                  child: Slider(
+                    value: radius.clamp(50.0, 500.0),
+                    min: 50,
+                    max: 500,
+                    onChanged: (value) {
                       setState(() {
-                        _selectedActionPoint = newPosition;
+                        _radiusController.text = value.toStringAsFixed(0);
                       });
                     },
                   ),
-                }
-              : {},
-          circles: _selectedActionPoint != null
-              ? {
-                  Circle(
-                    circleId: const CircleId('geofence_area'),
-                    center: _selectedActionPoint!,
-                    radius: radius,
-                    fillColor: Colors.blue.withValues(alpha: 0.2),
-                    strokeColor: Colors.blue,
-                    strokeWidth: 2,
-                  ),
-                }
-              : {},
-        ),
-        // --- Performance: Show placeholder while map loads ---
-        if (!_isMapReady)
-          Positioned.fill(
-            child: Container(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                ),
+                // Slider Labels
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(0xFF0D47A1),
-                        ),
+                    Text(
+                      '50m',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
                       ),
                     ),
-                    const SizedBox(height: 16),
                     Text(
-                      l10n.searchCityOrRegion,
-                      style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                      '500m',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
-        Positioned(
-          top: 16,
-          left: 16,
-          right: 16,
-          child: SafeArea(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _searchController,
-                textInputAction: TextInputAction.search,
-                onSubmitted: _searchLocation,
-                decoration: InputDecoration(
-                  hintText: l10n.searchCityOrRegion,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                  suffixIcon: _isSearching
-                      ? const Padding(
-                          padding: EdgeInsets.all(12.0),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : IconButton(
-                          icon: const Icon(Icons.clear, color: Colors.grey),
-                          onPressed: () {
-                            _searchController.clear();
-                            FocusScope.of(context).unfocus();
-                          },
-                        ),
+                const SizedBox(height: 32),
+
+                // Select Location on Map Header
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.map_outlined,
+                      color: Color(0xFF0D47A1),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isArabic
+                          ? 'اختر الموقع على الخريطة'
+                          : 'Select Location on Map',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.normal,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 16),
+
+                // Map Container
+                Container(
+                  height: 280,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.grey.shade200, // placeholder background
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: _buildMapWidget(radius),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Save Branch Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: FilledButton.icon(
+                    onPressed: _isLoading ? null : _saveBranch,
+                    icon: const Icon(Icons.save_outlined),
+                    label: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            l10n.saveBranch,
+                            style: GoogleFonts.cairo(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              height:
+                                  1.2, // Fix vertical alignment/clipping for Cairo
+                            ),
+                          ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D47A1),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(27),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 48), // Padding at bottom for scroll
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapWidget(double radius) {
+    if (!_isMapReady && _selectedActionPoint == null) {
+      // Return the map directly, but it might take a moment to initialize
+    }
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(
+        target: _selectedActionPoint ?? _initialLocation,
+        zoom: _selectedActionPoint == null ? 12 : 16,
+      ),
+      myLocationEnabled:
+          false, // UI indicates location is done via the button, not map layer directly but we can enable
+      myLocationButtonEnabled:
+          false, // The maps standard button hides to conform to UI
+      zoomControlsEnabled: true,
+      onMapCreated: (controller) {
+        _mapController = controller;
+        if (!_isMapReady) {
+          setState(() => _isMapReady = true);
+        }
+      },
+      onTap: (LatLng position) {
+        setState(() {
+          _selectedActionPoint = position;
+        });
+      },
+      markers: _selectedActionPoint != null
+          ? {
+              Marker(
+                markerId: const MarkerId('branch_location'),
+                position: _selectedActionPoint!,
+                draggable: true,
+                onDragEnd: (newPosition) {
+                  setState(() {
+                    _selectedActionPoint = newPosition;
+                  });
+                },
               ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: 16,
-          left: 16,
-          child: FloatingActionButton.extended(
-            heroTag: 'myLocationFab',
-            onPressed: _isLoading ? null : _getCurrentLocation,
-            backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFF1565C0),
-            icon: const Icon(Icons.my_location),
-            label: Text(
-              l10n.myLocation,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-      ],
+            }
+          : {},
+      circles: _selectedActionPoint != null
+          ? {
+              Circle(
+                circleId: const CircleId('geofence_area'),
+                center: _selectedActionPoint!,
+                radius: radius,
+                fillColor: const Color(0xFF0D47A1).withValues(alpha: 0.2),
+                strokeColor: const Color(0xFF0D47A1).withValues(alpha: 0.5),
+                strokeWidth: 2,
+              ),
+            }
+          : {},
     );
   }
 }

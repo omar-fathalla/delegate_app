@@ -510,9 +510,6 @@ class _DocumentCard extends StatelessWidget {
                                   height: 24,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.5,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Color(0xFF0D47A1),
-                                    ),
                                   ),
                                 ),
                               ),

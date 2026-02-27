@@ -46,7 +46,7 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
               onPressed: () => Navigator.pop(context),
               child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
             ),
-            ElevatedButton(
+            FilledButton(
               onPressed: () => Navigator.pop(context, controller.text.trim()),
               child: Text(l10n.saveChanges),
             ),
@@ -100,8 +100,8 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
               onPressed: () => Navigator.pop(context, false),
               child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () => Navigator.pop(context, true),
               child: Text(
                 l10n.deleteBranch,
@@ -266,7 +266,7 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  ElevatedButton.icon(
+                  FilledButton.icon(
                     onPressed: _downloadQR,
                     icon: const Icon(Icons.download),
                     label: Text(
@@ -276,7 +276,7 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    style: ElevatedButton.styleFrom(
+                    style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

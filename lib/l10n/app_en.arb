@@ -1,8 +1,12 @@
 {
     "@@locale": "en",
-    "appTitle": "Tashil - Delegate",
+    "appTitle": "Tashil",
     "@appTitle": {
         "description": "App title"
+    },
+    "delegateApp": "Delegate App",
+    "@delegateApp": {
+        "description": "Delegate app subtitle"
     },
     "login": "Login",
     "@login": {
@@ -12,7 +16,7 @@
     "@logout": {
         "description": "Logout label"
     },
-    "loginToContinue": "Login to continue",
+    "loginToContinue": "Welcome back, please enter your details",
     "@loginToContinue": {
         "description": "Login subtitle"
     },
@@ -20,11 +24,11 @@
     "@loginSuccessful": {
         "description": "Login success snackbar"
     },
-    "loginButton": "LOGIN",
+    "loginButton": "Login",
     "@loginButton": {
         "description": "Login button text"
     },
-    "mobileNumber": "Mobile Number",
+    "mobileNumber": "Phone Number",
     "@mobileNumber": {
         "description": "Mobile number field label"
     },
@@ -554,5 +558,38 @@
     "networkStatusOnline": "Online",
     "@networkStatusOnline": {
         "description": "Online network status indicator"
+    },
+    "noAccountContact": "Don't have an account? Contact the following number",
+    "@noAccountContact": {
+        "description": "No account contact text on login screen"
+    },
+    "contactNumber": "01211857725",
+    "@contactNumber": {
+        "description": "Contact phone number"
+    },
+    "darkMode": "Dark Mode",
+    "@darkMode": {
+        "description": "Dark mode setting label"
+    },
+    "privacyPolicy": "Privacy Policy",
+    "@privacyPolicy": {
+        "description": "Privacy policy setting label"
+    },
+    "helpCenter": "Help Center",
+    "@helpCenter": {
+        "description": "Help center setting label"
+    },
+    "version": "Tashil Representative - Version {version}",
+    "@version": {
+        "description": "App version label in settings",
+        "placeholders": {
+            "version": {
+                "type": "String"
+            }
+        }
+    },
+    "account": "Account",
+    "@account": {
+        "description": "Account section header"
     }
 }

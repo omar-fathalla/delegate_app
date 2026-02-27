@@ -26,98 +26,83 @@ class _MainScreenState extends State<MainScreen> {
     final delegate = widget.delegate;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0D47A1),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              height: 40,
-              width: 40,
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      appBar: _currentIndex == 2
+          ? null
+          : AppBar(
+              backgroundColor: const Color(0xFF0D47A1),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              title: Row(
                 children: [
-                  Text(
-                    l10n.helloUser(delegate.firstName),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    height: 40,
+                    width: 40,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
-                  Text(
-                    l10n.delegateRole,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withValues(alpha: 0.7),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.helloUser(delegate.firstName),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          l10n.delegateRole,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
       body: _buildBody(delegate),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withValues(alpha: 0.2),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-              _initializedTabs.add(index); // Mark tab as visited
-            });
-          },
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.white.withValues(alpha: 0.6),
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: const Color(0xFF0D47A1),
-          elevation: 0,
-          items: [
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.access_time_filled),
-              label: l10n.attendance,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.person),
-              label: l10n.profile,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.menu_rounded),
-              label: l10n.settings,
-            ),
-          ],
-        ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) {
+          setState(() {
+            _currentIndex = index;
+            _initializedTabs.add(index); // Mark tab as visited
+          });
+        },
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.access_time_filled),
+            label: l10n.attendance,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.person),
+            label: l10n.profile,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.menu_rounded),
+            label: l10n.settings,
+          ),
+        ],
       ),
     );
   }
