@@ -222,6 +222,9 @@ class _LoginScreenState extends State<LoginScreen>
                                         controller: _phoneController,
                                         keyboardType: TextInputType.phone,
                                         textDirection: TextDirection.ltr,
+                                        autofillHints: const [
+                                          AutofillHints.telephoneNumber,
+                                        ],
                                         decoration: InputDecoration(
                                           labelText: l10n.mobileNumber,
                                           prefixIcon: const Icon(
@@ -269,6 +272,9 @@ class _LoginScreenState extends State<LoginScreen>
                                       TextFormField(
                                         controller: _passwordController,
                                         textDirection: TextDirection.ltr,
+                                        autofillHints: const [
+                                          AutofillHints.password,
+                                        ],
                                         decoration: InputDecoration(
                                           labelText: l10n.password,
                                           prefixIcon: const Icon(
@@ -282,6 +288,9 @@ class _LoginScreenState extends State<LoginScreen>
                                                   : Icons.visibility_rounded,
                                               color: Colors.grey,
                                             ),
+                                            tooltip: _obscurePassword
+                                                ? 'Show password'
+                                                : 'Hide password',
                                             onPressed: () {
                                               setState(() {
                                                 _obscurePassword =
@@ -328,36 +337,45 @@ class _LoginScreenState extends State<LoginScreen>
                                       const SizedBox(height: 8),
 
                                       // Remember Me
-                                      Row(
-                                        children: [
-                                          SizedBox(
-                                            height: 28,
-                                            width: 28,
-                                            child: Checkbox(
-                                              value: _rememberMe,
-                                              onChanged: (value) {
-                                                setState(() {
-                                                  _rememberMe = value ?? false;
-                                                });
-                                              },
-                                              activeColor: const Color(
-                                                0xFF1565C0,
-                                              ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
+                                      GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            _rememberMe = !_rememberMe;
+                                          });
+                                        },
+                                        behavior: HitTestBehavior.opaque,
+                                        child: Row(
+                                          children: [
+                                            SizedBox(
+                                              height: 28,
+                                              width: 28,
+                                              child: Checkbox(
+                                                value: _rememberMe,
+                                                onChanged: (value) {
+                                                  setState(() {
+                                                    _rememberMe =
+                                                        value ?? false;
+                                                  });
+                                                },
+                                                activeColor: const Color(
+                                                  0xFF1565C0,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            l10n.rememberMe,
-                                            style: TextStyle(
-                                              color: Colors.grey.shade700,
-                                              fontSize: 14,
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              l10n.rememberMe,
+                                              style: TextStyle(
+                                                color: Colors.grey.shade700,
+                                                fontSize: 14,
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                       const SizedBox(height: 24),
 

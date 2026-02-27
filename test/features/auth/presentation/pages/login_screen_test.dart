@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 // Manual mock for AuthBloc
 class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
@@ -31,7 +32,14 @@ void main() {
   });
 
   testWidgets('LoginScreen disposes correctly', (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: LoginScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
     // Interact with text fields to ensure controllers are active
     await tester.enterText(find.byType(TextFormField).at(0), '1234567890');
@@ -50,7 +58,14 @@ void main() {
   testWidgets('LoginScreen toggles password visibility', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: LoginScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
     final passwordFieldFinder = find.byType(TextFormField).at(1);
     final passwordTextFieldFinder = find.descendant(
