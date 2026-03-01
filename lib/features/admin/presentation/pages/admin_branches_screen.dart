@@ -10,6 +10,7 @@ class AdminBranchesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: StreamBuilder<QuerySnapshot>(
@@ -30,18 +31,18 @@ class AdminBranchesScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.store_mall_directory_outlined,
                     size: 80,
-                    color: Colors.grey,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     l10n.branches,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -58,18 +59,14 @@ class AdminBranchesScreen extends StatelessWidget {
               final branch = BranchModel.fromFirestore(doc);
 
               return Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
                 child: ListTile(
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 8,
                   ),
                   leading: CircleAvatar(
-                    backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                    child: const Icon(Icons.store, color: Colors.blue),
+                    backgroundColor: colorScheme.primaryContainer,
+                    child: Icon(Icons.store, color: colorScheme.primary),
                   ),
                   title: Text(
                     branch.branchName,
@@ -79,7 +76,10 @@ class AdminBranchesScreen extends StatelessWidget {
                     '${branch.latitude.toStringAsFixed(4)}, ${branch.longitude.toStringAsFixed(4)}\nRadius: ${branch.geofenceRadius}m',
                   ),
                   isThreeLine: true,
-                  trailing: const Icon(Icons.qr_code, color: Colors.grey),
+                  trailing: Icon(
+                    Icons.qr_code,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                   onTap: () {
                     // Navigate to BranchDetailsScreen (to be created)
                     context.push('/admin/branch-details', extra: branch);

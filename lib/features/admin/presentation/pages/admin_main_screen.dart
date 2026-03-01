@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_branch_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_branches_screen.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -31,61 +32,10 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     return Scaffold(
       appBar: _currentIndex == 2
           ? null
-          : AppBar(
-              backgroundColor: const Color(0xFF0D47A1),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        width: 32,
-                        height: 32,
-                        fit: BoxFit.contain,
-                        errorBuilder: (c, e, s) => const Icon(
-                          Icons.admin_panel_settings,
-                          color: Color(0xFF1565C0),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.admin,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          l10n.helloUser(delegate.firstName),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+          : AdminHeader(
+              subtitle: _currentIndex == 1
+                  ? l10n.addBranch
+                  : l10n.helloUser(delegate.firstName),
             ),
       body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: NavigationBar(

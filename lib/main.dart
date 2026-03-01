@@ -6,12 +6,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/config/routes/app_router.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/core/cubit/theme_cubit.dart';
 
-/// Global locale provider accessible throughout the app.
+/// Global providers accessible throughout the app.
 late final LocaleProvider localeProvider;
 
 void main() async {
@@ -26,7 +29,7 @@ void main() async {
   final sharedPreferences = results[1] as SharedPreferences;
   await di.init(sharedPreferences: sharedPreferences);
 
-  // LocaleProvider is now registered in DI — no duplicate SharedPreferences call
+  // Providers are now registered in DI — no duplicate SharedPreferences call
   localeProvider = di.sl<LocaleProvider>();
 
   runApp(const MyApp());
@@ -43,45 +46,54 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    localeProvider.addListener(_onLocaleChanged);
+    localeProvider.addListener(_onStateChanged);
   }
 
   @override
   void dispose() {
-    localeProvider.removeListener(_onLocaleChanged);
+    localeProvider.removeListener(_onStateChanged);
     super.dispose();
   }
 
-  void _onLocaleChanged() {
+  void _onStateChanged() {
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Tashil Delegate',
-      theme: AppTheme.lightTheme,
-      routerConfig: appRouter,
-      debugShowCheckedModeBanner: false,
-      builder: (context, child) {
-        if (!isProduction) {
-          return Banner(
-            message: 'TEST ENV',
-            location: BannerLocation.topStart,
-            color: Colors.red,
-            child: child!,
+    return BlocProvider(
+      create: (_) => di.sl<ThemeCubit>(),
+      child: BlocBuilder<ThemeCubit, ThemeState>(
+        builder: (context, themeState) {
+          return MaterialApp.router(
+            title: 'Tashil Delegate',
+            theme: AppTheme.lightTheme(themeState.seedColor),
+            darkTheme: AppTheme.darkTheme(themeState.seedColor),
+            themeMode: themeState.themeMode,
+            routerConfig: appRouter,
+            debugShowCheckedModeBanner: false,
+            builder: (context, child) {
+              if (!isProduction) {
+                return Banner(
+                  message: 'TEST ENV',
+                  location: BannerLocation.topStart,
+                  color: Theme.of(context).colorScheme.error,
+                  child: child!,
+                );
+              }
+              return child!;
+            },
+            locale: localeProvider.locale,
+            supportedLocales: const [Locale('ar'), Locale('en')],
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
           );
-        }
-        return child!;
-      },
-      locale: localeProvider.locale,
-      supportedLocales: const [Locale('ar'), Locale('en')],
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
+        },
+      ),
     );
   }
 }

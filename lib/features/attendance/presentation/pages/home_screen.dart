@@ -24,54 +24,36 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     return BlocProvider(
       create: (context) =>
           sl<AttendanceBloc>()
             ..add(HistoryRequested(userId: widget.delegate.uid)),
       child: Scaffold(
-        backgroundColor: Colors.grey[50], // Light professional background
+        backgroundColor: theme.colorScheme.surface,
         appBar: AppBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          iconTheme: const IconThemeData(color: Color(0xFF0D47A1)),
+          backgroundColor: theme.colorScheme.surface,
+          surfaceTintColor: theme.colorScheme.surfaceTint,
+          iconTheme: IconThemeData(color: theme.colorScheme.primary),
           title: Row(
             children: [
-              Container(
-                height: 40,
-                width: 40,
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 4,
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     l10n.helloUser(widget.delegate.firstName),
-                    style: const TextStyle(
-                      color: Colors.black87,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
                     l10n.delegateRole,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -93,7 +75,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.message),
-                  backgroundColor: Colors.red,
+                  backgroundColor: theme.colorScheme.error,
+                  behavior: SnackBarBehavior.floating,
                 ),
               );
             } else if (state is AttendanceCheckedIn) {
@@ -101,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(l10n.checkedInSuccessfully),
-                  backgroundColor: Colors.green,
+                  backgroundColor: theme.colorScheme.tertiary,
                 ),
               );
             } else if (state is AttendanceCheckedOut) {
@@ -109,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(l10n.checkedOutSuccessfully),
-                  backgroundColor: Colors.orange,
+                  backgroundColor: theme.colorScheme.secondary,
                 ),
               );
             }
@@ -121,63 +104,56 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Status Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: isCheckedIn
-                            ? [const Color(0xFF00BFA5), const Color(0xFF00897B)]
-                            : [
-                                const Color(0xFF757575),
-                                const Color(0xFF424242),
-                              ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                  Card(
+                    color: isCheckedIn
+                        ? theme.colorScheme.primaryContainer
+                        : theme.colorScheme.surfaceContainerHighest,
+                    margin: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              (isCheckedIn
-                                      ? const Color(0xFF00BFA5)
-                                      : Colors.grey)
-                                  .withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
                     ),
-                    child: Column(
-                      children: [
-                        Text(
-                          l10n.currentStatus,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          Text(
+                            l10n.currentStatus,
+                            style: TextStyle(
+                              color: isCheckedIn
+                                  ? theme.colorScheme.onPrimaryContainer
+                                  : theme.colorScheme.onSurfaceVariant,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          isCheckedIn ? l10n.online : l10n.offline,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
+                          const SizedBox(height: 10),
+                          Text(
+                            isCheckedIn ? l10n.online : l10n.offline,
+                            style: TextStyle(
+                              color: isCheckedIn
+                                  ? theme.colorScheme.onPrimary
+                                  : theme.colorScheme.onSurface,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          DateFormat(
-                            'EEEE, MMM d, yyyy',
-                            Localizations.localeOf(context).languageCode,
-                          ).format(DateTime.now()),
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
+                          const SizedBox(height: 5),
+                          Text(
+                            DateFormat(
+                              'EEEE, MMM d, yyyy',
+                              Localizations.localeOf(context).languageCode,
+                            ).format(DateTime.now()),
+                            style: TextStyle(
+                              color: isCheckedIn
+                                  ? theme.colorScheme.onPrimary.withValues(
+                                      alpha: 0.8,
+                                    )
+                                  : theme.colorScheme.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
 
@@ -244,16 +220,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       height: 180,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white,
+                        color: theme.colorScheme.surface,
                         border: Border.all(
                           color: isCheckedIn
-                              ? Colors.orange
-                              : const Color(0xFF0D47A1),
+                              ? theme.colorScheme.secondary
+                              : theme.colorScheme.primary,
                           width: 4,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withValues(alpha: 0.2),
+                            color: theme.colorScheme.shadow.withValues(
+                              alpha: 0.1,
+                            ),
                             blurRadius: 15,
                             spreadRadius: 5,
                           ),
@@ -271,8 +249,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         : Icons.touch_app,
                                     size: 40,
                                     color: isCheckedIn
-                                        ? Colors.orange
-                                        : const Color(0xFF0D47A1),
+                                        ? theme.colorScheme.secondary
+                                        : theme.colorScheme.primary,
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
@@ -281,8 +259,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                       color: isCheckedIn
-                                          ? Colors.orange
-                                          : const Color(0xFF0D47A1),
+                                          ? theme.colorScheme.secondary
+                                          : theme.colorScheme.primary,
                                     ),
                                   ),
                                 ],
@@ -294,10 +272,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 40),
                   Text(
                     l10n.recentHistory,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -310,20 +288,16 @@ class _HomeScreenState extends State<HomeScreen> {
                               final item = state.history[index];
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 10),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 2,
                                 child: ListTile(
                                   leading: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.withValues(alpha: 0.1),
+                                      color: theme.colorScheme.primaryContainer,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(
+                                    child: Icon(
                                       Icons.history,
-                                      color: Color(0xFF0D47A1),
+                                      color: theme.colorScheme.primary,
                                     ),
                                   ),
                                   title: Text(
@@ -344,14 +318,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                   trailing: item.checkOutTime == null
-                                      ? const Icon(
+                                      ? Icon(
                                           Icons.circle,
-                                          color: Colors.green,
+                                          color: theme.colorScheme.secondary,
                                           size: 12,
                                         )
-                                      : const Icon(
+                                      : Icon(
                                           Icons.check_circle,
-                                          color: Colors.grey,
+                                          color:
+                                              theme.colorScheme.outlineVariant,
                                           size: 16,
                                         ),
                                 ),

@@ -7,6 +7,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/core/providers/locale_provider.dart';
+import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/main.dart';
 
 // Manual mock for AuthBloc
 class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
@@ -23,15 +28,39 @@ class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
 }
 
 void main() {
-  setUp(() {
+  setUp(() async {
     sl.allowReassignment = true;
     if (!sl.isRegistered<AuthBloc>()) {
       sl.registerFactory<AuthBloc>(() => MockAuthBloc());
     }
+
+    if (!sl.isRegistered<SharedPreferences>()) {
+      SharedPreferences.setMockInitialValues({'app_locale': 'en'});
+      final prefs = await SharedPreferences.getInstance();
+      sl.registerLazySingleton<SharedPreferences>(() => prefs);
+    }
+
+    if (!sl.isRegistered<LocaleProvider>()) {
+      sl.registerLazySingleton(() => LocaleProvider(sl<SharedPreferences>()));
+      localeProvider = sl<LocaleProvider>();
+    }
+
+    if (!sl.isRegistered<ThemeCubit>()) {
+      sl.registerLazySingleton(() => ThemeCubit(sl<SharedPreferences>()));
+    }
   });
 
+  Widget createWidgetUnderTest() {
+    return MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('en'),
+      home: const LoginScreen(),
+    );
+  }
+
   testWidgets('LoginScreen disposes correctly', (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    await tester.pumpWidget(createWidgetUnderTest());
 
     // Interact with text fields to ensure controllers are active
     await tester.enterText(find.byType(TextFormField).at(0), '1234567890');
@@ -50,7 +79,7 @@ void main() {
   testWidgets('LoginScreen toggles password visibility', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    await tester.pumpWidget(createWidgetUnderTest());
 
     final passwordFieldFinder = find.byType(TextFormField).at(1);
     final passwordTextFieldFinder = find.descendant(
@@ -62,31 +91,43 @@ void main() {
     TextField passwordTextField = tester.widget(passwordTextFieldFinder);
     expect(passwordTextField.obscureText, isTrue);
 
-    // Verify initial tooltip "Show password"
-    final showPasswordTooltip = find.byTooltip('Show password');
-    expect(showPasswordTooltip, findsOneWidget);
+    // Verify initial visibility off icon exists (since _obscurePassword = true)
+    final visibilityOffIconFinder = find.descendant(
+      of: passwordFieldFinder,
+      matching: find.byIcon(Icons.visibility_off_outlined),
+    );
+    expect(visibilityOffIconFinder, findsOneWidget);
 
-    // Tap the visibility toggle button (found via tooltip)
-    await tester.tap(showPasswordTooltip);
+    // Tap the visibility toggle button
+    await tester.tap(visibilityOffIconFinder);
     await tester.pump();
 
     // Verify state: visible
     passwordTextField = tester.widget(passwordTextFieldFinder);
     expect(passwordTextField.obscureText, isFalse);
 
-    // Verify tooltip changed to "Hide password"
-    final hidePasswordTooltip = find.byTooltip('Hide password');
-    expect(hidePasswordTooltip, findsOneWidget);
+    // Verify icon changed to visibility on
+    final visibilityOnIconFinder = find.descendant(
+      of: passwordFieldFinder,
+      matching: find.byIcon(Icons.visibility_outlined),
+    );
+    expect(visibilityOnIconFinder, findsOneWidget);
 
-    // Tap the visibility toggle button again (found via new tooltip)
-    await tester.tap(hidePasswordTooltip);
+    // Tap the visibility toggle button again
+    await tester.tap(visibilityOnIconFinder);
     await tester.pump();
 
     // Verify state: obscured again
     passwordTextField = tester.widget(passwordTextFieldFinder);
     expect(passwordTextField.obscureText, isTrue);
 
-    // Verify tooltip changed back to "Show password"
-    expect(find.byTooltip('Show password'), findsOneWidget);
+    // Verify icon changed back to visibility off
+    expect(
+      find.descendant(
+        of: passwordFieldFinder,
+        matching: find.byIcon(Icons.visibility_off_outlined),
+      ),
+      findsOneWidget,
+    );
   });
 }

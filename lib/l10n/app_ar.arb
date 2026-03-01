@@ -591,5 +591,69 @@
     "account": "الحساب",
     "@account": {
         "description": "Account section header"
+    },
+    "privacyPolicyDesc": "توضح سياسة الخصوصية هذه كيف نقوم بجمع، استخدام، والإفصاح عن معلوماتك الشخصية عند استخدامك لخدمات المندوب. نحن ملتزمون بحماية خصوصيتك وضمان التعامل مع بياناتك بشكل آمن.",
+    "@privacyPolicyDesc": {
+        "description": "Main privacy policy description"
+    },
+    "locationData": "بيانات الموقع",
+    "@locationData": {
+        "description": "Location data section title"
+    },
+    "locationDataDesc": "يجمع تطبيقنا بيانات الموقع لتمكين تتبع الطلبات في الوقت الفعلي ومطابقة المناديب مع الطلبات القريبة حتى عندما يكون التطبيق مغلقاً أو غير مستخدم. هذه البيانات أساسية للوظيفة الأساسية لخدمتنا.",
+    "@locationDataDesc": {
+        "description": "Location data section description"
+    },
+    "cameraAccess": "الوصول للكاميرا",
+    "@cameraAccess": {
+        "description": "Camera access section title"
+    },
+    "cameraAccessDesc": "نطلب الوصول إلى الكاميرا للسماح لك بالتقاط صور الفواتير، الطرود أو إثباتات التوصيل. يتم التقاط الصور فقط عندما تستخدم ميزة الكاميرا بوضوح داخل التطبيق.",
+    "@cameraAccessDesc": {
+        "description": "Camera access section description"
+    },
+    "dataSecurity": "أمن البيانات",
+    "@dataSecurity": {
+        "description": "Data security section title"
+    },
+    "dataSecurityDesc": "ننطبق معايير الأمان المعتمدة في الصناعة لحماية بياناتك. نحن لا نبيع بياناتك الشخصية. تتم مشاركة معلوماتك فقط مع الشركاء المعتمدين لمعالجة الخدمات.",
+    "@dataSecurityDesc": {
+        "description": "Data security section description"
+    },
+    "contactUs": "تواصل معنا",
+    "@contactUs": {
+        "description": "Contact Us section title"
+    },
+    "website": "الموقع الإلكتروني",
+    "@website": {
+        "description": "Website label"
+    },
+    "emailAddress": "البريد الإلكتروني",
+    "@emailAddress": {
+        "description": "Email address label"
+    },
+    "egyptOffice": "مكتب مصر",
+    "@egyptOffice": {
+        "description": "Egypt office label"
+    },
+    "uaeOffice": "مكتب الإمارات",
+    "@uaeOffice": {
+        "description": "UAE office label"
+    },
+    "swPointWebsite": "https://sw-point.com/",
+    "@swPointWebsite": {
+        "description": "SwitchPoint website value"
+    },
+    "swPointEmail": "support@sw-point.com",
+    "@swPointEmail": {
+        "description": "SwitchPoint support email value"
+    },
+    "swPointEgyptPhone": "Alexandria, Egypt +20 121 185 7725",
+    "@swPointEgyptPhone": {
+        "description": "SwitchPoint Egypt phone value"
+    },
+    "swPointUaePhone": "United Arab Emirates WhatsApp: +971 55 871 5615",
+    "@swPointUaePhone": {
+        "description": "SwitchPoint UAE phone value"
     }
 }

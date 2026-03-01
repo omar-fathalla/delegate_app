@@ -24,38 +24,17 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: _currentIndex == 2
           ? null
           : AppBar(
-              backgroundColor: const Color(0xFF0D47A1),
-              foregroundColor: Colors.white,
-              elevation: 0,
+              backgroundColor: colorScheme.surface,
+              foregroundColor: colorScheme.onSurface,
+              surfaceTintColor: colorScheme.surfaceTint,
               title: Row(
                 children: [
-                  Container(
-                    height: 40,
-                    width: 40,
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,7 +50,7 @@ class _MainScreenState extends State<MainScreen> {
                           l10n.delegateRole,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.7),
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],

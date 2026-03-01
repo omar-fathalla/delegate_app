@@ -591,5 +591,69 @@
     "account": "Account",
     "@account": {
         "description": "Account section header"
+    },
+    "privacyPolicyDesc": "This Privacy Policy describes how we collect, use, and disclose your personal information when you use our delegate services. We are committed to protecting your privacy and ensuring your data is handled securely.",
+    "@privacyPolicyDesc": {
+        "description": "Main privacy policy description"
+    },
+    "locationData": "LOCATION DATA",
+    "@locationData": {
+        "description": "Location data section title"
+    },
+    "locationDataDesc": "Our app collects location data to enable real-time tracking of deliveries and to match delegates with nearby orders even when the app is closed or not in use. This data is essential for the core functionality of our service.",
+    "@locationDataDesc": {
+        "description": "Location data section description"
+    },
+    "cameraAccess": "CAMERA ACCESS",
+    "@cameraAccess": {
+        "description": "Camera access section title"
+    },
+    "cameraAccessDesc": "We require camera access to allow you to take photos of bills, packages, or delivery proofs. Photos are only captured when you explicitly use the camera feature within the app.",
+    "@cameraAccessDesc": {
+        "description": "Camera access section description"
+    },
+    "dataSecurity": "DATA SECURITY",
+    "@dataSecurity": {
+        "description": "Data security section title"
+    },
+    "dataSecurityDesc": "We implement industry-standard security measures to protect your data. We do not sell your personal data. Your information is shared only with authorized partners for service processing.",
+    "@dataSecurityDesc": {
+        "description": "Data security section description"
+    },
+    "contactUs": "Contact Us",
+    "@contactUs": {
+        "description": "Contact Us section title"
+    },
+    "website": "Website",
+    "@website": {
+        "description": "Website label"
+    },
+    "emailAddress": "Email Address",
+    "@emailAddress": {
+        "description": "Email address label"
+    },
+    "egyptOffice": "Egypt Office",
+    "@egyptOffice": {
+        "description": "Egypt office label"
+    },
+    "uaeOffice": "UAE Office",
+    "@uaeOffice": {
+        "description": "UAE office label"
+    },
+    "swPointWebsite": "https://sw-point.com/",
+    "@swPointWebsite": {
+        "description": "SwitchPoint website value"
+    },
+    "swPointEmail": "support@sw-point.com",
+    "@swPointEmail": {
+        "description": "SwitchPoint support email value"
+    },
+    "swPointEgyptPhone": "Alexandria, Egypt +20 121 185 7725",
+    "@swPointEgyptPhone": {
+        "description": "SwitchPoint Egypt phone value"
+    },
+    "swPointUaePhone": "United Arab Emirates WhatsApp: +971 55 871 5615",
+    "@swPointUaePhone": {
+        "description": "SwitchPoint UAE phone value"
     }
 }

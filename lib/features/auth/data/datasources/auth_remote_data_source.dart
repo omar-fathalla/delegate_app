@@ -68,7 +68,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           delegatePublicId: '',
           allReceiptCodes: const [],
           createdAt: DateTime.now(),
-          createdBy: 'system',
+          createdBy: 'system_admin',
           hasPendingUpdate: false,
           isDeductedFromCompany: false,
           isPrinted: false,
@@ -89,11 +89,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       if (querySnapshot.docs.isNotEmpty) {
         final doc = querySnapshot.docs.first;
-        return DelegateModel.fromJson(doc.data(), doc.id);
+        final data = doc.data();
+        debugPrint('--- DATA SOURCE: Found in collectionGroup: delegates ---');
+        debugPrint('Doc ID: \${doc.id}');
+        debugPrint('Position in JSON: \${data["position"]}');
+        return DelegateModel.fromJson(data, doc.id);
       } else {
         // Fallback: Check if the user is an admin in the 'users' collection
-        // NOTE: Anonymous users may not have permission to query /users,
-        // so we wrap this in a try-catch to handle permission-denied gracefully.
         try {
           final userQuery = await firestore
               .collection('users')
@@ -105,8 +107,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             final userDoc = userQuery.docs.first;
             final userData = userDoc.data();
             final role = userData['role'] as String? ?? '';
+            debugPrint('--- DATA SOURCE: Found in collection: users ---');
+            debugPrint('User ID: \${userDoc.id}');
+            debugPrint('Role in JSON: \$role');
 
-            if (role == 'company-admin' || role == 'organization-admin') {
+            if (role == 'company-admin' ||
+                role == 'organization-admin' ||
+                role == 'Supervisor') {
+              debugPrint(
+                '--- DATA SOURCE: User matches Admin/Supervisor role ---',
+              );
               // Use the hardcoded password for admin login via mobile app
               const adminPassword = '4816361Aa';
 
@@ -133,7 +143,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 delegatePublicId: '',
                 allReceiptCodes: const [],
                 createdAt: DateTime.now(),
-                createdBy: 'system',
+                createdBy: 'system_admin',
                 hasPendingUpdate: false,
                 isDeductedFromCompany: false,
                 isPrinted: false,

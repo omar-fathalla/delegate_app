@@ -1,3 +1,17 @@
 {
-    "java.configuration.updateBuildConfiguration": "automatic"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.jdt.ls.java.home": "/Applications/Android Studio.app/Contents/jbr/Contents/Home",
+    "java.import.gradle.java.home": "/Applications/Android Studio.app/Contents/jbr/Contents/Home",
+    "java.import.gradle.enabled": false,
+    "java.import.maven.enabled": false,
+    "java.import.exclusions": [
+        "**/node_modules/**",
+        "**/.metadata/**",
+        "archetype-resources",
+        "META-INF/maven",
+        "**/.pub-cache/**",
+        "/opt/homebrew/**",
+        "**/.dart_tool/**",
+        "**/.idea/**"
+    ]
 }

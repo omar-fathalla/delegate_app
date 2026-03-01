@@ -871,6 +871,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Account'**
   String get account;
+
+  /// Main privacy policy description
+  ///
+  /// In en, this message translates to:
+  /// **'This Privacy Policy describes how we collect, use, and disclose your personal information when you use our delegate services. We are committed to protecting your privacy and ensuring your data is handled securely.'**
+  String get privacyPolicyDesc;
+
+  /// Location data section title
+  ///
+  /// In en, this message translates to:
+  /// **'LOCATION DATA'**
+  String get locationData;
+
+  /// Location data section description
+  ///
+  /// In en, this message translates to:
+  /// **'Our app collects location data to enable real-time tracking of deliveries and to match delegates with nearby orders even when the app is closed or not in use. This data is essential for the core functionality of our service.'**
+  String get locationDataDesc;
+
+  /// Camera access section title
+  ///
+  /// In en, this message translates to:
+  /// **'CAMERA ACCESS'**
+  String get cameraAccess;
+
+  /// Camera access section description
+  ///
+  /// In en, this message translates to:
+  /// **'We require camera access to allow you to take photos of bills, packages, or delivery proofs. Photos are only captured when you explicitly use the camera feature within the app.'**
+  String get cameraAccessDesc;
+
+  /// Data security section title
+  ///
+  /// In en, this message translates to:
+  /// **'DATA SECURITY'**
+  String get dataSecurity;
+
+  /// Data security section description
+  ///
+  /// In en, this message translates to:
+  /// **'We implement industry-standard security measures to protect your data. We do not sell your personal data. Your information is shared only with authorized partners for service processing.'**
+  String get dataSecurityDesc;
+
+  /// Contact Us section title
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Us'**
+  String get contactUs;
+
+  /// Website label
+  ///
+  /// In en, this message translates to:
+  /// **'Website'**
+  String get website;
+
+  /// Email address label
+  ///
+  /// In en, this message translates to:
+  /// **'Email Address'**
+  String get emailAddress;
+
+  /// Egypt office label
+  ///
+  /// In en, this message translates to:
+  /// **'Egypt Office'**
+  String get egyptOffice;
+
+  /// UAE office label
+  ///
+  /// In en, this message translates to:
+  /// **'UAE Office'**
+  String get uaeOffice;
+
+  /// SwitchPoint website value
+  ///
+  /// In en, this message translates to:
+  /// **'https://sw-point.com/'**
+  String get swPointWebsite;
+
+  /// SwitchPoint support email value
+  ///
+  /// In en, this message translates to:
+  /// **'support@sw-point.com'**
+  String get swPointEmail;
+
+  /// SwitchPoint Egypt phone value
+  ///
+  /// In en, this message translates to:
+  /// **'Alexandria, Egypt +20 121 185 7725'**
+  String get swPointEgyptPhone;
+
+  /// SwitchPoint UAE phone value
+  ///
+  /// In en, this message translates to:
+  /// **'United Arab Emirates WhatsApp: +971 55 871 5615'**
+  String get swPointUaePhone;
 }
 
 class _AppLocalizationsDelegate

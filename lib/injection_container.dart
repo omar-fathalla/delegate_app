@@ -25,6 +25,7 @@ import 'package:delegate_app/features/profile/domain/repositories/profile_reposi
 import 'package:delegate_app/features/profile/domain/usecases/get_delegate_profile.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
+import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:get_it/get_it.dart';
 
 final sl = GetIt.instance;
@@ -33,6 +34,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // ! Core
   sl.registerLazySingleton(() => sharedPreferences);
   sl.registerLazySingleton(() => LocaleProvider(sharedPreferences));
+  sl.registerLazySingleton(() => ThemeCubit(sl()));
 
   // ! Features - Auth
   // Bloc

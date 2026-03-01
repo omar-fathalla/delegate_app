@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
 import 'package:delegate_app/main.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/config/theme/color_schemes.dart';
 
 class SettingsScreen extends StatelessWidget {
   final Delegate delegate;
@@ -15,57 +19,29 @@ class SettingsScreen extends StatelessWidget {
     final isArabic = localeProvider.isArabic;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9), // Light grayish-blue background
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AdminHeader(subtitle: l10n.settings),
       body: SafeArea(
         child: Column(
           children: [
-            // Custom App Bar Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.notifications_rounded,
-                      color: Color(0xFF334155),
-                    ),
-                    onPressed: () {},
-                  ),
-                  Text(
-                    l10n.settings,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.orange.shade200,
-                    child: Icon(Icons.person, color: Colors.orange.shade800),
-                  ),
-                ],
-              ),
-            ),
-
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Section: Settings
-                    _buildSectionHeader(l10n.settings),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildSectionHeader(context, l10n.settings),
+                    ),
                     const SizedBox(height: 12),
 
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withValues(alpha: 0.2),
                       ),
                       child: Column(
                         children: [
@@ -74,31 +50,33 @@ class SettingsScreen extends StatelessWidget {
                             icon: Icons.translate_rounded,
                             title: l10n.language,
                             subtitle: isArabic ? l10n.arabic : l10n.english,
-                            trailing: GestureDetector(
-                              onTap: () => _toggleLanguage(context),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFD3E3FD),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  isArabic ? 'English' : 'العربية',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF041E49),
-                                  ),
+                            onTap: () => _toggleLanguage(context),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                isArabic ? 'English' : 'العربية',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimaryContainer,
                                 ),
                               ),
                             ),
                           ),
                           Divider(
                             height: 1,
-                            color: Colors.grey.shade200,
+                            color: Theme.of(context).colorScheme.outlineVariant,
                             indent: 64,
                           ),
                           _buildSettingsTile(
@@ -106,14 +84,56 @@ class SettingsScreen extends StatelessWidget {
                             icon: Icons.dark_mode_rounded,
                             title: l10n.darkMode,
                             subtitle:
-                                'Off', // Optional: translate "Off" if desired, or skip
+                                context.watch<ThemeCubit>().state.isDarkMode
+                                ? 'On'
+                                : 'Off',
                             trailing: Switch(
-                              value: false,
-                              onChanged: (val) {},
-                              activeTrackColor: const Color(
-                                0xFF0D47A1,
-                              ).withValues(alpha: 0.5),
-                              activeThumbColor: const Color(0xFF0D47A1),
+                              value: context
+                                  .watch<ThemeCubit>()
+                                  .state
+                                  .isDarkMode,
+                              onChanged: (val) =>
+                                  context.read<ThemeCubit>().toggleTheme(),
+                              activeTrackColor: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.5),
+                              activeThumbColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                            ),
+                          ),
+                          Divider(
+                            height: 1,
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                            indent: 64,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isArabic ? 'ألوان التطبيق' : 'App Colors',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceAround,
+                                  children: AppColorSchemes.seedColors
+                                      .map((c) => _buildColorOption(context, c))
+                                      .toList(),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -122,13 +142,18 @@ class SettingsScreen extends StatelessWidget {
                     const SizedBox(height: 32),
 
                     // Section: Account
-                    _buildSectionHeader(l10n.account),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildSectionHeader(context, l10n.account),
+                    ),
                     const SizedBox(height: 12),
 
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withValues(alpha: 0.2),
                       ),
                       child: Column(
                         children: [
@@ -136,11 +161,11 @@ class SettingsScreen extends StatelessWidget {
                             context: context,
                             icon: Icons.privacy_tip_outlined,
                             title: l10n.privacyPolicy,
-                            onTap: () {},
+                            onTap: () => context.push('/privacy-policy'),
                           ),
                           Divider(
                             height: 1,
-                            color: Colors.grey.shade200,
+                            color: Theme.of(context).colorScheme.outlineVariant,
                             indent: 64,
                           ),
                           _buildSettingsTile(
@@ -151,15 +176,15 @@ class SettingsScreen extends StatelessWidget {
                           ),
                           Divider(
                             height: 1,
-                            color: Colors.grey.shade200,
+                            color: Theme.of(context).colorScheme.outlineVariant,
                             indent: 64,
                           ),
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.logout_rounded,
                             title: l10n.logout,
-                            iconColor: Colors.red,
-                            titleColor: Colors.red,
+                            iconColor: Theme.of(context).colorScheme.error,
+                            titleColor: Theme.of(context).colorScheme.error,
                             onTap: () => _showLogoutConfirmation(context),
                             hideTrailingIcon: true,
                           ),
@@ -173,7 +198,7 @@ class SettingsScreen extends StatelessWidget {
                       child: Text(
                         l10n.version('2.4.0'),
                         style: TextStyle(
-                          color: Colors.grey.shade500,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 13,
                         ),
                       ),
@@ -189,15 +214,15 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsetsDirectional.only(start: 4),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.bold,
-          color: Color(0xFF0D47A1),
+          color: Theme.of(context).colorScheme.primary,
         ),
       ),
     );
@@ -209,19 +234,22 @@ class SettingsScreen extends StatelessWidget {
     required String title,
     String? subtitle,
     Widget? trailing,
-    Color iconColor = const Color(0xFF475569),
-    Color titleColor = const Color(0xFF1E293B),
+    Color? iconColor,
+    Color? titleColor,
     VoidCallback? onTap,
     bool hideTrailingIcon = false,
   }) {
+    final theme = Theme.of(context);
+    final finalIconColor = iconColor ?? theme.colorScheme.onSurfaceVariant;
+    final finalTitleColor = titleColor ?? theme.colorScheme.onSurface;
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Row(
           children: [
-            Icon(icon, color: iconColor, size: 28),
+            Icon(icon, color: finalIconColor, size: 28),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -232,24 +260,64 @@ class SettingsScreen extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
-                      color: titleColor,
+                      color: finalTitleColor,
                     ),
                   ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
-            if (trailing != null) trailing,
+            ?trailing,
             if (trailing == null && !hideTrailingIcon)
-              Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildColorOption(BuildContext context, Color color) {
+    final themeCubit = context.watch<ThemeCubit>();
+    // ignore: deprecated_member_use
+    final isSelected = themeCubit.state.seedColor.value == color.value;
+
+    return GestureDetector(
+      onTap: () => context.read<ThemeCubit>().setSeedColor(color),
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: isSelected
+              ? Border.all(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  width: 3,
+                )
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: isSelected
+            ? const Icon(Icons.check, color: Colors.white, size: 24)
+            : null,
       ),
     );
   }
@@ -260,6 +328,7 @@ class SettingsScreen extends StatelessWidget {
 
   void _showLogoutConfirmation(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
 
     showDialog(
       context: context,
@@ -267,7 +336,7 @@ class SettingsScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.logout_rounded, color: Colors.red, size: 24),
+            Icon(Icons.logout_rounded, color: colorScheme.error, size: 24),
             const SizedBox(width: 8),
             Text(l10n.logout),
           ],
@@ -282,13 +351,13 @@ class SettingsScreen extends StatelessWidget {
             onPressed: () => Navigator.pop(dialogContext),
             child: Text(
               localeProvider.isArabic ? 'إلغاء' : 'Cancel',
-              style: const TextStyle(color: Colors.grey),
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
             ),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

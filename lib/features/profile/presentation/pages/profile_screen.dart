@@ -28,23 +28,23 @@ class _ProfileBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    const primaryColor = Color(0xFF0D47A1);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: colorScheme.surface,
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             SliverToBoxAdapter(
-              child: _buildProfileHeader(context, primaryColor, l10n),
+              child: _buildProfileHeader(context, colorScheme, l10n),
             ),
             SliverPersistentHeader(
               pinned: true,
               delegate: _TabBarDelegate(
                 TabBar(
-                  labelColor: primaryColor,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: primaryColor,
+                  labelColor: colorScheme.primary,
+                  unselectedLabelColor: colorScheme.onSurfaceVariant,
+                  indicatorColor: colorScheme.primary,
                   indicatorWeight: 3,
                   labelStyle: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -73,57 +73,44 @@ class _ProfileBody extends StatelessWidget {
   // ─── Profile Header ─────────────────────────────────────────────
   Widget _buildProfileHeader(
     BuildContext context,
-    Color primaryColor,
+    ColorScheme colorScheme,
     AppLocalizations l10n,
   ) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [primaryColor, primaryColor.withValues(alpha: 0.85)],
-        ),
-      ),
-      padding: const EdgeInsetsDirectional.fromSTEB(20, 30, 20, 24),
+      color: colorScheme.surface,
+      padding: const EdgeInsetsDirectional.fromSTEB(20, 48, 20, 24),
       child: Column(
         children: [
-          // Avatar — use personal photo if available
-          _buildProfileAvatar(),
-          const SizedBox(height: 14),
-          // Name
+          _buildProfileAvatar(colorScheme),
+          const SizedBox(height: 16),
           Text(
             delegate.fullName,
-            style: const TextStyle(
-              fontSize: 22,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: colorScheme.onSurface,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
-          // Public ID
           Text(
             '${l10n.delegateId}: ${delegate.delegatePublicId}',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w400,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 10),
-          // Position badge
+          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(20),
+              color: colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               delegate.position.name.toUpperCase(),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
+                color: colorScheme.onSecondaryContainer,
+                fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,
               ),
             ),
@@ -133,27 +120,28 @@ class _ProfileBody extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileAvatar() {
+  Widget _buildProfileAvatar(ColorScheme colorScheme) {
     final personalPhotoUrl = _getPersonalPhotoUrl();
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.5),
-          width: 3,
-        ),
+        border: Border.all(color: colorScheme.outlineVariant, width: 2),
       ),
       child: personalPhotoUrl != null
           ? CircleAvatar(
-              radius: 45,
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              radius: 48,
+              backgroundColor: colorScheme.surfaceContainerHighest,
               backgroundImage: CachedNetworkImageProvider(personalPhotoUrl),
             )
           : CircleAvatar(
-              radius: 45,
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
-              child: const Icon(Icons.person, size: 50, color: Colors.white),
+              radius: 48,
+              backgroundColor: colorScheme.surfaceContainerHighest,
+              child: Icon(
+                Icons.person,
+                size: 50,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
     );
   }
@@ -273,18 +261,23 @@ class _ProfileBody extends StatelessWidget {
 
   // ─── Tab 2: Documents ───────────────────────────────────────────
   Widget _buildDocumentsTab(BuildContext context, AppLocalizations l10n) {
+    final colorScheme = Theme.of(context).colorScheme;
     if (delegate.documents.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.description_outlined, size: 80, color: Colors.grey[300]),
+            Icon(
+              Icons.description_outlined,
+              size: 80,
+              color: colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 16),
             Text(
               l10n.noDocumentsUploaded,
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[500],
+                color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -310,17 +303,22 @@ class _ProfileBody extends StatelessWidget {
 
   // ─── Tab 3: Request History ─────────────────────────────────────
   Widget _buildRequestHistoryTab(BuildContext context, AppLocalizations l10n) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history_outlined, size: 80, color: Colors.grey[300]),
+          Icon(
+            Icons.history_outlined,
+            size: 80,
+            color: colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: 16),
           Text(
             l10n.noRequestsYet,
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[500],
+              color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -344,13 +342,8 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
-      ),
-      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -361,18 +354,18 @@ class _SectionCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0D47A1).withValues(alpha: 0.1),
+                    color: colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: const Color(0xFF0D47A1), size: 22),
+                  child: Icon(icon, color: colorScheme.primary, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A2E),
+                    color: colorScheme.onSurface,
                   ),
                 ),
               ],
@@ -402,6 +395,7 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       children: [
         Padding(
@@ -412,10 +406,10 @@ class _InfoRow extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0F4FF),
+                  color: colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: const Color(0xFF0D47A1), size: 20),
+                child: Icon(icon, color: colorScheme.primary, size: 20),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -426,17 +420,17 @@ class _InfoRow extends StatelessWidget {
                       label,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[600],
+                        color: colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       value,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A2E),
+                        color: colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -445,8 +439,7 @@ class _InfoRow extends StatelessWidget {
             ],
           ),
         ),
-        if (showDivider)
-          Divider(height: 1, color: Colors.grey.withValues(alpha: 0.15)),
+        if (showDivider) Divider(height: 1, color: colorScheme.outlineVariant),
       ],
     );
   }
@@ -461,8 +454,12 @@ class _DocumentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final String title = _getDocumentTitle(document.documentKey, l10n);
-    final Color statusColor = _getStatusColor(document.documentStatus);
+    final Color statusColor = _getStatusColor(
+      document.documentStatus,
+      colorScheme,
+    );
     final IconData statusIcon = _getStatusIcon(document.documentStatus);
     final String statusText = _getStatusText(document.documentStatus, l10n);
     final bool hasImage = document.documentURL.isNotEmpty;
@@ -470,18 +467,18 @@ class _DocumentCard extends StatelessWidget {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: colorScheme.shadow.withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Material(
-        color: Colors.transparent,
+        color: colorScheme.surface.withValues(alpha: 0),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
@@ -503,7 +500,7 @@ class _DocumentCard extends StatelessWidget {
                             imageUrl: document.documentURL,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Container(
-                              color: const Color(0xFFF0F4FF),
+                              color: colorScheme.surfaceContainerHighest,
                               child: const Center(
                                 child: SizedBox(
                                   width: 24,
@@ -515,21 +512,21 @@ class _DocumentCard extends StatelessWidget {
                               ),
                             ),
                             errorWidget: (context, url, error) => Container(
-                              color: const Color(0xFFF0F4FF),
-                              child: const Column(
+                              color: colorScheme.surfaceContainerHighest,
+                              child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
                                     Icons.broken_image_outlined,
                                     size: 32,
-                                    color: Color(0xFFB0BEC5),
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Text(
                                     'فشل التحميل',
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Color(0xFFB0BEC5),
+                                      color: colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
@@ -537,11 +534,11 @@ class _DocumentCard extends StatelessWidget {
                             ),
                           )
                         : Container(
-                            color: const Color(0xFFF0F4FF),
+                            color: colorScheme.surfaceContainerHighest,
                             child: Icon(
                               _getDocumentIcon(document.documentKey),
                               size: 40,
-                              color: const Color(0xFFB0BEC5),
+                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                     // Status badge overlay
@@ -567,14 +564,18 @@ class _DocumentCard extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(statusIcon, size: 10, color: Colors.white),
+                            Icon(
+                              statusIcon,
+                              size: 10,
+                              color: colorScheme.surface,
+                            ),
                             const SizedBox(width: 3),
                             Text(
                               statusText,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: colorScheme.surface,
                               ),
                             ),
                           ],
@@ -589,13 +590,13 @@ class _DocumentCard extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
+                            color: colorScheme.shadow.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.zoom_in_rounded,
                             size: 16,
-                            color: Colors.white,
+                            color: colorScheme.surface,
                           ),
                         ),
                       ),
@@ -612,10 +613,10 @@ class _DocumentCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A1A2E),
+                          color: colorScheme.onSurface,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -628,7 +629,7 @@ class _DocumentCard extends StatelessWidget {
                           document.rejectionReason!,
                           style: TextStyle(
                             fontSize: 10,
-                            color: Colors.red[700],
+                            color: colorScheme.error,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -639,7 +640,7 @@ class _DocumentCard extends StatelessWidget {
                             Icon(
                               Icons.access_time,
                               size: 11,
-                              color: Colors.grey[500],
+                              color: colorScheme.onSurfaceVariant,
                             ),
                             const SizedBox(width: 4),
                             Expanded(
@@ -649,7 +650,7 @@ class _DocumentCard extends StatelessWidget {
                                 ).format(document.uploadedAt!),
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: Colors.grey[500],
+                                  color: colorScheme.onSurfaceVariant,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -674,7 +675,9 @@ class _DocumentCard extends StatelessWidget {
       PageRouteBuilder(
         opaque: false,
         barrierDismissible: true,
-        barrierColor: Colors.black87,
+        barrierColor: Theme.of(
+          context,
+        ).colorScheme.inverseSurface.withValues(alpha: 0.87),
         pageBuilder: (context, animation, secondaryAnimation) {
           return _FullScreenImageViewer(
             imageUrl: document.documentURL,
@@ -722,16 +725,16 @@ class _DocumentCard extends StatelessWidget {
     }
   }
 
-  Color _getStatusColor(DocumentStatus status) {
+  Color _getStatusColor(DocumentStatus status, ColorScheme colorScheme) {
     switch (status) {
       case DocumentStatus.approved:
-        return const Color(0xFF4CAF50);
+        return colorScheme.tertiary;
       case DocumentStatus.rejected:
-        return const Color(0xFFF44336);
+        return colorScheme.error;
       case DocumentStatus.pending:
-        return const Color(0xFFFF9800);
+        return colorScheme.secondary;
       case DocumentStatus.notProvided:
-        return Colors.grey;
+        return colorScheme.outline;
     }
   }
 
@@ -771,25 +774,34 @@ class _FullScreenImageViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: colorScheme.surface.withValues(alpha: 0),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: colorScheme.surface.withValues(alpha: 0),
         elevation: 0,
         title: Text(
           title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: colorScheme.onInverseSurface,
             fontWeight: FontWeight.w600,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+          icon: Icon(
+            Icons.close_rounded,
+            color: colorScheme.onInverseSurface,
+            size: 28,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.open_in_new_rounded, color: Colors.white),
+            icon: Icon(
+              Icons.open_in_new_rounded,
+              color: colorScheme.onInverseSurface,
+            ),
             tooltip: 'Open in browser',
             onPressed: () async {
               final uri = Uri.parse(imageUrl);
@@ -807,23 +819,28 @@ class _FullScreenImageViewer extends StatelessWidget {
           child: CachedNetworkImage(
             imageUrl: imageUrl,
             fit: BoxFit.contain,
-            placeholder: (context, url) => const Center(
+            placeholder: (context, url) => Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  colorScheme.onInverseSurface,
+                ),
               ),
             ),
-            errorWidget: (context, url, error) => const Column(
+            errorWidget: (context, url, error) => Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   Icons.broken_image_outlined,
                   size: 64,
-                  color: Colors.white54,
+                  color: colorScheme.onInverseSurface.withValues(alpha: 0.54),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Text(
                   'فشل تحميل الصورة',
-                  style: TextStyle(color: Colors.white54, fontSize: 16),
+                  style: TextStyle(
+                    color: colorScheme.onInverseSurface.withValues(alpha: 0.54),
+                    fontSize: 16,
+                  ),
                 ),
               ],
             ),
@@ -845,7 +862,10 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(color: Colors.white, child: tabBar);
+    return Container(
+      color: Theme.of(context).colorScheme.surface,
+      child: tabBar,
+    );
   }
 
   @override

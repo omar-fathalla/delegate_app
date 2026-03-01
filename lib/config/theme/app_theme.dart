@@ -1,23 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'color_schemes.dart';
+
 class AppTheme {
-  static ThemeData get lightTheme {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF0D47A1), // Deep Blue (Primary)
-      secondary: const Color(0xFF00BFA5), // Teal Accent (Secondary)
-      error: const Color(0xFFD32F2F),
-      surface: const Color(0xFFF8F9FA),
-    );
-
-    final baseTextTheme = GoogleFonts.cairoTextTheme();
-
+  // Base configuration to prevent code duplication (Clean Code)
+  static ThemeData _baseTheme(
+    ColorScheme colorScheme,
+    TextTheme baseTextTheme,
+  ) {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
       textTheme: baseTextTheme,
 
-      // Inputs
+      // Inputs (Spacing & White Space)
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
@@ -27,7 +24,7 @@ class AppTheme {
         ),
       ),
 
-      // Buttons
+      // Buttons (Typography & Touch Targets)
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -55,9 +52,9 @@ class AppTheme {
         ),
       ),
 
-      // Navigation
+      // Navigation (Micro-interactions & State Management)
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
+        backgroundColor: colorScheme.surface,
         elevation: 8,
         indicatorColor: colorScheme.secondaryContainer,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -81,26 +78,51 @@ class AppTheme {
 
       // App Bar
       appBarTheme: AppBarTheme(
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
         elevation: 0,
         centerTitle: false,
       ),
 
       // Dialogs & Cards
-      cardTheme: const CardThemeData(
-        elevation: 1,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-        ),
+      cardTheme: CardThemeData(
+        color: colorScheme.surfaceContainer,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         clipBehavior: Clip.antiAlias,
       ),
-      dialogTheme: const DialogThemeData(
-        shape: RoundedRectangleBorder(
+      dialogTheme: DialogThemeData(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(28)),
         ),
         elevation: 3,
+        backgroundColor: colorScheme.surfaceContainer,
       ),
     );
+  }
+
+  static ThemeData lightTheme([Color? seedColor]) {
+    final color = seedColor ?? AppColorSchemes.seedColors[0];
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: color,
+      brightness: Brightness.light,
+    );
+    final baseTextTheme = GoogleFonts.cairoTextTheme();
+
+    return _baseTheme(colorScheme, baseTextTheme);
+  }
+
+  static ThemeData darkTheme([Color? seedColor]) {
+    final color = seedColor ?? AppColorSchemes.seedColors[0];
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: color,
+      brightness: Brightness.dark,
+    );
+    final baseTextTheme = GoogleFonts.cairoTextTheme().apply(
+      bodyColor: colorScheme.onSurface,
+      displayColor: colorScheme.onSurface,
+    );
+
+    return _baseTheme(colorScheme, baseTextTheme);
   }
 }

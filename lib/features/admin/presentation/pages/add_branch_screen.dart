@@ -271,9 +271,10 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     final l10n = AppLocalizations.of(context)!;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final radius = double.tryParse(_radiusController.text) ?? 100.0;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
@@ -285,24 +286,24 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 // Branch Name Field
                 TextFormField(
                   controller: _nameController,
-                  style: const TextStyle(fontSize: 16, color: Colors.black),
+                  style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
                   decoration: InputDecoration(
                     labelText: l10n.branchName,
-                    labelStyle: TextStyle(color: Colors.grey.shade600),
-                    prefixIcon: const Icon(
+                    labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                    prefixIcon: Icon(
                       Icons.storefront_outlined,
-                      color: Colors.black54,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFE8EAF6),
-                    border: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black87),
+                    fillColor: colorScheme.surfaceContainerHighest,
+                    border: UnderlineInputBorder(
+                      borderSide: BorderSide(color: colorScheme.outline),
                     ),
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black87),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: colorScheme.outline),
                     ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF0D47A1)),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: colorScheme.primary),
                     ),
                   ),
                   validator: (value) {
@@ -319,24 +320,24 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                   controller: _searchController,
                   textInputAction: TextInputAction.search,
                   onFieldSubmitted: _searchLocation,
-                  style: const TextStyle(fontSize: 16, color: Colors.black),
+                  style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
                   decoration: InputDecoration(
                     labelText: l10n.searchCityOrRegion,
-                    labelStyle: TextStyle(color: Colors.grey.shade600),
-                    prefixIcon: const Icon(
+                    labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                    prefixIcon: Icon(
                       Icons.search_outlined,
-                      color: Colors.black54,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFE8EAF6),
-                    border: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black87),
+                    fillColor: colorScheme.surfaceContainerHighest,
+                    border: UnderlineInputBorder(
+                      borderSide: BorderSide(color: colorScheme.outline),
                     ),
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black87),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: colorScheme.outline),
                     ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF0D47A1)),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: colorScheme.primary),
                     ),
                     suffixIcon: _isSearching
                         ? const Padding(
@@ -349,9 +350,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                           )
                         : (_searchController.text.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(
+                                  icon: Icon(
                                     Icons.clear,
-                                    color: Colors.grey,
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
                                   onPressed: () {
                                     _searchController.clear();
@@ -376,8 +377,8 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                       style: const TextStyle(fontSize: 14),
                     ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFD3E3FD),
-                      foregroundColor: const Color(0xFF041E49),
+                      backgroundColor: colorScheme.primaryContainer,
+                      foregroundColor: colorScheme.onPrimaryContainer,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 12,
@@ -395,22 +396,20 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                   isArabic
                       ? 'نطاق السياج الجغرافي: ${radius.toInt()} متر'
                       : 'Geofence Radius: ${radius.toInt()}m',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 16),
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: const Color(0xFF0D47A1),
-                    inactiveTrackColor: const Color(0xFFD3E3FD),
+                    activeTrackColor: colorScheme.primary,
+                    inactiveTrackColor: colorScheme.primaryContainer,
                     trackHeight: 4,
-                    thumbColor: const Color(0xFF0D47A1),
-                    overlayColor: const Color(
-                      0xFF0D47A1,
-                    ).withValues(alpha: 0.1),
+                    thumbColor: colorScheme.primary,
+                    overlayColor: colorScheme.primary.withValues(alpha: 0.1),
                     overlayShape: const RoundSliderOverlayShape(
                       overlayRadius: 20,
                     ),
@@ -436,14 +435,14 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                     Text(
                       '50m',
                       style: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: colorScheme.onSurfaceVariant,
                         fontSize: 13,
                       ),
                     ),
                     Text(
                       '500m',
                       style: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: colorScheme.onSurfaceVariant,
                         fontSize: 13,
                       ),
                     ),
@@ -454,9 +453,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 // Select Location on Map Header
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.map_outlined,
-                      color: Color(0xFF0D47A1),
+                      color: colorScheme.primary,
                       size: 24,
                     ),
                     const SizedBox(width: 8),
@@ -464,10 +463,10 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                       isArabic
                           ? 'اختر الموقع على الخريطة'
                           : 'Select Location on Map',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.normal,
-                        color: Colors.black,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -479,11 +478,12 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                   height: 280,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.grey.shade200, // placeholder background
+                    color: colorScheme
+                        .surfaceContainerHighest, // placeholder background
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: _buildMapWidget(radius),
+                    child: _buildMapWidget(radius, colorScheme),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -496,11 +496,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                     onPressed: _isLoading ? null : _saveBranch,
                     icon: const Icon(Icons.save_outlined),
                     label: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: colorScheme.onPrimary,
                               strokeWidth: 2,
                             ),
                           )
@@ -514,8 +514,8 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                             ),
                           ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D47A1),
-                      foregroundColor: Colors.white,
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(27),
                       ),
@@ -531,7 +531,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     );
   }
 
-  Widget _buildMapWidget(double radius) {
+  Widget _buildMapWidget(double radius, ColorScheme colorScheme) {
     if (!_isMapReady && _selectedActionPoint == null) {
       // Return the map directly, but it might take a moment to initialize
     }
@@ -576,8 +576,8 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 circleId: const CircleId('geofence_area'),
                 center: _selectedActionPoint!,
                 radius: radius,
-                fillColor: const Color(0xFF0D47A1).withValues(alpha: 0.2),
-                strokeColor: const Color(0xFF0D47A1).withValues(alpha: 0.5),
+                fillColor: colorScheme.primary.withValues(alpha: 0.2),
+                strokeColor: colorScheme.primary.withValues(alpha: 0.5),
                 strokeWidth: 2,
               ),
             }

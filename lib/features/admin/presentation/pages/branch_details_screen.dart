@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
 import '../../data/models/branch_model.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:go_router/go_router.dart';
@@ -88,6 +89,7 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
 
   Future<void> _deleteBranch() async {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -101,11 +103,13 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
               child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.error,
+              ),
               onPressed: () => Navigator.pop(context, true),
               child: Text(
                 l10n.deleteBranch,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: theme.colorScheme.onError),
               ),
             ),
           ],
@@ -171,6 +175,7 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
     // We encode the attendance type and branch name to match the existing requirements
@@ -180,18 +185,16 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.branchDetails),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (GoRouter.of(context).canPop()) {
-              context.pop();
-            } else {
-              context.go('/');
-            }
-          },
-        ),
+      appBar: AdminHeader(
+        subtitle: l10n.branchDetails,
+        showBackButton: true,
+        onBackPressed: () {
+          if (GoRouter.of(context).canPop()) {
+            context.pop();
+          } else {
+            context.go('/');
+          }
+        },
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -202,66 +205,73 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
                 children: [
                   Screenshot(
                     controller: _screenshotController,
-                    child: Container(
-                      padding: const EdgeInsets.all(32),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Image.asset('assets/images/logo.png', height: 40),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'تسهيل',
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1565C0),
+                    child: Card(
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'تسهيل',
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.primary,
+                                  ),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              _branch.branchName,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: theme.colorScheme.onSurface,
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            _branch.branchName,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.black87,
                             ),
-                          ),
-                          const SizedBox(height: 32),
-                          QrImageView(
-                            data: qrData,
-                            version: QrVersions.auto,
-                            size: 250.0,
-                            backgroundColor: Colors.white,
-                          ),
-                          const SizedBox(height: 32),
-                          const Text(
-                            'Scan to Check-In',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 2,
+                            const SizedBox(height: 32),
+                            // QR code must remain high contrast (black on white)
+                            // for reliable scanning regardless of the app theme.
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: QrImageView(
+                                data: qrData,
+                                version: QrVersions.auto,
+                                size: 250.0,
+                                // Using dataModuleStyle to ensure high contrast even in dark mode
+                                dataModuleStyle: const QrDataModuleStyle(
+                                  dataModuleShape: QrDataModuleShape.square,
+                                  color: Colors.black,
+                                ),
+                                eyeStyle: const QrEyeStyle(
+                                  eyeShape: QrEyeShape.square,
+                                  color: Colors.black,
+                                ),
+                                backgroundColor: Colors.white,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 32),
+                            Text(
+                              'Scan to Check-In',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: theme.colorScheme.outline,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -303,13 +313,16 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: _deleteBranch,
-                          icon: const Icon(Icons.delete, color: Colors.red),
+                          icon: Icon(
+                            Icons.delete,
+                            color: theme.colorScheme.error,
+                          ),
                           label: Text(
                             l10n.deleteBranch,
-                            style: const TextStyle(color: Colors.red),
+                            style: TextStyle(color: theme.colorScheme.error),
                           ),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.red),
+                            side: BorderSide(color: theme.colorScheme.error),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),

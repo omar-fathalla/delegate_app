@@ -424,4 +424,57 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get account => 'الحساب';
+
+  @override
+  String get privacyPolicyDesc =>
+      'توضح سياسة الخصوصية هذه كيف نقوم بجمع، استخدام، والإفصاح عن معلوماتك الشخصية عند استخدامك لخدمات المندوب. نحن ملتزمون بحماية خصوصيتك وضمان التعامل مع بياناتك بشكل آمن.';
+
+  @override
+  String get locationData => 'بيانات الموقع';
+
+  @override
+  String get locationDataDesc =>
+      'يجمع تطبيقنا بيانات الموقع لتمكين تتبع الطلبات في الوقت الفعلي ومطابقة المناديب مع الطلبات القريبة حتى عندما يكون التطبيق مغلقاً أو غير مستخدم. هذه البيانات أساسية للوظيفة الأساسية لخدمتنا.';
+
+  @override
+  String get cameraAccess => 'الوصول للكاميرا';
+
+  @override
+  String get cameraAccessDesc =>
+      'نطلب الوصول إلى الكاميرا للسماح لك بالتقاط صور الفواتير، الطرود أو إثباتات التوصيل. يتم التقاط الصور فقط عندما تستخدم ميزة الكاميرا بوضوح داخل التطبيق.';
+
+  @override
+  String get dataSecurity => 'أمن البيانات';
+
+  @override
+  String get dataSecurityDesc =>
+      'ننطبق معايير الأمان المعتمدة في الصناعة لحماية بياناتك. نحن لا نبيع بياناتك الشخصية. تتم مشاركة معلوماتك فقط مع الشركاء المعتمدين لمعالجة الخدمات.';
+
+  @override
+  String get contactUs => 'تواصل معنا';
+
+  @override
+  String get website => 'الموقع الإلكتروني';
+
+  @override
+  String get emailAddress => 'البريد الإلكتروني';
+
+  @override
+  String get egyptOffice => 'مكتب مصر';
+
+  @override
+  String get uaeOffice => 'مكتب الإمارات';
+
+  @override
+  String get swPointWebsite => 'https://sw-point.com/';
+
+  @override
+  String get swPointEmail => 'support@sw-point.com';
+
+  @override
+  String get swPointEgyptPhone => 'Alexandria, Egypt +20 121 185 7725';
+
+  @override
+  String get swPointUaePhone =>
+      'United Arab Emirates WhatsApp: +971 55 871 5615';
 }

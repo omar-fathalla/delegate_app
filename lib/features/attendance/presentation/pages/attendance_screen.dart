@@ -90,25 +90,28 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
             setState(() => isCheckedIn = true);
+            final theme = Theme.of(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(l10n.checkedInSuccessfully),
-                backgroundColor: Colors.green,
+                backgroundColor: theme.colorScheme.tertiary,
               ),
             );
           } else if (state is AttendanceCheckedOut) {
             setState(() => isCheckedIn = false);
+            final theme = Theme.of(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(l10n.checkedOutSuccessfully),
-                backgroundColor: Colors.orange,
+                backgroundColor: theme.colorScheme.secondary,
               ),
             );
           } else if (state is AttendanceError) {
+            final theme = Theme.of(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.red,
+                backgroundColor: theme.colorScheme.error,
               ),
             );
           } else if (state is AttendanceHistoryLoaded) {
@@ -122,10 +125,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               isCheckedIn = hasActiveCheckIn;
             });
           } else if (state is AttendanceSyncSuccess) {
+            final theme = Theme.of(context);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('تمت مزامنة البيانات المحفوظة بنجاح'),
-                backgroundColor: Colors.green,
+              SnackBar(
+                content: const Text('تمت مزامنة البيانات المحفوظة بنجاح'),
+                backgroundColor: theme.colorScheme.tertiary,
               ),
             );
             Future.delayed(const Duration(seconds: 1), () {
@@ -158,12 +162,21 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   ? null
                   : () => _showQRScanner(context),
               backgroundColor: isCheckedIn
-                  ? Colors.orange
-                  : const Color(0xFF0D47A1),
-              icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+                  ? Theme.of(context).colorScheme.errorContainer
+                  : Theme.of(context).colorScheme.primaryContainer,
+              icon: Icon(
+                Icons.qr_code_scanner,
+                color: isCheckedIn
+                    ? Theme.of(context).colorScheme.onErrorContainer
+                    : Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
               label: Text(
                 isCheckedIn ? l10n.scanToCheckOut : l10n.scanToCheckIn,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: isCheckedIn
+                      ? Theme.of(context).colorScheme.onErrorContainer
+                      : Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
               ),
             ),
             floatingActionButtonLocation:
@@ -177,106 +190,100 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Widget _buildHeader(BuildContext context) {
     final locale = Localizations.localeOf(context).languageCode;
     final l10n = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF42A5F5),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                tooltip: 'Previous Month',
-                icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                onPressed: () {
-                  setState(() {
-                    _selectedMonth = DateTime(
-                      _selectedMonth.year,
-                      _selectedMonth.month - 1,
-                    );
-                    // Recompute when month changes
-                    _recomputeFilteredHistory();
-                  });
-                },
-              ),
-              Text(
-                DateFormat('MMMM yyyy', locale).format(_selectedMonth),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+    return Card(
+      elevation: 0,
+      color: colorScheme.primaryContainer,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                FilledButton.tonal(
+                  style: FilledButton.styleFrom(
+                    shape: const CircleBorder(),
+                    padding: const EdgeInsets.all(14),
+                    backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
+                    foregroundColor: colorScheme.onPrimaryContainer,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = DateTime(
+                        _selectedMonth.year,
+                        _selectedMonth.month - 1,
+                      );
+                      _recomputeFilteredHistory();
+                    });
+                  },
+                  child: const Icon(Icons.chevron_left_rounded, size: 28),
                 ),
-              ),
-              IconButton(
-                tooltip: 'Next Month',
-                icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
-                onPressed: () {
-                  setState(() {
-                    _selectedMonth = DateTime(
-                      _selectedMonth.year,
-                      _selectedMonth.month + 1,
-                    );
-                    // Recompute when month changes
-                    _recomputeFilteredHistory();
-                  });
-                },
-              ),
+                Text(
+                  DateFormat('MMMM yyyy', locale).format(_selectedMonth),
+                  style: TextStyle(
+                    color: colorScheme.onPrimaryContainer,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                FilledButton.tonal(
+                  style: FilledButton.styleFrom(
+                    shape: const CircleBorder(),
+                    padding: const EdgeInsets.all(14),
+                    backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
+                    foregroundColor: colorScheme.onPrimaryContainer,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = DateTime(
+                        _selectedMonth.year,
+                        _selectedMonth.month + 1,
+                      );
+                      _recomputeFilteredHistory();
+                    });
+                  },
+                  child: const Icon(Icons.chevron_right_rounded, size: 28),
+                ),
+              ],
+            ),
+            if (_isOffline) ...[
+              const SizedBox(height: 20),
+              _buildConnectivityBadge(context, l10n),
             ],
-          ),
-          const SizedBox(height: 8),
-          // --- Performance: Use cached _isOffline instead of StreamBuilder ---
-          _buildConnectivityBadge(l10n),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildConnectivityBadge(AppLocalizations l10n) {
-    if (_isOffline) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.orange,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off, color: Colors.white, size: 16),
-            const SizedBox(width: 8),
-            Text(
-              l10n.networkStatusOffline,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+  Widget _buildConnectivityBadge(BuildContext context, AppLocalizations l10n) {
+    final colorScheme = Theme.of(context).colorScheme;
+    if (!_isOffline) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.green,
-        borderRadius: BorderRadius.circular(12),
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.cloud_done_outlined, color: Colors.white, size: 16),
+          Icon(
+            Icons.cloud_off_rounded,
+            color: colorScheme.onErrorContainer,
+            size: 18,
+          ),
           const SizedBox(width: 8),
           Text(
-            l10n.networkStatusOnline,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
+            l10n.networkStatusOffline,
+            style: TextStyle(
+              color: colorScheme.onErrorContainer,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -294,15 +301,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         state is AttendanceSyncInProgress) {
       return _buildShimmerSkeleton();
     } else if (state is AttendanceError) {
+      final colorScheme = Theme.of(context).colorScheme;
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            Icon(Icons.error_outline, size: 64, color: colorScheme.error),
             const SizedBox(height: 16),
             Text(
               state.message,
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -320,6 +328,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     } else if (state is AttendanceHistoryLoaded) {
       // --- Performance: Use pre-computed cached data ---
       if (_filteredHistory.isEmpty) {
+        final colorScheme = Theme.of(context).colorScheme;
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -327,22 +336,22 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D47A1).withValues(alpha: 0.1),
+                  color: colorScheme.surfaceContainerHighest,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.verified_user_outlined,
                   size: 64,
-                  color: Color(0xFF0D47A1),
+                  color: colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 24),
               Text(
                 l10n.noHistoryAvailable,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0D47A1),
+                  color: colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 16),
@@ -352,24 +361,24 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: colorScheme.surfaceContainer,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.blue.shade100),
+                  border: Border.all(color: colorScheme.outlineVariant),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.qr_code_scanner,
-                      color: Color(0xFF0D47A1),
+                      color: colorScheme.primary,
                       size: 24,
                     ),
                     const SizedBox(width: 12),
                     Flexible(
                       child: Text(
                         l10n.scanQrInstruction,
-                        style: const TextStyle(
-                          color: Color(0xFF0D47A1),
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -403,6 +412,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               locale,
             ).format(dayDate);
 
+            final colorScheme = Theme.of(context).colorScheme;
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -413,23 +424,23 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0D47A1).withValues(alpha: 0.1),
+                          color: colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.calendar_today_rounded,
                           size: 18,
-                          color: Color(0xFF0D47A1),
+                          color: colorScheme.onPrimaryContainer,
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           fullDateStr,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0D47A1),
+                            color: colorScheme.primary,
                           ),
                         ),
                       ),
@@ -439,14 +450,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.blue[50],
+                          color: colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '${records.length}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF0D47A1),
+                            color: colorScheme.onPrimaryContainer,
                           ),
                         ),
                       ),
@@ -475,135 +486,128 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     durationStr = l10n.inProgress;
                   }
 
-                  return Container(
+                  return Card(
                     margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withValues(alpha: 0.1),
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on_rounded,
-                                    size: 14,
-                                    color: Colors.grey[500],
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    branchName,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[500],
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.location_on_rounded,
+                                      size: 14,
+                                      color: colorScheme.outline,
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.login,
-                                    size: 16,
-                                    color: Colors.green,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    l10n.inLabel(inTime),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      branchName,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: colorScheme.outline,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.logout,
-                                    size: 16,
-                                    color: Colors.orange,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    l10n.outLabel(outTime),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.login,
+                                      size: 16,
+                                      color: colorScheme.tertiary,
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.timer_outlined,
-                                    size: 14,
-                                    color: item.checkOutTime != null
-                                        ? const Color(0xFF0D47A1)
-                                        : Colors.grey[400],
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    durationStr,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      l10n.inLabel(inTime),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.logout,
+                                      size: 16,
+                                      color: colorScheme.error,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      l10n.outLabel(outTime),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.timer_outlined,
+                                      size: 14,
                                       color: item.checkOutTime != null
-                                          ? const Color(0xFF0D47A1)
-                                          : Colors.grey[400],
+                                          ? colorScheme.primary
+                                          : colorScheme.outlineVariant,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (!item.isSynced)
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(end: 8.0),
-                            child: Tooltip(
-                              message: l10n.pendingSync,
-                              child: const Icon(
-                                Icons.cloud_off,
-                                color: Colors.orange,
-                                size: 20,
-                              ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      durationStr,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: item.checkOutTime != null
+                                            ? colorScheme.primary
+                                            : colorScheme.outlineVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                        if (item.checkOutTime == null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green[50],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              l10n.active,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.green,
-                                fontWeight: FontWeight.bold,
+                          if (!item.isSynced)
+                            Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                end: 8.0,
+                              ),
+                              child: Tooltip(
+                                message: l10n.pendingSync,
+                                child: Icon(
+                                  Icons.cloud_off,
+                                  color: colorScheme.error,
+                                  size: 20,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                          if (item.checkOutTime == null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.tertiaryContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                l10n.active,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: colorScheme.onTertiaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   );
                 }),
@@ -619,10 +623,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   void _showQRScanner(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
     final attendanceBloc = BlocProvider.of<AttendanceBloc>(context);
     final parentContext = context;
     final action = isCheckedIn ? l10n.checkOut : l10n.checkIn;
-    final color = isCheckedIn ? Colors.orange : const Color(0xFF0D47A1);
+    final color = isCheckedIn ? colorScheme.secondary : colorScheme.primary;
     _isProcessing = false;
 
     final scannerController = MobileScannerController();
@@ -697,7 +702,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     ScaffoldMessenger.of(parentContext).showSnackBar(
                       SnackBar(
                         content: Text(l10n.invalidQRCode),
-                        backgroundColor: Colors.red,
+                        backgroundColor: colorScheme.error,
                       ),
                     );
                   }
@@ -718,8 +723,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.black.withValues(alpha: 0.7),
-                      Colors.transparent,
+                      colorScheme.scrim.withValues(alpha: 0.7),
+                      colorScheme.scrim.withValues(alpha: 0.0),
                     ],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
@@ -729,8 +734,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   children: [
                     Text(
                       l10n.scanForAction(action),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colorScheme.surface,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -745,9 +750,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               right: 0,
               child: Container(
                 padding: const EdgeInsets.all(30),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(30),
                     topRight: Radius.circular(30),
                   ),
@@ -769,7 +774,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 ).languageCode,
                               ).format(DateTime.now()),
                               style: TextStyle(
-                                color: Colors.grey[600],
+                                color: colorScheme.onSurfaceVariant,
                                 fontSize: 14,
                               ),
                             ),
@@ -780,8 +785,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                   parentContext,
                                 ).languageCode,
                               ).format(DateTime.now()),
-                              style: const TextStyle(
-                                color: Colors.black87,
+                              style: TextStyle(
+                                color: colorScheme.onSurface,
                                 fontSize: 32,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -805,7 +810,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     const SizedBox(height: 20),
                     Text(
                       l10n.pointCameraToQR(action),
-                      style: TextStyle(color: Colors.grey[500]),
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -815,10 +820,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               top: 40,
               left: 20,
               child: CircleAvatar(
-                backgroundColor: Colors.white.withValues(alpha: 0.3),
+                backgroundColor: colorScheme.surface.withValues(alpha: 0.3),
                 child: IconButton(
                   tooltip: 'Close Scanner',
-                  icon: const Icon(Icons.close, color: Colors.white),
+                  icon: Icon(Icons.close, color: colorScheme.surface),
                   onPressed: () {
                     scannerController.stop();
                     Navigator.pop(parentContext);
@@ -863,11 +868,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (!serviceEnabled) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
+          SnackBar(
+            content: const Text(
               'Location services are disabled. Please enable them.',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -880,9 +885,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (permission == LocationPermission.denied) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Location permissions are denied'),
-              backgroundColor: Colors.red,
+            SnackBar(
+              content: const Text('Location permissions are denied'),
+              backgroundColor: Theme.of(context).colorScheme.error,
             ),
           );
         }
@@ -893,11 +898,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (permission == LocationPermission.deniedForever) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
+          SnackBar(
+            content: const Text(
               'Location permissions are permanently denied, we cannot request permissions.',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -975,30 +980,22 @@ class _ShimmerCardState extends State<_ShimmerCard>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withValues(alpha: 0.1),
-                blurRadius: 5,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildShimmerBar(width: 120, height: 12),
-              const SizedBox(height: 12),
-              _buildShimmerBar(width: 180, height: 14),
-              const SizedBox(height: 8),
-              _buildShimmerBar(width: 160, height: 14),
-              const SizedBox(height: 8),
-              _buildShimmerBar(width: 100, height: 12),
-            ],
+        return Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildShimmerBar(width: 120, height: 12),
+                const SizedBox(height: 12),
+                _buildShimmerBar(width: 180, height: 14),
+                const SizedBox(height: 8),
+                _buildShimmerBar(width: 160, height: 14),
+                const SizedBox(height: 8),
+                _buildShimmerBar(width: 100, height: 12),
+              ],
+            ),
           ),
         );
       },
@@ -1006,6 +1003,10 @@ class _ShimmerCardState extends State<_ShimmerCard>
   }
 
   Widget _buildShimmerBar({required double width, required double height}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final baseColor = colorScheme.surfaceContainerHighest;
+    final highlightColor = colorScheme.surface;
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -1015,7 +1016,7 @@ class _ShimmerCardState extends State<_ShimmerCard>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(6),
             gradient: LinearGradient(
-              colors: [Colors.grey[300]!, Colors.grey[100]!, Colors.grey[300]!],
+              colors: [baseColor, highlightColor, baseColor],
               stops: [
                 (_controller.value - 0.3).clamp(0.0, 1.0),
                 _controller.value,

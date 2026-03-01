@@ -144,4 +144,103 @@ void main() {
     expect(result, const Left(tFailure));
     expect(mockAuthRepository.getDelegateByPhoneCallCount, 1);
   });
+
+  group('User provided test cases', () {
+    test('Admin login with exactly 01508899965 and 4816361Aa', () async {
+      final adminDelegate = Delegate(
+        uid: '1',
+        firstName: 'Test',
+        middleName: 'User',
+        lastName: 'Name',
+        fullName: 'Test User Name',
+        nationalityID: '4816361Aa',
+        motherName: 'Mother Name',
+        city: 'City',
+        phoneNumber: '01508899965',
+        gender: DelegateGender.male,
+        position: DelegatePosition.supervisor,
+        birthDate: DateTime(1990, 1, 1),
+        organizationUID: 'org1',
+        organizationName: 'Org Name',
+        companyUID: 'comp1',
+        companyName: 'Comp Name',
+        status: DelegateStatus.active,
+        delegatePublicId: 'DEL-123',
+        allReceiptCodes: const [],
+        createdAt: DateTime.now(),
+        createdBy: 'admin',
+        hasPendingUpdate: false,
+        isDeductedFromCompany: false,
+        isPrinted: false,
+        isProfileComplete: true,
+        numberOfDocuments: 0,
+        paymentAmount: 0,
+        version: 1,
+        documents: const [],
+      );
+
+      mockAuthRepository.getDelegateByPhoneStub = (_) async =>
+          Right(adminDelegate);
+
+      final result = await usecase(
+        const LoginParams(phoneNumber: '01508899965', password: '4816361Aa'),
+      );
+
+      expect(result.isRight(), isTrue);
+      result.fold(
+        (l) => fail('Should be right'),
+        (r) => expect(r.position, DelegatePosition.supervisor),
+      );
+    });
+
+    test('Delegate login with 01281769997 and 29712200201981', () async {
+      final promoterDelegate = Delegate(
+        uid: '1',
+        firstName: 'Test',
+        middleName: 'User',
+        lastName: 'Name',
+        fullName: 'Test User Name',
+        nationalityID: '29712200201981',
+        motherName: 'Mother Name',
+        city: 'City',
+        phoneNumber: '01281769997',
+        gender: DelegateGender.male,
+        position: DelegatePosition.promoter,
+        birthDate: DateTime(1990, 1, 1),
+        organizationUID: 'org1',
+        organizationName: 'Org Name',
+        companyUID: 'comp1',
+        companyName: 'Comp Name',
+        status: DelegateStatus.active,
+        delegatePublicId: 'DEL-123',
+        allReceiptCodes: const [],
+        createdAt: DateTime.now(),
+        createdBy: 'admin',
+        hasPendingUpdate: false,
+        isDeductedFromCompany: false,
+        isPrinted: false,
+        isProfileComplete: true,
+        numberOfDocuments: 0,
+        paymentAmount: 0,
+        version: 1,
+        documents: const [],
+      );
+
+      mockAuthRepository.getDelegateByPhoneStub = (_) async =>
+          Right(promoterDelegate);
+
+      final result = await usecase(
+        const LoginParams(
+          phoneNumber: '01281769997',
+          password: '29712200201981',
+        ),
+      );
+
+      expect(result.isRight(), isTrue);
+      result.fold(
+        (l) => fail('Should be right'),
+        (r) => expect(r.position, DelegatePosition.promoter),
+      );
+    });
+  });
 }
