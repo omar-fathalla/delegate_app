@@ -53,7 +53,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:564223619997:android:cf0fadb7ec4ebf13233574",
         "android_client_info": {
-          "package_name": "com.tashil.delegate"
+          "package_name": "com.tashil.app"
         }
       },
       "oauth_client": [
@@ -61,7 +61,7 @@
           "client_id": "564223619997-krqa8votsfdn1mnqfm90jegrhsdqjo4s.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.tashil.delegate",
+            "package_name": "com.tashil.app",
             "certificate_hash": "425213bfb15948a1cbfba42989605ebfb558a47e"
           }
         },
@@ -69,7 +69,7 @@
           "client_id": "564223619997-p1irtc21h29uc64csjbehlq40ltjn91e.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.tashil.delegate",
+            "package_name": "com.tashil.app",
             "certificate_hash": "28e05ef731d524f238623476bda658fdf69c545f"
           }
         },
