@@ -967,6 +967,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'United Arab Emirates WhatsApp: +971 55 871 5615'**
   String get swPointUaePhone;
+
+  /// Tooltip for previous month navigation
+  ///
+  /// In en, this message translates to:
+  /// **'Previous Month'**
+  String get previousMonth;
+
+  /// Tooltip for next month navigation
+  ///
+  /// In en, this message translates to:
+  /// **'Next Month'**
+  String get nextMonth;
+
+  /// Tooltip for close scanner button
+  ///
+  /// In en, this message translates to:
+  /// **'Close Scanner'**
+  String get closeScanner;
 }
 
 class _AppLocalizationsDelegate

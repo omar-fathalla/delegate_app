@@ -655,5 +655,17 @@
     "swPointUaePhone": "United Arab Emirates WhatsApp: +971 55 871 5615",
     "@swPointUaePhone": {
         "description": "SwitchPoint UAE phone value"
+    },
+    "previousMonth": "الشهر السابق",
+    "@previousMonth": {
+        "description": "Tooltip for previous month navigation"
+    },
+    "nextMonth": "الشهر التالي",
+    "@nextMonth": {
+        "description": "Tooltip for next month navigation"
+    },
+    "closeScanner": "إغلاق الماسح الضوئي",
+    "@closeScanner": {
+        "description": "Tooltip for close scanner button"
     }
 }

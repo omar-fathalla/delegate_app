@@ -477,4 +477,13 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get swPointUaePhone =>
       'United Arab Emirates WhatsApp: +971 55 871 5615';
+
+  @override
+  String get previousMonth => 'الشهر السابق';
+
+  @override
+  String get nextMonth => 'الشهر التالي';
+
+  @override
+  String get closeScanner => 'إغلاق الماسح الضوئي';
 }
