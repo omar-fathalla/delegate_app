@@ -247,12 +247,17 @@ class _LoginScreenState extends State<LoginScreen>
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // Phone field
-                                    TextFormField(
-                                      controller: _phoneController,
-                                      keyboardType: TextInputType.phone,
-                                      textDirection: TextDirection.ltr,
-                                      style: TextStyle(
+                                    AutofillGroup(
+                                      child: Column(
+                                        children: [
+                                          // Phone field
+                                          TextFormField(
+                                            controller: _phoneController,
+                                            keyboardType: TextInputType.phone,
+                                            textDirection: TextDirection.ltr,
+                                            textInputAction: TextInputAction.next,
+                                            autofillHints: const [AutofillHints.telephoneNumber],
+                                            style: TextStyle(
                                         fontSize: 16,
                                         color: colorScheme.onSurface,
                                       ),
@@ -266,17 +271,19 @@ class _LoginScreenState extends State<LoginScreen>
                                           return l10n.enterMobileNumber;
                                         }
                                         return null;
-                                      },
-                                    ),
+                                            },
+                                          ),
 
-                                    const SizedBox(height: 16),
+                                          const SizedBox(height: 16),
 
-                                    // Password field
-                                    TextFormField(
-                                      controller: _passwordController,
-                                      textDirection: TextDirection.ltr,
-                                      obscureText: _obscurePassword,
-                                      style: TextStyle(
+                                          // Password field
+                                          TextFormField(
+                                            controller: _passwordController,
+                                            textDirection: TextDirection.ltr,
+                                            obscureText: _obscurePassword,
+                                            textInputAction: TextInputAction.done,
+                                            autofillHints: const [AutofillHints.password],
+                                            style: TextStyle(
                                         fontSize: 16,
                                         color: colorScheme.onSurface,
                                       ),
@@ -305,40 +312,65 @@ class _LoginScreenState extends State<LoginScreen>
                                           return l10n.enterPassword;
                                         }
                                         return null;
-                                      },
+                                            },
+                                            onFieldSubmitted: (_) {
+                                              if (state is! AuthLoading && _formKey.currentState!.validate()) {
+                                                BlocProvider.of<AuthBloc>(context).add(
+                                                  LoginRequested(
+                                                    phoneNumber: _phoneController.text,
+                                                    password: _passwordController.text,
+                                                    rememberMe: _rememberMe,
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
                                     ),
 
                                     const SizedBox(height: 16),
 
                                     // Remember Me
-                                    Row(
-                                      children: [
-                                        SizedBox(
-                                          height: 24,
-                                          width: 24,
-                                          child: Checkbox(
-                                            value: _rememberMe,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                _rememberMe = value ?? false;
-                                              });
-                                            },
-                                            activeColor: colorScheme.primary,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
+                                    InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _rememberMe = !_rememberMe;
+                                        });
+                                      },
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            SizedBox(
+                                              height: 24,
+                                              width: 24,
+                                              child: Checkbox(
+                                                value: _rememberMe,
+                                                onChanged: (value) {
+                                                  setState(() {
+                                                    _rememberMe = value ?? false;
+                                                  });
+                                                },
+                                                activeColor: colorScheme.primary,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                              ),
                                             ),
-                                          ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              l10n.rememberMe,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: colorScheme.onSurface,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          l10n.rememberMe,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: colorScheme.onSurface,
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
 
                                     const SizedBox(height: 32),
