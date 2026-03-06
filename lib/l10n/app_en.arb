@@ -36,6 +36,14 @@
     "@password": {
         "description": "Password field label"
     },
+    "showPassword": "Show Password",
+    "@showPassword": {
+        "description": "Show password tooltip"
+    },
+    "hidePassword": "Hide Password",
+    "@hidePassword": {
+        "description": "Hide password tooltip"
+    },
     "motherName": "Mother's Name",
     "@motherName": {
         "description": "Mother name field label"
