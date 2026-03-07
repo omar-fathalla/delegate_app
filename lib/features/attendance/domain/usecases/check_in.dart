@@ -45,12 +45,12 @@ class CheckInParams extends Equatable {
 
   @override
   List<Object?> get props => [
-        userId,
-        companyId,
-        organizationId,
-        deviceInfo,
-        lat,
-        long,
-        branchName,
-      ];
+    userId,
+    companyId,
+    organizationId,
+    deviceInfo,
+    lat,
+    long,
+    branchName,
+  ];
 }
