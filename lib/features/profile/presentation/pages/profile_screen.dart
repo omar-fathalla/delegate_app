@@ -794,6 +794,7 @@ class _FullScreenImageViewer extends StatelessWidget {
             color: colorScheme.onInverseSurface,
             size: 28,
           ),
+          tooltip: 'Close',
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [

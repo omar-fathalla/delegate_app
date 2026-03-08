@@ -62,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
           actions: [
             IconButton(
               icon: const Icon(Icons.logout),
+              tooltip: l10n.logout,
               onPressed: () {
                 // In real app, clear session
                 Navigator.of(context).pop();
