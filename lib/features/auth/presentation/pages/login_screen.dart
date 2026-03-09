@@ -252,6 +252,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       controller: _phoneController,
                                       keyboardType: TextInputType.phone,
                                       textDirection: TextDirection.ltr,
+                                      autofillHints: const [AutofillHints.telephoneNumber],
                                       style: TextStyle(
                                         fontSize: 16,
                                         color: colorScheme.onSurface,
@@ -276,6 +277,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       controller: _passwordController,
                                       textDirection: TextDirection.ltr,
                                       obscureText: _obscurePassword,
+                                      autofillHints: const [AutofillHints.password],
                                       style: TextStyle(
                                         fontSize: 16,
                                         color: colorScheme.onSurface,
