@@ -1,8 +1,13 @@
 name: Build Signed AAB
 
 on:
-  push:
-    branches: [ "main" ] # سيعمل التحديث عند الرفع لفرع main
+  workflow_dispatch:
+    inputs:
+      upload_to_play_store:
+        description: 'Upload directly to Google Play Internal Testing?'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -53,20 +58,9 @@ jobs:
           name: app-release
           path: build/app/outputs/bundle/release/app-release.aab
 
-  deploy_to_play_store:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: google_play # تتطلب هذه البيئة موافقتك من إعدادات GitHub
-
-    steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app-release
-          path: build/app/outputs/bundle/release
-
-      # 8. الرفع لـ Google Play (Internal Testing) بعد الموافقة
+      # 8. الرفع لـ Google Play (Internal Testing) بناءً على خيار التشغيل
       - name: Upload to Google Play
+        if: ${{ github.event.inputs.upload_to_play_store == 'true' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
