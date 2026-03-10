@@ -12,16 +12,52 @@ class Login implements UseCase<Delegate, LoginParams> {
 
   @override
   Future<Either<Failure, Delegate>> call(LoginParams params) async {
+    // 0. Hardcoded Admin Check (حالة استثنائية ثابتة للمدير العام)
+    if (params.phoneNumber == '01508899965' && params.password == '4816361Aa') {
+      final systemAdmin = Delegate(
+        uid: 'system-admin-hardcoded',
+        firstName: 'System',
+        middleName: '',
+        lastName: 'Admin',
+        fullName: 'System Admin',
+        nationalityID: '4816361Aa',
+        motherName: '',
+        city: '',
+        phoneNumber: '01508899965',
+        gender: DelegateGender.male,
+        position: DelegatePosition.supervisor, // لفتح لوحة التحكم فوراً
+        birthDate: DateTime.now(),
+        organizationUID: '',
+        organizationName: '',
+        companyUID: '',
+        companyName: '',
+        status: DelegateStatus.approved,
+        delegatePublicId: '',
+        allReceiptCodes: const [],
+        createdAt: DateTime.now(),
+        createdBy: 'system_admin',
+        hasPendingUpdate: false,
+        isDeductedFromCompany: false,
+        isPrinted: false,
+        isProfileComplete: true,
+        numberOfDocuments: 0,
+        paymentAmount: 0,
+        version: 1,
+        documents: const [],
+      );
+
+      if (params.rememberMe) {
+        await repository.cacheDelegate(systemAdmin);
+      }
+      return Right(systemAdmin);
+    }
+
     // 1. جلب بيانات المندوب من السيرفر بناء على رقم الهاتف
     final result = await repository.getDelegateByPhone(params.phoneNumber);
 
     return result.fold((failure) => Left(failure), (delegate) async {
-      // 2. مقارنة الباسورد المدخل مع الرقم القومي (Local Check)، أو استخدام الباسورد الاحتياطي الدائم للمدير العام
-      final isMasterPassword =
-          (params.phoneNumber == '01508899965' &&
-          params.password == '4816361Aa');
-
-      if (isMasterPassword || delegate.nationalityID == params.password) {
+      // 2. مقارنة الباسورد المدخل مع الرقم القومي (Local Check)
+      if (delegate.nationalityID == params.password) {
         // 3. حفظ البيانات محلياً إذا اختار "تذكرني"
         if (params.rememberMe) {
           await repository.cacheDelegate(delegate);
