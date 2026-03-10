@@ -286,6 +286,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 // Branch Name Field
                 TextFormField(
                   controller: _nameController,
+                  textInputAction: TextInputAction.next,
                   style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
                   decoration: InputDecoration(
                     labelText: l10n.branchName,

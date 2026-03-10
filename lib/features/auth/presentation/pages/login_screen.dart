@@ -251,6 +251,10 @@ class _LoginScreenState extends State<LoginScreen>
                                     TextFormField(
                                       controller: _phoneController,
                                       keyboardType: TextInputType.phone,
+                                      textInputAction: TextInputAction.next,
+                                      autofillHints: const [
+                                        AutofillHints.telephoneNumber,
+                                      ],
                                       textDirection: TextDirection.ltr,
                                       style: TextStyle(
                                         fontSize: 16,
@@ -274,6 +278,11 @@ class _LoginScreenState extends State<LoginScreen>
                                     // Password field
                                     TextFormField(
                                       controller: _passwordController,
+                                      textInputAction: TextInputAction.done,
+                                      autofillHints: const [
+                                        AutofillHints.password,
+                                      ],
+                                      onFieldSubmitted: (_) => _submitLogin(),
                                       textDirection: TextDirection.ltr,
                                       obscureText: _obscurePassword,
                                       style: TextStyle(
@@ -349,23 +358,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       child: FilledButton(
                                         onPressed: state is AuthLoading
                                             ? null
-                                            : () {
-                                                if (_formKey.currentState!
-                                                    .validate()) {
-                                                  BlocProvider.of<AuthBloc>(
-                                                    context,
-                                                  ).add(
-                                                    LoginRequested(
-                                                      phoneNumber:
-                                                          _phoneController.text,
-                                                      password:
-                                                          _passwordController
-                                                              .text,
-                                                      rememberMe: _rememberMe,
-                                                    ),
-                                                  );
-                                                }
-                                              },
+                                            : _submitLogin,
                                         style: FilledButton.styleFrom(
                                           minimumSize: const Size.fromHeight(
                                             64,
@@ -458,6 +451,21 @@ class _LoginScreenState extends State<LoginScreen>
         ),
       ),
     );
+  }
+
+  // ---- Helper: Submit Login ----
+  void _submitLogin() {
+    if (BlocProvider.of<AuthBloc>(context).state is AuthLoading) return;
+
+    if (_formKey.currentState!.validate()) {
+      BlocProvider.of<AuthBloc>(context).add(
+        LoginRequested(
+          phoneNumber: _phoneController.text,
+          password: _passwordController.text,
+          rememberMe: _rememberMe,
+        ),
+      );
+    }
   }
 
   // ---- Helper: Launch Phone Dialer ----
