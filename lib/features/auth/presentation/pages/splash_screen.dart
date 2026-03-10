@@ -65,79 +65,50 @@ class _SplashScreenState extends State<SplashScreen>
           }
         },
         child: Scaffold(
-          body: Container(
+          backgroundColor: colorScheme.surface,
+          body: SizedBox(
             width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  colorScheme.primary, // Top lighter premium blue
-                  colorScheme.primaryContainer, // Bottom deep blue
-                ],
-              ),
-            ),
             child: SafeArea(
               child: FadeTransition(
                 opacity: _fadeAnimation,
                 child: ScaleTransition(
                   scale: _scaleAnimation,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Spacer(flex: 4),
+                      const Spacer(),
                       Text(
-                        'TASHIL',
-                        style: TextStyle(
-                          fontSize: 42,
-                          fontWeight: FontWeight.w800,
-                          color: colorScheme.onPrimary,
-                          letterSpacing: 8.0,
-                        ),
+                        'Tashil',
+                        style:
+                            Theme.of(context).textTheme.displayLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.primary,
+                              letterSpacing: 1.5,
+                            ) ??
+                            TextStyle(
+                              fontSize: 56,
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.primary,
+                              letterSpacing: 1.5,
+                            ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       Text(
-                        'تسهيل المندوب',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          color: colorScheme.onPrimary.withValues(alpha: 0.9),
-                          letterSpacing: 1.0,
-                        ),
+                        'تسهيل',
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary.withValues(alpha: 0.8),
+                            ) ??
+                            TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary.withValues(alpha: 0.8),
+                            ),
                       ),
-                      const Spacer(flex: 2),
-                      SizedBox(
-                        width: 44,
-                        height: 44,
-                        child: CircularProgressIndicator(
-                          color: colorScheme.onPrimary,
-                          backgroundColor: colorScheme.onPrimary.withValues(
-                            alpha: 0.2,
-                          ),
-                          strokeWidth: 2.5,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'جارِ التحميل...',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: colorScheme.onPrimary.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      const Spacer(flex: 4),
-                      Text(
-                        '•\nPREMIUM LOGISTICS SOLUTION',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.onPrimary.withValues(alpha: 0.4),
-                          letterSpacing: 2.0,
-                          height: 1.8,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
+                      const Spacer(),
+                      CircularProgressIndicator(color: colorScheme.primary),
+                      const SizedBox(height: 48),
                     ],
                   ),
                 ),
