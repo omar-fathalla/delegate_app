@@ -19,8 +19,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool isCheckedIn = false;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -80,24 +78,36 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
             } else if (state is AttendanceCheckedIn) {
-              setState(() => isCheckedIn = true);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(l10n.checkedInSuccessfully),
                   backgroundColor: theme.colorScheme.tertiary,
                 ),
               );
+              context.read<AttendanceBloc>().add(
+                HistoryRequested(userId: widget.delegate.uid),
+              );
             } else if (state is AttendanceCheckedOut) {
-              setState(() => isCheckedIn = false);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(l10n.checkedOutSuccessfully),
                   backgroundColor: theme.colorScheme.secondary,
                 ),
               );
+              context.read<AttendanceBloc>().add(
+                HistoryRequested(userId: widget.delegate.uid),
+              );
             }
           },
           builder: (context, state) {
+            bool isCheckedIn = false;
+            String? activeAttendanceId;
+
+            if (state is AttendanceHistoryLoaded) {
+              isCheckedIn = state.activeAttendanceId != null;
+              activeAttendanceId = state.activeAttendanceId;
+            }
+
             return Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
@@ -168,14 +178,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             if (position == null || !context.mounted) return;
 
                             if (isCheckedIn) {
-                              final activeId = context
-                                  .read<AttendanceBloc>()
-                                  .currentAttendanceId;
-                              if (activeId == null) return;
+                              if (activeAttendanceId == null) return;
 
                               context.read<AttendanceBloc>().add(
                                 CheckOutRequested(
-                                  attendanceId: activeId,
+                                  attendanceId: activeAttendanceId,
                                   userId: widget.delegate.uid,
                                   lat: position.latitude,
                                   long: position.longitude,

@@ -29,32 +29,39 @@ class AttendanceCheckedOut extends AttendanceState {
   List<Object> get props => [attendance];
 }
 
+enum SyncStatus { initial, inProgress, success, failure }
+
 class AttendanceHistoryLoaded extends AttendanceState {
   final List<Attendance> history;
+  final String? activeAttendanceId;
+  final SyncStatus syncStatus;
 
-  const AttendanceHistoryLoaded({required this.history});
+  const AttendanceHistoryLoaded({
+    required this.history,
+    this.activeAttendanceId,
+    this.syncStatus = SyncStatus.initial,
+  });
+
+  AttendanceHistoryLoaded copyWith({
+    List<Attendance>? history,
+    String? activeAttendanceId,
+    SyncStatus? syncStatus,
+  }) {
+    return AttendanceHistoryLoaded(
+      history: history ?? this.history,
+      activeAttendanceId: activeAttendanceId ?? this.activeAttendanceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+    );
+  }
 
   @override
-  List<Object> get props => [history];
+  List<Object?> get props => [history, activeAttendanceId, syncStatus];
 }
 
 class AttendanceError extends AttendanceState {
   final String message;
 
   const AttendanceError({required this.message});
-
-  @override
-  List<Object> get props => [message];
-}
-
-class AttendanceSyncInProgress extends AttendanceState {}
-
-class AttendanceSyncSuccess extends AttendanceState {}
-
-class AttendanceSyncFailed extends AttendanceState {
-  final String message;
-
-  const AttendanceSyncFailed({required this.message});
 
   @override
   List<Object> get props => [message];

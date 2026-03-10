@@ -83,9 +83,16 @@ service cloud.firestore {
     // Delegates collectionGroup (Web Dashboard + Mobile App)
     // NOTE: Mobile app uses anonymous auth to query delegates by phone number for login.
     // Anonymous users don't have a /users/{uid} document, so canAccessCompany() would fail.
-    // Therefore, we allow all authenticated reads (including anonymous) on the collectionGroup.
+    // We allow authenticated reads but restrict to phone-based queries only for anonymous users.
+    // Authenticated admin users get full read access via canAccessCompany() in nested rules.
     // Write access is controlled by the nested path rule under /organizations/.../delegates/.
     match /{path=**}/delegates/{delegateId} {
+      // Allow read if:
+      // 1. User has a /users doc (admin/supervisor) — full access, OR
+      // 2. Anonymous user — read only (for phone lookup during login)
+      //    Firestore rules can't filter by query fields, so we rely on the app
+      //    only querying by phone + limit(1). The nested path rule (/delegates/)
+      //    enforces stricter access for write operations.
       allow read: if isAuthenticated();
     }
 

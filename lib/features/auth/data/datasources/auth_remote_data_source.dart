@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/config/app_config.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -43,17 +44,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       final normalizedPhone = _normalizePhone(phoneNumber);
 
-      // ── Hardcoded Admin Login ──────────────────────────────────────
-      // Admin enters with this fixed phone number and password (4816361Aa).
-      // This bypasses all Firestore queries — no permissions needed.
-      if (normalizedPhone == '01508899965') {
+      // ── Admin Login via Environment Config ─────────────────────────
+      // Admin credentials are passed via --dart-define at build time.
+      // No sensitive data is stored in the source code.
+      if (AppConfig.isAdminConfigured &&
+          normalizedPhone == AppConfig.adminPhone) {
         return DelegateModel(
           uid: 'admin-mobile-login',
           firstName: 'Admin',
           middleName: '',
           lastName: '',
           fullName: 'Admin',
-          nationalityID: '4816361Aa', // Password for admin login
+          nationalityID: AppConfig.adminPassword, // Password from env config
           motherName: '',
           city: '',
           phoneNumber: normalizedPhone,
@@ -117,8 +119,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               debugPrint(
                 '--- DATA SOURCE: User matches Admin/Supervisor role ---',
               );
-              // Use the hardcoded password for admin login via mobile app
-              const adminPassword = '4816361Aa';
+              // Admin password loaded from environment config (--dart-define)
+              final adminPassword = AppConfig.adminPassword;
 
               // Map admin user to a supervisor DelegateModel for dashboard access
               return DelegateModel(

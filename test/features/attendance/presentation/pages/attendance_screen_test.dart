@@ -160,15 +160,15 @@ void main() {
 
     // Verify Previous Month Button
     final prevButtonFinder = find.widgetWithIcon(
-      IconButton,
-      Icons.arrow_back_ios,
+      FilledButton,
+      Icons.chevron_left_rounded,
     );
     expect(prevButtonFinder, findsOneWidget);
 
     // Verify Next Month Button
     final nextButtonFinder = find.widgetWithIcon(
-      IconButton,
-      Icons.arrow_forward_ios,
+      FilledButton,
+      Icons.chevron_right_rounded,
     );
     expect(nextButtonFinder, findsOneWidget);
   });

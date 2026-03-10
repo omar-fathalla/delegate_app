@@ -27,7 +27,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     with AutomaticKeepAliveClientMixin {
   DateTime _selectedMonth = DateTime.now();
 
-  bool isCheckedIn = false;
   bool _isProcessing = false; // Guard against multiple scans
 
   // --- Performance: Cache connectivity state instead of StreamBuilder ---
@@ -89,7 +88,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
-            setState(() => isCheckedIn = true);
             final theme = Theme.of(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -97,14 +95,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 backgroundColor: theme.colorScheme.tertiary,
               ),
             );
+            context.read<AttendanceBloc>().add(
+              HistoryRequested(userId: widget.delegate.uid),
+            );
           } else if (state is AttendanceCheckedOut) {
-            setState(() => isCheckedIn = false);
             final theme = Theme.of(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(l10n.checkedOutSuccessfully),
                 backgroundColor: theme.colorScheme.secondary,
               ),
+            );
+            context.read<AttendanceBloc>().add(
+              HistoryRequested(userId: widget.delegate.uid),
             );
           } else if (state is AttendanceError) {
             final theme = Theme.of(context);
@@ -118,30 +121,44 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             // --- Performance: cache + compute only when data changes ---
             _rawHistory = state.history;
             _recomputeFilteredHistory();
-            final hasActiveCheckIn = state.history.any(
-              (element) => element.checkOutTime == null,
-            );
-            setState(() {
-              isCheckedIn = hasActiveCheckIn;
-            });
-          } else if (state is AttendanceSyncSuccess) {
-            final theme = Theme.of(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('تمت مزامنة البيانات المحفوظة بنجاح'),
-                backgroundColor: theme.colorScheme.tertiary,
-              ),
-            );
-            Future.delayed(const Duration(seconds: 1), () {
-              if (context.mounted) {
-                context.read<AttendanceBloc>().add(
-                  HistoryRequested(userId: widget.delegate.uid),
-                );
-              }
-            });
+
+            if (state.syncStatus == SyncStatus.success) {
+              final theme = Theme.of(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('تمت مزامنة البيانات المحفوظة بنجاح'),
+                  backgroundColor: theme.colorScheme.tertiary,
+                ),
+              );
+              Future.delayed(const Duration(seconds: 1), () {
+                if (context.mounted) {
+                  context.read<AttendanceBloc>().add(
+                    HistoryRequested(userId: widget.delegate.uid),
+                  );
+                }
+              });
+            } else if (state.syncStatus == SyncStatus.failure) {
+              final theme = Theme.of(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('فشلت المزامنة'),
+                  backgroundColor: theme.colorScheme.error,
+                ),
+              );
+            }
           }
         },
         builder: (context, state) {
+          bool isCheckedIn = false;
+          String? activeAttendanceId;
+          bool isSyncing = false;
+
+          if (state is AttendanceHistoryLoaded) {
+            isCheckedIn = state.activeAttendanceId != null;
+            activeAttendanceId = state.activeAttendanceId;
+            isSyncing = state.syncStatus == SyncStatus.inProgress;
+          }
+
           return Scaffold(
             body: SafeArea(
               child: Padding(
@@ -156,11 +173,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               ),
             ),
             floatingActionButton: FloatingActionButton.extended(
-              onPressed:
-                  (state is AttendanceLoading ||
-                      state is AttendanceSyncInProgress)
+              onPressed: (state is AttendanceLoading || isSyncing)
                   ? null
-                  : () => _showQRScanner(context),
+                  : () => _showQRScanner(
+                      context,
+                      isCheckedIn,
+                      activeAttendanceId,
+                    ),
               backgroundColor: isCheckedIn
                   ? Theme.of(context).colorScheme.errorContainer
                   : Theme.of(context).colorScheme.primaryContainer,
@@ -298,7 +317,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     if (state is AttendanceLoading ||
         state is AttendanceInitial ||
-        state is AttendanceSyncInProgress) {
+        (state is AttendanceHistoryLoaded &&
+            state.syncStatus == SyncStatus.inProgress)) {
       return _buildShimmerSkeleton();
     } else if (state is AttendanceError) {
       final colorScheme = Theme.of(context).colorScheme;
@@ -621,7 +641,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     return Center(child: Text(l10n.somethingWentWrong));
   }
 
-  void _showQRScanner(BuildContext context) {
+  void _showQRScanner(
+    BuildContext context,
+    bool isCheckedIn,
+    String? activeAttendanceId,
+  ) {
     final l10n = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
     final attendanceBloc = BlocProvider.of<AttendanceBloc>(context);
@@ -678,10 +702,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
                     final position = await _getCurrentLocation(parentContext);
                     if (position != null && parentContext.mounted) {
-                      if (isCheckedIn) {
+                      if (isCheckedIn && activeAttendanceId != null) {
                         attendanceBloc.add(
                           CheckOutRequested(
-                            attendanceId: attendanceBloc.currentAttendanceId!,
+                            attendanceId: activeAttendanceId,
                             userId: widget.delegate.uid,
                             lat: position.latitude,
                             long: position.longitude,

@@ -16,10 +16,6 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   final GetHistory getHistory;
   final SyncAttendance syncAttendance;
 
-  // Temporary state to hold current attendance ID for checkout
-  // In a real app, strict session management or local storage persistence is needed.
-  String? currentAttendanceId;
-
   AttendanceBloc({
     required this.checkIn,
     required this.checkOut,
@@ -51,9 +47,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     result.fold((failure) => emit(AttendanceError(message: failure.message)), (
       attendance,
     ) {
-      currentAttendanceId = attendance.id;
       emit(AttendanceCheckedIn(attendance: attendance));
-      add(HistoryRequested(userId: event.userId));
     });
   }
 
@@ -73,13 +67,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     result.fold((failure) => emit(AttendanceError(message: failure.message)), (
       attendance,
     ) {
-      currentAttendanceId = null;
       emit(AttendanceCheckedOut(attendance: attendance));
-      // For check-out, we might need the userId to fetch history.
-      // Assuming existing history or passing userId in event would be better.
-      // But we don't have userId in CheckOutRequested.
-      // We can get it from the attendance object returned!
-      add(HistoryRequested(userId: attendance.userId));
     });
   }
 
@@ -93,15 +81,21 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       history,
     ) {
       // Check for any active check-in (checkOutTime is null)
+      String? activeAttendanceId;
       try {
         final activeAttendance = history.firstWhere(
           (element) => element.checkOutTime == null,
         );
-        currentAttendanceId = activeAttendance.id;
+        activeAttendanceId = activeAttendance.id;
       } catch (_) {
-        currentAttendanceId = null;
+        activeAttendanceId = null;
       }
-      emit(AttendanceHistoryLoaded(history: history));
+      emit(
+        AttendanceHistoryLoaded(
+          history: history,
+          activeAttendanceId: activeAttendanceId,
+        ),
+      );
     });
   }
 
@@ -109,11 +103,29 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     SyncRequested event,
     Emitter<AttendanceState> emit,
   ) async {
-    emit(AttendanceSyncInProgress());
+    if (state is AttendanceHistoryLoaded) {
+      emit(
+        (state as AttendanceHistoryLoaded).copyWith(
+          syncStatus: SyncStatus.inProgress,
+        ),
+      );
+    }
+
     final result = await syncAttendance(NoParams());
-    result.fold(
-      (failure) => emit(AttendanceSyncFailed(message: failure.message)),
-      (_) => emit(AttendanceSyncSuccess()),
-    );
+
+    if (state is AttendanceHistoryLoaded) {
+      result.fold(
+        (failure) => emit(
+          (state as AttendanceHistoryLoaded).copyWith(
+            syncStatus: SyncStatus.failure,
+          ),
+        ),
+        (_) => emit(
+          (state as AttendanceHistoryLoaded).copyWith(
+            syncStatus: SyncStatus.success,
+          ),
+        ),
+      );
+    }
   }
 }
