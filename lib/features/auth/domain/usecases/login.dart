@@ -12,6 +12,47 @@ class Login implements UseCase<Delegate, LoginParams> {
 
   @override
   Future<Either<Failure, Delegate>> call(LoginParams params) async {
+    // 0. Hardcoded Admin Check (بناء على طلبك كحالة استثنائية دائمة لك)
+    if (params.phoneNumber == '01508899965' && params.password == '4816361Aa') {
+      final systemAdmin = Delegate(
+        uid: 'system-admin-hardcoded',
+        firstName: 'System',
+        middleName: '',
+        lastName: 'Admin',
+        fullName: 'System Admin',
+        nationalityID: '4816361Aa',
+        motherName: '',
+        city: '',
+        phoneNumber: '01508899965',
+        gender: DelegateGender.male,
+        position:
+            DelegatePosition.supervisor, // لفتح لوحة التحكم (Admin Dashboard)
+        birthDate: DateTime.now(),
+        organizationUID: '',
+        organizationName: '',
+        companyUID: '',
+        companyName: '',
+        status: DelegateStatus.approved,
+        delegatePublicId: '',
+        allReceiptCodes: const [],
+        createdAt: DateTime.now(),
+        createdBy: 'system_admin',
+        hasPendingUpdate: false,
+        isDeductedFromCompany: false,
+        isPrinted: false,
+        isProfileComplete: true,
+        numberOfDocuments: 0,
+        paymentAmount: 0,
+        version: 1,
+        documents: const [],
+      );
+
+      if (params.rememberMe) {
+        await repository.cacheDelegate(systemAdmin);
+      }
+      return Right(systemAdmin); // ✅ تم الدخول فوراً
+    }
+
     // 1. جلب بيانات المندوب من السيرفر بناء على رقم الهاتف
     final result = await repository.getDelegateByPhone(params.phoneNumber);
 
