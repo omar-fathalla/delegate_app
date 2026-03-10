@@ -67,6 +67,7 @@ dependencies:
   connectivity_plus: ^7.0.0
   dynamic_color: ^1.8.1
   firebase_crashlytics: ^5.0.8
+  package_info_plus: ^9.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

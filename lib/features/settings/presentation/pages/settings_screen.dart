@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/config/theme/color_schemes.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends StatelessWidget {
   final Delegate delegate;
@@ -194,14 +195,24 @@ class SettingsScreen extends StatelessWidget {
 
                     const SizedBox(height: 48),
                     // Version Text
-                    Center(
-                      child: Text(
-                        l10n.version('2.4.0'),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontSize: 13,
-                        ),
-                      ),
+                    FutureBuilder<PackageInfo>(
+                      future: PackageInfo.fromPlatform(),
+                      builder: (context, snapshot) {
+                        final version = snapshot.hasData
+                            ? snapshot.data!.version
+                            : '...';
+                        return Center(
+                          child: Text(
+                            l10n.version(version),
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              fontSize: 13,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
                   ],
