@@ -406,6 +406,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noAccountContact => 'ليس لديك حساب؟ تواصل على الرقم التالي';
 
   @override
+  String get noAccountTitle => 'ليس لديك حساب؟';
+
+  @override
+  String get noAccountSubtitle => 'تواصل على الرقم التالي';
+
+  @override
   String get contactNumber => '01211857725';
 
   @override

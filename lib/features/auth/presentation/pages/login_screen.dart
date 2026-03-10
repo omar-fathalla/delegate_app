@@ -282,7 +282,8 @@ class _LoginScreenState extends State<LoginScreen>
                                       autofillHints: const [
                                         AutofillHints.password,
                                       ],
-                                      onFieldSubmitted: (_) => _submitLogin(),
+                                      onFieldSubmitted: (_) =>
+                                          _submitLogin(context),
                                       textDirection: TextDirection.ltr,
                                       obscureText: _obscurePassword,
                                       style: TextStyle(
@@ -358,7 +359,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       child: FilledButton(
                                         onPressed: state is AuthLoading
                                             ? null
-                                            : _submitLogin,
+                                            : () => _submitLogin(context),
                                         style: FilledButton.styleFrom(
                                           minimumSize: const Size.fromHeight(
                                             64,
@@ -414,27 +415,65 @@ class _LoginScreenState extends State<LoginScreen>
                               onTap: () {
                                 _launchPhoneDialer(l10n.contactNumber);
                               },
-                              child: Text.rich(
-                                TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: '${l10n.noAccountContact} ',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: colorScheme.onSurfaceVariant,
+                              child: Column(
+                                children: [
+                                  Text(
+                                    l10n.noAccountTitle,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    l10n.noAccountSubtitle,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primaryContainer
+                                          .withValues(alpha: 0.3),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: colorScheme.primary.withValues(
+                                          alpha: 0.3,
+                                        ),
                                       ),
                                     ),
-                                    TextSpan(
-                                      text: l10n.contactNumber,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: colorScheme.primary,
-                                      ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.support_agent_rounded,
+                                          color: colorScheme.primary,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          l10n.contactNumber,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 1.2,
+                                            color: colorScheme.primary,
+                                          ),
+                                          textDirection: TextDirection.ltr,
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                                textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -454,7 +493,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   // ---- Helper: Submit Login ----
-  void _submitLogin() {
+  void _submitLogin(BuildContext context) {
     if (BlocProvider.of<AuthBloc>(context).state is AuthLoading) return;
 
     if (_formKey.currentState!.validate()) {

@@ -563,6 +563,14 @@
     "@noAccountContact": {
         "description": "No account contact text on login screen"
     },
+    "noAccountTitle": "ليس لديك حساب؟",
+    "@noAccountTitle": {
+        "description": "No account title text on login screen"
+    },
+    "noAccountSubtitle": "تواصل على الرقم التالي",
+    "@noAccountSubtitle": {
+        "description": "No account subtitle text on login screen"
+    },
     "contactNumber": "01211857725",
     "@contactNumber": {
         "description": "Contact phone number"

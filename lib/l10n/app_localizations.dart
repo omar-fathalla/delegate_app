@@ -836,6 +836,18 @@ abstract class AppLocalizations {
   /// **'Don\'t have an account? Contact the following number'**
   String get noAccountContact;
 
+  /// No account title text on login screen
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t have an account?'**
+  String get noAccountTitle;
+
+  /// No account subtitle text on login screen
+  ///
+  /// In en, this message translates to:
+  /// **'Contact the following number'**
+  String get noAccountSubtitle;
+
   /// Contact phone number
   ///
   /// In en, this message translates to:

@@ -408,6 +408,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Don\'t have an account? Contact the following number';
 
   @override
+  String get noAccountTitle => 'Don\'t have an account?';
+
+  @override
+  String get noAccountSubtitle => 'Contact the following number';
+
+  @override
   String get contactNumber => '01211857725';
 
   @override
