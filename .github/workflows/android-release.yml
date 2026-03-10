@@ -9,12 +9,34 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      # 0. تحديث رقم البناء (Build Number) في pubspec.yaml تلقائياً
+      - name: Auto-increment Build Number
+        run: |
+          CURRENT_VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //')
+          VERSION_NAME=$(echo "$CURRENT_VERSION" | cut -d'+' -f1)
+          CURRENT_BUILD=$(echo "$CURRENT_VERSION" | cut -d'+' -f2)
+          NEW_BUILD=$((CURRENT_BUILD + 1))
+          NEW_VERSION="${VERSION_NAME}+${NEW_BUILD}"
+          
+          sed -i "s/^version: .*/version: ${NEW_VERSION}/" pubspec.yaml
+          
+          echo "Updated version to $NEW_VERSION"
+          
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add pubspec.yaml
+          git commit -m "chore: auto-increment build number to $NEW_BUILD [skip ci]"
+          git push
 
       # 1. إعداد جافا (الإصدار 21 كما هو في إعداداتك)
       - name: Set up JDK 21
