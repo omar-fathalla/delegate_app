@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/utils/date_time_utils.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 class DelegateModel extends Delegate {
@@ -40,19 +41,6 @@ class DelegateModel extends Delegate {
   });
 
   factory DelegateModel.fromJson(Map<String, dynamic> json, String uid) {
-    DateTime parseDate(dynamic date) {
-      if (date is Timestamp) return date.toDate();
-      if (date is String) return DateTime.parse(date);
-      return DateTime.now();
-    }
-
-    DateTime? parseNullableDate(dynamic date) {
-      if (date == null) return null;
-      if (date is Timestamp) return date.toDate();
-      if (date is String) return DateTime.parse(date);
-      return null;
-    }
-
     DelegateGender parseGender(String? gender) {
       return gender == 'Female' ? DelegateGender.female : DelegateGender.male;
     }
@@ -94,7 +82,7 @@ class DelegateModel extends Delegate {
       phoneNumber: json['phoneNumber'] ?? '',
       gender: parseGender(json['gender']),
       position: parsePosition(json['position']),
-      birthDate: parseDate(json['birthDate']),
+      birthDate: DateTimeUtils.parseDate(json['birthDate']),
       organizationUID: json['organizationUID'] ?? '',
       organizationName: json['organizationName'] ?? '',
       companyUID: json['companyUID'] ?? '',
@@ -105,7 +93,7 @@ class DelegateModel extends Delegate {
       allReceiptCodes: (json['allReceiptCodes'] as List? ?? [])
           .map((e) => e.toString())
           .toList(),
-      createdAt: parseDate(json['createdAt']),
+      createdAt: DateTimeUtils.parseDate(json['createdAt']),
       createdBy: json['createdBy'] ?? '',
       hasPendingUpdate: json['hasPendingUpdate'] ?? false,
       isDeductedFromCompany: json['isDeductedFromCompany'] ?? false,
@@ -115,7 +103,7 @@ class DelegateModel extends Delegate {
       numberOfDocuments: json['numberOfDocuments'] ?? 0,
       paymentAmount: json['paymentAmount'] ?? 0,
       receiptCode: json['receiptCode'],
-      updatedAt: parseNullableDate(json['updatedAt']),
+      updatedAt: DateTimeUtils.parseNullableDate(json['updatedAt']),
       updatedBy: json['updatedBy'],
       version: json['version'] ?? 1,
       documents: (json['documents'] as List? ?? [])
@@ -309,21 +297,14 @@ class DelegateDocumentModel extends DelegateDocument {
       }
     }
 
-    DateTime? parseNullableDate(dynamic date) {
-      if (date == null) return null;
-      if (date is Timestamp) return date.toDate();
-      if (date is String) return DateTime.parse(date);
-      return null;
-    }
-
     return DelegateDocumentModel(
       documentKey: parseKey(json['documentKey']),
       documentStatus: parseStatus(json['documentStatus']),
       documentURL: json['documentURL'] ?? '',
       rejectionReason: json['rejectionReason'],
-      reviewedAt: parseNullableDate(json['reviewedAt']),
+      reviewedAt: DateTimeUtils.parseNullableDate(json['reviewedAt']),
       reviewedBy: json['reviewedBy'],
-      uploadedAt: parseNullableDate(json['uploadedAt']),
+      uploadedAt: DateTimeUtils.parseNullableDate(json['uploadedAt']),
       receiptCode: json['receiptCode'],
       secondaryURL: json['secondaryURL'],
     );

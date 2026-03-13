@@ -672,7 +672,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 final List<Barcode> barcodes = capture.barcodes;
                 if (barcodes.isNotEmpty) {
                   final String rawValue = barcodes.first.rawValue ?? '';
-                  debugPrint('Barcode found! $rawValue');
 
                   String? scannedBranch;
                   try {
@@ -685,8 +684,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         scannedBranch = decoded['branch'] as String;
                       }
                     }
-                  } catch (e) {
-                    debugPrint('Error parsing QR: $e');
+                  } catch (_) {
                   }
 
                   scannerController.stop();
@@ -948,8 +946,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         final iosInfo = await deviceInfoPlugin.iosInfo;
         return '${iosInfo.name} ${iosInfo.systemName} ${iosInfo.systemVersion}';
       }
-    } catch (e) {
-      debugPrint('Error getting device info: $e');
+    } catch (_) {
     }
     return 'Unknown Device';
   }

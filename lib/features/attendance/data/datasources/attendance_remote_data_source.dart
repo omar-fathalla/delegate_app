@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/failures.dart';
+import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
-import 'package:flutter/foundation.dart';
 
 abstract class AttendanceRemoteDataSource {
   Future<AttendanceModel> checkIn(
@@ -80,17 +80,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         branchName: branchName,
       );
     } on FirebaseException catch (e) {
-      debugPrint(
-        'AttendanceRemoteDataSource.checkIn FirebaseException: ${e.code}',
-      );
-      throw const ServerFailure('فشل في تسجيل الحضور. حاول مرة أخرى.');
+      throwFirestoreFailure(e, 'فشل في تسجيل الحضور. حاول مرة أخرى.');
     } on TimeoutException {
-      throw const ServerFailure(
-        'انتهت مهلة الاتصال بالخادم. يرجى التحقق من الإنترنت.',
-      );
-    } catch (e) {
-      debugPrint('AttendanceRemoteDataSource.checkIn error: $e');
-      throw const ServerFailure('حدث خطأ غير متوقع أثناء تسجيل الحضور.');
+      throwTimeoutFailure();
+    } catch (_) {
+      throwUnexpectedFailure('حدث خطأ غير متوقع أثناء تسجيل الحضور.');
     }
   }
 
@@ -154,17 +148,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         branchName: lastData['branchName'],
       );
     } on FirebaseException catch (e) {
-      debugPrint(
-        'AttendanceRemoteDataSource.checkOut FirebaseException: ${e.code}',
-      );
-      throw const ServerFailure('فشل في تسجيل الانصراف. حاول مرة أخرى.');
+      throwFirestoreFailure(e, 'فشل في تسجيل الانصراف. حاول مرة أخرى.');
     } on TimeoutException {
-      throw const ServerFailure(
-        'انتهت مهلة الاتصال بالخادم. يرجى التحقق من الإنترنت.',
-      );
-    } catch (e) {
-      debugPrint('AttendanceRemoteDataSource.checkOut error: $e');
-      throw const ServerFailure('حدث خطأ غير متوقع أثناء تسجيل الانصراف.');
+      throwTimeoutFailure();
+    } catch (_) {
+      throwUnexpectedFailure('حدث خطأ غير متوقع أثناء تسجيل الانصراف.');
     }
   }
 
@@ -227,15 +215,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
       return history;
     } on FirebaseException catch (e) {
-      debugPrint(
-        'AttendanceRemoteDataSource.getHistory FirebaseException: Code: ${e.code}, Message: ${e.message}, Plugin: ${e.plugin}',
-      );
-      throw const ServerFailure('فشل في تحميل سجل الحضور.');
+      throwFirestoreFailure(e, 'فشل في تحميل سجل الحضور.');
     } on TimeoutException {
-      throw const ServerFailure('انتهت مهلة الاتصال بالخادم.');
-    } catch (e) {
-      debugPrint('AttendanceRemoteDataSource.getHistory error: $e');
-      throw const ServerFailure('حدث خطأ غير متوقع أثناء تحميل السجل.');
+      throwTimeoutFailure('انتهت مهلة الاتصال بالخادم.');
+    } catch (_) {
+      throwUnexpectedFailure('حدث خطأ غير متوقع أثناء تحميل السجل.');
     }
   }
 
@@ -275,16 +259,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       // If the last log is 'check_out', then there is no active session.
       return null;
     } on FirebaseException catch (e) {
-      debugPrint(
-        'AttendanceRemoteDataSource.findActiveAttendance FirebaseException: '
-        'code=${e.code}, message=${e.message}',
-      );
-      throw const ServerFailure('فشل في البحث عن جلسة الحضور النشطة.');
+      throwFirestoreFailure(e, 'فشل في البحث عن جلسة الحضور النشطة.');
     } on TimeoutException {
-      throw const ServerFailure('انتهت مهلة الاتصال بالخادم.');
-    } catch (e) {
-      debugPrint('AttendanceRemoteDataSource.findActiveAttendance error: $e');
-      throw const ServerFailure('حدث خطأ غير متوقع.');
+      throwTimeoutFailure('انتهت مهلة الاتصال بالخادم.');
+    } catch (_) {
+      throwUnexpectedFailure();
     }
   }
 
@@ -319,15 +298,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
       await batch.commit().timeout(const Duration(seconds: 10));
     } on FirebaseException catch (e) {
-      debugPrint(
-        'AttendanceRemoteDataSource.syncOfflineQueue FirebaseException: ${e.code}',
-      );
-      throw const ServerFailure('فشل في مزامنة البيانات المؤجلة.');
+      throwFirestoreFailure(e, 'فشل في مزامنة البيانات المؤجلة.');
     } on TimeoutException {
-      throw const ServerFailure('انتهت مهلة الاتصال بالخادم أثناء المزامنة.');
-    } catch (e) {
-      debugPrint('AttendanceRemoteDataSource.syncOfflineQueue error: $e');
-      throw const ServerFailure('حدث خطأ غير متوقع أثناء المزامنة.');
+      throwTimeoutFailure('انتهت مهلة الاتصال بالخادم أثناء المزامنة.');
+    } catch (_) {
+      throwUnexpectedFailure('حدث خطأ غير متوقع أثناء المزامنة.');
     }
   }
 
@@ -346,8 +321,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       }
 
       return querySnapshot.docs.first.data();
-    } catch (e) {
-      debugPrint('AttendanceRemoteDataSource.getBranchByName error: $e');
+    } catch (_) {
       return null;
     }
   }
@@ -388,13 +362,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             .timeout(const Duration(seconds: 5));
       }
     } on FirebaseException catch (e) {
-      debugPrint(
-        'AttendanceRemoteDataSource.saveBranch FirebaseException: ${e.code}',
-      );
-      throw const ServerFailure('فشل في حفظ بيانات الفرع.');
-    } catch (e) {
-      debugPrint('AttendanceRemoteDataSource.saveBranch error: $e');
-      throw const ServerFailure('حدث خطأ غير متوقع أثناء حفظ بيانات الفرع.');
+      throwFirestoreFailure(e, 'فشل في حفظ بيانات الفرع.');
+    } catch (_) {
+      throwUnexpectedFailure('حدث خطأ غير متوقع أثناء حفظ بيانات الفرع.');
     }
   }
 }

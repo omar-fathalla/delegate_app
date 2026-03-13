@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/utils/date_time_utils.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 
 class AttendanceModel extends Attendance {
@@ -17,30 +17,18 @@ class AttendanceModel extends Attendance {
   });
 
   factory AttendanceModel.fromJson(Map<String, dynamic> json, String id) {
-    DateTime parseDate(dynamic date) {
-      if (date is Timestamp) return date.toDate();
-      if (date is String) return DateTime.parse(date);
-      return DateTime.now();
-    }
-
     return AttendanceModel(
       id: id,
       userId: json['userId'] ?? '',
-      checkInTime: parseDate(json['checkInTime']),
-      checkOutTime: json['checkOutTime'] != null
-          ? parseDate(json['checkOutTime'])
-          : null,
+      checkInTime: DateTimeUtils.parseDate(json['checkInTime']),
+      checkOutTime: DateTimeUtils.parseNullableDate(json['checkOutTime']),
       latitude: json['latitude']?.toDouble(),
       longitude: json['longitude']?.toDouble(),
       imageUrl: json['imageUrl'],
       branchName: json['branchName'],
       isSynced: json['isSynced'] ?? true,
-      localCheckInTime: json['localCheckInTime'] != null
-          ? parseDate(json['localCheckInTime'])
-          : null,
-      localCheckOutTime: json['localCheckOutTime'] != null
-          ? parseDate(json['localCheckOutTime'])
-          : null,
+      localCheckInTime: DateTimeUtils.parseNullableDate(json['localCheckInTime']),
+      localCheckOutTime: DateTimeUtils.parseNullableDate(json['localCheckOutTime']),
     );
   }
 
