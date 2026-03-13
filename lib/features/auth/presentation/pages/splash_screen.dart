@@ -51,9 +51,6 @@ class _SplashScreenState extends State<SplashScreen>
         listener: (context, state) {
           if (state is AuthAuthenticated) {
             final delegate = state.delegate;
-            debugPrint('=== SPLASH REDIRECT ===');
-            debugPrint('Phone: ${delegate.phoneNumber}');
-            debugPrint('Position from Data: ${delegate.position}');
             if (delegate.createdBy == 'system_admin' ||
                 delegate.phoneNumber == '01508899965') {
               context.go('/admin/home', extra: delegate);

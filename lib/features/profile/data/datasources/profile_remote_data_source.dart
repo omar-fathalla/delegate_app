@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/exceptions.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
-import 'package:flutter/foundation.dart';
 
 abstract class ProfileRemoteDataSource {
   Future<DelegateModel> getDelegateProfile(String uid);
@@ -67,7 +66,6 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       // 3. Convert to Model
       return DelegateModel.fromJson(delegateData, uid);
     } catch (e) {
-      debugPrint('Error in getDelegateProfile: $e');
       if (e is ServerException) rethrow;
       throw ServerException(e.toString());
     }

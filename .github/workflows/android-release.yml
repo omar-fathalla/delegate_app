@@ -55,13 +55,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # 4. إعداد ملف التوقيع (Keystore) من Secrets
+      # 4. تشغيل الاختبارات
+      - name: Run tests
+        run: flutter test --coverage
+
+      # 5. إعداد ملف التوقيع (Keystore) من Secrets
       - name: Decode Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 --decode --ignore-garbage > android/app/upload-keystore.jks
 
-      # 5. إنشاء ملف key.properties ديناميكياً
+      # 6. إنشاء ملف key.properties ديناميكياً
       - name: Create key.properties
         run: |
           echo "storePassword=${{ secrets.STORE_PASSWORD }}" > android/key.properties
@@ -69,18 +73,18 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "storeFile=upload-keystore.jks" >> android/key.properties
 
-      # 6. بناء نسخة الـ App Bundle الموقعة
+      # 7. بناء نسخة الـ App Bundle الموقعة
       - name: Build AAB
         run: flutter build appbundle --release
 
-      # 7. رفع الملف الناتج كـ Artifact (لتتمكن من تحميله)
+      # 8. رفع الملف الناتج كـ Artifact (لتتمكن من تحميله)
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: build/app/outputs/bundle/release/app-release.aab
 
-      # 8. الرفع لـ Google Play (Internal Testing) بناءً على خيار التشغيل
+      # 9. الرفع لـ Google Play (Internal Testing) بناءً على خيار التشغيل
       - name: Upload to Google Play
         if: ${{ github.event.inputs.upload_to_play_store == 'true' }}
         uses: r0adkll/upload-google-play@v1

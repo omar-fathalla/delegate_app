@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// A wrapper around [SharedPreferences] that provides a consistent API
@@ -46,8 +45,7 @@ class SecureStorageService {
   }) async {
     try {
       await write(key: key, value: jsonEncode(value));
-    } catch (e) {
-      debugPrint('SecureStorageService.writeJson error: $e');
+    } catch (_) {
     }
   }
 
@@ -57,8 +55,7 @@ class SecureStorageService {
       final raw = await read(key: key);
       if (raw == null) return null;
       return jsonDecode(raw) as Map<String, dynamic>;
-    } catch (e) {
-      debugPrint('SecureStorageService.readJson error: $e');
+    } catch (_) {
       return null;
     }
   }

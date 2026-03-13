@@ -78,8 +78,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           ),
         );
       }
-    } catch (e) {
-      debugPrint('Error fetching initial location: $e');
+    } catch (_) {
     }
   }
 

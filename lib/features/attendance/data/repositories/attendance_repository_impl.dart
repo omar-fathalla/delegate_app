@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
@@ -50,10 +49,6 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     final branch = BranchModel.fromMap(branchData);
 
     if (branch.latitude == 0.0 && branch.longitude == 0.0) {
-      debugPrint(
-        'DEBUG: Missing coordinates for $branchName — '
-        'lat: ${branch.latitude}, long: ${branch.longitude}',
-      );
       throw ServerFailure(
         'بيانات إحداثيات الفرع ($branchName) غير مكتملة في النظام. يرجى إبلاغ الإدارة.',
       );
@@ -151,8 +146,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
           if (e is ServerFailure && e.message.contains('خارج نطاق')) {
             rethrow;
           }
-          // All other errors (missing index, network, etc.) → log and continue
-          debugPrint('Geofencing check-out skipped (non-blocking): $e');
+          // All other errors (missing index, network, etc.) → continue
         }
       }
 
@@ -161,7 +155,6 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       return Right(result);
     } catch (e) {
       if (e is Failure) return Left(e);
-      debugPrint('Unexpected error in AttendanceRepository.checkOut: $e');
       return const Left(
         ServerFailure('حدث خطأ غير متوقع أثناء تسجيل الانصراف.'),
       );
@@ -254,8 +247,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       return const Right(null);
     } on Failure catch (e) {
       return Left(e);
-    } catch (e) {
-      debugPrint('AttendanceRepository.saveBranch error: $e');
+    } catch (_) {
       return const Left(
         ServerFailure('حدث خطأ غير متوقع أثناء حفظ بيانات الفرع.'),
       );

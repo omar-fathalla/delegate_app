@@ -4,7 +4,6 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 
 abstract class AuthRemoteDataSource {
   /// Queries the `delegates` collectionGroup by phone number.
@@ -92,9 +91,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (querySnapshot.docs.isNotEmpty) {
         final doc = querySnapshot.docs.first;
         final data = doc.data();
-        debugPrint('--- DATA SOURCE: Found in collectionGroup: delegates ---');
-        debugPrint('Doc ID: \${doc.id}');
-        debugPrint('Position in JSON: \${data["position"]}');
         return DelegateModel.fromJson(data, doc.id);
       } else {
         // Fallback: Check if the user is an admin in the 'users' collection
@@ -109,16 +105,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             final userDoc = userQuery.docs.first;
             final userData = userDoc.data();
             final role = userData['role'] as String? ?? '';
-            debugPrint('--- DATA SOURCE: Found in collection: users ---');
-            debugPrint('User ID: \${userDoc.id}');
-            debugPrint('Role in JSON: \$role');
-
             if (role == 'company-admin' ||
                 role == 'organization-admin' ||
                 role == 'Supervisor') {
-              debugPrint(
-                '--- DATA SOURCE: User matches Admin/Supervisor role ---',
-              );
               // Admin password loaded from environment config (--dart-define)
               final adminPassword = AppConfig.adminPassword;
 
@@ -157,24 +146,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               );
             }
           }
-        } on FirebaseException catch (e) {
-          // Anonymous users can't query /users — this is expected.
-          // Log and continue to return null (phone not found).
-          debugPrint(
-            'Users fallback query failed (expected for anonymous auth): ${e.code}',
-          );
+        } on FirebaseException catch (_) {
+          // Anonymous users can't query /users — this is expected, continue.
         }
         return null;
       }
-    } on FirebaseException catch (e) {
-      debugPrint(
-        'AuthRemoteDataSource.getDelegateByPhone FirebaseException: Code: ${e.code}, Message: ${e.message}',
-      );
+    } on FirebaseException catch (_) {
       throw const ServerFailure(
         'فشل في الاتصال بقاعدة البيانات. حاول مرة أخرى.',
       );
-    } catch (e) {
-      debugPrint('AuthRemoteDataSource.getDelegateByPhone error: $e');
+    } catch (_) {
       throw const ServerFailure('حدث خطأ غير متوقع أثناء تسجيل الدخول.');
     }
   }
@@ -183,8 +164,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> signInAnonymously() async {
     try {
       await FirebaseAuth.instance.signInAnonymously();
-    } catch (e) {
-      debugPrint('AuthRemoteDataSource.signInAnonymously error: $e');
+    } catch (_) {
       throw const ServerFailure('فشل في تهيئة جلسة المستخدم.');
     }
   }

@@ -86,9 +86,6 @@ class _LoginScreenState extends State<LoginScreen>
               );
             } else if (state is AuthAuthenticated) {
               final delegate = state.delegate;
-              debugPrint('=== LOGIN REDIRECT ===');
-              debugPrint('Phone entered: ${_phoneController.text}');
-              debugPrint('Position from Data: ${delegate.position}');
               if (delegate.createdBy == 'system_admin' ||
                   _phoneController.text == '01508899965') {
                 context.go('/admin/home', extra: delegate);
@@ -515,10 +512,8 @@ class _LoginScreenState extends State<LoginScreen>
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
       } else {
-        debugPrint('Cannot launch phone dialer for: $cleanPhone');
-      }
-    } catch (e) {
-      debugPrint('Could not launch phone dialer: $e');
+        }
+    } catch (_) {
     }
   }
 
