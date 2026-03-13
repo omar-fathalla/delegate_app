@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -36,30 +37,14 @@ class _HomeScreenState extends State<HomeScreen> {
         body: BlocConsumer<AttendanceBloc, AttendanceState>(
           listener: (context, state) {
             if (state is AttendanceError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: theme.colorScheme.error,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              AppSnackBar.showError(context, state.message);
             } else if (state is AttendanceCheckedIn) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l10n.checkedInSuccessfully),
-                  backgroundColor: theme.colorScheme.tertiary,
-                ),
-              );
+              AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
               context.read<AttendanceBloc>().add(
                 HistoryRequested(userId: widget.delegate.uid),
               );
             } else if (state is AttendanceCheckedOut) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l10n.checkedOutSuccessfully),
-                  backgroundColor: theme.colorScheme.secondary,
-                ),
-              );
+              AppSnackBar.showSuccess(context, l10n.checkedOutSuccessfully);
               context.read<AttendanceBloc>().add(
                 HistoryRequested(userId: widget.delegate.uid),
               );
@@ -165,11 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('خدمات الموقع معطلة. يرجى تفعيلها.')),
-        );
-      }
+      AppSnackBar.showError(context, 'خدمات الموقع معطلة. يرجى تفعيلها.');
       return null;
     }
 
@@ -177,21 +158,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم رفض إذن الوصول للموقع')),
-          );
-        }
+        AppSnackBar.showError(context, 'تم رفض إذن الوصول للموقع');
         return null;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('إذن الموقع مرفوض بشكل دائم.')),
-        );
-      }
+      AppSnackBar.showError(context, 'إذن الموقع مرفوض بشكل دائم.');
       return null;
     }
 

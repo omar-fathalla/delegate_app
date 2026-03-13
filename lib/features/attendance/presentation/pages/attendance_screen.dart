@@ -7,6 +7,7 @@ import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bl
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
@@ -88,48 +89,24 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
-            final theme = Theme.of(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(l10n.checkedInSuccessfully),
-                backgroundColor: theme.colorScheme.tertiary,
-              ),
-            );
+            AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
             context.read<AttendanceBloc>().add(
               HistoryRequested(userId: widget.delegate.uid),
             );
           } else if (state is AttendanceCheckedOut) {
-            final theme = Theme.of(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(l10n.checkedOutSuccessfully),
-                backgroundColor: theme.colorScheme.secondary,
-              ),
-            );
+            AppSnackBar.showSuccess(context, l10n.checkedOutSuccessfully);
             context.read<AttendanceBloc>().add(
               HistoryRequested(userId: widget.delegate.uid),
             );
           } else if (state is AttendanceError) {
-            final theme = Theme.of(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: theme.colorScheme.error,
-              ),
-            );
+            AppSnackBar.showError(context, state.message);
           } else if (state is AttendanceHistoryLoaded) {
             // --- Performance: cache + compute only when data changes ---
             _rawHistory = state.history;
             _recomputeFilteredHistory();
 
             if (state.syncStatus == SyncStatus.success) {
-              final theme = Theme.of(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('تمت مزامنة البيانات المحفوظة بنجاح'),
-                  backgroundColor: theme.colorScheme.tertiary,
-                ),
-              );
+              AppSnackBar.showSuccess(context, 'تمت مزامنة البيانات المحفوظة بنجاح');
               Future.delayed(const Duration(seconds: 1), () {
                 if (context.mounted) {
                   context.read<AttendanceBloc>().add(
@@ -138,13 +115,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 }
               });
             } else if (state.syncStatus == SyncStatus.failure) {
-              final theme = Theme.of(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('فشلت المزامنة'),
-                  backgroundColor: theme.colorScheme.error,
-                ),
-              );
+              AppSnackBar.showError(context, 'فشلت المزامنة');
             }
           }
         },
@@ -691,12 +662,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   Navigator.pop(parentContext);
 
                   if (scannedBranch != null) {
-                    ScaffoldMessenger.of(parentContext).showSnackBar(
-                      const SnackBar(
-                        content: Text('Fetching location...'),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
+                    AppSnackBar.showInfo(parentContext, 'Fetching location...');
 
                     final position = await _getCurrentLocation(parentContext);
                     if (position != null && parentContext.mounted) {
@@ -712,21 +678,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       } else {
                         await _checkIn(attendanceBloc, scannedBranch, position);
                         if (parentContext.mounted) {
-                          ScaffoldMessenger.of(parentContext).showSnackBar(
-                            SnackBar(
-                              content: Text('تسجيل حضور في $scannedBranch...'),
-                            ),
-                          );
+                          AppSnackBar.showInfo(parentContext, 'تسجيل حضور في $scannedBranch...');
                         }
                       }
                     }
                   } else {
-                    ScaffoldMessenger.of(parentContext).showSnackBar(
-                      SnackBar(
-                        content: Text(l10n.invalidQRCode),
-                        backgroundColor: colorScheme.error,
-                      ),
-                    );
+                    AppSnackBar.showError(parentContext, l10n.invalidQRCode);
                   }
                 } else {
                   _isProcessing = false;
@@ -888,16 +845,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Location services are disabled. Please enable them.',
-            ),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
+      AppSnackBar.showError(context, 'خدمات الموقع معطلة. يرجى تفعيلها.');
       return null;
     }
 
@@ -905,29 +853,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Location permissions are denied'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
+        AppSnackBar.showError(context, 'تم رفض إذن الوصول للموقع');
         return null;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Location permissions are permanently denied, we cannot request permissions.',
-            ),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
+      AppSnackBar.showError(context, 'إذن الموقع مرفوض بشكل دائم.');
       return null;
     }
 
