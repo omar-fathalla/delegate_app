@@ -196,7 +196,7 @@ void main() {
 
   group('LogoutRequested', () {
     blocTest<AuthBloc, AuthState>(
-      'emits [AuthUnauthenticated] when logout is requested',
+      'emits [AuthLoading, AuthUnauthenticated] when logout is requested',
       build: () {
         when(() => mockLogout(any())).thenAnswer(
           (_) async => const Right(null),
@@ -205,6 +205,7 @@ void main() {
       },
       act: (bloc) => bloc.add(LogoutRequested()),
       expect: () => [
+        AuthLoading(),
         AuthUnauthenticated(),
       ],
       verify: (_) {

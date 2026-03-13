@@ -845,6 +845,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
+      if (!context.mounted) return null;
       AppSnackBar.showError(context, 'خدمات الموقع معطلة. يرجى تفعيلها.');
       return null;
     }
@@ -853,12 +854,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
+        if (!context.mounted) return null;
         AppSnackBar.showError(context, 'تم رفض إذن الوصول للموقع');
         return null;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
+      if (!context.mounted) return null;
       AppSnackBar.showError(context, 'إذن الموقع مرفوض بشكل دائم.');
       return null;
     }
