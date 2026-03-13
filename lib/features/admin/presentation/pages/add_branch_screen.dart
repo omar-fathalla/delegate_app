@@ -355,6 +355,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                     Icons.clear,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
+                                  tooltip: MaterialLocalizations.of(
+                                    context,
+                                  ).closeButtonTooltip,
                                   onPressed: () {
                                     _searchController.clear();
                                     FocusScope.of(context).unfocus();
