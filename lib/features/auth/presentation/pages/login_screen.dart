@@ -318,34 +318,49 @@ class _LoginScreenState extends State<LoginScreen>
                                     const SizedBox(height: 16),
 
                                     // Remember Me
-                                    Row(
-                                      children: [
-                                        SizedBox(
-                                          height: 24,
-                                          width: 24,
-                                          child: Checkbox(
-                                            value: _rememberMe,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                _rememberMe = value ?? false;
-                                              });
-                                            },
-                                            activeColor: colorScheme.primary,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
+                                    InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _rememberMe = !_rememberMe;
+                                        });
+                                      },
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                          horizontal: 4,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            SizedBox(
+                                              height: 24,
+                                              width: 24,
+                                              child: Checkbox(
+                                                value: _rememberMe,
+                                                onChanged: (value) {
+                                                  setState(() {
+                                                    _rememberMe = value ?? false;
+                                                  });
+                                                },
+                                                activeColor: colorScheme.primary,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                              ),
                                             ),
-                                          ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              l10n.rememberMe,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: colorScheme.onSurface,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          l10n.rememberMe,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: colorScheme.onSurface,
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
 
                                     const SizedBox(height: 32),
