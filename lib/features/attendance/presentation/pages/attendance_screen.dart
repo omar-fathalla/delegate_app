@@ -106,7 +106,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             _recomputeFilteredHistory();
 
             if (state.syncStatus == SyncStatus.success) {
-              AppSnackBar.showSuccess(context, 'تمت مزامنة البيانات المحفوظة بنجاح');
+              AppSnackBar.showSuccess(
+                context,
+                'تمت مزامنة البيانات المحفوظة بنجاح',
+              );
               Future.delayed(const Duration(seconds: 1), () {
                 if (context.mounted) {
                   context.read<AttendanceBloc>().add(
@@ -194,23 +197,30 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                FilledButton.tonal(
-                  style: FilledButton.styleFrom(
-                    shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(14),
-                    backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
-                    foregroundColor: colorScheme.onPrimaryContainer,
+                Tooltip(
+                  message: MaterialLocalizations.of(
+                    context,
+                  ).previousPageTooltip,
+                  child: FilledButton.tonal(
+                    style: FilledButton.styleFrom(
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(14),
+                      backgroundColor: colorScheme.surface.withValues(
+                        alpha: 0.5,
+                      ),
+                      foregroundColor: colorScheme.onPrimaryContainer,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _selectedMonth = DateTime(
+                          _selectedMonth.year,
+                          _selectedMonth.month - 1,
+                        );
+                        _recomputeFilteredHistory();
+                      });
+                    },
+                    child: const Icon(Icons.chevron_left_rounded, size: 28),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedMonth = DateTime(
-                        _selectedMonth.year,
-                        _selectedMonth.month - 1,
-                      );
-                      _recomputeFilteredHistory();
-                    });
-                  },
-                  child: const Icon(Icons.chevron_left_rounded, size: 28),
                 ),
                 Text(
                   DateFormat('MMMM yyyy', locale).format(_selectedMonth),
@@ -220,23 +230,28 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                FilledButton.tonal(
-                  style: FilledButton.styleFrom(
-                    shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(14),
-                    backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
-                    foregroundColor: colorScheme.onPrimaryContainer,
+                Tooltip(
+                  message: MaterialLocalizations.of(context).nextPageTooltip,
+                  child: FilledButton.tonal(
+                    style: FilledButton.styleFrom(
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(14),
+                      backgroundColor: colorScheme.surface.withValues(
+                        alpha: 0.5,
+                      ),
+                      foregroundColor: colorScheme.onPrimaryContainer,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _selectedMonth = DateTime(
+                          _selectedMonth.year,
+                          _selectedMonth.month + 1,
+                        );
+                        _recomputeFilteredHistory();
+                      });
+                    },
+                    child: const Icon(Icons.chevron_right_rounded, size: 28),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedMonth = DateTime(
-                        _selectedMonth.year,
-                        _selectedMonth.month + 1,
-                      );
-                      _recomputeFilteredHistory();
-                    });
-                  },
-                  child: const Icon(Icons.chevron_right_rounded, size: 28),
                 ),
               ],
             ),
@@ -655,8 +670,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         scannedBranch = decoded['branch'] as String;
                       }
                     }
-                  } catch (_) {
-                  }
+                  } catch (_) {}
 
                   scannerController.stop();
                   Navigator.pop(parentContext);
@@ -678,7 +692,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       } else {
                         await _checkIn(attendanceBloc, scannedBranch, position);
                         if (parentContext.mounted) {
-                          AppSnackBar.showInfo(parentContext, 'تسجيل حضور في $scannedBranch...');
+                          AppSnackBar.showInfo(
+                            parentContext,
+                            'تسجيل حضور في $scannedBranch...',
+                          );
                         }
                       }
                     }
@@ -801,7 +818,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               child: CircleAvatar(
                 backgroundColor: colorScheme.surface.withValues(alpha: 0.3),
                 child: IconButton(
-                  tooltip: 'Close Scanner',
+                  tooltip: MaterialLocalizations.of(
+                    parentContext,
+                  ).closeButtonTooltip,
                   icon: Icon(Icons.close, color: colorScheme.surface),
                   onPressed: () {
                     scannerController.stop();
@@ -881,8 +900,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         final iosInfo = await deviceInfoPlugin.iosInfo;
         return '${iosInfo.name} ${iosInfo.systemName} ${iosInfo.systemVersion}';
       }
-    } catch (_) {
-    }
+    } catch (_) {}
     return 'Unknown Device';
   }
 
