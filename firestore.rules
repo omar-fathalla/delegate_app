@@ -365,6 +365,14 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    // ==================== APP UPDATES ====================
+    match /app_updates/{updateId} {
+      // Anyone logged in can read updates
+      allow read: if isAuthenticated();
+      // Only super admin can create/edit/delete updates from dashboard
+      allow write: if isSuperAdmin();
+    }
+
     // ==================== MOBILE APP (Tashil Delegate) ====================
 
     // Attendance Logs (New System) - Authenticated, Append-Only

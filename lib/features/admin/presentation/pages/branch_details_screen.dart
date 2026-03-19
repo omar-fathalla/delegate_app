@@ -1,26 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
 import '../../data/models/branch_model.dart';
+import '../bloc/branch_bloc.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:screenshot/screenshot.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:gal/gal.dart';
 
-class BranchDetailsScreen extends StatefulWidget {
+class BranchDetailsScreen extends StatelessWidget {
   final BranchModel branch;
 
   const BranchDetailsScreen({super.key, required this.branch});
 
   @override
-  State<BranchDetailsScreen> createState() => _BranchDetailsScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => di.sl<BranchBloc>(),
+      child: _BranchDetailsView(branch: branch),
+    );
+  }
 }
 
-class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
+class _BranchDetailsView extends StatefulWidget {
+  final BranchModel branch;
+
+  const _BranchDetailsView({required this.branch});
+
+  @override
+  State<_BranchDetailsView> createState() => _BranchDetailsViewState();
+}
+
+class _BranchDetailsViewState extends State<_BranchDetailsView> {
   late BranchModel _branch;
-  bool _isLoading = false;
+  bool _isDownloading = false;
   final ScreenshotController _screenshotController = ScreenshotController();
 
   @override
@@ -56,33 +72,16 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
       },
     );
 
-    if (newName != null &&
-        newName.isNotEmpty &&
-        newName != _branch.branchName) {
-      setState(() => _isLoading = true);
-      try {
-        await FirebaseFirestore.instance
-            .collection('branches')
-            .doc(_branch.id)
-            .update({'branchName': newName});
-
-        setState(() {
-          _branch = BranchModel(
-            id: _branch.id,
-            branchName: newName,
-            latitude: _branch.latitude,
-            longitude: _branch.longitude,
-            geofenceRadius: _branch.geofenceRadius,
-          );
-        });
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(l10n.errorGeneral)));
-        }
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
+    if (newName != null && newName.isNotEmpty && newName != _branch.branchName) {
+      final updated = BranchModel(
+        id: _branch.id,
+        branchName: newName,
+        latitude: _branch.latitude,
+        longitude: _branch.longitude,
+        geofenceRadius: _branch.geofenceRadius,
+      );
+      if (mounted) {
+        context.read<BranchBloc>().add(BranchUpdateRequested(branch: updated));
       }
     }
   }
@@ -117,59 +116,62 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
       },
     );
 
-    if (confirm == true) {
-      setState(() => _isLoading = true);
-      try {
-        await FirebaseFirestore.instance
-            .collection('branches')
-            .doc(_branch.id)
-            .delete();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.branchDeletedSuccessfully)),
-          );
-          context.pop(); // Go back to the list
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(l10n.errorGeneral)));
-        }
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
-      }
+    if (confirm == true && mounted) {
+      context
+          .read<BranchBloc>()
+          .add(BranchDeleteRequested(branchId: _branch.id));
     }
   }
 
   Future<void> _downloadQR() async {
     final l10n = AppLocalizations.of(context)!;
-    setState(() => _isLoading = true);
+    setState(() => _isDownloading = true);
 
     try {
-      final image = await _screenshotController.capture();
-      if (image == null) return;
-
-      final hasAccess = await Gal.hasAccess();
+      bool hasAccess = await Gal.hasAccess();
       if (!hasAccess) {
-        await Gal.requestAccess();
+        hasAccess = await Gal.requestAccess();
       }
 
-      await Gal.putImageBytes(image, name: '${_branch.branchName}_QR');
+      if (!hasAccess) {
+        throw Exception('Storage permission denied');
+      }
+
+      final image = await _screenshotController.capture(
+        pixelRatio: 4.0,
+        delay: const Duration(milliseconds: 200),
+      );
+
+      if (image == null) {
+        throw Exception('Failed to capture QR code image');
+      }
+
+      await Gal.putImageBytes(image, name: 'Tashil_${_branch.branchName}_QR');
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.qrSavedToGallery)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.qrSavedToGallery),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.errorGeneral)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${l10n.errorGeneral}: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isDownloading = false);
     }
   }
 
@@ -178,163 +180,213 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
-    // We encode the attendance type and branch name to match the existing requirements
     final qrData = jsonEncode({
       "type": "attendance",
       "branch": _branch.branchName,
     });
 
-    return Scaffold(
-      appBar: AdminHeader(
-        subtitle: l10n.branchDetails,
-        showBackButton: true,
-        onBackPressed: () {
-          if (GoRouter.of(context).canPop()) {
-            context.pop();
-          } else {
-            context.go('/');
-          }
-        },
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Screenshot(
-                    controller: _screenshotController,
-                    child: Card(
-                      margin: EdgeInsets.zero,
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'تسهيل',
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.primary,
+    return BlocConsumer<BranchBloc, BranchState>(
+      listener: (context, state) {
+        if (state is BranchUpdateSuccess) {
+          setState(() {
+            _branch = BranchModel(
+              id: state.branch.id,
+              branchName: state.branch.branchName,
+              latitude: state.branch.latitude,
+              longitude: state.branch.longitude,
+              geofenceRadius: state.branch.geofenceRadius,
+            );
+          });
+        } else if (state is BranchDeleteSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.branchDeletedSuccessfully)),
+          );
+          context.pop();
+        } else if (state is BranchError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      builder: (context, state) {
+        final isBlocLoading = state is BranchLoading;
+        final isLoading = _isDownloading || isBlocLoading;
+
+        return Scaffold(
+          appBar: AdminHeader(
+            subtitle: l10n.branchDetails,
+            showBackButton: true,
+            onBackPressed: () {
+              if (GoRouter.of(context).canPop()) {
+                context.pop();
+              } else {
+                context.go('/');
+              }
+            },
+          ),
+          body: Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Screenshot(
+                      controller: _screenshotController,
+                      child: Card(
+                        margin: EdgeInsets.zero,
+                        elevation: 0,
+                        color: theme.colorScheme.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Tashil',
+                                style: TextStyle(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.w900,
+                                  color: theme.colorScheme.primary,
+                                  letterSpacing: -1,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _branch.branchName,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 32),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.04,
+                                      ),
+                                      blurRadius: 15,
+                                      spreadRadius: 5,
+                                    ),
+                                  ],
+                                ),
+                                child: QrImageView(
+                                  data: qrData,
+                                  version: QrVersions.auto,
+                                  size: 240.0,
+                                  dataModuleStyle: const QrDataModuleStyle(
+                                    dataModuleShape: QrDataModuleShape.square,
+                                    color: Colors.black,
                                   ),
+                                  eyeStyle: const QrEyeStyle(
+                                    eyeShape: QrEyeShape.square,
+                                    color: Colors.black,
+                                  ),
+                                  backgroundColor: Colors.white,
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              _branch.branchName,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: theme.colorScheme.onSurface,
                               ),
-                            ),
-                            const SizedBox(height: 32),
-                            // QR code must remain high contrast (black on white)
-                            // for reliable scanning regardless of the app theme.
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: QrImageView(
-                                data: qrData,
-                                version: QrVersions.auto,
-                                size: 250.0,
-                                // Using dataModuleStyle to ensure high contrast even in dark mode
-                                dataModuleStyle: const QrDataModuleStyle(
-                                  dataModuleShape: QrDataModuleShape.square,
-                                  color: Colors.black,
+                              const SizedBox(height: 32),
+                              Text(
+                                'Scan to Check-In',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: theme.colorScheme.outline,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 2,
                                 ),
-                                eyeStyle: const QrEyeStyle(
-                                  eyeShape: QrEyeShape.square,
-                                  color: Colors.black,
-                                ),
-                                backgroundColor: Colors.white,
                               ),
-                            ),
-                            const SizedBox(height: 32),
-                            Text(
-                              'Scan to Check-In',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: theme.colorScheme.outline,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 2,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 32),
-                  FilledButton.icon(
-                    onPressed: _downloadQR,
-                    icon: const Icon(Icons.download),
-                    label: Text(
-                      l10n.downloadQR,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(height: 40),
+                    FilledButton.icon(
+                      onPressed: isLoading ? null : _downloadQR,
+                      icon: const Icon(Icons.file_download_outlined),
+                      label: Text(
+                        l10n.downloadQR,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                     ),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _editName,
-                          icon: const Icon(Icons.edit),
-                          label: Text(l10n.editName),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: isLoading ? null : _editName,
+                            icon: const Icon(Icons.edit_outlined),
+                            label: Text(l10n.editName),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _deleteBranch,
-                          icon: Icon(
-                            Icons.delete,
-                            color: theme.colorScheme.error,
-                          ),
-                          label: Text(
-                            l10n.deleteBranch,
-                            style: TextStyle(color: theme.colorScheme.error),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: theme.colorScheme.error),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: isLoading ? null : _deleteBranch,
+                            icon: Icon(
+                              Icons.delete_outline,
+                              color: theme.colorScheme.error,
+                            ),
+                            label: Text(
+                              l10n.deleteBranch,
+                              style: TextStyle(color: theme.colorScheme.error),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(
+                                color: theme.colorScheme.error.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+              if (isLoading)
+                Positioned.fill(
+                  child: Container(
+                    color: theme.colorScheme.surface.withValues(alpha: 0.7),
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

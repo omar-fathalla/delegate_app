@@ -171,6 +171,17 @@ class SettingsScreen extends StatelessWidget {
                           ),
                           _buildSettingsTile(
                             context: context,
+                            icon: Icons.auto_awesome_rounded,
+                            title: isArabic ? 'ما الجديد؟' : "What's New?",
+                            onTap: () => context.push('/changelog'),
+                          ),
+                          Divider(
+                            height: 1,
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                            indent: 64,
+                          ),
+                          _buildSettingsTile(
+                            context: context,
                             icon: Icons.help_outline_rounded,
                             title: l10n.helpCenter,
                             onTap: () {},

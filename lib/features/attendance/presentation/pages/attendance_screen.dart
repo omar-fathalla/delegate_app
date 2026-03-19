@@ -89,12 +89,26 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
-            AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
+            if (state.attendance.isSynced) {
+              AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
+            } else {
+              AppSnackBar.showInfo(
+                context,
+                'تم تسجيل الدخول محلياً. ستتم المزامنة لاحقاً عند الاتصال بالشبكة.',
+              );
+            }
             context.read<AttendanceBloc>().add(
               HistoryRequested(userId: widget.delegate.uid),
             );
           } else if (state is AttendanceCheckedOut) {
-            AppSnackBar.showSuccess(context, l10n.checkedOutSuccessfully);
+            if (state.attendance.isSynced) {
+              AppSnackBar.showSuccess(context, l10n.checkedOutSuccessfully);
+            } else {
+              AppSnackBar.showInfo(
+                context,
+                'تم تسجيل الانصراف محلياً. ستتم المزامنة لاحقاً عند الاتصال بالشبكة.',
+              );
+            }
             context.read<AttendanceBloc>().add(
               HistoryRequested(userId: widget.delegate.uid),
             );
@@ -625,7 +639,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final color = isCheckedIn ? colorScheme.secondary : colorScheme.primary;
     _isProcessing = false;
 
-    final scannerController = MobileScannerController();
+    final scannerController = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates, // Prevent multiple scans and CPU overload
+      returnImage: false,
+      facing: CameraFacing.back,
+    );
 
     showModalBottomSheet(
       context: context,
@@ -655,10 +673,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         scannedBranch = decoded['branch'] as String;
                       }
                     }
-                  } catch (_) {
-                  }
+                  } catch (_) {}
 
-                  scannerController.stop();
+                  // Avoid blocking the UI thread with scannerController.stop()
+                  // because popping the navigator will dispose it properly anyway.
                   Navigator.pop(parentContext);
 
                   if (scannedBranch != null) {
@@ -804,7 +822,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   tooltip: 'Close Scanner',
                   icon: Icon(Icons.close, color: colorScheme.surface),
                   onPressed: () {
-                    scannerController.stop();
                     Navigator.pop(parentContext);
                   },
                 ),
@@ -866,9 +883,31 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       return null;
     }
 
-    return await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+    } on TimeoutException catch (_) {
+      final lastPosition = await Geolocator.getLastKnownPosition();
+      if (lastPosition != null) {
+        return lastPosition;
+      }
+      if (context.mounted) {
+        AppSnackBar.showError(
+          context,
+          'انتهى الوقت ولم نتمكن من تحديد الموقع. يرجى التأكد من تفعيل الـ GPS وأنت في مكان مفتوح.',
+        );
+      }
+      return null;
+    } catch (e) {
+      if (context.mounted) {
+        AppSnackBar.showError(context, 'حدث خطأ أثناء تحديد الموقع.');
+      }
+      return null;
+    }
   }
 
   Future<String> _getDeviceInfo() async {

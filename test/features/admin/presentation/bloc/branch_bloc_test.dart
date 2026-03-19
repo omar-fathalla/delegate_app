@@ -6,6 +6,7 @@ import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/domain/usecases/add_branch.dart';
 import 'package:delegate_app/features/admin/domain/usecases/delete_branch.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_branches.dart';
+import 'package:delegate_app/features/admin/domain/usecases/update_branch.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -14,11 +15,15 @@ class MockGetBranches extends Mock implements GetBranches {}
 
 class MockAddBranch extends Mock implements AddBranch {}
 
+class MockUpdateBranch extends Mock implements UpdateBranch {}
+
 class MockDeleteBranch extends Mock implements DeleteBranch {}
 
 class FakeNoParams extends Fake implements NoParams {}
 
 class FakeAddBranchParams extends Fake implements AddBranchParams {}
+
+class FakeUpdateBranchParams extends Fake implements UpdateBranchParams {}
 
 class FakeDeleteBranchParams extends Fake implements DeleteBranchParams {}
 
@@ -26,6 +31,7 @@ void main() {
   late BranchBloc bloc;
   late MockGetBranches mockGetBranches;
   late MockAddBranch mockAddBranch;
+  late MockUpdateBranch mockUpdateBranch;
   late MockDeleteBranch mockDeleteBranch;
 
   const tBranch = Branch(
@@ -39,16 +45,19 @@ void main() {
   setUpAll(() {
     registerFallbackValue(FakeNoParams());
     registerFallbackValue(FakeAddBranchParams());
+    registerFallbackValue(FakeUpdateBranchParams());
     registerFallbackValue(FakeDeleteBranchParams());
   });
 
   setUp(() {
     mockGetBranches = MockGetBranches();
     mockAddBranch = MockAddBranch();
+    mockUpdateBranch = MockUpdateBranch();
     mockDeleteBranch = MockDeleteBranch();
     bloc = BranchBloc(
       getBranches: mockGetBranches,
       addBranch: mockAddBranch,
+      updateBranch: mockUpdateBranch,
       deleteBranch: mockDeleteBranch,
     );
   });
@@ -166,6 +175,41 @@ void main() {
       expect: () => [
         isA<BranchLoading>(),
         BranchError(message: 'فشل في حذف الفرع.'),
+      ],
+    );
+  });
+
+  group('BranchUpdateRequested', () {
+    blocTest<BranchBloc, BranchState>(
+      'emits [BranchLoading, BranchUpdateSuccess] on success',
+      build: () {
+        when(() => mockUpdateBranch(any()))
+            .thenAnswer((_) async => const Right(tBranch));
+        return bloc;
+      },
+      act: (b) => b.add(const BranchUpdateRequested(branch: tBranch)),
+      expect: () => [
+        isA<BranchLoading>(),
+        isA<BranchUpdateSuccess>(),
+      ],
+      verify: (b) {
+        final state = b.state as BranchUpdateSuccess;
+        expect(state.branch.id, 'b1');
+        expect(state.branch.branchName, 'الفرع الرئيسي');
+      },
+    );
+
+    blocTest<BranchBloc, BranchState>(
+      'emits [BranchLoading, BranchError] on failure',
+      build: () {
+        when(() => mockUpdateBranch(any())).thenAnswer(
+            (_) async => const Left(ServerFailure('فشل في تحديث الفرع.')));
+        return bloc;
+      },
+      act: (b) => b.add(const BranchUpdateRequested(branch: tBranch)),
+      expect: () => [
+        isA<BranchLoading>(),
+        BranchError(message: 'فشل في تحديث الفرع.'),
       ],
     );
   });
