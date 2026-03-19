@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
+import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/domain/repositories/attendance_repository.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
@@ -82,7 +83,29 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }) async {
     try {
       if (!await _hasConnection()) {
-        throw const ServerFailure('No internet connection (offline mode)');
+        final localDocId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
+        final localAttendance = AttendanceModel(
+          id: localDocId,
+          userId: userId,
+          checkInTime: DateTime.now(),
+          latitude: lat,
+          longitude: long,
+          branchName: branchName,
+          isSynced: false,
+        );
+
+        await localDataSource.cacheAttendance(localAttendance);
+        await offlineQueue.addToQueue({
+          'type': 'check_in',
+          'delegateId': userId,
+          'companyId': companyId,
+          'organizationId': organizationId,
+          'location': {'latitude': lat, 'longitude': long},
+          'deviceInfo': deviceInfo,
+          'branchName': branchName,
+        });
+        
+        return Right(localAttendance);
       }
 
       // --- Anti-Fraud Geofencing ---
@@ -108,7 +131,6 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       await localDataSource.cacheAttendance(result);
       return Right(result);
     } on Failure catch (e) {
-      // We removed the offline fallback here to satisfy the "internet required" for anti-fraud
       return Left(e);
     }
   }
@@ -122,7 +144,31 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }) async {
     try {
       if (!await _hasConnection()) {
-        throw const ServerFailure('No internet connection (offline mode)');
+         try {
+           final localHistory = await localDataSource.getLastAttendanceHistory();
+           final activeSessionIndex = localHistory.indexWhere((element) => element.id == attendanceId);
+           
+           if (activeSessionIndex != -1) {
+             final activeSession = localHistory[activeSessionIndex];
+             // Safely use copyWith from AttendanceModel
+             final updatedSession = activeSession.copyWith(
+               checkOutTime: DateTime.now(),
+               isSynced: false,
+             );
+             
+             await localDataSource.updateAttendance(updatedSession);
+             await offlineQueue.addToQueue({
+               'type': 'check_out',
+               'relatedCheckInId': attendanceId,
+               'location': {'latitude': lat, 'longitude': long},
+             });
+             return Right(updatedSession);
+           } else {
+             return const Left(ServerFailure('لم يتم العثور على سجل مسبق محلياً لإتمام الانصراف، يرجى الاتصال بالإنترنت.'));
+           }
+         } catch (_) {
+            return const Left(ServerFailure('حدث خطأ أثناء حفظ الانصراف محلياً.'));
+         }
       }
 
       // --- Anti-Fraud Geofencing for Check-Out (Non-Blocking) ---

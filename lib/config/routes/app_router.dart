@@ -6,6 +6,7 @@ import 'package:delegate_app/features/admin/presentation/pages/admin_main_screen
 import 'package:delegate_app/features/admin/presentation/pages/branch_details_screen.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
+import 'package:delegate_app/features/changelog/presentation/pages/changelog_screen.dart';
 import 'package:go_router/go_router.dart';
 
 final appRouter = GoRouter(
@@ -37,6 +38,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/privacy-policy',
       builder: (context, state) => const PrivacyPolicyScreen(),
+    ),
+    GoRoute(
+      path: '/changelog',
+      builder: (context, state) => const ChangelogScreen(),
     ),
   ],
 );

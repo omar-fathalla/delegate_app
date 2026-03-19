@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import '../../data/models/branch_model.dart';
+import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/l10n/app_localizations.dart';
+import '../bloc/branch_bloc.dart';
 
 class AdminBranchesScreen extends StatelessWidget {
   const AdminBranchesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => di.sl<BranchBloc>()..add(BranchLoadRequested()),
+      child: const _AdminBranchesView(),
+    );
+  }
+}
+
+class _AdminBranchesView extends StatelessWidget {
+  const _AdminBranchesView();
 
   @override
   Widget build(BuildContext context) {
@@ -13,81 +26,107 @@ class AdminBranchesScreen extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('branches').snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text(l10n.errorGeneral));
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: BlocBuilder<BranchBloc, BranchState>(
+        builder: (context, state) {
+          if (state is BranchLoading || state is BranchInitial) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final docs = snapshot.data?.docs ?? [];
-
-          if (docs.isEmpty) {
+          if (state is BranchError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.store_mall_directory_outlined,
-                    size: 80,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                  Icon(Icons.error_outline, size: 48, color: colorScheme.error),
                   const SizedBox(height: 16),
-                  Text(
-                    l10n.branches,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                  Text(state.message, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  FilledButton.tonal(
+                    onPressed: () =>
+                        context.read<BranchBloc>().add(BranchLoadRequested()),
+                    child: Text(l10n.retry),
                   ),
                 ],
               ),
             );
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: docs.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              final branch = BranchModel.fromFirestore(doc);
-
-              return Card(
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  leading: CircleAvatar(
-                    backgroundColor: colorScheme.primaryContainer,
-                    child: Icon(Icons.store, color: colorScheme.primary),
-                  ),
-                  title: Text(
-                    branch.branchName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    '${branch.latitude.toStringAsFixed(4)}, ${branch.longitude.toStringAsFixed(4)}\nRadius: ${branch.geofenceRadius}m',
-                  ),
-                  isThreeLine: true,
-                  trailing: Icon(
-                    Icons.qr_code,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  onTap: () {
-                    // Navigate to BranchDetailsScreen (to be created)
-                    context.push('/admin/branch-details', extra: branch);
-                  },
+          if (state is BranchLoaded) {
+            if (state.branches.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.store_mall_directory_outlined,
+                      size: 80,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.branches,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               );
-            },
-          );
+            }
+
+            return RefreshIndicator(
+              onRefresh: () async =>
+                  context.read<BranchBloc>().add(BranchLoadRequested()),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: state.branches.length,
+                separatorBuilder: (context, i) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final branch = state.branches[index];
+
+                  return Card(
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      leading: CircleAvatar(
+                        backgroundColor: colorScheme.primaryContainer,
+                        child: Icon(Icons.store, color: colorScheme.primary),
+                      ),
+                      title: Text(
+                        branch.branchName,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        '${branch.latitude.toStringAsFixed(4)}, ${branch.longitude.toStringAsFixed(4)}\nRadius: ${branch.geofenceRadius}m',
+                      ),
+                      isThreeLine: true,
+                      trailing: Icon(
+                        Icons.qr_code,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      onTap: () {
+                        context
+                            .push('/admin/branch-details', extra: branch)
+                            .then((_) {
+                          if (context.mounted) {
+                            context
+                                .read<BranchBloc>()
+                                .add(BranchLoadRequested());
+                          }
+                        });
+                      },
+                    ),
+                  );
+                },
+              ),
+            );
+          }
+
+          return const SizedBox.shrink();
         },
       ),
     );

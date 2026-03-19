@@ -94,3 +94,68 @@ jobs:
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
           track: internal
           status: completed
+
+      # 10. إرسال "ما الجديد؟" تلقائياً للمندوبين عبر Firestore
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+
+      - name: Publish Changelog to Firestore
+        run: |
+          # Get version from pubspec.yaml
+          VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+
+          # Get commit messages since last release tag (or last 10 commits)
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --no-merges --grep="^chore" --invert-grep | head -10)
+          else
+            COMMITS=$(git log --oneline --no-merges --grep="^chore" --invert-grep -10)
+          fi
+
+          # Build highlights array from commit messages
+          HIGHLIGHTS=""
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            # Clean commit message: remove hash and conventional commit prefix
+            MSG=$(echo "$line" | sed 's/^[a-f0-9]* //' | sed 's/^feat[:(][^)]*)*: *//' | sed 's/^fix[:(][^)]*)*: *//' | sed 's/^refactor[:(][^)]*)*: *//' | sed 's/^ *//')
+            [ -z "$MSG" ] && continue
+            # Escape double quotes for JSON
+            MSG=$(echo "$MSG" | sed 's/"/\\"/g')
+            HIGHLIGHTS="${HIGHLIGHTS}{\"stringValue\":\"${MSG}\"},"
+          done <<< "$COMMITS"
+
+          # Remove trailing comma
+          HIGHLIGHTS=$(echo "$HIGHLIGHTS" | sed 's/,$//')
+
+          ACCESS_TOKEN=$(gcloud auth print-access-token)
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DOC_ID="release_${VERSION}_$(date +%s)"
+
+          # Create Firestore document
+          curl -sf -X POST \
+            "https://firestore.googleapis.com/v1/projects/practice-firebase-72df1/databases/(default)/documents/app_updates?documentId=${DOC_ID}" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"fields\": {
+                \"title\": {\"stringValue\": \"تحديث الإصدار ${VERSION}\"},
+                \"titleEn\": {\"stringValue\": \"Version ${VERSION} Update\"},
+                \"description\": {\"stringValue\": \"تم إصدار نسخة جديدة من التطبيق\"},
+                \"descriptionEn\": {\"stringValue\": \"A new version of the app has been released\"},
+                \"highlights\": {\"arrayValue\": {\"values\": [${HIGHLIGHTS}]}},
+                \"highlightsEn\": {\"arrayValue\": {\"values\": [${HIGHLIGHTS}]}},
+                \"version\": {\"stringValue\": \"${VERSION}\"},
+                \"type\": {\"stringValue\": \"feature\"},
+                \"priority\": {\"stringValue\": \"normal\"},
+                \"createdAt\": {\"timestampValue\": \"${TIMESTAMP}\"},
+                \"isActive\": {\"booleanValue\": true}
+              }
+            }"
+
+          echo "Changelog published for version ${VERSION}"
+
+          # Tag this release for future changelog diffs
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}" || true

@@ -1,4 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/features/admin/data/datasources/admin_remote_data_source.dart';
+import 'package:delegate_app/features/admin/data/repositories/admin_repository_impl.dart';
+import 'package:delegate_app/features/admin/domain/repositories/admin_repository.dart';
+import 'package:delegate_app/features/admin/domain/usecases/add_branch.dart';
+import 'package:delegate_app/features/admin/domain/usecases/delete_branch.dart';
+import 'package:delegate_app/features/admin/domain/usecases/get_branches.dart';
+import 'package:delegate_app/features/admin/domain/usecases/update_branch.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
@@ -24,6 +32,12 @@ import 'package:delegate_app/features/profile/data/repositories/profile_reposito
 import 'package:delegate_app/features/profile/domain/repositories/profile_repository.dart';
 import 'package:delegate_app/features/profile/domain/usecases/get_delegate_profile.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
+import 'package:delegate_app/features/changelog/data/datasources/changelog_remote_datasource.dart';
+import 'package:delegate_app/features/changelog/data/repositories/changelog_repository_impl.dart';
+import 'package:delegate_app/features/changelog/domain/repositories/changelog_repository.dart';
+import 'package:delegate_app/features/changelog/domain/usecases/get_new_updates.dart';
+import 'package:delegate_app/features/changelog/domain/usecases/get_all_updates.dart';
+import 'package:delegate_app/features/changelog/presentation/bloc/changelog_bloc.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:get_it/get_it.dart';
@@ -60,8 +74,6 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton<AuthLocalDataSource>(
     () => AuthLocalDataSourceImpl(sharedPreferences: sl()),
   );
-  // USE MOCKS FOR DEMO
-  // sl.registerLazySingleton<AuthRemoteDataSource>(() => MockAuthDataSource());
   sl.registerLazySingleton<AuthRemoteDataSource>(
     () => AuthRemoteDataSourceImpl(firestore: sl()),
   );
@@ -116,12 +128,61 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton<AttendanceOfflineQueue>(
     () => AttendanceOfflineQueueImpl(sharedPreferences: sl()),
   );
-  // USE MOCKS FOR DEMO
-  // sl.registerLazySingleton<AttendanceRemoteDataSource>(
-  //   () => MockAttendanceDataSource(),
-  // );
   sl.registerLazySingleton<AttendanceRemoteDataSource>(
     () => AttendanceRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  // ! Features - Admin
+  // Bloc
+  sl.registerFactory(
+    () => BranchBloc(
+      getBranches: sl(),
+      addBranch: sl(),
+      updateBranch: sl(),
+      deleteBranch: sl(),
+    ),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(() => GetBranches(sl()));
+  sl.registerLazySingleton(() => AddBranch(sl()));
+  sl.registerLazySingleton(() => UpdateBranch(sl()));
+  sl.registerLazySingleton(() => DeleteBranch(sl()));
+
+  // Repository
+  sl.registerLazySingleton<AdminRepository>(
+    () => AdminRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data source
+  sl.registerLazySingleton<AdminRemoteDataSource>(
+    () => AdminRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  // ! Features - Changelog
+  // Bloc
+  sl.registerFactory(
+    () => ChangelogBloc(
+      getNewUpdates: sl(),
+      getAllUpdates: sl(),
+    ),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(() => GetNewUpdates(sl()));
+  sl.registerLazySingleton(() => GetAllUpdates(sl()));
+
+  // Repository
+  sl.registerLazySingleton<ChangelogRepository>(
+    () => ChangelogRepositoryImpl(
+      remoteDataSource: sl(),
+      sharedPreferences: sl(),
+    ),
+  );
+
+  // Data source
+  sl.registerLazySingleton<ChangelogRemoteDataSource>(
+    () => ChangelogRemoteDataSourceImpl(firestore: sl()),
   );
 
   // ! Core
