@@ -55,9 +55,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # 4. تشغيل الاختبارات
+      # 4. تشغيل الاختبارات (بشكل تسلسلي لتجنب تنافس الموارد)
       - name: Run tests
-        run: flutter test --coverage
+        run: flutter test --concurrency=1
 
       # 5. إعداد ملف التوقيع (Keystore) من Secrets
       - name: Decode Keystore

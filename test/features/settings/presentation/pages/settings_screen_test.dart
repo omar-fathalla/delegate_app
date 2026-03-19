@@ -76,8 +76,9 @@ void main() {
   });
 
   group('SettingsScreen', () {
-    testWidgets('renders settings screen with key elements',
-        (WidgetTester tester) async {
+    testWidgets('renders settings screen with key elements', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
@@ -89,8 +90,7 @@ void main() {
       expect(find.byIcon(Icons.logout_rounded), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('dark mode switch toggles theme',
-        (WidgetTester tester) async {
+    testWidgets('dark mode switch toggles theme', (WidgetTester tester) async {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
@@ -103,8 +103,9 @@ void main() {
       expect(themeCubit.state.isDarkMode, !initialDark);
     });
 
-    testWidgets('tapping logout shows confirmation dialog',
-        (WidgetTester tester) async {
+    testWidgets('tapping logout shows confirmation dialog', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
@@ -116,8 +117,9 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
     });
 
-    testWidgets('logout dialog has cancel and confirm buttons',
-        (WidgetTester tester) async {
+    testWidgets('logout dialog has cancel and confirm buttons', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
@@ -128,8 +130,9 @@ void main() {
       expect(find.byType(FilledButton), findsOneWidget);
     });
 
-    testWidgets('tapping cancel closes logout dialog',
-        (WidgetTester tester) async {
+    testWidgets('tapping cancel closes logout dialog', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
@@ -144,8 +147,9 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
     });
 
-    testWidgets('color picker circles are rendered',
-        (WidgetTester tester) async {
+    testWidgets('color picker circles are rendered', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
