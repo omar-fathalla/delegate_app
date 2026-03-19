@@ -109,8 +109,12 @@ void main() {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
+      final logoutTile = find.byIcon(Icons.logout_rounded).last;
+      await tester.ensureVisible(logoutTile);
+      await tester.pumpAndSettle();
+
       // Tap the logout tile
-      await tester.tap(find.byIcon(Icons.logout_rounded).last);
+      await tester.tap(logoutTile);
       await tester.pumpAndSettle();
 
       // Dialog should appear
@@ -123,7 +127,11 @@ void main() {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.logout_rounded).last);
+      final logoutTile = find.byIcon(Icons.logout_rounded).last;
+      await tester.ensureVisible(logoutTile);
+      await tester.pumpAndSettle();
+
+      await tester.tap(logoutTile);
       await tester.pumpAndSettle();
 
       expect(find.byType(TextButton), findsOneWidget);
@@ -136,7 +144,11 @@ void main() {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.logout_rounded).last);
+      final logoutTile = find.byIcon(Icons.logout_rounded).last;
+      await tester.ensureVisible(logoutTile);
+      await tester.pumpAndSettle();
+
+      await tester.tap(logoutTile);
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);
