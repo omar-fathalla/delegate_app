@@ -147,26 +147,44 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final image = await _screenshotController.capture();
-      if (image == null) return;
-
-      final hasAccess = await Gal.hasAccess();
+      // 1. Check and request access explicitly for better reliability
+      bool hasAccess = await Gal.hasAccess();
       if (!hasAccess) {
-        await Gal.requestAccess();
+        hasAccess = await Gal.requestAccess();
+      }
+      
+      if (!hasAccess) {
+        throw Exception('Storage permission denied');
       }
 
-      await Gal.putImageBytes(image, name: '${_branch.branchName}_QR');
+      // 2. Capture with high pixel ratio for a professional look
+      final image = await _screenshotController.capture(
+        pixelRatio: 4.0, 
+        delay: const Duration(milliseconds: 200),
+      );
+      
+      if (image == null) {
+        throw Exception('Failed to capture QR code image');
+      }
+
+      // 3. Save to photo gallery
+      await Gal.putImageBytes(image, name: 'Tashil_${_branch.branchName}_QR');
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.qrSavedToGallery)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(l10n.qrSavedToGallery),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+        ));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.errorGeneral)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${l10n.errorGeneral}: $e'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -178,7 +196,6 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
-    // We encode the attendance type and branch name to match the existing requirements
     final qrData = jsonEncode({
       "type": "attendance",
       "branch": _branch.branchName,
@@ -196,145 +213,163 @@ class _BranchDetailsScreenState extends State<BranchDetailsScreen> {
           }
         },
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Screenshot(
-                    controller: _screenshotController,
-                    child: Card(
-                      margin: EdgeInsets.zero,
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'تسهيل',
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.primary,
-                                  ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Screenshot(
+                  controller: _screenshotController,
+                  child: Card(
+                    margin: EdgeInsets.zero,
+                    elevation: 0,
+                    color: theme.colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Tashil', // English always as requested
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w900,
+                              color: theme.colorScheme.primary,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _branch.branchName,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 15,
+                                  spreadRadius: 5,
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 24),
-                            Text(
-                              _branch.branchName,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: theme.colorScheme.onSurface,
+                            child: QrImageView(
+                              data: qrData,
+                              version: QrVersions.auto,
+                              size: 240.0,
+                              dataModuleStyle: const QrDataModuleStyle(
+                                dataModuleShape: QrDataModuleShape.square,
+                                color: Colors.black,
                               ),
+                              eyeStyle: const QrEyeStyle(
+                                eyeShape: QrEyeShape.square,
+                                color: Colors.black,
+                              ),
+                              backgroundColor: Colors.white,
                             ),
-                            const SizedBox(height: 32),
-                            // QR code must remain high contrast (black on white)
-                            // for reliable scanning regardless of the app theme.
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: QrImageView(
-                                data: qrData,
-                                version: QrVersions.auto,
-                                size: 250.0,
-                                // Using dataModuleStyle to ensure high contrast even in dark mode
-                                dataModuleStyle: const QrDataModuleStyle(
-                                  dataModuleShape: QrDataModuleShape.square,
-                                  color: Colors.black,
-                                ),
-                                eyeStyle: const QrEyeStyle(
-                                  eyeShape: QrEyeShape.square,
-                                  color: Colors.black,
-                                ),
-                                backgroundColor: Colors.white,
-                              ),
+                          ),
+                          const SizedBox(height: 32),
+                          Text(
+                            'Scan to Check-In',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: theme.colorScheme.outline,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 2,
                             ),
-                            const SizedBox(height: 32),
-                            Text(
-                              'Scan to Check-In',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: theme.colorScheme.outline,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 2,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  FilledButton.icon(
-                    onPressed: _downloadQR,
-                    icon: const Icon(Icons.download),
-                    label: Text(
-                      l10n.downloadQR,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                ),
+                const SizedBox(height: 40),
+                FilledButton.icon(
+                  onPressed: _isLoading ? null : _downloadQR,
+                  icon: const Icon(Icons.file_download_outlined),
+                  label: Text(
+                    l10n.downloadQR,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _editName,
-                          icon: const Icon(Icons.edit),
-                          label: Text(l10n.editName),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        onPressed: _isLoading ? null : _editName,
+                        icon: const Icon(Icons.edit_outlined),
+                        label: Text(l10n.editName),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _deleteBranch,
-                          icon: Icon(
-                            Icons.delete,
-                            color: theme.colorScheme.error,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _deleteBranch,
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: theme.colorScheme.error,
+                        ),
+                        label: Text(
+                          l10n.deleteBranch,
+                          style: TextStyle(color: theme.colorScheme.error),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: theme.colorScheme.error.withValues(alpha: 0.5),
                           ),
-                          label: Text(
-                            l10n.deleteBranch,
-                            style: TextStyle(color: theme.colorScheme.error),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: theme.colorScheme.error),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (_isLoading)
+            Positioned.fill(
+              child: Container(
+                color: theme.colorScheme.surface.withValues(alpha: 0.7),
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
               ),
             ),
+        ],
+      ),
     );
   }
 }

@@ -29,6 +29,15 @@ class BranchActionSuccess extends BranchState {
   List<Object> get props => [branch];
 }
 
+class BranchUpdateSuccess extends BranchState {
+  final Branch branch;
+
+  const BranchUpdateSuccess({required this.branch});
+
+  @override
+  List<Object> get props => [branch];
+}
+
 class BranchDeleteSuccess extends BranchState {
   const BranchDeleteSuccess();
 }

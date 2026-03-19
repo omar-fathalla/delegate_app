@@ -20,6 +20,15 @@ class BranchAddRequested extends BranchEvent {
   List<Object> get props => [branch];
 }
 
+class BranchUpdateRequested extends BranchEvent {
+  final Branch branch;
+
+  const BranchUpdateRequested({required this.branch});
+
+  @override
+  List<Object> get props => [branch];
+}
+
 class BranchDeleteRequested extends BranchEvent {
   final String branchId;
 
