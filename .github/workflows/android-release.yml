@@ -18,6 +18,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # 0. تحديث رقم البناء (Build Number) في pubspec.yaml تلقائياً
       - name: Auto-increment Build Number
@@ -104,7 +106,7 @@ jobs:
       - name: Publish Changelog to Firestore
         run: |
           # Get version from pubspec.yaml
-          VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+          VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | cut -d'+' -f1 | tr -d '\r\n ' )
 
           # Get commit messages since last release tag (or last 10 commits)
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -126,15 +128,19 @@ jobs:
             HIGHLIGHTS="${HIGHLIGHTS}{\"stringValue\":\"${MSG}\"},"
           done <<< "$COMMITS"
 
-          # Remove trailing comma
-          HIGHLIGHTS=$(echo "$HIGHLIGHTS" | sed 's/,$//')
+          # Remove trailing comma or provide fallback if empty
+          if [ -z "$HIGHLIGHTS" ]; then
+            HIGHLIGHTS="{\"stringValue\":\"تحسينات عامة والأداء\"}"
+          else
+            HIGHLIGHTS=$(echo "$HIGHLIGHTS" | sed 's/,$//')
+          fi
 
           ACCESS_TOKEN=$(gcloud auth print-access-token)
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           DOC_ID="release_${VERSION}_$(date +%s)"
 
           # Create Firestore document
-          curl -sf -X POST \
+          curl --fail-with-body -sS -X POST \
             "https://firestore.googleapis.com/v1/projects/practice-firebase-72df1/databases/(default)/documents/app_updates?documentId=${DOC_ID}" \
             -H "Authorization: Bearer ${ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
