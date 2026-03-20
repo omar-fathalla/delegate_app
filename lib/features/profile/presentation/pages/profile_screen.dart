@@ -789,6 +789,7 @@ class _FullScreenImageViewer extends StatelessWidget {
           ),
         ),
         leading: IconButton(
+          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
           icon: Icon(
             Icons.close_rounded,
             color: colorScheme.onInverseSurface,
