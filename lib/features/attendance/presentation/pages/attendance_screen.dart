@@ -208,23 +208,26 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                FilledButton.tonal(
-                  style: FilledButton.styleFrom(
-                    shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(14),
-                    backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
-                    foregroundColor: colorScheme.onPrimaryContainer,
+                Tooltip(
+                  message: MaterialLocalizations.of(context).previousMonthTooltip,
+                  child: FilledButton.tonal(
+                    style: FilledButton.styleFrom(
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(14),
+                      backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
+                      foregroundColor: colorScheme.onPrimaryContainer,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _selectedMonth = DateTime(
+                          _selectedMonth.year,
+                          _selectedMonth.month - 1,
+                        );
+                        _recomputeFilteredHistory();
+                      });
+                    },
+                    child: const Icon(Icons.chevron_left_rounded, size: 28),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedMonth = DateTime(
-                        _selectedMonth.year,
-                        _selectedMonth.month - 1,
-                      );
-                      _recomputeFilteredHistory();
-                    });
-                  },
-                  child: const Icon(Icons.chevron_left_rounded, size: 28),
                 ),
                 Text(
                   DateFormat('MMMM yyyy', locale).format(_selectedMonth),
@@ -234,23 +237,26 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                FilledButton.tonal(
-                  style: FilledButton.styleFrom(
-                    shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(14),
-                    backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
-                    foregroundColor: colorScheme.onPrimaryContainer,
+                Tooltip(
+                  message: MaterialLocalizations.of(context).nextMonthTooltip,
+                  child: FilledButton.tonal(
+                    style: FilledButton.styleFrom(
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(14),
+                      backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
+                      foregroundColor: colorScheme.onPrimaryContainer,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _selectedMonth = DateTime(
+                          _selectedMonth.year,
+                          _selectedMonth.month + 1,
+                        );
+                        _recomputeFilteredHistory();
+                      });
+                    },
+                    child: const Icon(Icons.chevron_right_rounded, size: 28),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedMonth = DateTime(
-                        _selectedMonth.year,
-                        _selectedMonth.month + 1,
-                      );
-                      _recomputeFilteredHistory();
-                    });
-                  },
-                  child: const Icon(Icons.chevron_right_rounded, size: 28),
                 ),
               ],
             ),
@@ -819,7 +825,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               child: CircleAvatar(
                 backgroundColor: colorScheme.surface.withValues(alpha: 0.3),
                 child: IconButton(
-                  tooltip: 'Close Scanner',
+                  tooltip: MaterialLocalizations.of(parentContext).closeButtonTooltip,
                   icon: Icon(Icons.close, color: colorScheme.surface),
                   onPressed: () {
                     Navigator.pop(parentContext);
