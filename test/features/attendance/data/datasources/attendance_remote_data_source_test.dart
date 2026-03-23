@@ -65,6 +65,7 @@ void main() {
     // 2. Act - perform check-out
     final checkOutResult = await dataSource.checkOut(
       checkInResult.id,
+      'org1',
       11.0,
       21.0,
     );
@@ -101,10 +102,10 @@ void main() {
       organizationId: 'org1',
       deviceInfo: 'device1',
     );
-    await dataSource.checkOut(checkIn.id, 11.0, 21.0);
+    await dataSource.checkOut(checkIn.id, 'org1', 11.0, 21.0);
 
     // Act
-    final history = await dataSource.getHistory('user1');
+    final history = await dataSource.getHistory('user1', 'org1');
 
     // Assert
     expect(history.length, 1);
@@ -125,7 +126,7 @@ void main() {
       );
 
       // Act
-      final active = await dataSource.findActiveAttendance('user1');
+      final active = await dataSource.findActiveAttendance('user1', 'org1');
 
       // Assert
       expect(active, isNotNull);
@@ -145,10 +146,10 @@ void main() {
         organizationId: 'org1',
         deviceInfo: 'device1',
       );
-      await dataSource.checkOut(checkIn.id, 11.0, 21.0);
+      await dataSource.checkOut(checkIn.id, 'org1', 11.0, 21.0);
 
       // Act
-      final active = await dataSource.findActiveAttendance('user1');
+      final active = await dataSource.findActiveAttendance('user1', 'org1');
 
       // Assert
       expect(active, isNull);

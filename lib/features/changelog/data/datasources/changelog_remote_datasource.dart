@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/changelog/data/models/app_update_model.dart';
@@ -23,7 +24,8 @@ class ChangelogRemoteDataSourceImpl implements ChangelogRemoteDataSource {
           .collection('app_updates')
           .where('isActive', isEqualTo: true)
           .orderBy('createdAt', descending: true)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 5));
 
       return snapshot.docs
           .map((doc) => AppUpdateModel.fromJson(doc.data(), doc.id))
@@ -41,7 +43,8 @@ class ChangelogRemoteDataSourceImpl implements ChangelogRemoteDataSource {
           .where('isActive', isEqualTo: true)
           .where('createdAt', isGreaterThan: Timestamp.fromDate(since))
           .orderBy('createdAt', descending: true)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 5));
 
       return snapshot.docs
           .map((doc) => AppUpdateModel.fromJson(doc.data(), doc.id))

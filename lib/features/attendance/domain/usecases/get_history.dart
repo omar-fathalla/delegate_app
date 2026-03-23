@@ -14,15 +14,19 @@ class GetHistory implements UseCase<List<Attendance>, GetHistoryParams> {
   Future<Either<Failure, List<Attendance>>> call(
     GetHistoryParams params,
   ) async {
-    return await repository.getHistory(params.userId);
+    return await repository.getHistory(params.userId, params.organizationId);
   }
 }
 
 class GetHistoryParams extends Equatable {
   final String userId;
+  final String organizationId;
 
-  const GetHistoryParams({required this.userId});
+  const GetHistoryParams({
+    required this.userId,
+    required this.organizationId,
+  });
 
   @override
-  List<Object> get props => [userId];
+  List<Object> get props => [userId, organizationId];
 }

@@ -41,27 +41,33 @@ class CheckInRequested extends AttendanceEvent {
 class CheckOutRequested extends AttendanceEvent {
   final String attendanceId;
   final String userId;
+  final String organizationId;
   final double lat;
   final double long;
 
   const CheckOutRequested({
     required this.attendanceId,
     required this.userId,
+    required this.organizationId,
     required this.lat,
     required this.long,
   });
 
   @override
-  List<Object> get props => [attendanceId, userId, lat, long];
+  List<Object> get props => [attendanceId, userId, organizationId, lat, long];
 }
 
 class HistoryRequested extends AttendanceEvent {
   final String userId;
+  final String organizationId;
 
-  const HistoryRequested({required this.userId});
+  const HistoryRequested({
+    required this.userId,
+    required this.organizationId,
+  });
 
   @override
-  List<Object> get props => [userId];
+  List<Object> get props => [userId, organizationId];
 }
 
 class SyncRequested extends AttendanceEvent {

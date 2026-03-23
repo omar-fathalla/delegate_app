@@ -20,6 +20,8 @@ import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_all_delegates.dart';
 import 'package:mocktail/mocktail.dart';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -31,12 +33,16 @@ class MockCheckIn extends Mock implements CheckIn {}
 class MockCheckOut extends Mock implements CheckOut {}
 class MockGetHistory extends Mock implements GetHistory {}
 class MockSyncAttendance extends Mock implements SyncAttendance {}
+class MockCacheDelegate extends Mock implements CacheDelegate {}
+class MockCacheAllDelegates extends Mock implements CacheAllDelegates {}
 
 class FakeLoginParams extends Fake implements LoginParams {}
 class FakeNoParams extends Fake implements NoParams {}
 class FakeCheckInParams extends Fake implements CheckInParams {}
 class FakeCheckOutParams extends Fake implements CheckOutParams {}
 class FakeGetHistoryParams extends Fake implements GetHistoryParams {}
+class FakeDelegate extends Fake implements Delegate {}
+class FakeDelegateList extends Fake implements List<Delegate> {}
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -75,6 +81,7 @@ final tDelegate = Delegate(
 final tAttendanceCheckIn = Attendance(
   id: 'att_1',
   userId: 'user_1',
+  organizationId: 'org1',
   checkInTime: DateTime(2024, 6, 15, 9, 0),
   checkOutTime: null,
   latitude: 30.0444,
@@ -86,6 +93,7 @@ final tAttendanceCheckIn = Attendance(
 final tAttendanceCheckOut = Attendance(
   id: 'att_1',
   userId: 'user_1',
+  organizationId: 'org1',
   checkInTime: DateTime(2024, 6, 15, 9, 0),
   checkOutTime: DateTime(2024, 6, 15, 17, 0),
   latitude: 30.0444,
@@ -103,6 +111,8 @@ void main() {
     registerFallbackValue(FakeCheckInParams());
     registerFallbackValue(FakeCheckOutParams());
     registerFallbackValue(FakeGetHistoryParams());
+    registerFallbackValue(FakeDelegate());
+    registerFallbackValue(<Delegate>[]);
   });
 
   group('Integration: Login Flow', () {
@@ -110,21 +120,30 @@ void main() {
     late MockCheckAutoLogin mockCheckAutoLogin;
     late MockLogout mockLogout;
 
+    late MockCacheDelegate mockCacheDelegate;
+    late MockCacheAllDelegates mockCacheAllDelegates;
+
     setUp(() {
       mockLogin = MockLogin();
       mockCheckAutoLogin = MockCheckAutoLogin();
       mockLogout = MockLogout();
+      mockCacheDelegate = MockCacheDelegate();
+      mockCacheAllDelegates = MockCacheAllDelegates();
     });
 
     blocTest<AuthBloc, AuthState>(
       'Scenario 1: Successful login transitions to AuthAuthenticated',
       build: () {
         when(() => mockLogin(any()))
-            .thenAnswer((_) async => Right(tDelegate));
+            .thenAnswer((_) async => Right([tDelegate]));
+        when(() => mockCacheAllDelegates(any()))
+            .thenAnswer((_) async => const Right(null));
         return AuthBloc(
           loginUseCase: mockLogin,
           checkAutoLoginUseCase: mockCheckAutoLogin,
           logoutUseCase: mockLogout,
+          cacheDelegateUseCase: mockCacheDelegate,
+          cacheAllDelegatesUseCase: mockCacheAllDelegates,
         );
       },
       act: (bloc) => bloc.add(const LoginRequested(
@@ -151,6 +170,8 @@ void main() {
           loginUseCase: mockLogin,
           checkAutoLoginUseCase: mockCheckAutoLogin,
           logoutUseCase: mockLogout,
+          cacheDelegateUseCase: mockCacheDelegate,
+          cacheAllDelegatesUseCase: mockCacheAllDelegates,
         );
       },
       act: (bloc) => bloc.add(const LoginRequested(
@@ -176,6 +197,8 @@ void main() {
           loginUseCase: mockLogin,
           checkAutoLoginUseCase: mockCheckAutoLogin,
           logoutUseCase: mockLogout,
+          cacheDelegateUseCase: mockCacheDelegate,
+          cacheAllDelegatesUseCase: mockCacheAllDelegates,
         );
       },
       act: (bloc) => bloc.add(CheckAutoLoginRequested()),
@@ -194,6 +217,8 @@ void main() {
           loginUseCase: mockLogin,
           checkAutoLoginUseCase: mockCheckAutoLogin,
           logoutUseCase: mockLogout,
+          cacheDelegateUseCase: mockCacheDelegate,
+          cacheAllDelegatesUseCase: mockCacheAllDelegates,
         );
       },
       act: (bloc) => bloc.add(CheckAutoLoginRequested()),
@@ -296,6 +321,7 @@ void main() {
       act: (bloc) => bloc.add(const CheckOutRequested(
         attendanceId: 'att_1',
         userId: 'user_1',
+        organizationId: 'org1',
         lat: 30.0444,
         long: 31.2357,
       )),
@@ -323,7 +349,7 @@ void main() {
           syncAttendance: mockSync,
         );
       },
-      act: (bloc) => bloc.add(HistoryRequested(userId: 'user_1')),
+      act: (bloc) => bloc.add(HistoryRequested(userId: 'user_1', organizationId: 'org1')),
       expect: () => [
         isA<AttendanceLoading>(),
         isA<AttendanceHistoryLoaded>(),
@@ -367,11 +393,12 @@ void main() {
         bloc.add(const CheckOutRequested(
           attendanceId: 'att_1',
           userId: 'user_1',
+          organizationId: 'org1',
           lat: 30.0444,
           long: 31.2357,
         ));
         await Future.delayed(Duration.zero);
-        bloc.add(HistoryRequested(userId: 'user_1'));
+        bloc.add(HistoryRequested(userId: 'user_1', organizationId: 'org1'));
       },
       expect: () => [
         isA<AttendanceLoading>(),
@@ -389,10 +416,15 @@ void main() {
     late MockCheckAutoLogin mockCheckAutoLogin;
     late MockLogout mockLogout;
 
+    late MockCacheDelegate mockCacheDelegate;
+    late MockCacheAllDelegates mockCacheAllDelegates;
+
     setUp(() {
       mockLogin = MockLogin();
       mockCheckAutoLogin = MockCheckAutoLogin();
       mockLogout = MockLogout();
+      mockCacheDelegate = MockCacheDelegate();
+      mockCacheAllDelegates = MockCacheAllDelegates();
     });
 
     blocTest<AuthBloc, AuthState>(
@@ -404,6 +436,8 @@ void main() {
           loginUseCase: mockLogin,
           checkAutoLoginUseCase: mockCheckAutoLogin,
           logoutUseCase: mockLogout,
+          cacheDelegateUseCase: mockCacheDelegate,
+          cacheAllDelegatesUseCase: mockCacheAllDelegates,
         );
       },
       seed: () => AuthAuthenticated(delegate: tDelegate),

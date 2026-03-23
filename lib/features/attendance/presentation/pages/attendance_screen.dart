@@ -55,10 +55,24 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     });
   }
 
+
   @override
   void dispose() {
     _connectivitySub.cancel();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant AttendanceScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.delegate.organizationUID != widget.delegate.organizationUID) {
+      setState(() {
+        _rawHistory.clear();
+        _filteredHistory.clear();
+        _groupedByDay.clear();
+        _dayKeys.clear();
+      });
+    }
   }
 
   /// Recomputes filtered/grouped data only when source data or month changes.
@@ -83,9 +97,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     final l10n = AppLocalizations.of(context)!;
     return BlocProvider(
-      create: (context) => sl<AttendanceBloc>()
-        ..add(HistoryRequested(userId: widget.delegate.uid))
-        ..add(const SyncRequested()),
+      key: ValueKey(widget.delegate.organizationUID),
+      create: (context) {
+        final bloc = sl<AttendanceBloc>();
+        bloc.add(HistoryRequested(
+          userId: widget.delegate.uid,
+          organizationId: widget.delegate.organizationUID,
+        ));
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!bloc.isClosed) {
+            bloc.add(const SyncRequested());
+          }
+        });
+        return bloc;
+      },
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
@@ -98,7 +123,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               );
             }
             context.read<AttendanceBloc>().add(
-              HistoryRequested(userId: widget.delegate.uid),
+              HistoryRequested(
+                userId: widget.delegate.uid,
+                organizationId: widget.delegate.organizationUID,
+              ),
             );
           } else if (state is AttendanceCheckedOut) {
             if (state.attendance.isSynced) {
@@ -110,7 +138,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               );
             }
             context.read<AttendanceBloc>().add(
-              HistoryRequested(userId: widget.delegate.uid),
+              HistoryRequested(
+                userId: widget.delegate.uid,
+                organizationId: widget.delegate.organizationUID,
+              ),
             );
           } else if (state is AttendanceError) {
             AppSnackBar.showError(context, state.message);
@@ -124,7 +155,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               Future.delayed(const Duration(seconds: 1), () {
                 if (context.mounted) {
                   context.read<AttendanceBloc>().add(
-                    HistoryRequested(userId: widget.delegate.uid),
+                    HistoryRequested(
+                      userId: widget.delegate.uid,
+                      organizationId: widget.delegate.organizationUID,
+                    ),
                   );
                 }
               });
@@ -322,7 +356,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             FilledButton(
               onPressed: () {
                 context.read<AttendanceBloc>().add(
-                  HistoryRequested(userId: widget.delegate.uid),
+                  HistoryRequested(
+                    userId: widget.delegate.uid,
+                    organizationId: widget.delegate.organizationUID,
+                  ),
                 );
               },
               child: Text(l10n.retry),
@@ -402,7 +439,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         onRefresh: () async {
           context.read<AttendanceBloc>().add(const SyncRequested());
           context.read<AttendanceBloc>().add(
-            HistoryRequested(userId: widget.delegate.uid),
+            HistoryRequested(
+              userId: widget.delegate.uid,
+              organizationId: widget.delegate.organizationUID,
+            ),
           );
         },
         child: ListView.builder(
@@ -689,6 +729,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           CheckOutRequested(
                             attendanceId: activeAttendanceId,
                             userId: widget.delegate.uid,
+                            organizationId: widget.delegate.organizationUID,
                             lat: position.latitude,
                             long: position.longitude,
                           ),

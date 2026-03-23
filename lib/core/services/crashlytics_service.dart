@@ -16,13 +16,20 @@ class CrashlyticsService {
 
     // التقاط أخطاء Flutter framework
     FlutterError.onError = (errorDetails) {
-      _crashlytics.recordFlutterFatalError(errorDetails);
+      // Do not use recordFlutterFatalError, as it forcefully crashes the app
+      // for ANY layout exception (e.g. bottom overflow by 2 pixels).
+      FirebaseCrashlytics.instance.recordFlutterError(errorDetails);
+      FlutterError.presentError(errorDetails);
     };
 
     // التقاط أخطاء Dart غير المعالجة (async errors)
     PlatformDispatcher.instance.onError = (error, stack) {
-      _crashlytics.recordError(error, stack, fatal: true);
-      return true;
+      debugPrint('Unhandled Exception: $error');
+      debugPrintStack(stackTrace: stack);
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: false);
+      // Return false to allow the framework to handle the error
+      // (e.g., show the ErrorWidget) and prevent infinite render loops.
+      return false;
     };
   }
 

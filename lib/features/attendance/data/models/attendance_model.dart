@@ -5,6 +5,7 @@ class AttendanceModel extends Attendance {
   const AttendanceModel({
     required super.id,
     required super.userId,
+    required super.organizationId,
     required super.checkInTime,
     super.checkOutTime,
     super.latitude,
@@ -19,11 +20,12 @@ class AttendanceModel extends Attendance {
   factory AttendanceModel.fromJson(Map<String, dynamic> json, String id) {
     return AttendanceModel(
       id: id,
-      userId: json['userId'] ?? '',
-      checkInTime: DateTimeUtils.parseDate(json['checkInTime']),
+      userId: json['userId'] ?? json['delegateId'] ?? '',
+      organizationId: json['organizationId'] ?? '',
+      checkInTime: DateTimeUtils.parseDate(json['checkInTime'] ?? json['timestamp']),
       checkOutTime: DateTimeUtils.parseNullableDate(json['checkOutTime']),
-      latitude: json['latitude']?.toDouble(),
-      longitude: json['longitude']?.toDouble(),
+      latitude: json['location']?['latitude']?.toDouble() ?? json['latitude']?.toDouble(),
+      longitude: json['location']?['longitude']?.toDouble() ?? json['longitude']?.toDouble(),
       imageUrl: json['imageUrl'],
       branchName: json['branchName'],
       isSynced: json['isSynced'] ?? true,
@@ -36,10 +38,15 @@ class AttendanceModel extends Attendance {
     return {
       'id': id,
       'userId': userId,
+      'delegateId': userId, // للتوافق مع Firestore
+      'organizationId': organizationId,
       'checkInTime': checkInTime.toIso8601String(),
+      'timestamp': checkInTime.toIso8601String(), // للتوافق مع Firestore
       'checkOutTime': checkOutTime?.toIso8601String(),
-      'latitude': latitude,
-      'longitude': longitude,
+      'location': {
+        'latitude': latitude,
+        'longitude': longitude,
+      },
       'imageUrl': imageUrl,
       'branchName': branchName,
       'isSynced': isSynced,
@@ -51,6 +58,7 @@ class AttendanceModel extends Attendance {
   AttendanceModel copyWith({
     String? id,
     String? userId,
+    String? organizationId,
     DateTime? checkInTime,
     DateTime? checkOutTime,
     double? latitude,
@@ -64,6 +72,7 @@ class AttendanceModel extends Attendance {
     return AttendanceModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      organizationId: organizationId ?? this.organizationId,
       checkInTime: checkInTime ?? this.checkInTime,
       checkOutTime: checkOutTime ?? this.checkOutTime,
       latitude: latitude ?? this.latitude,

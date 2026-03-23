@@ -11,6 +11,19 @@ class AuthInitial extends AuthState {}
 
 class AuthLoading extends AuthState {}
 
+class AuthOrganizationSelectionRequired extends AuthState {
+  final List<Delegate> delegates;
+  final bool rememberMe;
+
+  const AuthOrganizationSelectionRequired({
+    required this.delegates,
+    required this.rememberMe,
+  });
+
+  @override
+  List<Object> get props => [delegates, rememberMe];
+}
+
 class AuthAuthenticated extends AuthState {
   final Delegate delegate;
 

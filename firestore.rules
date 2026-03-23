@@ -345,6 +345,14 @@ service cloud.firestore {
             belongsToCompany(orgId, resource.data.targetCompanyId))
         );
       }
+
+      // ==================== ATTENDANCE LOGS ====================
+      // Attendance logs scoped to the organization
+      match /attendance_logs/{logId} {
+        allow read, create: if isAuthenticated();
+        // Append-only logs
+        allow update, delete: if false;
+      }
     }
 
     // ==================== MAIL COLLECTION ====================

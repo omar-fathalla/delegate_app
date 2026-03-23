@@ -12,8 +12,8 @@ void main() {
     dataSource = AuthRemoteDataSourceImpl(firestore: fakeFirestore);
   });
 
-  group('getDelegateByPhone', () {
-    test('should return DelegateModel when delegate found in collectionGroup',
+  group('getDelegatesByPhone', () {
+    test('should return list of DelegateModels when delegate found in collectionGroup',
         () async {
       // Seed data in the nested delegates collection
       await fakeFirestore
@@ -44,18 +44,18 @@ void main() {
         'createdBy': 'admin',
       });
 
-      final result = await dataSource.getDelegateByPhone('01000000000');
+      final result = await dataSource.getDelegatesByPhone('01000000000');
 
-      expect(result, isNotNull);
-      expect(result!.firstName, 'أحمد');
-      expect(result.phoneNumber, '01000000000');
-      expect(result.nationalityID, '12345678901234');
+      expect(result, isNotEmpty);
+      expect(result.first.firstName, 'أحمد');
+      expect(result.first.phoneNumber, '01000000000');
+      expect(result.first.nationalityID, '12345678901234');
     });
 
-    test('should return null when phone number is not found', () async {
-      final result = await dataSource.getDelegateByPhone('09999999999');
+    test('should return empty list when phone number is not found', () async {
+      final result = await dataSource.getDelegatesByPhone('09999999999');
 
-      expect(result, isNull);
+      expect(result, isEmpty);
     });
 
     test('should normalize phone number with +20 prefix', () async {
@@ -74,10 +74,10 @@ void main() {
         'status': 'active',
       });
 
-      final result = await dataSource.getDelegateByPhone('+201234567890');
+      final result = await dataSource.getDelegatesByPhone('+201234567890');
 
-      expect(result, isNotNull);
-      expect(result!.firstName, 'سارة');
+      expect(result, isNotEmpty);
+      expect(result.first.firstName, 'سارة');
     });
 
     test('should find admin in users collection', () async {
@@ -91,10 +91,10 @@ void main() {
         'companyName': 'شركة تسهيل',
       });
 
-      final result = await dataSource.getDelegateByPhone('01508899965');
+      final result = await dataSource.getDelegatesByPhone('01508899965');
 
-      expect(result, isNotNull);
-      expect(result!.position, DelegatePosition.supervisor);
+      expect(result, isNotEmpty);
+      expect(result.first.position, DelegatePosition.supervisor);
     });
   });
 }

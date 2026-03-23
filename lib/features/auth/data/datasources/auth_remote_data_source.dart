@@ -7,8 +7,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 abstract class AuthRemoteDataSource {
   /// Queries the `delegates` collectionGroup by phone number.
-  /// Returns [DelegateModel] if found, `null` if not.
-  Future<DelegateModel?> getDelegateByPhone(String phoneNumber);
+  /// Returns a list of [DelegateModel] matching the phone number.
+  /// May contain multiple documents if delegate is registered in multiple orgs.
+  Future<List<DelegateModel>> getDelegatesByPhone(String phoneNumber);
 
   /// Signs in the user anonymously to satisfy Firestore rules.
   Future<void> signInAnonymously();
@@ -39,7 +40,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<DelegateModel?> getDelegateByPhone(String phoneNumber) async {
+  Future<List<DelegateModel>> getDelegatesByPhone(String phoneNumber) async {
     try {
       final normalizedPhone = _normalizePhone(phoneNumber);
 
@@ -48,71 +49,78 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // No sensitive data is stored in the source code.
       if (AppConfig.isAdminConfigured &&
           normalizedPhone == AppConfig.adminPhone) {
-        return DelegateModel(
-          uid: 'admin-mobile-login',
-          firstName: 'Admin',
-          middleName: '',
-          lastName: '',
-          fullName: 'Admin',
-          nationalityID: AppConfig.adminPassword, // Password from env config
-          motherName: '',
-          city: '',
-          phoneNumber: normalizedPhone,
-          gender: DelegateGender.male,
-          position: DelegatePosition.supervisor, // Forces dashboard redirect
-          birthDate: DateTime.now(),
-          organizationUID: '',
-          organizationName: '',
-          companyUID: '',
-          companyName: '',
-          status: DelegateStatus.approved,
-          delegatePublicId: '',
-          allReceiptCodes: const [],
-          createdAt: DateTime.now(),
-          createdBy: 'system_admin',
-          hasPendingUpdate: false,
-          isDeductedFromCompany: false,
-          isPrinted: false,
-          isProfileComplete: true,
-          numberOfDocuments: 0,
-          paymentAmount: 0,
-          version: 1,
-          documents: const [],
-        );
+        return [
+          DelegateModel(
+            uid: 'admin-mobile-login',
+            firstName: 'Admin',
+            middleName: '',
+            lastName: '',
+            fullName: 'Admin',
+            nationalityID: AppConfig.adminPassword, // Password from env config
+            motherName: '',
+            city: '',
+            phoneNumber: normalizedPhone,
+            gender: DelegateGender.male,
+            position: DelegatePosition.supervisor, // Forces dashboard redirect
+            birthDate: DateTime.now(),
+            organizationUID: '',
+            organizationName: '',
+            companyUID: '',
+            companyName: '',
+            status: DelegateStatus.approved,
+            delegatePublicId: '',
+            allReceiptCodes: const [],
+            createdAt: DateTime.now(),
+            createdBy: 'system_admin',
+            hasPendingUpdate: false,
+            isDeductedFromCompany: false,
+            isPrinted: false,
+            isProfileComplete: true,
+            numberOfDocuments: 0,
+            paymentAmount: 0,
+            version: 1,
+            documents: const [],
+          ),
+        ];
       }
       // ──────────────────────────────────────────────────────────────
 
       final querySnapshot = await firestore
           .collectionGroup('delegates')
           .where('phoneNumber', isEqualTo: normalizedPhone)
-          .limit(1)
           .get();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final doc = querySnapshot.docs.first;
+      final delegates = <DelegateModel>[];
+      for (final doc in querySnapshot.docs) {
         final data = doc.data();
-        return DelegateModel.fromJson(data, doc.id);
-      } else {
-        // Fallback: Check if the user is an admin in the 'users' collection
-        try {
-          final userQuery = await firestore
-              .collection('users')
-              .where('phoneNumber', isEqualTo: normalizedPhone)
-              .limit(1)
-              .get();
+        delegates.add(DelegateModel.fromJson(data, doc.id));
+      }
 
-          if (userQuery.docs.isNotEmpty) {
-            final userDoc = userQuery.docs.first;
-            final userData = userDoc.data();
-            final role = userData['role'] as String? ?? '';
-            if (role == 'company-admin' ||
-                role == 'organization-admin' ||
-                role == 'Supervisor') {
-              // Admin password loaded from environment config (--dart-define)
-              final adminPassword = AppConfig.adminPassword;
+      if (delegates.isNotEmpty) {
+        return delegates;
+      }
 
-              // Map admin user to a supervisor DelegateModel for dashboard access
-              return DelegateModel(
+      // Fallback: Check if the user is an admin in the 'users' collection
+      try {
+        final userQuery = await firestore
+            .collection('users')
+            .where('phoneNumber', isEqualTo: normalizedPhone)
+            .limit(1)
+            .get();
+
+        if (userQuery.docs.isNotEmpty) {
+          final userDoc = userQuery.docs.first;
+          final userData = userDoc.data();
+          final role = userData['role'] as String? ?? '';
+          if (role == 'company-admin' ||
+              role == 'organization-admin' ||
+              role == 'Supervisor') {
+            // Admin password loaded from environment config (--dart-define)
+            final adminPassword = AppConfig.adminPassword;
+
+            // Map admin user to a supervisor DelegateModel for dashboard access
+            return [
+              DelegateModel(
                 uid: userDoc.id,
                 firstName: userData['displayName'] ?? 'Admin',
                 middleName: '',
@@ -123,8 +131,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 city: '',
                 phoneNumber: normalizedPhone,
                 gender: DelegateGender.male,
-                position:
-                    DelegatePosition.supervisor, // Forces dashboard redirect
+                position: DelegatePosition.supervisor, // Forces dashboard redirect
                 birthDate: DateTime.now(),
                 organizationUID: userData['organizationUID'] ?? '',
                 organizationName: userData['organizationName'] ?? '',
@@ -143,14 +150,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 paymentAmount: 0,
                 version: 1,
                 documents: const [],
-              );
-            }
+              ),
+            ];
           }
-        } on FirebaseException catch (_) {
-          // Anonymous users can't query /users — this is expected, continue.
         }
-        return null;
+      } on FirebaseException catch (_) {
+        // Anonymous users can't query /users — this is expected, continue.
       }
+      return [];
     } on FirebaseException catch (_) {
       throw const ServerFailure(
         'فشل في الاتصال بقاعدة البيانات. حاول مرة أخرى.',

@@ -25,3 +25,16 @@ class LoginRequested extends AuthEvent {
 class CheckAutoLoginRequested extends AuthEvent {}
 
 class LogoutRequested extends AuthEvent {}
+
+class OrganizationSelected extends AuthEvent {
+  final Delegate delegate;
+  final bool rememberMe;
+
+  const OrganizationSelected({
+    required this.delegate,
+    required this.rememberMe,
+  });
+
+  @override
+  List<Object> get props => [delegate, rememberMe];
+}

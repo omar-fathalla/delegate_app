@@ -16,7 +16,7 @@ class AuthRepositoryImpl implements AuthRepository {
   });
 
   @override
-  Future<Either<Failure, Delegate>> getDelegateByPhone(
+  Future<Either<Failure, List<Delegate>>> getDelegatesByPhone(
     String phoneNumber,
   ) async {
     try {
@@ -24,20 +24,28 @@ class AuthRepositoryImpl implements AuthRepository {
       await remoteDataSource.signInAnonymously();
 
       // 2. Now fetch the delegate data
-      final delegate = await remoteDataSource.getDelegateByPhone(phoneNumber);
-      if (delegate == null) {
+      final delegates = await remoteDataSource.getDelegatesByPhone(phoneNumber);
+      if (delegates.isEmpty) {
         return const Left(AuthFailure('رقم الهاتف غير مسجل'));
       }
 
-      // Validate delegate status — block Suspended/Rejected accounts
-      if (delegate.status == DelegateStatus.suspended) {
-        return const Left(AuthFailure('تم تعليق حسابك. تواصل مع الإدارة.'));
-      }
-      if (delegate.status == DelegateStatus.rejected) {
+      // Filter out suspended/rejected delegates
+      final validDelegates = delegates
+          .where((delegate) =>
+              delegate.status != DelegateStatus.suspended &&
+              delegate.status != DelegateStatus.rejected)
+          .toList();
+
+      if (validDelegates.isEmpty) {
+        // Determine which message to show from the first delegate's status
+        final first = delegates.first;
+        if (first.status == DelegateStatus.suspended) {
+          return const Left(AuthFailure('تم تعليق حسابك. تواصل مع الإدارة.'));
+        }
         return const Left(AuthFailure('تم رفض حسابك. تواصل مع الإدارة.'));
       }
 
-      return Right(delegate);
+      return Right(validDelegates);
     } on Failure catch (failure) {
       return Left(failure);
     } catch (e) {
@@ -63,6 +71,32 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final delegate = localDataSource.getCachedDelegateData();
       return Right(delegate);
+    } on Failure catch (failure) {
+      return Left(failure);
+    } catch (e) {
+      return Left(CacheFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> cacheAllDelegates(
+      List<Delegate> delegates) async {
+    try {
+      final models = delegates.map((d) => d as DelegateModel).toList();
+      await localDataSource.cacheAllDelegatesData(models);
+      return const Right(null);
+    } on Failure catch (failure) {
+      return Left(failure);
+    } catch (e) {
+      return Left(CacheFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Delegate>>> getCachedAllDelegates() async {
+    try {
+      final delegates = localDataSource.getCachedAllDelegatesData();
+      return Right(delegates);
     } on Failure catch (failure) {
       return Left(failure);
     } catch (e) {

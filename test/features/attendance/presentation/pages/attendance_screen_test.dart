@@ -29,6 +29,7 @@ class MockAttendanceRepository implements AttendanceRepository {
       Attendance(
         id: '1',
         userId: userId,
+        organizationId: organizationId,
         checkInTime: DateTime.now(),
         checkOutTime: null,
       ),
@@ -41,11 +42,13 @@ class MockAttendanceRepository implements AttendanceRepository {
     double lat,
     double long, {
     required String userId,
+    required String organizationId,
   }) async {
     return Right(
       Attendance(
         id: attendanceId,
         userId: 'user1',
+        organizationId: organizationId,
         checkInTime: DateTime.now().subtract(const Duration(hours: 1)),
         checkOutTime: DateTime.now(),
       ),
@@ -53,13 +56,14 @@ class MockAttendanceRepository implements AttendanceRepository {
   }
 
   @override
-  Future<Either<Failure, List<Attendance>>> getHistory(String userId) async {
+  Future<Either<Failure, List<Attendance>>> getHistory(String userId, String organizationId) async {
     return const Right([]);
   }
 
   @override
   Future<Either<Failure, Attendance?>> findActiveAttendance(
     String userId,
+    String organizationId,
   ) async {
     return const Right(null);
   }
