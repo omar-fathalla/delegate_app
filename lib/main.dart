@@ -33,8 +33,10 @@ void main() async {
     SharedPreferences.getInstance(),
   ]);
 
-  // تهيئة Crashlytics لالتقاط الأخطاء في الإنتاج
-  await CrashlyticsService.initialize();
+  // Initialize Crashlytics non-blockingly
+  CrashlyticsService.initialize().catchError((e) {
+    debugPrint('Crashlytics Init Error: $e');
+  });
 
   // مراقب BLoC لتسجيل الأخطاء والانتقالات
   Bloc.observer = AppBlocObserver();
@@ -45,8 +47,10 @@ void main() async {
   // Providers are now registered in DI — no duplicate SharedPreferences call
   localeProvider = di.sl<LocaleProvider>();
 
-  // Initialize push notifications (FCM)
-  await PushNotificationService().initialize();
+  // Initialize push notifications (FCM) non-blockingly
+  PushNotificationService().initialize().catchError((e) {
+    debugPrint('FCM Init Error: $e');
+  });
 
   runApp(const MyApp());
 }

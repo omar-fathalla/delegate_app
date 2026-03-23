@@ -17,6 +17,7 @@ class CheckOut implements UseCase<Attendance, CheckOutParams> {
       params.lat,
       params.long,
       userId: params.userId,
+      organizationId: params.organizationId,
     );
   }
 }
@@ -24,16 +25,18 @@ class CheckOut implements UseCase<Attendance, CheckOutParams> {
 class CheckOutParams extends Equatable {
   final String attendanceId;
   final String userId;
+  final String organizationId;
   final double lat;
   final double long;
 
   const CheckOutParams({
     required this.attendanceId,
     required this.userId,
+    required this.organizationId,
     required this.lat,
     required this.long,
   });
 
   @override
-  List<Object> get props => [attendanceId, userId, lat, long];
+  List<Object> get props => [attendanceId, userId, organizationId, lat, long];
 }

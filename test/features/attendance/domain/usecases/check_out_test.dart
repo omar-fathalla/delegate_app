@@ -25,6 +25,7 @@ void main() {
   final tAttendance = Attendance(
     id: tAttendanceId,
     userId: tUserId,
+    organizationId: 'org1',
     checkInTime: DateTime(2024, 1, 1, 8, 0),
     checkOutTime: DateTime(2024, 1, 1, 17, 0),
     latitude: tLat,
@@ -40,6 +41,7 @@ void main() {
         any(),
         any(),
         userId: any(named: 'userId'),
+        organizationId: any(named: 'organizationId'),
       ),
     ).thenAnswer((_) async => Right(tAttendance));
 
@@ -48,6 +50,7 @@ void main() {
       const CheckOutParams(
         attendanceId: tAttendanceId,
         userId: tUserId,
+        organizationId: 'org1',
         lat: tLat,
         long: tLong,
       ),
@@ -61,6 +64,7 @@ void main() {
         tLat,
         tLong,
         userId: tUserId,
+        organizationId: 'org1',
       ),
     ).called(1);
   });
@@ -74,6 +78,7 @@ void main() {
         any(),
         any(),
         userId: any(named: 'userId'),
+        organizationId: any(named: 'organizationId'),
       ),
     ).thenAnswer((_) async => const Left(tFailure));
 
@@ -82,6 +87,7 @@ void main() {
       const CheckOutParams(
         attendanceId: tAttendanceId,
         userId: tUserId,
+        organizationId: 'org1',
         lat: tLat,
         long: tLong,
       ),
@@ -95,9 +101,10 @@ void main() {
     const params = CheckOutParams(
       attendanceId: tAttendanceId,
       userId: tUserId,
+      organizationId: 'org1',
       lat: tLat,
       long: tLong,
     );
-    expect(params.props, [tAttendanceId, tUserId, tLat, tLong]);
+    expect(params.props, [tAttendanceId, tUserId, 'org1', tLat, tLong]);
   });
 }

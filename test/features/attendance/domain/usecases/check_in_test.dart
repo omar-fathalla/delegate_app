@@ -47,17 +47,18 @@ class MockAttendanceRepository implements AttendanceRepository {
     double lat,
     double long, {
     required String userId,
+    required String organizationId,
   }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<Either<Failure, List<Attendance>>> getHistory(String userId) {
+  Future<Either<Failure, List<Attendance>>> getHistory(String userId, String organizationId) {
     throw UnimplementedError();
   }
 
   @override
-  Future<Either<Failure, Attendance?>> findActiveAttendance(String userId) {
+  Future<Either<Failure, Attendance?>> findActiveAttendance(String userId, String organizationId) {
     throw UnimplementedError();
   }
 
@@ -97,6 +98,7 @@ void main() {
   final tAttendance = Attendance(
     id: '1',
     userId: tUserId,
+    organizationId: tOrganizationId,
     checkInTime: DateTime(2023, 1, 1, 8, 0),
     latitude: tLat,
     longitude: tLong,

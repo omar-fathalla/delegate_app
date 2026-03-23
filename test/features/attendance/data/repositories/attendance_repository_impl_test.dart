@@ -18,9 +18,9 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
     required String deviceInfo,
     String? branchName,
   })? checkInStub;
-  Future<AttendanceModel> Function(String, double, double)? checkOutStub;
-  Future<List<AttendanceModel>> Function(String)? getHistoryStub;
-  Future<AttendanceModel?> Function(String)? findActiveAttendanceStub;
+  Future<AttendanceModel> Function(String, String, double, double)? checkOutStub;
+  Future<List<AttendanceModel>> Function(String, String)? getHistoryStub;
+  Future<AttendanceModel?> Function(String, String)? findActiveAttendanceStub;
   Future<void> Function(List<Map<String, dynamic>>)? syncOfflineQueueStub;
   Future<Map<String, dynamic>?> Function(String)? getBranchByNameStub;
   Future<void> Function({
@@ -60,24 +60,25 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
   @override
   Future<AttendanceModel> checkOut(
     String attendanceId,
+    String organizationId,
     double lat,
     double long,
   ) {
-    if (checkOutStub != null) return checkOutStub!(attendanceId, lat, long);
+    if (checkOutStub != null) return checkOutStub!(attendanceId, organizationId, lat, long);
     throw UnimplementedError();
   }
 
   @override
-  Future<List<AttendanceModel>> getHistory(String userId) {
+  Future<List<AttendanceModel>> getHistory(String userId, String organizationId) {
     getHistoryCallCount++;
-    if (getHistoryStub != null) return getHistoryStub!(userId);
+    if (getHistoryStub != null) return getHistoryStub!(userId, organizationId);
     throw UnimplementedError();
   }
 
   @override
-  Future<AttendanceModel?> findActiveAttendance(String userId) {
+  Future<AttendanceModel?> findActiveAttendance(String userId, String organizationId) {
     if (findActiveAttendanceStub != null) {
-      return findActiveAttendanceStub!(userId);
+      return findActiveAttendanceStub!(userId, organizationId);
     }
     throw UnimplementedError();
   }
@@ -187,6 +188,7 @@ void main() {
   final tAttendance = AttendanceModel(
     id: 'a1',
     userId: 'u1',
+    organizationId: 'org1',
     checkInTime: tCheckInTime,
     latitude: 30.0444,
     longitude: 31.2357,
@@ -195,9 +197,9 @@ void main() {
 
   group('getHistory', () {
     test('should return history from remote on success', () async {
-      mockRemote.getHistoryStub = (_) async => [tAttendance];
+      mockRemote.getHistoryStub = (userId, orgId) async => [tAttendance];
 
-      final result = await repository.getHistory('u1');
+      final result = await repository.getHistory('u1', 'org1');
 
       expect(mockRemote.getHistoryCallCount, 1);
       result.fold(
@@ -210,9 +212,9 @@ void main() {
     });
 
     test('should cache remote history locally', () async {
-      mockRemote.getHistoryStub = (_) async => [tAttendance];
+      mockRemote.getHistoryStub = (userId, orgId) async => [tAttendance];
 
-      await repository.getHistory('u1');
+      await repository.getHistory('u1', 'org1');
 
       expect(mockLocal.overwriteCallCount, 1);
     });
@@ -254,9 +256,9 @@ void main() {
 
   group('findActiveAttendance', () {
     test('should return attendance when found', () async {
-      mockRemote.findActiveAttendanceStub = (_) async => tAttendance;
+      mockRemote.findActiveAttendanceStub = (userId, orgId) async => tAttendance;
 
-      final result = await repository.findActiveAttendance('u1');
+      final result = await repository.findActiveAttendance('u1', 'org1');
 
       result.fold(
         (failure) => fail('Should have returned Right'),
@@ -265,9 +267,9 @@ void main() {
     });
 
     test('should return Right(null) when no active attendance', () async {
-      mockRemote.findActiveAttendanceStub = (_) async => null;
+      mockRemote.findActiveAttendanceStub = (userId, orgId) async => null;
 
-      final result = await repository.findActiveAttendance('u1');
+      final result = await repository.findActiveAttendance('u1', 'org1');
 
       result.fold(
         (failure) => fail('Should have returned Right'),

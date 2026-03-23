@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 class Attendance extends Equatable {
   final String id;
   final String userId;
+  final String organizationId; // معرّف المنظمة - لعزل البيانات لكل منظمة
   final DateTime checkInTime;
   final DateTime? checkOutTime;
   final double? latitude;
@@ -16,6 +17,7 @@ class Attendance extends Equatable {
   const Attendance({
     required this.id,
     required this.userId,
+    required this.organizationId,
     required this.checkInTime,
     this.checkOutTime,
     this.latitude,
@@ -31,6 +33,7 @@ class Attendance extends Equatable {
   List<Object?> get props => [
     id,
     userId,
+    organizationId,
     checkInTime,
     checkOutTime,
     latitude,

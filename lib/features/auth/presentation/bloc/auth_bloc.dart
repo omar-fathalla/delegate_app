@@ -5,6 +5,8 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_all_delegates.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -13,15 +15,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final Login loginUseCase;
   final CheckAutoLogin checkAutoLoginUseCase;
   final Logout logoutUseCase;
+  final CacheDelegate cacheDelegateUseCase;
+  final CacheAllDelegates cacheAllDelegatesUseCase;
 
   AuthBloc({
     required this.loginUseCase,
     required this.checkAutoLoginUseCase,
     required this.logoutUseCase,
+    required this.cacheDelegateUseCase,
+    required this.cacheAllDelegatesUseCase,
   }) : super(AuthInitial()) {
     on<LoginRequested>(_onLoginRequested);
     on<CheckAutoLoginRequested>(_onCheckAutoLogin);
     on<LogoutRequested>(_onLogoutRequested);
+    on<OrganizationSelected>(_onOrganizationSelected);
   }
 
   Future<void> _onLoginRequested(
@@ -37,9 +44,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       ),
     );
 
-    result.fold(
-      (failure) => emit(AuthError(message: failure.message)),
-      (delegate) => emit(AuthAuthenticated(delegate: delegate)),
+    await result.fold(
+      (failure) async {
+        emit(AuthError(message: failure.message));
+      },
+      (delegates) async {
+        // Always cache all delegates for organization switching later
+        await cacheAllDelegatesUseCase(delegates);
+
+        if (delegates.length == 1) {
+          // Single organization - proceed directly
+          emit(AuthAuthenticated(delegate: delegates.first));
+        } else {
+          // Multiple organizations - show selection
+          emit(AuthOrganizationSelectionRequired(
+            delegates: delegates,
+            rememberMe: event.rememberMe,
+          ));
+        }
+      },
     );
   }
 
@@ -50,13 +73,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     final result = await checkAutoLoginUseCase(NoParams());
 
-    result.fold((failure) => emit(AuthUnauthenticated()), (delegate) {
-      if (delegate != null) {
-        emit(AuthAuthenticated(delegate: delegate));
-      } else {
+    await result.fold(
+      (failure) async {
         emit(AuthUnauthenticated());
-      }
-    });
+      },
+      (delegate) async {
+        if (delegate != null) {
+          emit(AuthAuthenticated(delegate: delegate));
+        } else {
+          emit(AuthUnauthenticated());
+        }
+      },
+    );
   }
 
   Future<void> _onLogoutRequested(
@@ -66,5 +94,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     await logoutUseCase(NoParams());
     emit(AuthUnauthenticated());
+  }
+
+  Future<void> _onOrganizationSelected(
+    OrganizationSelected event,
+    Emitter<AuthState> emit,
+  ) async {
+    if (event.rememberMe) {
+      await cacheDelegateUseCase(event.delegate);
+    }
+    emit(AuthAuthenticated(delegate: event.delegate));
   }
 }

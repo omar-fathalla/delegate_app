@@ -17,6 +17,8 @@ import 'package:delegate_app/features/auth/domain/repositories/auth_repository.d
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_all_delegates.dart';
 import 'package:delegate_app/features/attendance/data/repositories/attendance_repository_impl.dart';
 import 'package:delegate_app/features/attendance/domain/repositories/attendance_repository.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
@@ -57,6 +59,8 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       loginUseCase: sl(),
       checkAutoLoginUseCase: sl(),
       logoutUseCase: sl(),
+      cacheDelegateUseCase: sl(),
+      cacheAllDelegatesUseCase: sl(),
     ),
   );
 
@@ -64,6 +68,8 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => Login(sl()));
   sl.registerLazySingleton(() => CheckAutoLogin(sl()));
   sl.registerLazySingleton(() => Logout(sl()));
+  sl.registerLazySingleton(() => CacheDelegate(sl()));
+  sl.registerLazySingleton(() => CacheAllDelegates(sl()));
 
   // Repository
   sl.registerLazySingleton<AuthRepository>(
@@ -192,6 +198,5 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // We register them as lazy singletons if needed, but ensure they aren't
   // accessed unless Firebase.initializeApp() is actually called.
 
-  final firestore = FirebaseFirestore.instance;
-  sl.registerLazySingleton(() => firestore);
+  sl.registerLazySingleton(() => FirebaseFirestore.instance);
 }

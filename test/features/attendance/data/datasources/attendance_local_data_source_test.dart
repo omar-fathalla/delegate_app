@@ -12,6 +12,7 @@ void main() {
   final tAttendance1 = AttendanceModel(
     id: 'a1',
     userId: 'u1',
+    organizationId: 'org1',
     checkInTime: tCheckInTime,
     latitude: 30.0444,
     longitude: 31.2357,
@@ -21,6 +22,7 @@ void main() {
   final tAttendance2 = AttendanceModel(
     id: 'a2',
     userId: 'u1',
+    organizationId: 'org1',
     checkInTime: tCheckInTime.add(const Duration(days: 1)),
     latitude: 30.0444,
     longitude: 31.2357,
@@ -77,6 +79,7 @@ void main() {
       final updated = AttendanceModel(
         id: 'a1',
         userId: 'u1',
+        organizationId: 'org1',
         checkInTime: tCheckInTime,
         checkOutTime: DateTime(2024, 6, 15, 17, 0),
         latitude: 30.0444,

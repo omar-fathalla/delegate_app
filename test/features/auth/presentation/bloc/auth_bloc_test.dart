@@ -5,6 +5,8 @@ import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_all_delegates.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +18,10 @@ class MockCheckAutoLogin extends Mock implements CheckAutoLogin {}
 
 class MockLogout extends Mock implements Logout {}
 
+class MockCacheDelegate extends Mock implements CacheDelegate {}
+
+class MockCacheAllDelegates extends Mock implements CacheAllDelegates {}
+
 class FakeLoginParams extends Fake implements LoginParams {}
 
 class FakeNoParams extends Fake implements NoParams {}
@@ -25,6 +31,8 @@ void main() {
   late MockLogin mockLogin;
   late MockCheckAutoLogin mockCheckAutoLogin;
   late MockLogout mockLogout;
+  late MockCacheDelegate mockCacheDelegate;
+  late MockCacheAllDelegates mockCacheAllDelegates;
 
   final tDelegate = Delegate(
     uid: '1',
@@ -61,16 +69,62 @@ void main() {
   setUpAll(() {
     registerFallbackValue(FakeLoginParams());
     registerFallbackValue(FakeNoParams());
+    registerFallbackValue(
+      Delegate(
+        uid: 'fake',
+        firstName: 'fake',
+        middleName: 'fake',
+        lastName: 'fake',
+        fullName: 'fake',
+        nationalityID: 'fake',
+        motherName: 'fake',
+        city: 'fake',
+        phoneNumber: 'fake',
+        gender: DelegateGender.male,
+        position: DelegatePosition.promoter,
+        birthDate: DateTime(2000, 1, 1),
+        organizationUID: 'fake',
+        organizationName: 'fake',
+        companyUID: 'fake',
+        companyName: 'fake',
+        status: DelegateStatus.active,
+        delegatePublicId: 'fake',
+        allReceiptCodes: const [],
+        createdAt: DateTime.now(),
+        createdBy: 'fake',
+        hasPendingUpdate: false,
+        isDeductedFromCompany: false,
+        isPrinted: false,
+        isProfileComplete: true,
+        numberOfDocuments: 0,
+        paymentAmount: 0,
+        version: 1,
+        documents: const [],
+      ),
+    );
   });
 
   setUp(() {
     mockLogin = MockLogin();
     mockCheckAutoLogin = MockCheckAutoLogin();
     mockLogout = MockLogout();
+    mockCacheDelegate = MockCacheDelegate();
+    mockCacheAllDelegates = MockCacheAllDelegates();
+
+    // Setup default return values for mocks
+    when(() => mockCacheDelegate(any())).thenAnswer(
+      (_) async => const Right(null),
+    );
+    when(() => mockCacheAllDelegates(any())).thenAnswer(
+      (_) async => const Right(null),
+    );
+
     authBloc = AuthBloc(
       loginUseCase: mockLogin,
       checkAutoLoginUseCase: mockCheckAutoLogin,
       logoutUseCase: mockLogout,
+      cacheDelegateUseCase: mockCacheDelegate,
+      cacheAllDelegatesUseCase: mockCacheAllDelegates,
     );
   });
 
@@ -84,10 +138,10 @@ void main() {
 
   group('LoginRequested', () {
     blocTest<AuthBloc, AuthState>(
-      'emits [AuthLoading, AuthAuthenticated] when login succeeds',
+      'emits [AuthLoading, AuthAuthenticated] when login succeeds with single delegate',
       build: () {
         when(() => mockLogin(any())).thenAnswer(
-          (_) async => Right(tDelegate),
+          (_) async => Right([tDelegate]),
         );
         return authBloc;
       },

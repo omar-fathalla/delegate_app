@@ -6,6 +6,8 @@ import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_all_delegates.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
@@ -25,6 +27,12 @@ class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
 
   @override
   Logout get logoutUseCase => throw UnimplementedError();
+
+  @override
+  CacheDelegate get cacheDelegateUseCase => throw UnimplementedError();
+
+  @override
+  CacheAllDelegates get cacheAllDelegatesUseCase => throw UnimplementedError();
 }
 
 void main() {

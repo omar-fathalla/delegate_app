@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
@@ -84,25 +85,24 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                 ),
               );
-            } else if (state is AuthAuthenticated) {
-              final delegate = state.delegate;
-              if (delegate.createdBy == 'system_admin' ||
-                  _phoneController.text == '01508899965') {
-                context.go('/admin/home', extra: delegate);
-              } else {
-                context.go('/home', extra: delegate);
-              }
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l10n.loginSuccessful),
-                  backgroundColor:
-                      colorScheme.tertiary, // Kept for success state
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+            } else if (state is AuthOrganizationSelectionRequired) {
+              _showOrganizationSelector(
+                context,
+                state.delegates,
+                state.rememberMe,
               );
+            } else if (state is AuthAuthenticated) {
+              // تأخير بسيط للتأكد من إغلاق أي dialog/bottom sheet أولاً
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                final delegate = state.delegate;
+                if (delegate.createdBy == 'system_admin' ||
+                    _phoneController.text == '01508899965') {
+                  context.go('/admin/home', extra: delegate);
+                } else {
+                  context.go('/home', extra: delegate);
+                }
+              });
             }
           },
           builder: (context, state) {
@@ -533,6 +533,153 @@ class _LoginScreenState extends State<LoginScreen>
         size: 22,
       ),
       suffixIcon: suffixIcon,
+    );
+  }
+
+  // ---- Helper: Organization Selection Bottom Sheet ----
+  void _showOrganizationSelector(
+    BuildContext blocContext,
+    List<Delegate> delegates,
+    bool rememberMe,
+  ) {
+    final colorScheme = Theme.of(blocContext).colorScheme;
+    final isArabic = localeProvider.isArabic;
+
+    showModalBottomSheet(
+      context: blocContext,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (sheetContext) {
+        return Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(28),
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                isArabic ? 'اختر المنظمة' : 'Select Organization',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isArabic
+                    ? 'أنت مسجل في أكثر من منظمة. اختر للمتابعة.'
+                    : 'You are registered in multiple organizations.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...delegates.map((delegate) => _buildOrgCard(
+                    blocContext,
+                    sheetContext: sheetContext,
+                    delegate: delegate,
+                    rememberMe: rememberMe,
+                  )),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildOrgCard(
+    BuildContext blocContext, {
+    required BuildContext sheetContext,
+    required Delegate delegate,
+    required bool rememberMe,
+  }) {
+    final colorScheme = Theme.of(blocContext).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          // أغلق الـ bottom sheet باستخدام context الخاص به
+          Navigator.pop(sheetContext);
+          // انتظر frame واحد حتى يُغلق الـ bottom sheet تماماً
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            BlocProvider.of<AuthBloc>(blocContext).add(
+              OrganizationSelected(
+                delegate: delegate,
+                rememberMe: rememberMe,
+              ),
+            );
+          });
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.business_rounded,
+                  color: colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      delegate.organizationName,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      delegate.companyName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

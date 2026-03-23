@@ -8,16 +8,16 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
-  Future<DelegateModel?> Function(String)? getDelegateByPhoneStub;
+  Future<List<DelegateModel>> Function(String)? getDelegatesByPhoneStub;
   String? lastPhoneNumber;
   int callCount = 0;
 
   @override
-  Future<DelegateModel?> getDelegateByPhone(String phoneNumber) {
+  Future<List<DelegateModel>> getDelegatesByPhone(String phoneNumber) {
     callCount++;
     lastPhoneNumber = phoneNumber;
-    if (getDelegateByPhoneStub != null) {
-      return getDelegateByPhoneStub!(phoneNumber);
+    if (getDelegatesByPhoneStub != null) {
+      return getDelegatesByPhoneStub!(phoneNumber);
     }
     throw UnimplementedError();
   }
@@ -34,7 +34,9 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
 
 class MockAuthLocalDataSource implements AuthLocalDataSource {
   DelegateModel? cachedDelegate;
+  List<DelegateModel> cachedAllDelegates = [];
   int cacheCallCount = 0;
+  int cacheAllCallCount = 0;
   int clearCallCount = 0;
 
   @override
@@ -52,6 +54,18 @@ class MockAuthLocalDataSource implements AuthLocalDataSource {
   Future<void> clearCachedData() async {
     clearCallCount++;
     cachedDelegate = null;
+    cachedAllDelegates = [];
+  }
+
+  @override
+  Future<void> cacheAllDelegatesData(List<DelegateModel> delegates) async {
+    cacheAllCallCount++;
+    cachedAllDelegates = delegates;
+  }
+
+  @override
+  List<DelegateModel> getCachedAllDelegatesData() {
+    return cachedAllDelegates;
   }
 }
 
@@ -102,25 +116,29 @@ void main() {
     documents: const [],
   );
 
-  group('getDelegateByPhone', () {
-    test('should return delegate when phone number is found', () async {
+  group('getDelegatesByPhone', () {
+    test('should return list of delegates when phone number is found', () async {
       // arrange
-      mockRemoteDataSource.getDelegateByPhoneStub = (_) async => tDelegateModel;
+      mockRemoteDataSource.getDelegatesByPhoneStub = (_) async => [tDelegateModel];
       // act
-      final result = await repository.getDelegateByPhone(tPhoneNumber);
+      final result = await repository.getDelegatesByPhone(tPhoneNumber);
       // assert
       expect(mockRemoteDataSource.callCount, 1);
       expect(mockRemoteDataSource.lastPhoneNumber, tPhoneNumber);
-      expect(result, equals(Right(tDelegateModel)));
+      expect(result.isRight(), isTrue);
+      result.fold(
+        (l) => fail('Should be right'),
+        (r) => expect(r, [tDelegateModel]),
+      );
     });
 
     test(
-      'should return AuthFailure when phone number is not found (null)',
+      'should return AuthFailure when phone number is not found',
       () async {
         // arrange
-        mockRemoteDataSource.getDelegateByPhoneStub = (_) async => null;
+        mockRemoteDataSource.getDelegatesByPhoneStub = (_) async => [];
         // act
-        final result = await repository.getDelegateByPhone(tPhoneNumber);
+        final result = await repository.getDelegatesByPhone(tPhoneNumber);
         // assert
         expect(mockRemoteDataSource.callCount, 1);
         expect(result, isA<Left<Failure, dynamic>>());
@@ -134,9 +152,9 @@ void main() {
       () async {
         // arrange
         const tFailure = ServerFailure('Server Error');
-        mockRemoteDataSource.getDelegateByPhoneStub = (_) => throw tFailure;
+        mockRemoteDataSource.getDelegatesByPhoneStub = (_) => throw tFailure;
         // act
-        final result = await repository.getDelegateByPhone(tPhoneNumber);
+        final result = await repository.getDelegatesByPhone(tPhoneNumber);
         // assert
         expect(mockRemoteDataSource.callCount, 1);
         expect(result, equals(const Left(tFailure)));
@@ -147,10 +165,10 @@ void main() {
       'should return ServerFailure when an unexpected exception is thrown',
       () async {
         // arrange
-        mockRemoteDataSource.getDelegateByPhoneStub = (_) =>
+        mockRemoteDataSource.getDelegatesByPhoneStub = (_) =>
             throw Exception('Unexpected error');
         // act
-        final result = await repository.getDelegateByPhone(tPhoneNumber);
+        final result = await repository.getDelegatesByPhone(tPhoneNumber);
         // assert
         expect(result, isA<Left<Failure, dynamic>>());
         final failure = (result as Left).value;

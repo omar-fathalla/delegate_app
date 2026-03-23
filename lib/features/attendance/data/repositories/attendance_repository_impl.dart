@@ -87,6 +87,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         final localAttendance = AttendanceModel(
           id: localDocId,
           userId: userId,
+          organizationId: organizationId,
           checkInTime: DateTime.now(),
           latitude: lat,
           longitude: long,
@@ -104,7 +105,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
           'deviceInfo': deviceInfo,
           'branchName': branchName,
         });
-        
+
         return Right(localAttendance);
       }
 
@@ -141,13 +142,14 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     double lat,
     double long, {
     required String userId,
+    required String organizationId,
   }) async {
     try {
       if (!await _hasConnection()) {
          try {
            final localHistory = await localDataSource.getLastAttendanceHistory();
            final activeSessionIndex = localHistory.indexWhere((element) => element.id == attendanceId);
-           
+
            if (activeSessionIndex != -1) {
              final activeSession = localHistory[activeSessionIndex];
              // Safely use copyWith from AttendanceModel
@@ -155,11 +157,13 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
                checkOutTime: DateTime.now(),
                isSynced: false,
              );
-             
+
              await localDataSource.updateAttendance(updatedSession);
              await offlineQueue.addToQueue({
                'type': 'check_out',
                'relatedCheckInId': attendanceId,
+               'delegateId': userId,
+               'organizationId': organizationId,
                'location': {'latitude': lat, 'longitude': long},
              });
              return Right(updatedSession);
@@ -178,6 +182,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         try {
           final activeAttendance = await remoteDataSource.findActiveAttendance(
             userId,
+            organizationId,
           );
           if (activeAttendance != null && activeAttendance.branchName != null) {
             await _verifyGeofence(
@@ -196,7 +201,12 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         }
       }
 
-      final result = await remoteDataSource.checkOut(attendanceId, lat, long);
+      final result = await remoteDataSource.checkOut(
+        attendanceId,
+        organizationId,
+        lat,
+        long,
+      );
       await localDataSource.updateAttendance(result);
       return Right(result);
     } catch (e) {
@@ -208,14 +218,17 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }
 
   @override
-  Future<Either<Failure, List<Attendance>>> getHistory(String userId) async {
+  Future<Either<Failure, List<Attendance>>> getHistory(
+    String userId,
+    String organizationId,
+  ) async {
     try {
       if (!await _hasConnection()) {
         throw const ServerFailure('No internet connection (offline mode)');
       }
 
-      // Firestore is the single source of truth (already filtered by delegateId)
-      final remoteHistory = await remoteDataSource.getHistory(userId);
+      // Firestore is the single source of truth (already filtered by delegateId and organizationId)
+      final remoteHistory = await remoteDataSource.getHistory(userId, organizationId);
 
       // Cache this delegate's data for offline fallback
       try {
@@ -243,12 +256,13 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   @override
   Future<Either<Failure, Attendance?>> findActiveAttendance(
     String userId,
+    String organizationId,
   ) async {
     try {
       if (!await _hasConnection()) {
         throw const ServerFailure('No internet connection (offline mode)');
       }
-      final result = await remoteDataSource.findActiveAttendance(userId);
+      final result = await remoteDataSource.findActiveAttendance(userId, organizationId);
       return Right(result);
     } on Failure catch (e) {
       return Left(e);

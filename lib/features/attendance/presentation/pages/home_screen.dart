@@ -30,7 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return BlocProvider(
       create: (context) =>
           sl<AttendanceBloc>()
-            ..add(HistoryRequested(userId: widget.delegate.uid)),
+            ..add(HistoryRequested(
+              userId: widget.delegate.uid,
+              organizationId: widget.delegate.organizationUID,
+            )),
       child: Scaffold(
         backgroundColor: theme.colorScheme.surface,
         appBar: HomeAppBar(delegate: widget.delegate),
@@ -41,12 +44,18 @@ class _HomeScreenState extends State<HomeScreen> {
             } else if (state is AttendanceCheckedIn) {
               AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
               context.read<AttendanceBloc>().add(
-                HistoryRequested(userId: widget.delegate.uid),
+                HistoryRequested(
+                  userId: widget.delegate.uid,
+                  organizationId: widget.delegate.organizationUID,
+                ),
               );
             } else if (state is AttendanceCheckedOut) {
               AppSnackBar.showSuccess(context, l10n.checkedOutSuccessfully);
               context.read<AttendanceBloc>().add(
-                HistoryRequested(userId: widget.delegate.uid),
+                HistoryRequested(
+                  userId: widget.delegate.uid,
+                  organizationId: widget.delegate.organizationUID,
+                ),
               );
             }
           },
@@ -82,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             CheckOutRequested(
                               attendanceId: activeAttendanceId,
                               userId: widget.delegate.uid,
+                              organizationId: widget.delegate.organizationUID,
                               lat: position.latitude,
                               long: position.longitude,
                             ),

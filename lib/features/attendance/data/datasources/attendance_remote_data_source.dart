@@ -17,14 +17,16 @@ abstract class AttendanceRemoteDataSource {
   });
   Future<AttendanceModel> checkOut(
     String attendanceId,
+    String organizationId,
     double lat,
     double long,
   );
-  Future<List<AttendanceModel>> getHistory(String userId);
+  Future<List<AttendanceModel>> getHistory(String userId, String organizationId);
 
   /// Finds the active attendance record (where checkOutTime is null)
-  /// for the given [userId]. Returns `null` if no active session exists.
-  Future<AttendanceModel?> findActiveAttendance(String userId);
+  /// for the given [userId] in the specified [organizationId].
+  /// Returns `null` if no active session exists.
+  Future<AttendanceModel?> findActiveAttendance(String userId, String organizationId);
 
   /// Syncs an offline queue of attendance actions to Firestore.
   Future<void> syncOfflineQueue(List<Map<String, dynamic>> queue);
@@ -46,6 +48,15 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
   AttendanceRemoteDataSourceImpl({required this.firestore});
 
+  /// Helper: Get the organization-scoped attendance_logs collection
+  /// Path: /organizations/{organizationId}/attendance_logs
+  CollectionReference<Map<String, dynamic>> _attendanceCollection(
+      String organizationId) =>
+      firestore
+          .collection('organizations')
+          .doc(organizationId)
+          .collection(kAttendanceCollection);
+
   @override
   Future<AttendanceModel> checkIn(
     String userId,
@@ -57,10 +68,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     String? branchName,
   }) async {
     try {
-      final docRef = await firestore
-          .collection(kAttendanceCollection)
+      final docRef = await _attendanceCollection(organizationId)
           .add({
             'delegateId': userId,
+            'userId': userId,
             'companyId': companyId,
             'organizationId': organizationId,
             'timestamp': FieldValue.serverTimestamp(),
@@ -74,6 +85,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       return AttendanceModel(
         id: docRef.id,
         userId: userId,
+        organizationId: organizationId,
         checkInTime: DateTime.now(),
         latitude: lat,
         longitude: long,
@@ -91,27 +103,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   @override
   Future<AttendanceModel> checkOut(
     String attendanceId,
+    String organizationId,
     double lat,
     double long,
   ) async {
     try {
-      // NOTE: We don't have easy access to company/org ID here without fetching user again.
-      // However, for check-out we mostly need userId and timestamp.
-      // For consistency, we might want to fetch the check-in doc, but that's in the log list now.
-      // COMPROMISE: We will proceed with minimal check-out info.
-      // Ideally, the Bloc should pass the full context.
-      // But for now, let's look up the LAST check-in to get the Organization info if needed.
-      // OR, since we are just logging, maybe we can skip orgId for check-out if the backend correlates them?
-      // No, let's fetch the last check-in to copy the IDs.
-
-      final lastCheckInSnapshot = await firestore
-          .collection(kAttendanceCollection)
-          //.where('userId', isEqualTo: ...) // userId is not passed cleanly here, assumes attendanceId is enough?
-          // BUT attendanceId was the DOC ID in the old system.
-          // In the new system, we actually need the USER ID to find the last log.
-          // The current signature takes `attendanceId`.
-          // Implementation Detail: In the new system, `attendanceId` returned by checkIn is the ID of the 'check_in' log doc.
-          // So we CAN fetch that doc to get metadata.
+      final lastCheckInSnapshot = await _attendanceCollection(organizationId)
           .doc(attendanceId)
           .get()
           .timeout(const Duration(seconds: 5));
@@ -120,27 +117,26 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         throw const ServerFailure('سجل الحضور غير موجود.');
       }
       final lastData = lastCheckInSnapshot.data()!;
-      final userId = lastData['delegateId'];
+      final userId = lastData['delegateId'] ?? lastData['userId'];
       final companyId = lastData['companyId'];
-      final organizationId = lastData['organizationId'];
 
-      await firestore
-          .collection(kAttendanceCollection)
+      await _attendanceCollection(organizationId)
           .add({
             'delegateId': userId,
+            'userId': userId,
             'companyId': companyId,
             'organizationId': organizationId,
             'timestamp': FieldValue.serverTimestamp(),
             'type': 'check_out',
             'location': {'latitude': lat, 'longitude': long},
-            'relatedCheckInId': attendanceId, // Link to the check-in
+            'relatedCheckInId': attendanceId,
           })
           .timeout(const Duration(seconds: 5));
 
-      // Return a model representing the closed session
       return AttendanceModel(
         id: attendanceId,
         userId: userId,
+        organizationId: organizationId,
         checkInTime: (lastData['timestamp'] as Timestamp).toDate(),
         checkOutTime: DateTime.now(),
         latitude: (lastData['location']['latitude'] as num).toDouble(),
@@ -157,14 +153,29 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   }
 
   @override
-  Future<List<AttendanceModel>> getHistory(String userId) async {
+  Future<List<AttendanceModel>> getHistory(
+      String userId, String organizationId) async {
     try {
-      final querySnapshot = await firestore
-          .collection(kAttendanceCollection)
-          .where('delegateId', isEqualTo: userId)
-          .orderBy('timestamp', descending: false) // Process chronologically
-          .get()
-          .timeout(const Duration(seconds: 5));
+      // جرب orderBy أولاً
+      QuerySnapshot<Map<String, dynamic>> querySnapshot;
+      try {
+        querySnapshot = await _attendanceCollection(organizationId)
+            .where('delegateId', isEqualTo: userId)
+            .orderBy('timestamp', descending: false)
+            .get()
+            .timeout(const Duration(seconds: 5));
+      } catch (e) {
+        // إذا فشل orderBy (مثل عدم وجود index)، جرب بدونه
+        querySnapshot = await _attendanceCollection(organizationId)
+            .where('delegateId', isEqualTo: userId)
+            .get()
+            .timeout(const Duration(seconds: 5));
+      }
+
+      // إذا لم توجد بيانات، أرجع قائمة فارغة (ليس خطأ)
+      if (querySnapshot.docs.isEmpty) {
+        return [];
+      }
 
       final List<AttendanceModel> history = [];
       final Map<String, AttendanceModel> openSessions = {};
@@ -176,13 +187,15 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         if (type == 'check_in') {
           final model = AttendanceModel(
             id: doc.id,
-            userId: data['delegateId'] ?? '',
+            userId: data['delegateId'] ?? data['userId'] ?? '',
+            organizationId: organizationId,
             checkInTime: data['timestamp'] != null
                 ? (data['timestamp'] as Timestamp).toDate()
                 : DateTime.now(),
-            latitude: (data['location']['latitude'] as num?)?.toDouble() ?? 0.0,
+            latitude:
+                (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
             longitude:
-                (data['location']['longitude'] as num?)?.toDouble() ?? 0.0,
+                (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
             branchName: data['branchName'],
           );
           openSessions[doc.id] = model;
@@ -190,45 +203,39 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           final relatedId = data['relatedCheckInId'] as String?;
           if (relatedId != null && openSessions.containsKey(relatedId)) {
             final checkInModel = openSessions.remove(relatedId)!;
-            final completedSession = AttendanceModel(
-              id: checkInModel.id,
-              userId: checkInModel.userId,
-              checkInTime: checkInModel.checkInTime,
+            final completedSession = checkInModel.copyWith(
               checkOutTime: data['timestamp'] != null
                   ? (data['timestamp'] as Timestamp).toDate()
                   : DateTime.now(),
-              latitude: checkInModel.latitude,
-              longitude: checkInModel.longitude,
-              branchName: checkInModel.branchName,
-              // We could store check-out location too if model supports it
             );
             history.add(completedSession);
           }
         }
       }
 
-      // Add any remaining open sessions (active check-ins)
       history.addAll(openSessions.values);
-
-      // Sort by check-in time descending for the UI
       history.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
 
       return history;
     } on FirebaseException catch (e) {
+      // إذا كانت المشكلة أن المجموعة غير موجودة، أرجع قائمة فارغة
+      if (e.code == 'failed-precondition') {
+        return [];
+      }
       throwFirestoreFailure(e, 'فشل في تحميل سجل الحضور.');
     } on TimeoutException {
       throwTimeoutFailure('انتهت مهلة الاتصال بالخادم.');
     } catch (_) {
-      throwUnexpectedFailure('حدث خطأ غير متوقع أثناء تحميل السجل.');
+      // في حالة الأخطاء غير المتوقعة، أرجع قائمة فارغة بدل خطأ
+      return [];
     }
   }
 
   @override
-  Future<AttendanceModel?> findActiveAttendance(String userId) async {
+  Future<AttendanceModel?> findActiveAttendance(
+      String userId, String organizationId) async {
     try {
-      // Get the single most recent log for this user
-      final querySnapshot = await firestore
-          .collection(kAttendanceCollection)
+      final querySnapshot = await _attendanceCollection(organizationId)
           .where('delegateId', isEqualTo: userId)
           .orderBy('timestamp', descending: true)
           .limit(1)
@@ -242,21 +249,21 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final doc = querySnapshot.docs.first;
       final data = doc.data();
 
-      // If the last log is 'check_in', then the user is currently checked in.
       if (data['type'] == 'check_in') {
         return AttendanceModel(
           id: doc.id,
-          userId: data['delegateId'] ?? '',
+          userId: data['delegateId'] ?? data['userId'] ?? '',
+          organizationId: organizationId,
           checkInTime: data['timestamp'] != null
               ? (data['timestamp'] as Timestamp).toDate()
               : DateTime.now(),
-          latitude: (data['location']['latitude'] as num?)?.toDouble() ?? 0.0,
-          longitude: (data['location']['longitude'] as num?)?.toDouble() ?? 0.0,
+          latitude: (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
+          longitude:
+              (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
           branchName: data['branchName'],
         );
       }
 
-      // If the last log is 'check_out', then there is no active session.
       return null;
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في البحث عن جلسة الحضور النشطة.');
@@ -272,12 +279,13 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     try {
       final batch = firestore.batch();
       for (var action in queue) {
-        // We write directly to Firestore using serverTimestamp
-        final newDocRef = firestore.collection(kAttendanceCollection).doc();
+        final organizationId = action['organizationId'] as String? ?? '';
+        final newDocRef = _attendanceCollection(organizationId).doc();
         final Map<String, dynamic> data = {
           'delegateId': action['delegateId'],
+          'userId': action['delegateId'],
           'companyId': action['companyId'],
-          'organizationId': action['organizationId'],
+          'organizationId': organizationId,
           'timestamp': FieldValue.serverTimestamp(),
           'type': action['type'],
           'location': action['location'],
@@ -343,20 +351,20 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
       final Map<String, dynamic> data = {
         'branchName': branchName,
-        'latitude': latitude,
-        'longitude': longitude,
+        'location': {
+          'latitude': latitude,
+          'longitude': longitude,
+        },
         'geofenceRadius': geofenceRadius,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
       if (querySnapshot.docs.isEmpty) {
-        // Create new
         await firestore
             .collection('branches')
             .add(data)
             .timeout(const Duration(seconds: 5));
       } else {
-        // Update existing
         await querySnapshot.docs.first.reference
             .update(data)
             .timeout(const Duration(seconds: 5));

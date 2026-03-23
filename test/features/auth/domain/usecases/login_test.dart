@@ -6,22 +6,25 @@ import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class MockAuthRepository implements AuthRepository {
-  Future<Either<Failure, Delegate>> Function(String)? getDelegateByPhoneStub;
+  Future<Either<Failure, List<Delegate>>> Function(String)? getDelegatesByPhoneStub;
   Future<Either<Failure, void>> Function(Delegate)? cacheDelegateStub;
+  Future<Either<Failure, void>> Function(List<Delegate>)? cacheAllDelegatesStub;
 
-  int getDelegateByPhoneCallCount = 0;
+  int getDelegatesByPhoneCallCount = 0;
   int cacheDelegateCallCount = 0;
+  int cacheAllDelegatesCallCount = 0;
   String? lastPhone;
   Delegate? lastCachedDelegate;
+  List<Delegate>? lastCachedAllDelegates;
 
   @override
-  Future<Either<Failure, Delegate>> getDelegateByPhone(
+  Future<Either<Failure, List<Delegate>>> getDelegatesByPhone(
     String phoneNumber,
   ) async {
-    getDelegateByPhoneCallCount++;
+    getDelegatesByPhoneCallCount++;
     lastPhone = phoneNumber;
-    if (getDelegateByPhoneStub != null) {
-      return getDelegateByPhoneStub!(phoneNumber);
+    if (getDelegatesByPhoneStub != null) {
+      return getDelegatesByPhoneStub!(phoneNumber);
     }
     throw UnimplementedError();
   }
@@ -37,12 +40,29 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, void>> cacheAllDelegates(
+    List<Delegate> delegates,
+  ) async {
+    cacheAllDelegatesCallCount++;
+    lastCachedAllDelegates = delegates;
+    if (cacheAllDelegatesStub != null) {
+      return cacheAllDelegatesStub!(delegates);
+    }
+    return const Right(null);
+  }
+
+  @override
   Future<Either<Failure, void>> clearCache() async {
     throw UnimplementedError();
   }
 
   @override
   Future<Either<Failure, Delegate?>> getCachedDelegate() async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Either<Failure, List<Delegate>>> getCachedAllDelegates() async {
     throw UnimplementedError();
   }
 }
@@ -93,10 +113,11 @@ void main() {
   );
 
   test(
-    'should return delegate when phoneNumber exists and password matches nationalityID',
+    'should return list of delegates when phoneNumber exists and password matches nationalityID',
     () async {
       // arrange
-      mockAuthRepository.getDelegateByPhoneStub = (_) async => Right(tDelegate);
+      mockAuthRepository.getDelegatesByPhoneStub =
+          (_) async => Right([tDelegate]);
       // act
       final result = await usecase(
         const LoginParams(
@@ -106,12 +127,16 @@ void main() {
         ),
       );
       // assert
-      expect(result, Right(tDelegate));
-      expect(mockAuthRepository.getDelegateByPhoneCallCount, 1);
+      expect(result.isRight(), isTrue);
+      result.fold(
+        (l) => fail('Should be right'),
+        (r) => expect(r, [tDelegate]),
+      );
+      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
       expect(
         mockAuthRepository.cacheDelegateCallCount,
         1,
-      ); // rememberMe is true
+      ); // rememberMe is true and only one delegate
     },
   );
 
@@ -119,14 +144,15 @@ void main() {
     'should return AuthFailure when password does not match nationalityID',
     () async {
       // arrange
-      mockAuthRepository.getDelegateByPhoneStub = (_) async => Right(tDelegate);
+      mockAuthRepository.getDelegatesByPhoneStub =
+          (_) async => Right([tDelegate]);
       // act
       final result = await usecase(
         const LoginParams(phoneNumber: tMobile, password: 'wrongPassword'),
       );
       // assert
       expect(result, const Left(AuthFailure('كلمة المرور غير صحيحة')));
-      expect(mockAuthRepository.getDelegateByPhoneCallCount, 1);
+      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
       expect(mockAuthRepository.cacheDelegateCallCount, 0);
     },
   );
@@ -134,7 +160,7 @@ void main() {
   test('should return failure when repository fails to get delegate', () async {
     // arrange
     const tFailure = ServerFailure('Server Failure');
-    mockAuthRepository.getDelegateByPhoneStub = (_) async =>
+    mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
         const Left(tFailure);
     // act
     final result = await usecase(
@@ -142,7 +168,7 @@ void main() {
     );
     // assert
     expect(result, const Left(tFailure));
-    expect(mockAuthRepository.getDelegateByPhoneCallCount, 1);
+    expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
   });
 
   group('User provided test cases', () {
@@ -179,8 +205,8 @@ void main() {
         documents: const [],
       );
 
-      mockAuthRepository.getDelegateByPhoneStub = (_) async =>
-          Right(adminDelegate);
+      mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
+          Right([adminDelegate]);
 
       final result = await usecase(
         const LoginParams(phoneNumber: '01508899965', password: '4816361Aa'),
@@ -189,7 +215,7 @@ void main() {
       expect(result.isRight(), isTrue);
       result.fold(
         (l) => fail('Should be right'),
-        (r) => expect(r.position, DelegatePosition.supervisor),
+        (r) => expect(r.first.position, DelegatePosition.supervisor),
       );
     });
 
@@ -226,8 +252,8 @@ void main() {
         documents: const [],
       );
 
-      mockAuthRepository.getDelegateByPhoneStub = (_) async =>
-          Right(promoterDelegate);
+      mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
+          Right([promoterDelegate]);
 
       final result = await usecase(
         const LoginParams(
@@ -239,7 +265,7 @@ void main() {
       expect(result.isRight(), isTrue);
       result.fold(
         (l) => fail('Should be right'),
-        (r) => expect(r.position, DelegatePosition.promoter),
+        (r) => expect(r.first.position, DelegatePosition.promoter),
       );
     });
   });

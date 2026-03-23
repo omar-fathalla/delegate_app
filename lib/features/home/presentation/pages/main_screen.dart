@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
@@ -8,8 +9,11 @@ import 'package:delegate_app/features/changelog/presentation/bloc/changelog_bloc
 import 'package:delegate_app/features/changelog/presentation/bloc/changelog_event.dart';
 import 'package:delegate_app/features/changelog/presentation/bloc/changelog_state.dart';
 import 'package:delegate_app/features/changelog/presentation/widgets/whats_new_dialog.dart';
+import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
+import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/main.dart';
 
 class MainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -26,14 +30,38 @@ class _MainScreenState extends State<MainScreen> {
   /// Tracks which tabs have been visited so we only build them once.
   final Set<int> _initializedTabs = {0}; // Tab 0 (Attendance) loads first
 
+  List<Delegate> _allDelegates = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllDelegates();
+  }
+
+  Future<void> _loadAllDelegates() async {
+    final result = await di.sl<AuthRepository>().getCachedAllDelegates();
+    result.fold((_) {}, (delegates) {
+      if (mounted) setState(() => _allDelegates = delegates);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
     final colorScheme = Theme.of(context).colorScheme;
+    final isArabic = localeProvider.isArabic;
 
     return BlocProvider(
-      create: (_) => di.sl<ChangelogBloc>()..add(CheckForNewUpdates()),
+      create: (_) {
+        final bloc = di.sl<ChangelogBloc>();
+        Future.delayed(const Duration(seconds: 4), () {
+          if (!bloc.isClosed) {
+            bloc.add(CheckForNewUpdates());
+          }
+        });
+        return bloc;
+      },
       child: BlocListener<ChangelogBloc, ChangelogState>(
         listener: (context, state) {
           if (state is ChangelogHasNewUpdates) {
@@ -71,10 +99,11 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                             ),
                             Text(
-                              l10n.delegateRole,
+                              delegate.organizationName,
                               style: TextStyle(
-                                fontSize: 12,
-                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 13,
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -82,6 +111,18 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ],
                   ),
+                  actions: _allDelegates.length > 1
+                      ? [
+                          IconButton(
+                            icon: const Icon(Icons.swap_horiz_rounded),
+                            tooltip: isArabic
+                                ? 'تبديل المنظمة'
+                                : 'Switch Organization',
+                            onPressed: () =>
+                                _showOrgSwitcher(context, colorScheme),
+                          ),
+                        ]
+                      : null,
                 ),
           body: _buildBody(delegate),
           bottomNavigationBar: NavigationBar(
@@ -133,6 +174,96 @@ class _MainScreenState extends State<MainScreen> {
         else
           const SizedBox.shrink(),
       ],
+    );
+  }
+
+  Future<void> _switchToOrganization(Delegate delegate) async {
+    final cacheDelegate = di.sl<CacheDelegate>();
+    await cacheDelegate(delegate);
+    if (mounted) {
+      context.go('/home', extra: delegate);
+    }
+  }
+
+  void _showOrgSwitcher(BuildContext context, ColorScheme colorScheme) {
+    final isArabic = localeProvider.isArabic;
+    final currentDelegate = widget.delegate;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return SimpleDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          title: Row(
+            children: [
+              Icon(Icons.swap_horiz_rounded, color: colorScheme.primary),
+              const SizedBox(width: 12),
+              Text(
+                isArabic ? 'تبديل المنظمة' : 'Switch Organization',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          children: _allDelegates.map((delegate) {
+            final isCurrentOrg = delegate.uid == currentDelegate.uid;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Card(
+                elevation: isCurrentOrg ? 0 : 1,
+                color: isCurrentOrg
+                    ? colorScheme.primaryContainer
+                    : colorScheme.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: isCurrentOrg
+                      ? BorderSide(color: colorScheme.primary, width: 2)
+                      : BorderSide.none,
+                ),
+                child: ListTile(
+                  leading: Icon(
+                    Icons.business_rounded,
+                    color: isCurrentOrg
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text(
+                    delegate.organizationName,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  subtitle: Text(
+                    delegate.companyName,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  trailing: isCurrentOrg
+                      ? Icon(Icons.check_circle, color: colorScheme.primary)
+                      : null,
+                  onTap: isCurrentOrg
+                      ? null
+                      : () {
+                          Navigator.pop(dialogContext);
+                          _switchToOrganization(delegate);
+                        },
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }

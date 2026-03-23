@@ -17,11 +17,18 @@ abstract class AttendanceRepository {
     double lat,
     double long, {
     required String userId,
+    required String organizationId,
   });
-  Future<Either<Failure, List<Attendance>>> getHistory(String userId);
+  Future<Either<Failure, List<Attendance>>> getHistory(
+    String userId,
+    String organizationId,
+  );
 
   /// Finds the active attendance session (no checkOutTime) for the delegate.
-  Future<Either<Failure, Attendance?>> findActiveAttendance(String userId);
+  Future<Either<Failure, Attendance?>> findActiveAttendance(
+    String userId,
+    String organizationId,
+  );
 
   /// Synchronizes offline attendance records with the remote server.
   Future<Either<Failure, void>> syncPendingAttendance();

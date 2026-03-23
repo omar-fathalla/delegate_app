@@ -37,6 +37,7 @@ void main() {
   final tAttendance = Attendance(
     id: 'att-1',
     userId: 'user-1',
+    organizationId: 'org-1',
     checkInTime: DateTime(2024, 1, 1, 8, 0),
     latitude: 30.0444,
     longitude: 31.2357,
@@ -46,6 +47,7 @@ void main() {
   final tAttendanceWithCheckOut = Attendance(
     id: 'att-1',
     userId: 'user-1',
+    organizationId: 'org-1',
     checkInTime: DateTime(2024, 1, 1, 8, 0),
     checkOutTime: DateTime(2024, 1, 1, 17, 0),
     latitude: 30.0444,
@@ -150,6 +152,7 @@ void main() {
         const CheckOutRequested(
           attendanceId: 'att-1',
           userId: 'user-1',
+          organizationId: 'org-1',
           lat: 30.0444,
           long: 31.2357,
         ),
@@ -172,6 +175,7 @@ void main() {
         const CheckOutRequested(
           attendanceId: 'att-1',
           userId: 'user-1',
+          organizationId: 'org-1',
           lat: 30.0444,
           long: 31.2357,
         ),
@@ -192,7 +196,7 @@ void main() {
         ).thenAnswer((_) async => Right(tHistory));
         return bloc;
       },
-      act: (bloc) => bloc.add(const HistoryRequested(userId: 'user-1')),
+      act: (bloc) => bloc.add(const HistoryRequested(userId: 'user-1', organizationId: 'org-1')),
       expect: () => [
         AttendanceLoading(),
         AttendanceHistoryLoaded(history: tHistory, activeAttendanceId: 'att-1'),
@@ -207,7 +211,7 @@ void main() {
         ).thenAnswer((_) async => Right([tAttendanceWithCheckOut]));
         return bloc;
       },
-      act: (bloc) => bloc.add(const HistoryRequested(userId: 'user-1')),
+      act: (bloc) => bloc.add(const HistoryRequested(userId: 'user-1', organizationId: 'org-1')),
       expect: () => [
         AttendanceLoading(),
         AttendanceHistoryLoaded(
@@ -225,7 +229,7 @@ void main() {
         ).thenAnswer((_) async => const Left(ServerFailure('فشل جلب السجل')));
         return bloc;
       },
-      act: (bloc) => bloc.add(const HistoryRequested(userId: 'user-1')),
+      act: (bloc) => bloc.add(const HistoryRequested(userId: 'user-1', organizationId: 'org-1')),
       expect: () => [
         AttendanceLoading(),
         const AttendanceError(message: 'فشل جلب السجل'),

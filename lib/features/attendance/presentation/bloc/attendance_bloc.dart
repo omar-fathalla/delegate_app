@@ -60,6 +60,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       CheckOutParams(
         attendanceId: event.attendanceId,
         userId: event.userId,
+        organizationId: event.organizationId,
         lat: event.lat,
         long: event.long,
       ),
@@ -76,7 +77,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     Emitter<AttendanceState> emit,
   ) async {
     emit(AttendanceLoading());
-    final result = await getHistory(GetHistoryParams(userId: event.userId));
+    final result = await getHistory(GetHistoryParams(
+      userId: event.userId,
+      organizationId: event.organizationId,
+    ));
     result.fold((failure) => emit(AttendanceError(message: failure.message)), (
       history,
     ) {
