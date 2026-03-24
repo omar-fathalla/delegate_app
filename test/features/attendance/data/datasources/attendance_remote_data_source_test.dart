@@ -33,8 +33,9 @@ void main() {
     expect(result.branchName, 'branchA');
 
     // Verify document creation in fake firestore
-    // Verify document creation in fake firestore
     final snapshot = await fakeFirestore
+        .collection('organizations')
+        .doc('org1')
         .collection(kAttendanceCollection)
         .get();
     expect(snapshot.docs.length, 1);
@@ -80,6 +81,8 @@ void main() {
 
     // 4. Verify - check Firestore logs
     final snapshot = await fakeFirestore
+        .collection('organizations')
+        .doc('org1')
         .collection(kAttendanceCollection)
         .where('type', isEqualTo: 'check_out')
         .get();
