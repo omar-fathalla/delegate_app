@@ -5,3 +5,7 @@
 ## 2024-05-22 - [Auth] Password Visibility Toggle
 **Learning:** Obscured text fields without a visibility toggle frustrate users who need to verify complex passwords or names.
 **Action:** Always include a suffix icon toggle for `obscureText` fields, ensuring the icon state (eye vs slashed eye) matches the *action* (Show vs Hide) or *state* (Visible vs Hidden) consistently with the design system.
+
+## 2024-05-23 - [Auth] Password Visibility Toggle Tooltip
+**Learning:** Adding a visibility toggle to obscured text fields is not enough for screen reader users, who need to know the button's purpose and its current state.
+**Action:** Always provide a `tooltip` on the password visibility toggle `IconButton` that accurately describes the action that will happen when pressed (e.g., using `MaterialLocalizations.of(context).showAccountsLabel` or `hideAccountsLabel`).
