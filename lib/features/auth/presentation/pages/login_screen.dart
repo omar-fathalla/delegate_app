@@ -318,34 +318,46 @@ class _LoginScreenState extends State<LoginScreen>
                                     const SizedBox(height: 16),
 
                                     // Remember Me
-                                    Row(
-                                      children: [
-                                        SizedBox(
-                                          height: 24,
-                                          width: 24,
-                                          child: Checkbox(
-                                            value: _rememberMe,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                _rememberMe = value ?? false;
-                                              });
-                                            },
-                                            activeColor: colorScheme.primary,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
+                                    InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _rememberMe = !_rememberMe;
+                                        });
+                                      },
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            height: 24,
+                                            width: 24,
+                                            child: Checkbox(
+                                              value: _rememberMe,
+                                              onChanged: (value) {
+                                                setState(() {
+                                                  _rememberMe = value ?? false;
+                                                });
+                                              },
+                                              activeColor: colorScheme.primary,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          l10n.rememberMe,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: colorScheme.onSurface,
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            l10n.rememberMe,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: colorScheme.onSurface,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(
+                                            width: 4,
+                                          ), // Padding for better touch target visualization
+                                        ],
+                                      ),
                                     ),
 
                                     const SizedBox(height: 32),
@@ -511,10 +523,8 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
-      } else {
-        }
-    } catch (_) {
-    }
+      } else {}
+    } catch (_) {}
   }
 
   // ---- Helper: Input decoration ----
@@ -555,9 +565,7 @@ class _LoginScreenState extends State<LoginScreen>
         return Container(
           decoration: BoxDecoration(
             color: colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
           child: Column(
@@ -594,12 +602,14 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              ...delegates.map((delegate) => _buildOrgCard(
-                    blocContext,
-                    sheetContext: sheetContext,
-                    delegate: delegate,
-                    rememberMe: rememberMe,
-                  )),
+              ...delegates.map(
+                (delegate) => _buildOrgCard(
+                  blocContext,
+                  sheetContext: sheetContext,
+                  delegate: delegate,
+                  rememberMe: rememberMe,
+                ),
+              ),
             ],
           ),
         );
@@ -626,10 +636,7 @@ class _LoginScreenState extends State<LoginScreen>
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
             BlocProvider.of<AuthBloc>(blocContext).add(
-              OrganizationSelected(
-                delegate: delegate,
-                rememberMe: rememberMe,
-              ),
+              OrganizationSelected(delegate: delegate, rememberMe: rememberMe),
             );
           });
         },
