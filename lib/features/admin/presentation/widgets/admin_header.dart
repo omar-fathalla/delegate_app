@@ -26,6 +26,7 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       leading: showBackButton
           ? IconButton(
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
               icon: const Icon(Icons.arrow_back),
               onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
             )

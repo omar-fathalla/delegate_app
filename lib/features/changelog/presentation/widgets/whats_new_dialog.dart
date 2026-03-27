@@ -111,6 +111,7 @@ class WhatsNewDialog extends StatelessWidget {
                       ),
                     ),
                     IconButton(
+                      tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                       onPressed: () {
                         onDismiss();
                         Navigator.pop(context);
