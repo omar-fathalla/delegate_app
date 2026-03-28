@@ -45,6 +45,7 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
       actions: [
         IconButton(
           icon: const Icon(Icons.logout),
+          tooltip: l10n.logout,
           onPressed: () {
             Navigator.of(context).pop();
           },

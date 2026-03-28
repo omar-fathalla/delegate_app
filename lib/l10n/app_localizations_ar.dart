@@ -483,4 +483,16 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get swPointUaePhone =>
       'United Arab Emirates WhatsApp: +971 55 871 5615';
+
+  @override
+  String get showPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
+
+  @override
+  String get close => 'إغلاق';
+
+  @override
+  String get openInBrowser => 'الفتح في المتصفح';
 }

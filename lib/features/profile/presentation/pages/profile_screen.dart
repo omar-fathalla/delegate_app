@@ -794,6 +794,7 @@ class _FullScreenImageViewer extends StatelessWidget {
             color: colorScheme.onInverseSurface,
             size: 28,
           ),
+          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -802,7 +803,7 @@ class _FullScreenImageViewer extends StatelessWidget {
               Icons.open_in_new_rounded,
               color: colorScheme.onInverseSurface,
             ),
-            tooltip: 'Open in browser',
+            tooltip: AppLocalizations.of(context)!.openInBrowser,
             onPressed: () async {
               final uri = Uri.parse(imageUrl);
               if (await canLaunchUrl(uri)) {
