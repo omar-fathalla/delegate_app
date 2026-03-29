@@ -33,6 +33,8 @@
         "description": "Mobile number field label"
     },
     "password": "كلمة المرور",
+    "showPassword": "عرض كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور",
     "@password": {
         "description": "Password field label"
     },
