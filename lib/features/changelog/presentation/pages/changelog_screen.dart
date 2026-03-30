@@ -22,8 +22,15 @@ class ChangelogScreen extends StatelessWidget {
   }
 }
 
-class _ChangelogView extends StatelessWidget {
+class _ChangelogView extends StatefulWidget {
   const _ChangelogView();
+
+  @override
+  State<_ChangelogView> createState() => _ChangelogViewState();
+}
+
+class _ChangelogViewState extends State<_ChangelogView> {
+  int? _expandedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -58,9 +65,7 @@ class _ChangelogView extends StatelessWidget {
                     Text(
                       state.message,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 16),
                     FilledButton.tonalIcon(
@@ -106,7 +111,7 @@ class _ChangelogView extends StatelessWidget {
               itemCount: state.updates.length,
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) =>
-                  _buildUpdateCard(context, state.updates[index]),
+                  _buildUpdateCard(context, state.updates[index], index),
             );
           }
 
@@ -116,72 +121,113 @@ class _ChangelogView extends StatelessWidget {
     );
   }
 
-  Widget _buildUpdateCard(BuildContext context, AppUpdate update) {
+  Widget _buildUpdateCard(BuildContext context, AppUpdate update, int index) {
     final colorScheme = Theme.of(context).colorScheme;
     final isArabic = localeProvider.isArabic;
     final title = isArabic ? update.title : update.titleEn;
     final description = isArabic ? update.description : update.descriptionEn;
+    final isExpanded = _expandedIndex == index;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(16),
-        border: update.priority == UpdatePriority.critical
-            ? Border.all(
-                color: colorScheme.error.withValues(alpha: 0.3), width: 1.5)
-            : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _buildTypeChip(context, update.type),
-              if (update.priority != UpdatePriority.normal) ...[
-                const SizedBox(width: 8),
-                _buildPriorityChip(context, update.priority),
-              ],
-              const Spacer(),
-              Text(
-                'v${update.version}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: colorScheme.onSurfaceVariant,
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _expandedIndex = isExpanded ? null : index;
+        });
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(16),
+          border: update.priority == UpdatePriority.critical
+              ? Border.all(
+                  color: colorScheme.error.withValues(alpha: 0.3),
+                  width: 1.5,
+                )
+              : isExpanded
+              ? Border.all(
+                  color: colorScheme.primary.withValues(alpha: 0.2),
+                  width: 1,
+                )
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _buildTypeChip(context, update.type),
+                if (update.priority != UpdatePriority.normal) ...[
+                  const SizedBox(width: 8),
+                  _buildPriorityChip(context, update.priority),
+                ],
+                const Spacer(),
+                Text(
+                  'v${update.version}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
+                const SizedBox(width: 8),
+                Icon(
+                  isExpanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  size: 18,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: colorScheme.onSurface,
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            description,
-            style: TextStyle(
-              fontSize: 14,
-              color: colorScheme.onSurfaceVariant,
-              height: 1.5,
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                  ),
+                  ..._buildHighlights(context, update),
+                  const SizedBox(height: 12),
+                  Text(
+                    DateFormat(
+                      'dd MMM yyyy',
+                      isArabic ? 'ar' : 'en',
+                    ).format(update.createdAt),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.6,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              crossFadeState: isExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 300),
             ),
-          ),
-          ..._buildHighlights(context, update),
-          const SizedBox(height: 8),
-          Text(
-            DateFormat('dd MMM yyyy', isArabic ? 'ar' : 'en')
-                .format(update.createdAt),
-            style: TextStyle(
-              fontSize: 11,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -246,30 +292,32 @@ class _ChangelogView extends StatelessWidget {
 
     return [
       const SizedBox(height: 10),
-      ...items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.check_circle_rounded,
-                  size: 16,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    item,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colorScheme.onSurfaceVariant,
-                      height: 1.4,
-                    ),
+      ...items.map(
+        (item) => Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.check_circle_rounded,
+                size: 16,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.4,
                   ),
                 ),
-              ],
-            ),
-          )),
+              ),
+            ],
+          ),
+        ),
+      ),
     ];
   }
 

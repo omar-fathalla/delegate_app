@@ -25,14 +25,9 @@ class AttendanceHistoryList extends StatelessWidget {
                 color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                Icons.history,
-                color: theme.colorScheme.primary,
-              ),
+              child: Icon(Icons.history, color: theme.colorScheme.primary),
             ),
-            title: Text(
-              DateFormat('yyyy-MM-dd').format(item.checkInTime),
-            ),
+            title: Text(DateFormat('yyyy-MM-dd').format(item.checkInTime)),
             subtitle: Text(
               l10n.historyInOut(
                 DateFormat('HH:mm').format(item.checkInTime),

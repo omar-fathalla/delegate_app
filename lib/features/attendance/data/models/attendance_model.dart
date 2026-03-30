@@ -22,15 +22,25 @@ class AttendanceModel extends Attendance {
       id: id,
       userId: json['userId'] ?? json['delegateId'] ?? '',
       organizationId: json['organizationId'] ?? '',
-      checkInTime: DateTimeUtils.parseDate(json['checkInTime'] ?? json['timestamp']),
+      checkInTime: DateTimeUtils.parseDate(
+        json['checkInTime'] ?? json['timestamp'],
+      ),
       checkOutTime: DateTimeUtils.parseNullableDate(json['checkOutTime']),
-      latitude: json['location']?['latitude']?.toDouble() ?? json['latitude']?.toDouble(),
-      longitude: json['location']?['longitude']?.toDouble() ?? json['longitude']?.toDouble(),
+      latitude:
+          json['location']?['latitude']?.toDouble() ??
+          json['latitude']?.toDouble(),
+      longitude:
+          json['location']?['longitude']?.toDouble() ??
+          json['longitude']?.toDouble(),
       imageUrl: json['imageUrl'],
       branchName: json['branchName'],
       isSynced: json['isSynced'] ?? true,
-      localCheckInTime: DateTimeUtils.parseNullableDate(json['localCheckInTime']),
-      localCheckOutTime: DateTimeUtils.parseNullableDate(json['localCheckOutTime']),
+      localCheckInTime: DateTimeUtils.parseNullableDate(
+        json['localCheckInTime'],
+      ),
+      localCheckOutTime: DateTimeUtils.parseNullableDate(
+        json['localCheckOutTime'],
+      ),
     );
   }
 
@@ -43,10 +53,7 @@ class AttendanceModel extends Attendance {
       'checkInTime': checkInTime.toIso8601String(),
       'timestamp': checkInTime.toIso8601String(), // للتوافق مع Firestore
       'checkOutTime': checkOutTime?.toIso8601String(),
-      'location': {
-        'latitude': latitude,
-        'longitude': longitude,
-      },
+      'location': {'latitude': latitude, 'longitude': longitude},
       'imageUrl': imageUrl,
       'branchName': branchName,
       'isSynced': isSynced,

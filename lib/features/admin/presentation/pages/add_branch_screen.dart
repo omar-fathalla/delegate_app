@@ -245,16 +245,14 @@ class _AddBranchViewState extends State<_AddBranchView> {
     return BlocConsumer<BranchBloc, BranchState>(
       listener: (context, state) {
         if (state is BranchActionSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.branchAddedSuccessfully),
-            ),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.branchAddedSuccessfully)));
           context.pushReplacement('/admin/branch-details', extra: state.branch);
         } else if (state is BranchError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message)));
         }
       },
       builder: (context, state) {
@@ -373,8 +371,9 @@ class _AddBranchViewState extends State<_AddBranchView> {
                     Align(
                       alignment: AlignmentDirectional.centerStart,
                       child: FilledButton.icon(
-                        onPressed:
-                            (_isLocating || isSaving) ? null : _getCurrentLocation,
+                        onPressed: (_isLocating || isSaving)
+                            ? null
+                            : _getCurrentLocation,
                         icon: const Icon(Icons.my_location, size: 18),
                         label: Text(
                           l10n.myLocation,
@@ -413,7 +412,9 @@ class _AddBranchViewState extends State<_AddBranchView> {
                         inactiveTrackColor: colorScheme.primaryContainer,
                         trackHeight: 4,
                         thumbColor: colorScheme.primary,
-                        overlayColor: colorScheme.primary.withValues(alpha: 0.1),
+                        overlayColor: colorScheme.primary.withValues(
+                          alpha: 0.1,
+                        ),
                         overlayShape: const RoundSliderOverlayShape(
                           overlayRadius: 20,
                         ),

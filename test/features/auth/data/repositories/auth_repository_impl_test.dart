@@ -117,35 +117,37 @@ void main() {
   );
 
   group('getDelegatesByPhone', () {
-    test('should return list of delegates when phone number is found', () async {
-      // arrange
-      mockRemoteDataSource.getDelegatesByPhoneStub = (_) async => [tDelegateModel];
-      // act
-      final result = await repository.getDelegatesByPhone(tPhoneNumber);
-      // assert
-      expect(mockRemoteDataSource.callCount, 1);
-      expect(mockRemoteDataSource.lastPhoneNumber, tPhoneNumber);
-      expect(result.isRight(), isTrue);
-      result.fold(
-        (l) => fail('Should be right'),
-        (r) => expect(r, [tDelegateModel]),
-      );
-    });
-
     test(
-      'should return AuthFailure when phone number is not found',
+      'should return list of delegates when phone number is found',
       () async {
         // arrange
-        mockRemoteDataSource.getDelegatesByPhoneStub = (_) async => [];
+        mockRemoteDataSource.getDelegatesByPhoneStub = (_) async => [
+          tDelegateModel,
+        ];
         // act
         final result = await repository.getDelegatesByPhone(tPhoneNumber);
         // assert
         expect(mockRemoteDataSource.callCount, 1);
-        expect(result, isA<Left<Failure, dynamic>>());
-        final failure = (result as Left).value;
-        expect(failure, isA<AuthFailure>());
+        expect(mockRemoteDataSource.lastPhoneNumber, tPhoneNumber);
+        expect(result.isRight(), isTrue);
+        result.fold(
+          (l) => fail('Should be right'),
+          (r) => expect(r, [tDelegateModel]),
+        );
       },
     );
+
+    test('should return AuthFailure when phone number is not found', () async {
+      // arrange
+      mockRemoteDataSource.getDelegatesByPhoneStub = (_) async => [];
+      // act
+      final result = await repository.getDelegatesByPhone(tPhoneNumber);
+      // assert
+      expect(mockRemoteDataSource.callCount, 1);
+      expect(result, isA<Left<Failure, dynamic>>());
+      final failure = (result as Left).value;
+      expect(failure, isA<AuthFailure>());
+    });
 
     test(
       'should return ServerFailure when data source throws ServerFailure',

@@ -979,6 +979,420 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'United Arab Emirates WhatsApp: +971 55 871 5615'**
   String get swPointUaePhone;
+
+  /// Create admin screen title and button
+  ///
+  /// In en, this message translates to:
+  /// **'Create Admin'**
+  String get createAdmin;
+
+  /// Admin name field label
+  ///
+  /// In en, this message translates to:
+  /// **'Admin Name'**
+  String get adminName;
+
+  /// Admin phone field label
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Number'**
+  String get adminPhone;
+
+  /// Admin email field label
+  ///
+  /// In en, this message translates to:
+  /// **'Email Address'**
+  String get adminEmail;
+
+  /// Admin name validation error
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter admin name'**
+  String get pleaseEnterAdminName;
+
+  /// Admin phone validation error
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter phone number'**
+  String get pleaseEnterAdminPhone;
+
+  /// Admin email validation error
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter email address'**
+  String get pleaseEnterAdminEmail;
+
+  /// Invalid phone number validation error
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid phone number'**
+  String get invalidPhoneNumber;
+
+  /// Invalid email validation error
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid email address'**
+  String get invalidEmail;
+
+  /// Admin created success message
+  ///
+  /// In en, this message translates to:
+  /// **'Admin account created successfully! Activation email sent.'**
+  String get adminCreatedSuccessfully;
+
+  /// Manage admins menu item
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Admins'**
+  String get manageAdmins;
+
+  /// Empty admins list message
+  ///
+  /// In en, this message translates to:
+  /// **'No admins found'**
+  String get noAdminsFound;
+
+  /// Suspended status badge
+  ///
+  /// In en, this message translates to:
+  /// **'Suspended'**
+  String get suspended;
+
+  /// Edit admin action
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get editAdmin;
+
+  /// Delete admin action
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get deleteAdmin;
+
+  /// Suspend admin action
+  ///
+  /// In en, this message translates to:
+  /// **'Suspend'**
+  String get suspendAdmin;
+
+  /// Activate admin action
+  ///
+  /// In en, this message translates to:
+  /// **'Activate'**
+  String get activateAdmin;
+
+  /// Delete admin confirmation message
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this admin? This action cannot be undone.'**
+  String get deleteAdminConfirmation;
+
+  /// Cancel button text
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// Company delegates screen title
+  ///
+  /// In en, this message translates to:
+  /// **'Company Delegates'**
+  String get companyDelegates;
+
+  /// View attendance button
+  ///
+  /// In en, this message translates to:
+  /// **'View Attendance'**
+  String get viewAttendance;
+
+  /// Empty delegates list message
+  ///
+  /// In en, this message translates to:
+  /// **'No delegates found'**
+  String get noDelegatesFound;
+
+  /// View profile data button text
+  ///
+  /// In en, this message translates to:
+  /// **'View Profile'**
+  String get viewProfileData;
+
+  /// Add delegate button text
+  ///
+  /// In en, this message translates to:
+  /// **'Add Delegate'**
+  String get addDelegate;
+
+  /// Add delegate via web title
+  ///
+  /// In en, this message translates to:
+  /// **'Add via Web'**
+  String get addDelegateViaWeb;
+
+  /// Tasks tab or screen title
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks'**
+  String get tasks;
+
+  /// Dashboard section title
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s Overview'**
+  String get todayOverview;
+
+  /// Total delegates card title
+  ///
+  /// In en, this message translates to:
+  /// **'Total Delegates'**
+  String get totalDelegates;
+
+  /// Checked in today card title
+  ///
+  /// In en, this message translates to:
+  /// **'Checked In Today'**
+  String get checkedInToday;
+
+  /// Absent today card title
+  ///
+  /// In en, this message translates to:
+  /// **'Absent Today'**
+  String get absentToday;
+
+  /// Button text to add a new task
+  ///
+  /// In en, this message translates to:
+  /// **'Add Task'**
+  String get addTask;
+
+  /// Label for task title input
+  ///
+  /// In en, this message translates to:
+  /// **'Task Title'**
+  String get taskTitle;
+
+  /// Label for task description input
+  ///
+  /// In en, this message translates to:
+  /// **'Task Description'**
+  String get taskDescription;
+
+  /// Label for task priority selection
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get taskPriority;
+
+  /// High priority label
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get high;
+
+  /// Medium priority label
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get medium;
+
+  /// Low priority label
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get low;
+
+  /// Label for task due date input
+  ///
+  /// In en, this message translates to:
+  /// **'Due Date'**
+  String get taskDueDate;
+
+  /// Label for assigning task to a delegate
+  ///
+  /// In en, this message translates to:
+  /// **'Assign To'**
+  String get assignTo;
+
+  /// Option for assigning task to all delegates
+  ///
+  /// In en, this message translates to:
+  /// **'All Delegates'**
+  String get allDelegates;
+
+  /// Button text to create a task
+  ///
+  /// In en, this message translates to:
+  /// **'Create Task'**
+  String get createTask;
+
+  /// Success message after creating a task
+  ///
+  /// In en, this message translates to:
+  /// **'Task created successfully'**
+  String get taskCreatedSuccessfully;
+
+  /// Success message after updating a task
+  ///
+  /// In en, this message translates to:
+  /// **'Task updated successfully'**
+  String get taskUpdatedSuccessfully;
+
+  /// Message shown when no tasks match the filter
+  ///
+  /// In en, this message translates to:
+  /// **'No tasks found'**
+  String get noTasksFound;
+
+  /// Label for task status selection
+  ///
+  /// In en, this message translates to:
+  /// **'Task Status'**
+  String get taskStatus;
+
+  /// Pending task status label
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get taskPending;
+
+  /// In Progress task status label
+  ///
+  /// In en, this message translates to:
+  /// **'In Progress'**
+  String get taskInProgress;
+
+  /// Completed task status label
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get taskCompleted;
+
+  /// Filter option for all items
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get all;
+
+  /// Today label
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get today;
+
+  /// Yesterday label
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get yesterday;
+
+  /// Cancelled task status label
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get taskCancelled;
+
+  /// Task details title
+  ///
+  /// In en, this message translates to:
+  /// **'Task Details'**
+  String get taskDetails;
+
+  /// Task schedule title
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get taskSchedule;
+
+  /// Select delegate label
+  ///
+  /// In en, this message translates to:
+  /// **'Select Delegate'**
+  String get selectDelegate;
+
+  /// Validation error for required field
+  ///
+  /// In en, this message translates to:
+  /// **'This field is required'**
+  String get errorFieldRequired;
+
+  /// Message when no tasks are found and user is prompted to add one
+  ///
+  /// In en, this message translates to:
+  /// **'Add a task to get started'**
+  String get addTaskToGetStarted;
+
+  /// Title for the delegate's tasks screen
+  ///
+  /// In en, this message translates to:
+  /// **'My Tasks'**
+  String get myTasks;
+
+  /// Message when no tasks are assigned to the delegate
+  ///
+  /// In en, this message translates to:
+  /// **'No tasks yet'**
+  String get noTasksYet;
+
+  /// Button text to complete a task
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get complete;
+
+  /// General delete button text
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// Title for delete task dialog/button
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Task'**
+  String get deleteTask;
+
+  /// Confirmation message for deleting a task
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this task? This action cannot be undone.'**
+  String get deleteTaskConfirmation;
+
+  /// Label for task notes
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get notes;
+
+  /// Title for the task summary card on home screen
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks Summary'**
+  String get tasksSummary;
+
+  /// Label for total count
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get total;
+
+  /// Placeholder for searching delegates
+  ///
+  /// In en, this message translates to:
+  /// **'Search delegates...'**
+  String get searchDelegates;
+
+  /// Label for status filter
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by status'**
+  String get filterByStatus;
+
+  /// Message shown when no delegates match search or filter
+  ///
+  /// In en, this message translates to:
+  /// **'No delegates match your search'**
+  String get noDelegateSearchResults;
 }
 
 class _AppLocalizationsDelegate

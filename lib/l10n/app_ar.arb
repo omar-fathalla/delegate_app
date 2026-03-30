@@ -28,6 +28,14 @@
     "@loginButton": {
         "description": "Login button text"
     },
+    "errorFieldRequired": "هذا الحقل مطلوب",
+    "@errorFieldRequired": {
+        "description": "Error message for required field"
+    },
+    "addTaskToGetStarted": "أضف مهمة للبدء",
+    "@addTaskToGetStarted": {
+        "description": "Message to add task to get started"
+    },
     "mobileNumber": "رقم الجوال",
     "@mobileNumber": {
         "description": "Mobile number field label"
@@ -663,5 +671,261 @@
     "swPointUaePhone": "United Arab Emirates WhatsApp: +971 55 871 5615",
     "@swPointUaePhone": {
         "description": "SwitchPoint UAE phone value"
+    },
+    "createAdmin": "إنشاء أدمن",
+    "@createAdmin": {
+        "description": "Create admin screen title and button"
+    },
+    "adminName": "اسم الأدمن",
+    "@adminName": {
+        "description": "Admin name field label"
+    },
+    "adminPhone": "رقم الهاتف",
+    "@adminPhone": {
+        "description": "Admin phone field label"
+    },
+    "adminEmail": "البريد الإلكتروني",
+    "@adminEmail": {
+        "description": "Admin email field label"
+    },
+    "pleaseEnterAdminName": "يرجى إدخال اسم الأدمن",
+    "@pleaseEnterAdminName": {
+        "description": "Admin name validation error"
+    },
+    "pleaseEnterAdminPhone": "يرجى إدخال رقم الهاتف",
+    "@pleaseEnterAdminPhone": {
+        "description": "Admin phone validation error"
+    },
+    "pleaseEnterAdminEmail": "يرجى إدخال البريد الإلكتروني",
+    "@pleaseEnterAdminEmail": {
+        "description": "Admin email validation error"
+    },
+    "invalidPhoneNumber": "رقم هاتف غير صالح",
+    "@invalidPhoneNumber": {
+        "description": "Invalid phone number validation error"
+    },
+    "invalidEmail": "بريد إلكتروني غير صالح",
+    "@invalidEmail": {
+        "description": "Invalid email validation error"
+    },
+    "adminCreatedSuccessfully": "تم إنشاء حساب الأدمن بنجاح! تم إرسال بريد التفعيل.",
+    "@adminCreatedSuccessfully": {
+        "description": "Admin created success message"
+    },
+    "manageAdmins": "إدارة الأدمن",
+    "@manageAdmins": {
+        "description": "Manage admins menu item"
+    },
+    "noAdminsFound": "لا يوجد أدمن",
+    "@noAdminsFound": {
+        "description": "Empty admins list message"
+    },
+    "suspended": "موقوف",
+    "@suspended": {
+        "description": "Suspended status badge"
+    },
+    "editAdmin": "تعديل",
+    "@editAdmin": {
+        "description": "Edit admin action"
+    },
+    "deleteAdmin": "حذف",
+    "@deleteAdmin": {
+        "description": "Delete admin action"
+    },
+    "suspendAdmin": "إيقاف",
+    "@suspendAdmin": {
+        "description": "Suspend admin action"
+    },
+    "activateAdmin": "تفعيل",
+    "@activateAdmin": {
+        "description": "Activate admin action"
+    },
+    "deleteAdminConfirmation": "هل أنت متأكد من حذف هذا الأدمن؟ لا يمكن التراجع عن هذا الإجراء.",
+    "@deleteAdminConfirmation": {
+        "description": "Delete admin confirmation message"
+    },
+    "cancel": "إلغاء",
+    "@cancel": {
+        "description": "Cancel button text"
+    },
+    "companyDelegates": "مناديب الشركة",
+    "@companyDelegates": {
+        "description": "Company delegates screen title"
+    },
+    "viewAttendance": "عرض الحضور",
+    "@viewAttendance": {
+        "description": "View attendance button"
+    },
+    "noDelegatesFound": "لا يوجد مناديب",
+    "@noDelegatesFound": {
+        "description": "Empty delegates list message"
+    },
+    "viewProfileData": "عرض البيانات",
+    "@viewProfileData": {
+        "description": "View profile data button text"
+    },
+    "addDelegate": "إضافة مندوب",
+    "@addDelegate": {
+        "description": "Add delegate button text"
+    },
+    "addDelegateViaWeb": "إضافة عبر الموقع",
+    "@addDelegateViaWeb": {
+        "description": "Add delegate via web title"
+    },
+    "tasks": "المهام",
+    "@tasks": {
+        "description": "Tasks tab or screen title"
+    },
+    "todayOverview": "نظرة عامة اليوم",
+    "@todayOverview": {
+        "description": "Dashboard section title"
+    },
+    "totalDelegates": "إجمالي المناديب",
+    "@totalDelegates": {
+        "description": "Total delegates card title"
+    },
+    "checkedInToday": "الحاضرون اليوم",
+    "@checkedInToday": {
+        "description": "Checked in today card title"
+    },
+    "absentToday": "الغائبون",
+    "addTask": "إضافة مهمة",
+    "@addTask": {
+        "description": "Button text to add a new task"
+    },
+    "taskTitle": "عنوان المهمة",
+    "@taskTitle": {
+        "description": "Label for task title input"
+    },
+    "taskDescription": "وصف المهمة",
+    "@taskDescription": {
+        "description": "Label for task description input"
+    },
+    "taskPriority": "الأولوية",
+    "@taskPriority": {
+        "description": "Label for task priority selection"
+    },
+    "high": "عالية",
+    "@high": {
+        "description": "High priority label"
+    },
+    "medium": "متوسطة",
+    "@medium": {
+        "description": "Medium priority label"
+    },
+    "low": "منخفضة",
+    "@low": {
+        "description": "Low priority label"
+    },
+    "taskDueDate": "تاريخ التنفيذ",
+    "@taskDueDate": {
+        "description": "Label for task due date input"
+    },
+    "assignTo": "تعيين إلى",
+    "@assignTo": {
+        "description": "Label for assigning task to a delegate"
+    },
+    "all": "الكل",
+    "@all": {
+        "description": "Filter option for all items"
+    },
+    "today": "اليوم",
+    "@today": {
+        "description": "Today label"
+    },
+    "yesterday": "أمس",
+    "@yesterday": {
+        "description": "Yesterday label"
+    },
+    "allDelegates": "جميع المناديب",
+    "@allDelegates": {
+        "description": "Option for assigning task to all delegates"
+    },
+    "createTask": "إنشاء مهمة",
+    "@createTask": {
+        "description": "Button text to create a task"
+    },
+    "taskCreatedSuccessfully": "تم إنشاء المهمة بنجاح",
+    "@taskCreatedSuccessfully": {
+        "description": "Success message after creating a task"
+    },
+    "taskUpdatedSuccessfully": "تم تحديث المهمة بنجاح",
+    "@taskUpdatedSuccessfully": {
+        "description": "Success message after updating a task"
+    },
+    "noTasksFound": "لا توجد مهام حالياً",
+    "@noTasksFound": {
+        "description": "Message shown when no tasks match the filter"
+    },
+    "taskStatus": "حالة المهمة",
+    "@taskStatus": {
+        "description": "Label for task status selection"
+    },
+    "taskPending": "معلقة",
+    "@taskPending": {
+        "description": "Pending task status label"
+    },
+    "taskInProgress": "قيد التنفيذ",
+    "@taskInProgress": {
+        "description": "In Progress task status label"
+    },
+    "taskCompleted": "منجزة",
+    "@taskCompleted": {
+        "description": "Completed task status label"
+    },
+    "taskCancelled": "ملغاة",
+    "@taskCancelled": {
+        "description": "Cancelled task status label"
+    },
+    "myTasks": "مهامي",
+    "@myTasks": {
+        "description": "Title for the delegate's tasks screen"
+    },
+    "noTasksYet": "لا توجد مهامي بعد",
+    "@noTasksYet": {
+        "description": "Message when no tasks are assigned to the delegate"
+    },
+    "complete": "إكمال",
+    "@complete": {
+        "description": "Button text to complete a task"
+    },
+    "delete": "حذف",
+    "@delete": {
+        "description": "General delete button text"
+    },
+    "deleteTask": "حذف المهمة",
+    "@deleteTask": {
+        "description": "Title for delete task dialog/button"
+    },
+    "deleteTaskConfirmation": "هل أنت متأكد من رغبتك في حذف هذه المهمة؟ لا يمكن التراجع عن هذا الإجراء.",
+    "@deleteTaskConfirmation": {
+        "description": "Confirmation message for deleting a task"
+    },
+    "notes": "الملاحظات",
+    "@notes": {
+        "description": "Label for task notes"
+    },
+    "@absentToday": {
+        "description": "Absent today card title"
+    },
+    "tasksSummary": "ملخص المهام",
+    "@tasksSummary": {
+        "description": "Title for the task summary card on home screen"
+    },
+    "total": "الإجمالي",
+    "@total": {
+        "description": "Label for total count"
+    },
+    "searchDelegates": "البحث عن مندوب...",
+    "@searchDelegates": {
+      "description": "Placeholder for searching delegates"
+    },
+    "filterByStatus": "تصفية حسب الحالة",
+    "@filterByStatus": {
+      "description": "Label for status filter"
+    },
+    "noDelegateSearchResults": "لا توجد نتائج مطابقة لبحثك",
+    "@noDelegateSearchResults": {
+      "description": "Message shown when no delegates match search or filter"
     }
 }

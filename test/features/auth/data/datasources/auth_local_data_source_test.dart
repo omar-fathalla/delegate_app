@@ -45,8 +45,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     sharedPreferences = await SharedPreferences.getInstance();
-    dataSource =
-        AuthLocalDataSourceImpl(sharedPreferences: sharedPreferences);
+    dataSource = AuthLocalDataSourceImpl(sharedPreferences: sharedPreferences);
   });
 
   group('cacheDelegateData', () {

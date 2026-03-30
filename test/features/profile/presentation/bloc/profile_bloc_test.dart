@@ -69,16 +69,13 @@ void main() {
     blocTest<ProfileBloc, ProfileState>(
       'emits [ProfileLoading, ProfileLoaded] when profile loads successfully',
       build: () {
-        when(() => mockGetDelegateProfile(any())).thenAnswer(
-          (_) async => Right(tDelegate),
-        );
+        when(
+          () => mockGetDelegateProfile(any()),
+        ).thenAnswer((_) async => Right(tDelegate));
         return bloc;
       },
       act: (bloc) => bloc.add(const LoadProfile(uid: 'user-1')),
-      expect: () => [
-        ProfileLoading(),
-        ProfileLoaded(delegate: tDelegate),
-      ],
+      expect: () => [ProfileLoading(), ProfileLoaded(delegate: tDelegate)],
       verify: (_) {
         verify(() => mockGetDelegateProfile(any())).called(1);
       },

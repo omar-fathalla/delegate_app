@@ -17,6 +17,8 @@ enum DocumentKey {
 
 enum DocumentStatus { pending, approved, rejected, notProvided }
 
+enum UserRole { delegate, admin, superAdmin }
+
 class Delegate extends Equatable {
   final String uid;
   final String firstName;
@@ -52,6 +54,7 @@ class Delegate extends Equatable {
   final String? updatedBy;
   final int version;
   final List<DelegateDocument> documents;
+  final UserRole role;
 
   const Delegate({
     required this.uid,
@@ -88,6 +91,7 @@ class Delegate extends Equatable {
     this.updatedBy,
     required this.version,
     required this.documents,
+    this.role = UserRole.delegate,
   });
 
   @override
@@ -126,6 +130,7 @@ class Delegate extends Equatable {
     updatedBy,
     version,
     documents,
+    role,
   ];
 }
 

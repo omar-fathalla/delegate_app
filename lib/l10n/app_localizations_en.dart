@@ -485,4 +485,214 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get swPointUaePhone =>
       'United Arab Emirates WhatsApp: +971 55 871 5615';
+
+  @override
+  String get createAdmin => 'Create Admin';
+
+  @override
+  String get adminName => 'Admin Name';
+
+  @override
+  String get adminPhone => 'Phone Number';
+
+  @override
+  String get adminEmail => 'Email Address';
+
+  @override
+  String get pleaseEnterAdminName => 'Please enter admin name';
+
+  @override
+  String get pleaseEnterAdminPhone => 'Please enter phone number';
+
+  @override
+  String get pleaseEnterAdminEmail => 'Please enter email address';
+
+  @override
+  String get invalidPhoneNumber => 'Invalid phone number';
+
+  @override
+  String get invalidEmail => 'Invalid email address';
+
+  @override
+  String get adminCreatedSuccessfully =>
+      'Admin account created successfully! Activation email sent.';
+
+  @override
+  String get manageAdmins => 'Manage Admins';
+
+  @override
+  String get noAdminsFound => 'No admins found';
+
+  @override
+  String get suspended => 'Suspended';
+
+  @override
+  String get editAdmin => 'Edit';
+
+  @override
+  String get deleteAdmin => 'Delete';
+
+  @override
+  String get suspendAdmin => 'Suspend';
+
+  @override
+  String get activateAdmin => 'Activate';
+
+  @override
+  String get deleteAdminConfirmation =>
+      'Are you sure you want to delete this admin? This action cannot be undone.';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get companyDelegates => 'Company Delegates';
+
+  @override
+  String get viewAttendance => 'View Attendance';
+
+  @override
+  String get noDelegatesFound => 'No delegates found';
+
+  @override
+  String get viewProfileData => 'View Profile';
+
+  @override
+  String get addDelegate => 'Add Delegate';
+
+  @override
+  String get addDelegateViaWeb => 'Add via Web';
+
+  @override
+  String get tasks => 'Tasks';
+
+  @override
+  String get todayOverview => 'Today\'s Overview';
+
+  @override
+  String get totalDelegates => 'Total Delegates';
+
+  @override
+  String get checkedInToday => 'Checked In Today';
+
+  @override
+  String get absentToday => 'Absent Today';
+
+  @override
+  String get addTask => 'Add Task';
+
+  @override
+  String get taskTitle => 'Task Title';
+
+  @override
+  String get taskDescription => 'Task Description';
+
+  @override
+  String get taskPriority => 'Priority';
+
+  @override
+  String get high => 'High';
+
+  @override
+  String get medium => 'Medium';
+
+  @override
+  String get low => 'Low';
+
+  @override
+  String get taskDueDate => 'Due Date';
+
+  @override
+  String get assignTo => 'Assign To';
+
+  @override
+  String get allDelegates => 'All Delegates';
+
+  @override
+  String get createTask => 'Create Task';
+
+  @override
+  String get taskCreatedSuccessfully => 'Task created successfully';
+
+  @override
+  String get taskUpdatedSuccessfully => 'Task updated successfully';
+
+  @override
+  String get noTasksFound => 'No tasks found';
+
+  @override
+  String get taskStatus => 'Task Status';
+
+  @override
+  String get taskPending => 'Pending';
+
+  @override
+  String get taskInProgress => 'In Progress';
+
+  @override
+  String get taskCompleted => 'Completed';
+
+  @override
+  String get all => 'All';
+
+  @override
+  String get today => 'Today';
+
+  @override
+  String get yesterday => 'Yesterday';
+
+  @override
+  String get taskCancelled => 'Cancelled';
+
+  @override
+  String get taskDetails => 'Task Details';
+
+  @override
+  String get taskSchedule => 'Schedule';
+
+  @override
+  String get selectDelegate => 'Select Delegate';
+
+  @override
+  String get errorFieldRequired => 'This field is required';
+
+  @override
+  String get addTaskToGetStarted => 'Add a task to get started';
+
+  @override
+  String get myTasks => 'My Tasks';
+
+  @override
+  String get noTasksYet => 'No tasks yet';
+
+  @override
+  String get complete => 'Complete';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get deleteTask => 'Delete Task';
+
+  @override
+  String get deleteTaskConfirmation =>
+      'Are you sure you want to delete this task? This action cannot be undone.';
+
+  @override
+  String get notes => 'Notes';
+
+  @override
+  String get tasksSummary => 'Tasks Summary';
+
+  @override
+  String get total => 'Total';
+
+  @override
+  String get searchDelegates => 'Search delegates...';
+
+  @override
+  String get filterByStatus => 'Filter by status';
+
+  @override
+  String get noDelegateSearchResults => 'No delegates match your search';
 }

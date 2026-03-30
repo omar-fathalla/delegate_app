@@ -34,20 +34,20 @@ void main() {
         .collection('delegates')
         .doc(uid)
         .set({
-      'firstName': 'أحمد',
-      'middleName': 'محمد',
-      'lastName': 'علي',
-      'fullName': 'أحمد محمد علي',
-      'nationalityID': '12345678901234',
-      'motherName': 'منى',
-      'city': 'القاهرة',
-      'phoneNumber': '01000000000',
-      'gender': 'male',
-      'position': 'promoter',
-      'status': 'active',
-      'organizationUID': orgId,
-      'companyUID': companyId,
-    });
+          'firstName': 'أحمد',
+          'middleName': 'محمد',
+          'lastName': 'علي',
+          'fullName': 'أحمد محمد علي',
+          'nationalityID': '12345678901234',
+          'motherName': 'منى',
+          'city': 'القاهرة',
+          'phoneNumber': '01000000000',
+          'gender': 'male',
+          'position': 'promoter',
+          'status': 'active',
+          'organizationUID': orgId,
+          'companyUID': companyId,
+        });
   }
 
   group('getDelegateProfile', () {
@@ -81,16 +81,18 @@ void main() {
       );
     });
 
-    test('should throw ServerException when org/company IDs are missing',
-        () async {
-      await fakeFirestore.collection('users').doc('u2').set({
-        'role': 'delegate',
-      });
+    test(
+      'should throw ServerException when org/company IDs are missing',
+      () async {
+        await fakeFirestore.collection('users').doc('u2').set({
+          'role': 'delegate',
+        });
 
-      expect(
-        () => dataSource.getDelegateProfile('u2'),
-        throwsA(isA<ServerException>()),
-      );
-    });
+        expect(
+          () => dataSource.getDelegateProfile('u2'),
+          throwsA(isA<ServerException>()),
+        );
+      },
+    );
   });
 }

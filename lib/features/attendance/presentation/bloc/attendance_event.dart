@@ -60,14 +60,45 @@ class CheckOutRequested extends AttendanceEvent {
 class HistoryRequested extends AttendanceEvent {
   final String userId;
   final String organizationId;
+  final String? nationalityID;
+  final String? phoneNumber;
 
   const HistoryRequested({
     required this.userId,
     required this.organizationId,
+    this.nationalityID,
+    this.phoneNumber,
   });
 
   @override
-  List<Object> get props => [userId, organizationId];
+  List<Object?> get props => [
+    userId,
+    organizationId,
+    nationalityID,
+    phoneNumber,
+  ];
+}
+
+class LoadMoreHistoryRequested extends AttendanceEvent {
+  final String userId;
+  final String organizationId;
+  final String? nationalityID;
+  final String? phoneNumber;
+
+  const LoadMoreHistoryRequested({
+    required this.userId,
+    required this.organizationId,
+    this.nationalityID,
+    this.phoneNumber,
+  });
+
+  @override
+  List<Object?> get props => [
+    userId,
+    organizationId,
+    nationalityID,
+    phoneNumber,
+  ];
 }
 
 class SyncRequested extends AttendanceEvent {

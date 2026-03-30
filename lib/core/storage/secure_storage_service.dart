@@ -45,8 +45,7 @@ class SecureStorageService {
   }) async {
     try {
       await write(key: key, value: jsonEncode(value));
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   /// Reads a JSON-serializable [Map] for the given [key].

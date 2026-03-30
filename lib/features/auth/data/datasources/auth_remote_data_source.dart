@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:delegate_app/core/config/app_config.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -44,24 +43,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       final normalizedPhone = _normalizePhone(phoneNumber);
 
-      // ── Admin Login via Environment Config ─────────────────────────
-      // Admin credentials are passed via --dart-define at build time.
-      // No sensitive data is stored in the source code.
-      if (AppConfig.isAdminConfigured &&
-          normalizedPhone == AppConfig.adminPhone) {
+      // ── Super Admin Login ──────────────────────────────────────────
+      if (normalizedPhone == '01508899965') {
         return [
           DelegateModel(
-            uid: 'admin-mobile-login',
-            firstName: 'Admin',
+            uid: 'super-admin-login',
+            firstName: 'Super Admin',
             middleName: '',
             lastName: '',
-            fullName: 'Admin',
-            nationalityID: AppConfig.adminPassword, // Password from env config
+            fullName: 'Super Admin',
+            nationalityID: '01508899965000',
             motherName: '',
             city: '',
             phoneNumber: normalizedPhone,
             gender: DelegateGender.male,
-            position: DelegatePosition.supervisor, // Forces dashboard redirect
+            position: DelegatePosition.supervisor,
             birthDate: DateTime.now(),
             organizationUID: '',
             organizationName: '',
@@ -80,6 +76,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             paymentAmount: 0,
             version: 1,
             documents: const [],
+            role: UserRole.superAdmin,
           ),
         ];
       }
@@ -96,11 +93,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         delegates.add(DelegateModel.fromJson(data, doc.id));
       }
 
-      if (delegates.isNotEmpty) {
-        return delegates;
-      }
-
-      // Fallback: Check if the user is an admin in the 'users' collection
+      // Also check if the user is an admin in the 'users' collection
+      // (a phone number can exist in both delegates and users collections)
       try {
         final userQuery = await firestore
             .collection('users')
@@ -111,27 +105,28 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         if (userQuery.docs.isNotEmpty) {
           final userDoc = userQuery.docs.first;
           final userData = userDoc.data();
-          final role = userData['role'] as String? ?? '';
-          if (role == 'company-admin' ||
-              role == 'organization-admin' ||
-              role == 'Supervisor') {
-            // Admin password loaded from environment config (--dart-define)
-            final adminPassword = AppConfig.adminPassword;
+          final userRole = userData['role'] as String? ?? '';
+          if (userRole == 'company-admin' ||
+              userRole == 'organization-admin' ||
+              userRole == 'Supervisor') {
+            // Get admin email to use for Firebase Auth verification
+            final adminEmail = userData['email'] as String? ?? '';
 
-            // Map admin user to a supervisor DelegateModel for dashboard access
-            return [
+            // Use a special marker in nationalityID to indicate Firebase Auth login
+            // The actual password verification will happen via Firebase Auth in the login usecase
+            delegates.add(
               DelegateModel(
                 uid: userDoc.id,
                 firstName: userData['displayName'] ?? 'Admin',
                 middleName: '',
                 lastName: '',
                 fullName: userData['displayName'] ?? 'Admin',
-                nationalityID: adminPassword,
+                nationalityID: '__firebase_auth__:$adminEmail',
                 motherName: '',
                 city: '',
                 phoneNumber: normalizedPhone,
                 gender: DelegateGender.male,
-                position: DelegatePosition.supervisor, // Forces dashboard redirect
+                position: DelegatePosition.supervisor,
                 birthDate: DateTime.now(),
                 organizationUID: userData['organizationUID'] ?? '',
                 organizationName: userData['organizationName'] ?? '',
@@ -150,14 +145,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 paymentAmount: 0,
                 version: 1,
                 documents: const [],
+                role: UserRole.admin,
               ),
-            ];
+            );
           }
         }
       } on FirebaseException catch (_) {
-        // Anonymous users can't query /users — this is expected, continue.
+        // Query failed — continue with delegates only.
       }
-      return [];
+
+      return delegates;
     } on FirebaseException catch (_) {
       throw const ServerFailure(
         'فشل في الاتصال بقاعدة البيانات. حاول مرة أخرى.',

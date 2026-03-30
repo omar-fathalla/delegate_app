@@ -52,9 +52,9 @@ void main() {
 
   test('should return cached delegate when available', () async {
     // arrange
-    when(() => mockRepository.getCachedDelegate()).thenAnswer(
-      (_) async => Right(tDelegate),
-    );
+    when(
+      () => mockRepository.getCachedDelegate(),
+    ).thenAnswer((_) async => Right(tDelegate));
     // act
     final result = await usecase(NoParams());
     // assert
@@ -64,9 +64,9 @@ void main() {
 
   test('should return null when no cached delegate', () async {
     // arrange
-    when(() => mockRepository.getCachedDelegate()).thenAnswer(
-      (_) async => const Right(null),
-    );
+    when(
+      () => mockRepository.getCachedDelegate(),
+    ).thenAnswer((_) async => const Right(null));
     // act
     final result = await usecase(NoParams());
     // assert
@@ -82,9 +82,6 @@ void main() {
     // act
     final result = await usecase(NoParams());
     // assert
-    expect(
-      result,
-      const Left(CacheFailure('فشل جلب البيانات المحفوظة')),
-    );
+    expect(result, const Left(CacheFailure('فشل جلب البيانات المحفوظة')));
   });
 }

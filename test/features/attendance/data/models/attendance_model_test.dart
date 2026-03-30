@@ -81,9 +81,7 @@ void main() {
 
     test('should return empty string for userId if missing', () {
       // arrange
-      final Map<String, dynamic> json = {
-        'checkInTime': tCheckInTimestamp,
-      };
+      final Map<String, dynamic> json = {'checkInTime': tCheckInTimestamp};
       // act
       final result = AttendanceModel.fromJson(json, tId);
       // assert

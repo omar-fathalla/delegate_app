@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
+import 'package:delegate_app/features/attendance/domain/entities/attendance_pagination_result.dart';
 import 'package:delegate_app/features/attendance/domain/repositories/attendance_repository.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,12 +54,32 @@ class MockAttendanceRepository implements AttendanceRepository {
   }
 
   @override
-  Future<Either<Failure, List<Attendance>>> getHistory(String userId, String organizationId) {
+  Future<Either<Failure, List<Attendance>>> getHistory(
+    String userId,
+    String organizationId, {
+    String? nationalityID,
+    String? phoneNumber,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<Either<Failure, Attendance?>> findActiveAttendance(String userId, String organizationId) {
+  Future<Either<Failure, AttendancePaginationResult>> getHistoryPaginated(
+    String userId,
+    String organizationId, {
+    int limit = 20,
+    String? nationalityID,
+    String? phoneNumber,
+    dynamic lastDoc,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Either<Failure, Attendance?>> findActiveAttendance(
+    String userId,
+    String organizationId,
+  ) {
     throw UnimplementedError();
   }
 

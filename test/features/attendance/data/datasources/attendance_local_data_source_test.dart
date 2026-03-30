@@ -32,8 +32,9 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     sharedPreferences = await SharedPreferences.getInstance();
-    dataSource =
-        AttendanceLocalDataSourceImpl(sharedPreferences: sharedPreferences);
+    dataSource = AttendanceLocalDataSourceImpl(
+      sharedPreferences: sharedPreferences,
+    );
   });
 
   group('cacheAttendance', () {

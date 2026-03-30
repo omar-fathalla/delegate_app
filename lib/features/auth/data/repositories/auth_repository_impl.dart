@@ -31,9 +31,11 @@ class AuthRepositoryImpl implements AuthRepository {
 
       // Filter out suspended/rejected delegates
       final validDelegates = delegates
-          .where((delegate) =>
-              delegate.status != DelegateStatus.suspended &&
-              delegate.status != DelegateStatus.rejected)
+          .where(
+            (delegate) =>
+                delegate.status != DelegateStatus.suspended &&
+                delegate.status != DelegateStatus.rejected,
+          )
           .toList();
 
       if (validDelegates.isEmpty) {
@@ -80,7 +82,8 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, void>> cacheAllDelegates(
-      List<Delegate> delegates) async {
+    List<Delegate> delegates,
+  ) async {
     try {
       final models = delegates.map((d) => d as DelegateModel).toList();
       await localDataSource.cacheAllDelegatesData(models);

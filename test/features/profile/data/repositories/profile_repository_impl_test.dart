@@ -76,21 +76,23 @@ void main() {
       );
     });
 
-    test('should return Left(ServerFailure) when ServerException is thrown',
-        () async {
-      mockDataSource.getDelegateProfileStub =
-          (_) => throw ServerException('User not found');
+    test(
+      'should return Left(ServerFailure) when ServerException is thrown',
+      () async {
+        mockDataSource.getDelegateProfileStub = (_) =>
+            throw ServerException('User not found');
 
-      final result = await repository.getDelegateProfile('u1');
+        final result = await repository.getDelegateProfile('u1');
 
-      expect(result, isA<Left<Failure, dynamic>>());
-      final failure = (result as Left).value as ServerFailure;
-      expect(failure.message, 'User not found');
-    });
+        expect(result, isA<Left<Failure, dynamic>>());
+        final failure = (result as Left).value as ServerFailure;
+        expect(failure.message, 'User not found');
+      },
+    );
 
     test('should return Left(ServerFailure) on unexpected error', () async {
-      mockDataSource.getDelegateProfileStub =
-          (_) => throw Exception('Unexpected');
+      mockDataSource.getDelegateProfileStub = (_) =>
+          throw Exception('Unexpected');
 
       final result = await repository.getDelegateProfile('u1');
 

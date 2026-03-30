@@ -22,10 +22,7 @@ class GetHistoryParams extends Equatable {
   final String userId;
   final String organizationId;
 
-  const GetHistoryParams({
-    required this.userId,
-    required this.organizationId,
-  });
+  const GetHistoryParams({required this.userId, required this.organizationId});
 
   @override
   List<Object> get props => [userId, organizationId];

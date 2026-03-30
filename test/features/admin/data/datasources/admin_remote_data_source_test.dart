@@ -55,8 +55,10 @@ void main() {
       expect(result.latitude, 30.1);
 
       // Verify Firestore state
-      final doc =
-          await fakeFirestore.collection('branches').doc(result.id).get();
+      final doc = await fakeFirestore
+          .collection('branches')
+          .doc(result.id)
+          .get();
       expect(doc.exists, true);
       expect(doc.data()!['branchName'], 'فرع جديد');
     });

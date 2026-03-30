@@ -112,12 +112,12 @@ void main() {
     mockCacheAllDelegates = MockCacheAllDelegates();
 
     // Setup default return values for mocks
-    when(() => mockCacheDelegate(any())).thenAnswer(
-      (_) async => const Right(null),
-    );
-    when(() => mockCacheAllDelegates(any())).thenAnswer(
-      (_) async => const Right(null),
-    );
+    when(
+      () => mockCacheDelegate(any()),
+    ).thenAnswer((_) async => const Right(null));
+    when(
+      () => mockCacheAllDelegates(any()),
+    ).thenAnswer((_) async => const Right(null));
 
     authBloc = AuthBloc(
       loginUseCase: mockLogin,
@@ -140,21 +140,15 @@ void main() {
     blocTest<AuthBloc, AuthState>(
       'emits [AuthLoading, AuthAuthenticated] when login succeeds with single delegate',
       build: () {
-        when(() => mockLogin(any())).thenAnswer(
-          (_) async => Right([tDelegate]),
-        );
+        when(
+          () => mockLogin(any()),
+        ).thenAnswer((_) async => Right([tDelegate]));
         return authBloc;
       },
       act: (bloc) => bloc.add(
-        const LoginRequested(
-          phoneNumber: '01234567890',
-          password: 'testPass',
-        ),
+        const LoginRequested(phoneNumber: '01234567890', password: 'testPass'),
       ),
-      expect: () => [
-        AuthLoading(),
-        AuthAuthenticated(delegate: tDelegate),
-      ],
+      expect: () => [AuthLoading(), AuthAuthenticated(delegate: tDelegate)],
       verify: (_) {
         verify(() => mockLogin(any())).called(1);
       },
@@ -169,10 +163,7 @@ void main() {
         return authBloc;
       },
       act: (bloc) => bloc.add(
-        const LoginRequested(
-          phoneNumber: '01234567890',
-          password: 'wrong',
-        ),
+        const LoginRequested(phoneNumber: '01234567890', password: 'wrong'),
       ),
       expect: () => [
         AuthLoading(),
@@ -189,10 +180,7 @@ void main() {
         return authBloc;
       },
       act: (bloc) => bloc.add(
-        const LoginRequested(
-          phoneNumber: '01234567890',
-          password: 'wrongPass',
-        ),
+        const LoginRequested(phoneNumber: '01234567890', password: 'wrongPass'),
       ),
       expect: () => [
         AuthLoading(),
@@ -205,31 +193,25 @@ void main() {
     blocTest<AuthBloc, AuthState>(
       'emits [AuthLoading, AuthAuthenticated] when cached delegate found',
       build: () {
-        when(() => mockCheckAutoLogin(any())).thenAnswer(
-          (_) async => Right(tDelegate),
-        );
+        when(
+          () => mockCheckAutoLogin(any()),
+        ).thenAnswer((_) async => Right(tDelegate));
         return authBloc;
       },
       act: (bloc) => bloc.add(CheckAutoLoginRequested()),
-      expect: () => [
-        AuthLoading(),
-        AuthAuthenticated(delegate: tDelegate),
-      ],
+      expect: () => [AuthLoading(), AuthAuthenticated(delegate: tDelegate)],
     );
 
     blocTest<AuthBloc, AuthState>(
       'emits [AuthLoading, AuthUnauthenticated] when no cached delegate',
       build: () {
-        when(() => mockCheckAutoLogin(any())).thenAnswer(
-          (_) async => const Right(null),
-        );
+        when(
+          () => mockCheckAutoLogin(any()),
+        ).thenAnswer((_) async => const Right(null));
         return authBloc;
       },
       act: (bloc) => bloc.add(CheckAutoLoginRequested()),
-      expect: () => [
-        AuthLoading(),
-        AuthUnauthenticated(),
-      ],
+      expect: () => [AuthLoading(), AuthUnauthenticated()],
     );
 
     blocTest<AuthBloc, AuthState>(
@@ -241,10 +223,7 @@ void main() {
         return authBloc;
       },
       act: (bloc) => bloc.add(CheckAutoLoginRequested()),
-      expect: () => [
-        AuthLoading(),
-        AuthUnauthenticated(),
-      ],
+      expect: () => [AuthLoading(), AuthUnauthenticated()],
     );
   });
 
@@ -252,16 +231,13 @@ void main() {
     blocTest<AuthBloc, AuthState>(
       'emits [AuthLoading, AuthUnauthenticated] when logout is requested',
       build: () {
-        when(() => mockLogout(any())).thenAnswer(
-          (_) async => const Right(null),
-        );
+        when(
+          () => mockLogout(any()),
+        ).thenAnswer((_) async => const Right(null));
         return authBloc;
       },
       act: (bloc) => bloc.add(LogoutRequested()),
-      expect: () => [
-        AuthLoading(),
-        AuthUnauthenticated(),
-      ],
+      expect: () => [AuthLoading(), AuthUnauthenticated()],
       verify: (_) {
         verify(() => mockLogout(any())).called(1);
       },

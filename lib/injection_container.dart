@@ -6,7 +6,18 @@ import 'package:delegate_app/features/admin/domain/usecases/add_branch.dart';
 import 'package:delegate_app/features/admin/domain/usecases/delete_branch.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_branches.dart';
 import 'package:delegate_app/features/admin/domain/usecases/update_branch.dart';
+import 'package:delegate_app/features/admin/domain/usecases/create_admin.dart';
+import 'package:delegate_app/features/admin/domain/usecases/delete_admin_user.dart';
+import 'package:delegate_app/features/admin/domain/usecases/get_admins.dart';
+import 'package:delegate_app/features/admin/domain/usecases/suspend_admin_user.dart';
+import 'package:delegate_app/features/admin/domain/usecases/update_admin_user.dart';
+import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
+import 'package:delegate_app/features/admin/domain/usecases/get_dashboard_summary.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/create_admin_bloc.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/manage_admins_bloc.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
@@ -25,6 +36,7 @@ import 'package:delegate_app/features/attendance/data/datasources/attendance_off
 import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/get_history_paginated.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 
@@ -42,6 +54,18 @@ import 'package:delegate_app/features/changelog/domain/usecases/get_all_updates.
 import 'package:delegate_app/features/changelog/presentation/bloc/changelog_bloc.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/features/tasks/data/datasources/task_remote_data_source.dart';
+import 'package:delegate_app/features/tasks/data/repositories/task_repository_impl.dart';
+import 'package:delegate_app/features/tasks/domain/repositories/task_repository.dart';
+import 'package:delegate_app/features/tasks/domain/usecases/create_task.dart';
+import 'package:delegate_app/features/tasks/domain/usecases/delete_task.dart';
+import 'package:delegate_app/features/tasks/domain/usecases/get_admin_tasks.dart';
+import 'package:delegate_app/features/tasks/domain/usecases/get_delegate_tasks.dart';
+import 'package:delegate_app/features/tasks/domain/usecases/update_task.dart';
+import 'package:delegate_app/features/tasks/domain/usecases/update_task_status.dart';
+import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_bloc.dart';
+import 'package:delegate_app/features/tasks/presentation/bloc/create_task_bloc.dart';
+import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_bloc.dart';
 import 'package:get_it/get_it.dart';
 
 final sl = GetIt.instance;
@@ -108,6 +132,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       checkIn: sl(),
       checkOut: sl(),
       getHistory: sl(),
+      getHistoryPaginated: sl(),
       syncAttendance: sl(),
     ),
   );
@@ -116,6 +141,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => CheckIn(sl()));
   sl.registerLazySingleton(() => CheckOut(sl()));
   sl.registerLazySingleton(() => GetHistory(sl()));
+  sl.registerLazySingleton(() => GetHistoryPaginated(sl()));
   sl.registerLazySingleton(() => SyncAttendance(sl()));
 
   // Repository
@@ -149,11 +175,37 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
     ),
   );
 
+  // Create Admin BLoC
+  sl.registerFactory(() => CreateAdminBloc(createAdmin: sl()));
+
+  // Manage Admins BLoC
+  sl.registerFactory(
+    () => ManageAdminsBloc(
+      getAdmins: sl(),
+      deleteAdminUser: sl(),
+      suspendAdminUser: sl(),
+      updateAdminUser: sl(),
+    ),
+  );
+
+  // Admin Delegates BLoC
+  sl.registerFactory(() => AdminDelegatesBloc(getCompanyDelegates: sl()));
+
+  // Admin Dashboard BLoC
+  sl.registerFactory(() => AdminDashboardBloc(getDashboardSummary: sl()));
+
   // Use cases
   sl.registerLazySingleton(() => GetBranches(sl()));
   sl.registerLazySingleton(() => AddBranch(sl()));
   sl.registerLazySingleton(() => UpdateBranch(sl()));
   sl.registerLazySingleton(() => DeleteBranch(sl()));
+  sl.registerLazySingleton(() => CreateAdmin(sl()));
+  sl.registerLazySingleton(() => GetAdmins(sl()));
+  sl.registerLazySingleton(() => DeleteAdminUser(sl()));
+  sl.registerLazySingleton(() => SuspendAdminUser(sl()));
+  sl.registerLazySingleton(() => UpdateAdminUser(sl()));
+  sl.registerLazySingleton(() => GetCompanyDelegates(sl()));
+  sl.registerLazySingleton(() => GetDashboardSummary(sl()));
 
   // Repository
   sl.registerLazySingleton<AdminRepository>(
@@ -168,10 +220,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // ! Features - Changelog
   // Bloc
   sl.registerFactory(
-    () => ChangelogBloc(
-      getNewUpdates: sl(),
-      getAllUpdates: sl(),
-    ),
+    () => ChangelogBloc(getNewUpdates: sl(), getAllUpdates: sl()),
   );
 
   // Use cases
@@ -189,6 +238,43 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // Data source
   sl.registerLazySingleton<ChangelogRemoteDataSource>(
     () => ChangelogRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  // ! Features - Tasks
+  sl.registerFactory(
+    () => AdminTasksBloc(
+      getAdminTasks: sl(),
+      updateTaskStatus: sl(),
+      updateTask: sl(),
+    ),
+  );
+  sl.registerFactory(
+    () => CreateTaskBloc(createTask: sl(), getCompanyDelegates: sl()),
+  );
+  sl.registerFactory(
+    () => DelegateTasksBloc(
+      getDelegateTasks: sl(),
+      updateTaskStatus: sl(),
+      updateTask: sl(),
+    ),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(() => GetAdminTasks(sl()));
+  sl.registerLazySingleton(() => GetDelegateTasks(sl()));
+  sl.registerLazySingleton(() => CreateTask(sl()));
+  sl.registerLazySingleton(() => UpdateTaskStatus(sl()));
+  sl.registerLazySingleton(() => UpdateTask(sl()));
+  sl.registerLazySingleton(() => DeleteTask(sl()));
+
+  // Repository
+  sl.registerLazySingleton<TaskRepository>(
+    () => TaskRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data source
+  sl.registerLazySingleton<TaskRemoteDataSource>(
+    () => TaskRemoteDataSourceImpl(firestore: sl()),
   );
 
   // ! Core

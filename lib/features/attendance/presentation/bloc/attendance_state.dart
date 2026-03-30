@@ -35,27 +35,46 @@ class AttendanceHistoryLoaded extends AttendanceState {
   final List<Attendance> history;
   final String? activeAttendanceId;
   final SyncStatus syncStatus;
+  final dynamic lastDoc;
+  final bool isLoadingMore;
+  final bool hasReachedMax;
 
   const AttendanceHistoryLoaded({
     required this.history,
     this.activeAttendanceId,
     this.syncStatus = SyncStatus.initial,
+    this.lastDoc,
+    this.hasReachedMax = false,
+    this.isLoadingMore = false,
   });
 
   AttendanceHistoryLoaded copyWith({
     List<Attendance>? history,
     String? activeAttendanceId,
     SyncStatus? syncStatus,
+    dynamic lastDoc,
+    bool? hasReachedMax,
+    bool? isLoadingMore,
   }) {
     return AttendanceHistoryLoaded(
       history: history ?? this.history,
       activeAttendanceId: activeAttendanceId ?? this.activeAttendanceId,
       syncStatus: syncStatus ?? this.syncStatus,
+      lastDoc: lastDoc ?? this.lastDoc,
+      hasReachedMax: hasReachedMax ?? this.hasReachedMax,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     );
   }
 
   @override
-  List<Object?> get props => [history, activeAttendanceId, syncStatus];
+  List<Object?> get props => [
+    history,
+    activeAttendanceId,
+    syncStatus,
+    lastDoc,
+    hasReachedMax,
+    isLoadingMore,
+  ];
 }
 
 class AttendanceError extends AttendanceState {

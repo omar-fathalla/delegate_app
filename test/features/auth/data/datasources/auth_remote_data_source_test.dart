@@ -13,44 +13,46 @@ void main() {
   });
 
   group('getDelegatesByPhone', () {
-    test('should return list of DelegateModels when delegate found in collectionGroup',
-        () async {
-      // Seed data in the nested delegates collection
-      await fakeFirestore
-          .collection('organizations')
-          .doc('org1')
-          .collection('companies')
-          .doc('comp1')
-          .collection('delegates')
-          .doc('d1')
-          .set({
-        'firstName': 'أحمد',
-        'middleName': 'محمد',
-        'lastName': 'علي',
-        'fullName': 'أحمد محمد علي',
-        'nationalityID': '12345678901234',
-        'motherName': 'منى',
-        'city': 'القاهرة',
-        'phoneNumber': '01000000000',
-        'gender': 'male',
-        'position': 'promoter',
-        'birthDate': '1995-01-01',
-        'organizationUID': 'org1',
-        'organizationName': 'منظمة تسهيل',
-        'companyUID': 'comp1',
-        'companyName': 'شركة تسهيل',
-        'status': 'active',
-        'delegatePublicId': 'DEL-001',
-        'createdBy': 'admin',
-      });
+    test(
+      'should return list of DelegateModels when delegate found in collectionGroup',
+      () async {
+        // Seed data in the nested delegates collection
+        await fakeFirestore
+            .collection('organizations')
+            .doc('org1')
+            .collection('companies')
+            .doc('comp1')
+            .collection('delegates')
+            .doc('d1')
+            .set({
+              'firstName': 'أحمد',
+              'middleName': 'محمد',
+              'lastName': 'علي',
+              'fullName': 'أحمد محمد علي',
+              'nationalityID': '12345678901234',
+              'motherName': 'منى',
+              'city': 'القاهرة',
+              'phoneNumber': '01000000000',
+              'gender': 'male',
+              'position': 'promoter',
+              'birthDate': '1995-01-01',
+              'organizationUID': 'org1',
+              'organizationName': 'منظمة تسهيل',
+              'companyUID': 'comp1',
+              'companyName': 'شركة تسهيل',
+              'status': 'active',
+              'delegatePublicId': 'DEL-001',
+              'createdBy': 'admin',
+            });
 
-      final result = await dataSource.getDelegatesByPhone('01000000000');
+        final result = await dataSource.getDelegatesByPhone('01000000000');
 
-      expect(result, isNotEmpty);
-      expect(result.first.firstName, 'أحمد');
-      expect(result.first.phoneNumber, '01000000000');
-      expect(result.first.nationalityID, '12345678901234');
-    });
+        expect(result, isNotEmpty);
+        expect(result.first.firstName, 'أحمد');
+        expect(result.first.phoneNumber, '01000000000');
+        expect(result.first.nationalityID, '12345678901234');
+      },
+    );
 
     test('should return empty list when phone number is not found', () async {
       final result = await dataSource.getDelegatesByPhone('09999999999');
@@ -67,12 +69,12 @@ void main() {
           .collection('delegates')
           .doc('d2')
           .set({
-        'firstName': 'سارة',
-        'phoneNumber': '01234567890',
-        'gender': 'female',
-        'position': 'promoter',
-        'status': 'active',
-      });
+            'firstName': 'سارة',
+            'phoneNumber': '01234567890',
+            'gender': 'female',
+            'position': 'promoter',
+            'status': 'active',
+          });
 
       final result = await dataSource.getDelegatesByPhone('+201234567890');
 

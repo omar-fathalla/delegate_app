@@ -4,6 +4,8 @@ import 'package:delegate_app/features/attendance/data/datasources/attendance_loc
 import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
+import 'package:delegate_app/core/models/pagination_response.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/attendance/data/repositories/attendance_repository_impl.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,9 +19,18 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
-  })? checkInStub;
-  Future<AttendanceModel> Function(String, String, double, double)? checkOutStub;
+  })?
+  checkInStub;
+  Future<AttendanceModel> Function(String, String, double, double)?
+  checkOutStub;
   Future<List<AttendanceModel>> Function(String, String)? getHistoryStub;
+  Future<PaginationResponse<AttendanceModel>> Function(
+    String,
+    String, {
+    int limit,
+    DocumentSnapshot? startAfter,
+  })?
+  getHistoryPaginatedStub;
   Future<AttendanceModel?> Function(String, String)? findActiveAttendanceStub;
   Future<void> Function(List<Map<String, dynamic>>)? syncOfflineQueueStub;
   Future<Map<String, dynamic>?> Function(String)? getBranchByNameStub;
@@ -28,7 +39,8 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
     required double latitude,
     required double longitude,
     required double geofenceRadius,
-  })? saveBranchStub;
+  })?
+  saveBranchStub;
 
   int getHistoryCallCount = 0;
   int syncCallCount = 0;
@@ -64,19 +76,49 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
     double lat,
     double long,
   ) {
-    if (checkOutStub != null) return checkOutStub!(attendanceId, organizationId, lat, long);
+    if (checkOutStub != null) {
+      return checkOutStub!(attendanceId, organizationId, lat, long);
+    }
     throw UnimplementedError();
   }
 
   @override
-  Future<List<AttendanceModel>> getHistory(String userId, String organizationId) {
+  Future<List<AttendanceModel>> getHistory(
+    String userId,
+    String organizationId, {
+    String? nationalityID,
+    String? phoneNumber,
+  }) {
     getHistoryCallCount++;
     if (getHistoryStub != null) return getHistoryStub!(userId, organizationId);
     throw UnimplementedError();
   }
 
   @override
-  Future<AttendanceModel?> findActiveAttendance(String userId, String organizationId) {
+  Future<PaginationResponse<AttendanceModel>> getHistoryPaginated(
+    String userId,
+    String organizationId, {
+    int limit = 20,
+    String? nationalityID,
+    String? phoneNumber,
+    DocumentSnapshot? startAfter,
+  }) {
+    if (getHistoryPaginatedStub != null) {
+      return getHistoryPaginatedStub!(
+        userId,
+        organizationId,
+        limit: limit,
+        startAfter: startAfter,
+      );
+    }
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AttendanceModel?> findActiveAttendance(
+    String userId,
+    String organizationId,
+  ) {
     if (findActiveAttendanceStub != null) {
       return findActiveAttendanceStub!(userId, organizationId);
     }
@@ -202,13 +244,10 @@ void main() {
       final result = await repository.getHistory('u1', 'org1');
 
       expect(mockRemote.getHistoryCallCount, 1);
-      result.fold(
-        (failure) => fail('Should have returned Right'),
-        (history) {
-          expect(history.length, 1);
-          expect(history.first.id, 'a1');
-        },
-      );
+      result.fold((failure) => fail('Should have returned Right'), (history) {
+        expect(history.length, 1);
+        expect(history.first.id, 'a1');
+      });
     });
 
     test('should cache remote history locally', () async {
@@ -256,7 +295,8 @@ void main() {
 
   group('findActiveAttendance', () {
     test('should return attendance when found', () async {
-      mockRemote.findActiveAttendanceStub = (userId, orgId) async => tAttendance;
+      mockRemote.findActiveAttendanceStub = (userId, orgId) async =>
+          tAttendance;
 
       final result = await repository.findActiveAttendance('u1', 'org1');
 
@@ -280,12 +320,13 @@ void main() {
 
   group('saveBranch', () {
     test('should return Right(null) on success', () async {
-      mockRemote.saveBranchStub = ({
-        required String branchName,
-        required double latitude,
-        required double longitude,
-        required double geofenceRadius,
-      }) async {};
+      mockRemote.saveBranchStub =
+          ({
+            required String branchName,
+            required double latitude,
+            required double longitude,
+            required double geofenceRadius,
+          }) async {};
 
       final result = await repository.saveBranch(
         branchName: 'فرع جديد',
@@ -297,25 +338,27 @@ void main() {
       expect(result, equals(const Right(null)));
     });
 
-    test('should return Left(Failure) when data source throws Failure',
-        () async {
-      const tFailure = ServerFailure('Save failed');
-      mockRemote.saveBranchStub = ({
-        required String branchName,
-        required double latitude,
-        required double longitude,
-        required double geofenceRadius,
-      }) =>
-          throw tFailure;
+    test(
+      'should return Left(Failure) when data source throws Failure',
+      () async {
+        const tFailure = ServerFailure('Save failed');
+        mockRemote.saveBranchStub =
+            ({
+              required String branchName,
+              required double latitude,
+              required double longitude,
+              required double geofenceRadius,
+            }) => throw tFailure;
 
-      final result = await repository.saveBranch(
-        branchName: 'فرع جديد',
-        latitude: 30.0,
-        longitude: 31.0,
-        geofenceRadius: 200.0,
-      );
+        final result = await repository.saveBranch(
+          branchName: 'فرع جديد',
+          latitude: 30.0,
+          longitude: 31.0,
+          geofenceRadius: 200.0,
+        );
 
-      expect(result, equals(const Left(tFailure)));
-    });
+        expect(result, equals(const Left(tFailure)));
+      },
+    );
   });
 }

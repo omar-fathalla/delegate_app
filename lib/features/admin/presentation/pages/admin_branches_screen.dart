@@ -112,12 +112,12 @@ class _AdminBranchesView extends StatelessWidget {
                         context
                             .push('/admin/branch-details', extra: branch)
                             .then((_) {
-                          if (context.mounted) {
-                            context
-                                .read<BranchBloc>()
-                                .add(BranchLoadRequested());
-                          }
-                        });
+                              if (context.mounted) {
+                                context.read<BranchBloc>().add(
+                                  BranchLoadRequested(),
+                                );
+                              }
+                            });
                       },
                     ),
                   );

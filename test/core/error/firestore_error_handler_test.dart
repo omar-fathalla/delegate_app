@@ -6,7 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('throwFirestoreFailure', () {
     test('throws ServerFailure with the provided message', () {
-      final exception = FirebaseException(plugin: 'cloud_firestore', code: 'not-found');
+      final exception = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'not-found',
+      );
 
       expect(
         () => throwFirestoreFailure(exception, 'فشل في تسجيل الحضور.'),
@@ -21,8 +24,10 @@ void main() {
     });
 
     test('throws ServerFailure regardless of Firebase error code', () {
-      final permissionDenied =
-          FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied');
+      final permissionDenied = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
 
       expect(
         () => throwFirestoreFailure(permissionDenied, 'غير مصرح'),
@@ -77,11 +82,7 @@ void main() {
       expect(
         () => throwUnexpectedFailure('خطأ مخصص'),
         throwsA(
-          isA<ServerFailure>().having(
-            (f) => f.message,
-            'message',
-            'خطأ مخصص',
-          ),
+          isA<ServerFailure>().having((f) => f.message, 'message', 'خطأ مخصص'),
         ),
       );
     });

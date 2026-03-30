@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
+import 'package:delegate_app/features/attendance/domain/entities/attendance_pagination_result.dart';
 
 abstract class AttendanceRepository {
   Future<Either<Failure, Attendance>> checkIn(
@@ -21,8 +22,18 @@ abstract class AttendanceRepository {
   });
   Future<Either<Failure, List<Attendance>>> getHistory(
     String userId,
-    String organizationId,
-  );
+    String organizationId, {
+    String? nationalityID,
+    String? phoneNumber,
+  });
+  Future<Either<Failure, AttendancePaginationResult>> getHistoryPaginated(
+    String userId,
+    String organizationId, {
+    String? nationalityID,
+    String? phoneNumber,
+    int limit = 20,
+    dynamic lastDoc,
+  });
 
   /// Finds the active attendance session (no checkOutTime) for the delegate.
   Future<Either<Failure, Attendance?>> findActiveAttendance(

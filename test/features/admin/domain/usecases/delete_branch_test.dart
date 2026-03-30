@@ -17,8 +17,9 @@ void main() {
   });
 
   test('should return unit on successful deletion', () async {
-    when(() => mockRepo.deleteBranch(any()))
-        .thenAnswer((_) async => const Right(unit));
+    when(
+      () => mockRepo.deleteBranch(any()),
+    ).thenAnswer((_) async => const Right(unit));
 
     final result = await usecase(const DeleteBranchParams(branchId: 'b1'));
 
@@ -27,8 +28,9 @@ void main() {
   });
 
   test('should return ServerFailure when deletion fails', () async {
-    when(() => mockRepo.deleteBranch(any())).thenAnswer(
-        (_) async => const Left(ServerFailure('فشل في حذف الفرع.')));
+    when(
+      () => mockRepo.deleteBranch(any()),
+    ).thenAnswer((_) async => const Left(ServerFailure('فشل في حذف الفرع.')));
 
     final result = await usecase(const DeleteBranchParams(branchId: 'b1'));
 

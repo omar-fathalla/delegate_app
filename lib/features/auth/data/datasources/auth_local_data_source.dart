@@ -70,8 +70,12 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
       if (jsonString == null) return [];
       final jsonList = json.decode(jsonString) as List<dynamic>;
       return jsonList
-          .map((item) => DelegateModel.fromJson(
-              item as Map<String, dynamic>, (item as Map)['uid'] ?? ''))
+          .map(
+            (item) => DelegateModel.fromJson(
+              item as Map<String, dynamic>,
+              (item as Map)['uid'] ?? '',
+            ),
+          )
           .toList();
     } catch (e) {
       return [];

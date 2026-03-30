@@ -32,8 +32,9 @@ void main() {
   });
 
   test('should call repository.updateBranch with correct branch', () async {
-    when(() => mockRepository.updateBranch(any()))
-        .thenAnswer((_) async => const Right(tBranch));
+    when(
+      () => mockRepository.updateBranch(any()),
+    ).thenAnswer((_) async => const Right(tBranch));
 
     final result = await useCase(const UpdateBranchParams(branch: tBranch));
 
@@ -43,8 +44,9 @@ void main() {
   });
 
   test('should return Failure when repository fails', () async {
-    when(() => mockRepository.updateBranch(any())).thenAnswer(
-        (_) async => const Left(ServerFailure('فشل في تحديث الفرع.')));
+    when(
+      () => mockRepository.updateBranch(any()),
+    ).thenAnswer((_) async => const Left(ServerFailure('فشل في تحديث الفرع.')));
 
     final result = await useCase(const UpdateBranchParams(branch: tBranch));
 

@@ -6,7 +6,8 @@ import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class MockAuthRepository implements AuthRepository {
-  Future<Either<Failure, List<Delegate>>> Function(String)? getDelegatesByPhoneStub;
+  Future<Either<Failure, List<Delegate>>> Function(String)?
+  getDelegatesByPhoneStub;
   Future<Either<Failure, void>> Function(Delegate)? cacheDelegateStub;
   Future<Either<Failure, void>> Function(List<Delegate>)? cacheAllDelegatesStub;
 
@@ -116,8 +117,8 @@ void main() {
     'should return list of delegates when phoneNumber exists and password matches nationalityID',
     () async {
       // arrange
-      mockAuthRepository.getDelegatesByPhoneStub =
-          (_) async => Right([tDelegate]);
+      mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
+          Right([tDelegate]);
       // act
       final result = await usecase(
         const LoginParams(
@@ -144,8 +145,8 @@ void main() {
     'should return AuthFailure when password does not match nationalityID',
     () async {
       // arrange
-      mockAuthRepository.getDelegatesByPhoneStub =
-          (_) async => Right([tDelegate]);
+      mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
+          Right([tDelegate]);
       // act
       final result = await usecase(
         const LoginParams(phoneNumber: tMobile, password: 'wrongPassword'),

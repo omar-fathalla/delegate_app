@@ -96,8 +96,8 @@ class _LoginScreenState extends State<LoginScreen>
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;
                 final delegate = state.delegate;
-                if (delegate.createdBy == 'system_admin' ||
-                    _phoneController.text == '01508899965') {
+                if (delegate.role == UserRole.superAdmin ||
+                    delegate.role == UserRole.admin) {
                   context.go('/admin/home', extra: delegate);
                 } else {
                   context.go('/home', extra: delegate);
@@ -511,10 +511,8 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
-      } else {
-        }
-    } catch (_) {
-    }
+      } else {}
+    } catch (_) {}
   }
 
   // ---- Helper: Input decoration ----
@@ -555,9 +553,7 @@ class _LoginScreenState extends State<LoginScreen>
         return Container(
           decoration: BoxDecoration(
             color: colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
           child: Column(
@@ -594,12 +590,14 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              ...delegates.map((delegate) => _buildOrgCard(
-                    blocContext,
-                    sheetContext: sheetContext,
-                    delegate: delegate,
-                    rememberMe: rememberMe,
-                  )),
+              ...delegates.map(
+                (delegate) => _buildOrgCard(
+                  blocContext,
+                  sheetContext: sheetContext,
+                  delegate: delegate,
+                  rememberMe: rememberMe,
+                ),
+              ),
             ],
           ),
         );
@@ -626,10 +624,7 @@ class _LoginScreenState extends State<LoginScreen>
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
             BlocProvider.of<AuthBloc>(blocContext).add(
-              OrganizationSelected(
-                delegate: delegate,
-                rememberMe: rememberMe,
-              ),
+              OrganizationSelected(delegate: delegate, rememberMe: rememberMe),
             );
           });
         },

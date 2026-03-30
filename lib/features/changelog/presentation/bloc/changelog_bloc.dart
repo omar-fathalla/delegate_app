@@ -9,10 +9,8 @@ class ChangelogBloc extends Bloc<ChangelogEvent, ChangelogState> {
   final GetNewUpdates getNewUpdates;
   final GetAllUpdates getAllUpdates;
 
-  ChangelogBloc({
-    required this.getNewUpdates,
-    required this.getAllUpdates,
-  }) : super(ChangelogInitial()) {
+  ChangelogBloc({required this.getNewUpdates, required this.getAllUpdates})
+    : super(ChangelogInitial()) {
     on<CheckForNewUpdates>(_onCheckForNewUpdates);
     on<LoadAllUpdates>(_onLoadAllUpdates);
     on<DismissNewUpdates>(_onDismissNewUpdates);

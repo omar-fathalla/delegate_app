@@ -9,9 +9,11 @@ import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
+import 'package:delegate_app/features/attendance/domain/entities/attendance_pagination_result.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/get_history_paginated.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
@@ -27,21 +29,40 @@ import 'package:mocktail/mocktail.dart';
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
 class MockLogin extends Mock implements Login {}
+
 class MockCheckAutoLogin extends Mock implements CheckAutoLogin {}
+
 class MockLogout extends Mock implements Logout {}
+
 class MockCheckIn extends Mock implements CheckIn {}
+
 class MockCheckOut extends Mock implements CheckOut {}
+
 class MockGetHistory extends Mock implements GetHistory {}
+
+class MockGetHistoryPaginated extends Mock implements GetHistoryPaginated {}
+
 class MockSyncAttendance extends Mock implements SyncAttendance {}
+
 class MockCacheDelegate extends Mock implements CacheDelegate {}
+
 class MockCacheAllDelegates extends Mock implements CacheAllDelegates {}
 
 class FakeLoginParams extends Fake implements LoginParams {}
+
 class FakeNoParams extends Fake implements NoParams {}
+
 class FakeCheckInParams extends Fake implements CheckInParams {}
+
 class FakeCheckOutParams extends Fake implements CheckOutParams {}
+
 class FakeGetHistoryParams extends Fake implements GetHistoryParams {}
+
+class FakeGetHistoryPaginatedParams extends Fake
+    implements GetHistoryPaginatedParams {}
+
 class FakeDelegate extends Fake implements Delegate {}
+
 class FakeDelegateList extends Fake implements List<Delegate> {}
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
@@ -111,6 +132,7 @@ void main() {
     registerFallbackValue(FakeCheckInParams());
     registerFallbackValue(FakeCheckOutParams());
     registerFallbackValue(FakeGetHistoryParams());
+    registerFallbackValue(FakeGetHistoryPaginatedParams());
     registerFallbackValue(FakeDelegate());
     registerFallbackValue(<Delegate>[]);
   });
@@ -134,10 +156,12 @@ void main() {
     blocTest<AuthBloc, AuthState>(
       'Scenario 1: Successful login transitions to AuthAuthenticated',
       build: () {
-        when(() => mockLogin(any()))
-            .thenAnswer((_) async => Right([tDelegate]));
-        when(() => mockCacheAllDelegates(any()))
-            .thenAnswer((_) async => const Right(null));
+        when(
+          () => mockLogin(any()),
+        ).thenAnswer((_) async => Right([tDelegate]));
+        when(
+          () => mockCacheAllDelegates(any()),
+        ).thenAnswer((_) async => const Right(null));
         return AuthBloc(
           loginUseCase: mockLogin,
           checkAutoLoginUseCase: mockCheckAutoLogin,
@@ -146,14 +170,13 @@ void main() {
           cacheAllDelegatesUseCase: mockCacheAllDelegates,
         );
       },
-      act: (bloc) => bloc.add(const LoginRequested(
-        phoneNumber: '01234567890',
-        password: '12345678901234',
-      )),
-      expect: () => [
-        isA<AuthLoading>(),
-        isA<AuthAuthenticated>(),
-      ],
+      act: (bloc) => bloc.add(
+        const LoginRequested(
+          phoneNumber: '01234567890',
+          password: '12345678901234',
+        ),
+      ),
+      expect: () => [isA<AuthLoading>(), isA<AuthAuthenticated>()],
       verify: (bloc) {
         final state = bloc.state as AuthAuthenticated;
         expect(state.delegate.uid, 'user_1');
@@ -164,8 +187,9 @@ void main() {
     blocTest<AuthBloc, AuthState>(
       'Scenario 2: Failed login transitions to AuthError',
       build: () {
-        when(() => mockLogin(any())).thenAnswer(
-            (_) async => const Left(AuthFailure('كلمة المرور غلط')));
+        when(
+          () => mockLogin(any()),
+        ).thenAnswer((_) async => const Left(AuthFailure('كلمة المرور غلط')));
         return AuthBloc(
           loginUseCase: mockLogin,
           checkAutoLoginUseCase: mockCheckAutoLogin,
@@ -174,14 +198,13 @@ void main() {
           cacheAllDelegatesUseCase: mockCacheAllDelegates,
         );
       },
-      act: (bloc) => bloc.add(const LoginRequested(
-        phoneNumber: '01234567890',
-        password: 'wrong_password',
-      )),
-      expect: () => [
-        isA<AuthLoading>(),
-        isA<AuthError>(),
-      ],
+      act: (bloc) => bloc.add(
+        const LoginRequested(
+          phoneNumber: '01234567890',
+          password: 'wrong_password',
+        ),
+      ),
+      expect: () => [isA<AuthLoading>(), isA<AuthError>()],
       verify: (bloc) {
         final state = bloc.state as AuthError;
         expect(state.message, 'كلمة المرور غلط');
@@ -191,8 +214,9 @@ void main() {
     blocTest<AuthBloc, AuthState>(
       'Scenario 3: Auto-login with cached session',
       build: () {
-        when(() => mockCheckAutoLogin(any()))
-            .thenAnswer((_) async => Right(tDelegate));
+        when(
+          () => mockCheckAutoLogin(any()),
+        ).thenAnswer((_) async => Right(tDelegate));
         return AuthBloc(
           loginUseCase: mockLogin,
           checkAutoLoginUseCase: mockCheckAutoLogin,
@@ -202,17 +226,15 @@ void main() {
         );
       },
       act: (bloc) => bloc.add(CheckAutoLoginRequested()),
-      expect: () => [
-        isA<AuthLoading>(),
-        isA<AuthAuthenticated>(),
-      ],
+      expect: () => [isA<AuthLoading>(), isA<AuthAuthenticated>()],
     );
 
     blocTest<AuthBloc, AuthState>(
       'Scenario 4: Auto-login with no cached session',
       build: () {
-        when(() => mockCheckAutoLogin(any()))
-            .thenAnswer((_) async => const Right(null));
+        when(
+          () => mockCheckAutoLogin(any()),
+        ).thenAnswer((_) async => const Right(null));
         return AuthBloc(
           loginUseCase: mockLogin,
           checkAutoLoginUseCase: mockCheckAutoLogin,
@@ -222,10 +244,7 @@ void main() {
         );
       },
       act: (bloc) => bloc.add(CheckAutoLoginRequested()),
-      expect: () => [
-        isA<AuthLoading>(),
-        isA<AuthUnauthenticated>(),
-      ],
+      expect: () => [isA<AuthLoading>(), isA<AuthUnauthenticated>()],
     );
   });
 
@@ -233,40 +252,43 @@ void main() {
     late MockCheckIn mockCheckIn;
     late MockCheckOut mockCheckOut;
     late MockGetHistory mockGetHistory;
+    late MockGetHistoryPaginated mockGetHistoryPaginated;
     late MockSyncAttendance mockSync;
 
     setUp(() {
       mockCheckIn = MockCheckIn();
       mockCheckOut = MockCheckOut();
       mockGetHistory = MockGetHistory();
+      mockGetHistoryPaginated = MockGetHistoryPaginated();
       mockSync = MockSyncAttendance();
     });
 
     blocTest<AttendanceBloc, AttendanceState>(
       'Scenario 5: Successful check-in',
       build: () {
-        when(() => mockCheckIn(any()))
-            .thenAnswer((_) async => Right(tAttendanceCheckIn));
+        when(
+          () => mockCheckIn(any()),
+        ).thenAnswer((_) async => Right(tAttendanceCheckIn));
         return AttendanceBloc(
           checkIn: mockCheckIn,
           checkOut: mockCheckOut,
           getHistory: mockGetHistory,
+          getHistoryPaginated: mockGetHistoryPaginated,
           syncAttendance: mockSync,
         );
       },
-      act: (bloc) => bloc.add(const CheckInRequested(
-        userId: 'user_1',
-        companyId: 'comp1',
-        organizationId: 'org1',
-        deviceInfo: 'Test Device',
-        lat: 30.0444,
-        long: 31.2357,
-        branchName: 'الفرع الرئيسي',
-      )),
-      expect: () => [
-        isA<AttendanceLoading>(),
-        isA<AttendanceCheckedIn>(),
-      ],
+      act: (bloc) => bloc.add(
+        const CheckInRequested(
+          userId: 'user_1',
+          companyId: 'comp1',
+          organizationId: 'org1',
+          deviceInfo: 'Test Device',
+          lat: 30.0444,
+          long: 31.2357,
+          branchName: 'الفرع الرئيسي',
+        ),
+      ),
+      expect: () => [isA<AttendanceLoading>(), isA<AttendanceCheckedIn>()],
       verify: (bloc) {
         final state = bloc.state as AttendanceCheckedIn;
         expect(state.attendance.id, 'att_1');
@@ -277,29 +299,33 @@ void main() {
     blocTest<AttendanceBloc, AttendanceState>(
       'Scenario 6: Check-in fails outside geofence',
       build: () {
-        when(() => mockCheckIn(any())).thenAnswer((_) async =>
-            const Left(ServerFailure(
-                'أنت خارج نطاق الفرع (500 متر). النطاق المسموح: 150 متر.')));
+        when(() => mockCheckIn(any())).thenAnswer(
+          (_) async => const Left(
+            ServerFailure(
+              'أنت خارج نطاق الفرع (500 متر). النطاق المسموح: 150 متر.',
+            ),
+          ),
+        );
         return AttendanceBloc(
           checkIn: mockCheckIn,
           checkOut: mockCheckOut,
           getHistory: mockGetHistory,
+          getHistoryPaginated: mockGetHistoryPaginated,
           syncAttendance: mockSync,
         );
       },
-      act: (bloc) => bloc.add(const CheckInRequested(
-        userId: 'user_1',
-        companyId: 'comp1',
-        organizationId: 'org1',
-        deviceInfo: 'Test Device',
-        lat: 30.9999,
-        long: 31.9999,
-        branchName: 'الفرع الرئيسي',
-      )),
-      expect: () => [
-        isA<AttendanceLoading>(),
-        isA<AttendanceError>(),
-      ],
+      act: (bloc) => bloc.add(
+        const CheckInRequested(
+          userId: 'user_1',
+          companyId: 'comp1',
+          organizationId: 'org1',
+          deviceInfo: 'Test Device',
+          lat: 30.9999,
+          long: 31.9999,
+          branchName: 'الفرع الرئيسي',
+        ),
+      ),
+      expect: () => [isA<AttendanceLoading>(), isA<AttendanceError>()],
       verify: (bloc) {
         final state = bloc.state as AttendanceError;
         expect(state.message, contains('خارج نطاق'));
@@ -309,26 +335,27 @@ void main() {
     blocTest<AttendanceBloc, AttendanceState>(
       'Scenario 7: Successful check-out after check-in',
       build: () {
-        when(() => mockCheckOut(any()))
-            .thenAnswer((_) async => Right(tAttendanceCheckOut));
+        when(
+          () => mockCheckOut(any()),
+        ).thenAnswer((_) async => Right(tAttendanceCheckOut));
         return AttendanceBloc(
           checkIn: mockCheckIn,
           checkOut: mockCheckOut,
           getHistory: mockGetHistory,
+          getHistoryPaginated: mockGetHistoryPaginated,
           syncAttendance: mockSync,
         );
       },
-      act: (bloc) => bloc.add(const CheckOutRequested(
-        attendanceId: 'att_1',
-        userId: 'user_1',
-        organizationId: 'org1',
-        lat: 30.0444,
-        long: 31.2357,
-      )),
-      expect: () => [
-        isA<AttendanceLoading>(),
-        isA<AttendanceCheckedOut>(),
-      ],
+      act: (bloc) => bloc.add(
+        const CheckOutRequested(
+          attendanceId: 'att_1',
+          userId: 'user_1',
+          organizationId: 'org1',
+          lat: 30.0444,
+          long: 31.2357,
+        ),
+      ),
+      expect: () => [isA<AttendanceLoading>(), isA<AttendanceCheckedOut>()],
       verify: (bloc) {
         final state = bloc.state as AttendanceCheckedOut;
         expect(state.attendance.checkOutTime, isNotNull);
@@ -339,21 +366,26 @@ void main() {
     blocTest<AttendanceBloc, AttendanceState>(
       'Scenario 8: History loads correctly after check-in',
       build: () {
-        when(() => mockGetHistory(any())).thenAnswer((_) async => Right([
-              tAttendanceCheckIn,
-            ]));
+        when(() => mockGetHistoryPaginated(any())).thenAnswer(
+          (_) async => Right(
+            AttendancePaginationResult(
+              items: [tAttendanceCheckIn],
+              hasReachedMax: true,
+              lastDoc: null,
+            ),
+          ),
+        );
         return AttendanceBloc(
           checkIn: mockCheckIn,
           checkOut: mockCheckOut,
           getHistory: mockGetHistory,
+          getHistoryPaginated: mockGetHistoryPaginated,
           syncAttendance: mockSync,
         );
       },
-      act: (bloc) => bloc.add(HistoryRequested(userId: 'user_1', organizationId: 'org1')),
-      expect: () => [
-        isA<AttendanceLoading>(),
-        isA<AttendanceHistoryLoaded>(),
-      ],
+      act: (bloc) =>
+          bloc.add(HistoryRequested(userId: 'user_1', organizationId: 'org1')),
+      expect: () => [isA<AttendanceLoading>(), isA<AttendanceHistoryLoaded>()],
       verify: (bloc) {
         final state = bloc.state as AttendanceHistoryLoaded;
         expect(state.history.length, 1);
@@ -366,37 +398,51 @@ void main() {
     blocTest<AttendanceBloc, AttendanceState>(
       'Scenario 9: Full Login → CheckIn → CheckOut integration via BLoC chain',
       build: () {
-        when(() => mockCheckIn(any()))
-            .thenAnswer((_) async => Right(tAttendanceCheckIn));
-        when(() => mockCheckOut(any()))
-            .thenAnswer((_) async => Right(tAttendanceCheckOut));
-        when(() => mockGetHistory(any()))
-            .thenAnswer((_) async => Right([tAttendanceCheckOut]));
+        when(
+          () => mockCheckIn(any()),
+        ).thenAnswer((_) async => Right(tAttendanceCheckIn));
+        when(
+          () => mockCheckOut(any()),
+        ).thenAnswer((_) async => Right(tAttendanceCheckOut));
+        when(() => mockGetHistoryPaginated(any())).thenAnswer(
+          (_) async => Right(
+            AttendancePaginationResult(
+              items: [tAttendanceCheckOut],
+              hasReachedMax: true,
+              lastDoc: null,
+            ),
+          ),
+        );
         return AttendanceBloc(
           checkIn: mockCheckIn,
           checkOut: mockCheckOut,
           getHistory: mockGetHistory,
+          getHistoryPaginated: mockGetHistoryPaginated,
           syncAttendance: mockSync,
         );
       },
       act: (bloc) async {
-        bloc.add(const CheckInRequested(
-          userId: 'user_1',
-          companyId: 'comp1',
-          organizationId: 'org1',
-          deviceInfo: 'Device',
-          lat: 30.0444,
-          long: 31.2357,
-          branchName: 'الفرع الرئيسي',
-        ));
+        bloc.add(
+          const CheckInRequested(
+            userId: 'user_1',
+            companyId: 'comp1',
+            organizationId: 'org1',
+            deviceInfo: 'Device',
+            lat: 30.0444,
+            long: 31.2357,
+            branchName: 'الفرع الرئيسي',
+          ),
+        );
         await Future.delayed(Duration.zero);
-        bloc.add(const CheckOutRequested(
-          attendanceId: 'att_1',
-          userId: 'user_1',
-          organizationId: 'org1',
-          lat: 30.0444,
-          long: 31.2357,
-        ));
+        bloc.add(
+          const CheckOutRequested(
+            attendanceId: 'att_1',
+            userId: 'user_1',
+            organizationId: 'org1',
+            lat: 30.0444,
+            long: 31.2357,
+          ),
+        );
         await Future.delayed(Duration.zero);
         bloc.add(HistoryRequested(userId: 'user_1', organizationId: 'org1'));
       },
@@ -430,8 +476,9 @@ void main() {
     blocTest<AuthBloc, AuthState>(
       'Scenario 10: Logout clears session and transitions to AuthUnauthenticated',
       build: () {
-        when(() => mockLogout(any()))
-            .thenAnswer((_) async => const Right(null));
+        when(
+          () => mockLogout(any()),
+        ).thenAnswer((_) async => const Right(null));
         return AuthBloc(
           loginUseCase: mockLogin,
           checkAutoLoginUseCase: mockCheckAutoLogin,
@@ -442,10 +489,7 @@ void main() {
       },
       seed: () => AuthAuthenticated(delegate: tDelegate),
       act: (bloc) => bloc.add(LogoutRequested()),
-      expect: () => [
-        isA<AuthLoading>(),
-        isA<AuthUnauthenticated>(),
-      ],
+      expect: () => [isA<AuthLoading>(), isA<AuthUnauthenticated>()],
     );
   });
 }

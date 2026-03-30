@@ -483,4 +483,214 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get swPointUaePhone =>
       'United Arab Emirates WhatsApp: +971 55 871 5615';
+
+  @override
+  String get createAdmin => 'إنشاء أدمن';
+
+  @override
+  String get adminName => 'اسم الأدمن';
+
+  @override
+  String get adminPhone => 'رقم الهاتف';
+
+  @override
+  String get adminEmail => 'البريد الإلكتروني';
+
+  @override
+  String get pleaseEnterAdminName => 'يرجى إدخال اسم الأدمن';
+
+  @override
+  String get pleaseEnterAdminPhone => 'يرجى إدخال رقم الهاتف';
+
+  @override
+  String get pleaseEnterAdminEmail => 'يرجى إدخال البريد الإلكتروني';
+
+  @override
+  String get invalidPhoneNumber => 'رقم هاتف غير صالح';
+
+  @override
+  String get invalidEmail => 'بريد إلكتروني غير صالح';
+
+  @override
+  String get adminCreatedSuccessfully =>
+      'تم إنشاء حساب الأدمن بنجاح! تم إرسال بريد التفعيل.';
+
+  @override
+  String get manageAdmins => 'إدارة الأدمن';
+
+  @override
+  String get noAdminsFound => 'لا يوجد أدمن';
+
+  @override
+  String get suspended => 'موقوف';
+
+  @override
+  String get editAdmin => 'تعديل';
+
+  @override
+  String get deleteAdmin => 'حذف';
+
+  @override
+  String get suspendAdmin => 'إيقاف';
+
+  @override
+  String get activateAdmin => 'تفعيل';
+
+  @override
+  String get deleteAdminConfirmation =>
+      'هل أنت متأكد من حذف هذا الأدمن؟ لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
+  String get cancel => 'إلغاء';
+
+  @override
+  String get companyDelegates => 'مناديب الشركة';
+
+  @override
+  String get viewAttendance => 'عرض الحضور';
+
+  @override
+  String get noDelegatesFound => 'لا يوجد مناديب';
+
+  @override
+  String get viewProfileData => 'عرض البيانات';
+
+  @override
+  String get addDelegate => 'إضافة مندوب';
+
+  @override
+  String get addDelegateViaWeb => 'إضافة عبر الموقع';
+
+  @override
+  String get tasks => 'المهام';
+
+  @override
+  String get todayOverview => 'نظرة عامة اليوم';
+
+  @override
+  String get totalDelegates => 'إجمالي المناديب';
+
+  @override
+  String get checkedInToday => 'الحاضرون اليوم';
+
+  @override
+  String get absentToday => 'الغائبون';
+
+  @override
+  String get addTask => 'إضافة مهمة';
+
+  @override
+  String get taskTitle => 'عنوان المهمة';
+
+  @override
+  String get taskDescription => 'وصف المهمة';
+
+  @override
+  String get taskPriority => 'الأولوية';
+
+  @override
+  String get high => 'عالية';
+
+  @override
+  String get medium => 'متوسطة';
+
+  @override
+  String get low => 'منخفضة';
+
+  @override
+  String get taskDueDate => 'تاريخ التنفيذ';
+
+  @override
+  String get assignTo => 'تعيين إلى';
+
+  @override
+  String get allDelegates => 'جميع المناديب';
+
+  @override
+  String get createTask => 'إنشاء مهمة';
+
+  @override
+  String get taskCreatedSuccessfully => 'تم إنشاء المهمة بنجاح';
+
+  @override
+  String get taskUpdatedSuccessfully => 'تم تحديث المهمة بنجاح';
+
+  @override
+  String get noTasksFound => 'لا توجد مهام حالياً';
+
+  @override
+  String get taskStatus => 'حالة المهمة';
+
+  @override
+  String get taskPending => 'معلقة';
+
+  @override
+  String get taskInProgress => 'قيد التنفيذ';
+
+  @override
+  String get taskCompleted => 'منجزة';
+
+  @override
+  String get all => 'الكل';
+
+  @override
+  String get today => 'اليوم';
+
+  @override
+  String get yesterday => 'أمس';
+
+  @override
+  String get taskCancelled => 'ملغاة';
+
+  @override
+  String get taskDetails => 'Task Details';
+
+  @override
+  String get taskSchedule => 'Schedule';
+
+  @override
+  String get selectDelegate => 'Select Delegate';
+
+  @override
+  String get errorFieldRequired => 'هذا الحقل مطلوب';
+
+  @override
+  String get addTaskToGetStarted => 'أضف مهمة للبدء';
+
+  @override
+  String get myTasks => 'مهامي';
+
+  @override
+  String get noTasksYet => 'لا توجد مهامي بعد';
+
+  @override
+  String get complete => 'إكمال';
+
+  @override
+  String get delete => 'حذف';
+
+  @override
+  String get deleteTask => 'حذف المهمة';
+
+  @override
+  String get deleteTaskConfirmation =>
+      'هل أنت متأكد من رغبتك في حذف هذه المهمة؟ لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
+  String get notes => 'الملاحظات';
+
+  @override
+  String get tasksSummary => 'ملخص المهام';
+
+  @override
+  String get total => 'الإجمالي';
+
+  @override
+  String get searchDelegates => 'البحث عن مندوب...';
+
+  @override
+  String get filterByStatus => 'تصفية حسب الحالة';
+
+  @override
+  String get noDelegateSearchResults => 'لا توجد نتائج مطابقة لبحثك';
 }

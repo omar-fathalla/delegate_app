@@ -53,13 +53,12 @@ void main() {
 
   test('should return delegate profile from repository', () async {
     // arrange
-    when(() => mockRepository.getDelegateProfile(any()))
-        .thenAnswer((_) async => Right(tDelegate));
+    when(
+      () => mockRepository.getDelegateProfile(any()),
+    ).thenAnswer((_) async => Right(tDelegate));
 
     // act
-    final result = await usecase(
-      const GetDelegateProfileParams(uid: tUid),
-    );
+    final result = await usecase(const GetDelegateProfileParams(uid: tUid));
 
     // assert
     expect(result, Right(tDelegate));
@@ -69,13 +68,12 @@ void main() {
   test('should return failure when repository fails', () async {
     // arrange
     const tFailure = ServerFailure('فشل جلب الملف الشخصي');
-    when(() => mockRepository.getDelegateProfile(any()))
-        .thenAnswer((_) async => const Left(tFailure));
+    when(
+      () => mockRepository.getDelegateProfile(any()),
+    ).thenAnswer((_) async => const Left(tFailure));
 
     // act
-    final result = await usecase(
-      const GetDelegateProfileParams(uid: tUid),
-    );
+    final result = await usecase(const GetDelegateProfileParams(uid: tUid));
 
     // assert
     expect(result, const Left(tFailure));
@@ -84,13 +82,12 @@ void main() {
   test('should return network failure on connection error', () async {
     // arrange
     const tFailure = NetworkFailure('لا يوجد اتصال بالإنترنت');
-    when(() => mockRepository.getDelegateProfile(any()))
-        .thenAnswer((_) async => const Left(tFailure));
+    when(
+      () => mockRepository.getDelegateProfile(any()),
+    ).thenAnswer((_) async => const Left(tFailure));
 
     // act
-    final result = await usecase(
-      const GetDelegateProfileParams(uid: tUid),
-    );
+    final result = await usecase(const GetDelegateProfileParams(uid: tUid));
 
     // assert
     expect(result, const Left(tFailure));

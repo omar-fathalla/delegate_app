@@ -16,9 +16,7 @@ class CurrentStatusCard extends StatelessWidget {
           ? theme.colorScheme.primaryContainer
           : theme.colorScheme.surfaceContainerHighest,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

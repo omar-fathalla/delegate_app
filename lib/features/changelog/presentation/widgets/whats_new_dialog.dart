@@ -24,10 +24,7 @@ class WhatsNewDialog extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => WhatsNewDialog(
-        updates: updates,
-        onDismiss: onDismiss,
-      ),
+      builder: (_) => WhatsNewDialog(updates: updates, onDismiss: onDismiss),
     );
   }
 
@@ -44,9 +41,7 @@ class WhatsNewDialog extends StatelessWidget {
         return Container(
           decoration: BoxDecoration(
             color: colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.15),
@@ -134,7 +129,8 @@ class WhatsNewDialog extends StatelessWidget {
                   controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                   itemCount: updates.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
                   itemBuilder: (context, index) =>
                       _buildUpdateCard(context, updates[index]),
                 ),
@@ -184,7 +180,10 @@ class WhatsNewDialog extends StatelessWidget {
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(16),
         border: update.priority == UpdatePriority.critical
-            ? Border.all(color: colorScheme.error.withValues(alpha: 0.3), width: 1.5)
+            ? Border.all(
+                color: colorScheme.error.withValues(alpha: 0.3),
+                width: 1.5,
+              )
             : null,
       ),
       child: Column(
@@ -229,8 +228,10 @@ class WhatsNewDialog extends StatelessWidget {
           ..._buildHighlights(context, update),
           const SizedBox(height: 8),
           Text(
-            DateFormat('dd MMM yyyy', isArabic ? 'ar' : 'en')
-                .format(update.createdAt),
+            DateFormat(
+              'dd MMM yyyy',
+              isArabic ? 'ar' : 'en',
+            ).format(update.createdAt),
             style: TextStyle(
               fontSize: 11,
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
@@ -301,30 +302,32 @@ class WhatsNewDialog extends StatelessWidget {
 
     return [
       const SizedBox(height: 10),
-      ...items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.check_circle_rounded,
-                  size: 16,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    item,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colorScheme.onSurfaceVariant,
-                      height: 1.4,
-                    ),
+      ...items.map(
+        (item) => Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.check_circle_rounded,
+                size: 16,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.4,
                   ),
                 ),
-              ],
-            ),
-          )),
+              ),
+            ],
+          ),
+        ),
+      ),
     ];
   }
 

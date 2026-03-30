@@ -57,10 +57,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           emit(AuthAuthenticated(delegate: delegates.first));
         } else {
           // Multiple organizations - show selection
-          emit(AuthOrganizationSelectionRequired(
-            delegates: delegates,
-            rememberMe: event.rememberMe,
-          ));
+          emit(
+            AuthOrganizationSelectionRequired(
+              delegates: delegates,
+              rememberMe: event.rememberMe,
+            ),
+          );
         }
       },
     );

@@ -38,17 +38,17 @@ class AppUpdate extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        title,
-        titleEn,
-        description,
-        descriptionEn,
-        version,
-        type,
-        priority,
-        createdAt,
-        isActive,
-        highlights,
-        highlightsEn,
-      ];
+    id,
+    title,
+    titleEn,
+    description,
+    descriptionEn,
+    version,
+    type,
+    priority,
+    createdAt,
+    isActive,
+    highlights,
+    highlightsEn,
+  ];
 }

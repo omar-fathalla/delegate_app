@@ -72,7 +72,9 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
       },
     );
 
-    if (newName != null && newName.isNotEmpty && newName != _branch.branchName) {
+    if (newName != null &&
+        newName.isNotEmpty &&
+        newName != _branch.branchName) {
       final updated = BranchModel(
         id: _branch.id,
         branchName: newName,
@@ -117,9 +119,9 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
     );
 
     if (confirm == true && mounted) {
-      context
-          .read<BranchBloc>()
-          .add(BranchDeleteRequested(branchId: _branch.id));
+      context.read<BranchBloc>().add(
+        BranchDeleteRequested(branchId: _branch.id),
+      );
     }
   }
 
@@ -203,9 +205,9 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
           );
           context.pop();
         } else if (state is BranchError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message)));
         }
       },
       builder: (context, state) {
@@ -378,9 +380,7 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
                 Positioned.fill(
                   child: Container(
                     color: theme.colorScheme.surface.withValues(alpha: 0.7),
-                    child: const Center(
-                      child: CircularProgressIndicator(),
-                    ),
+                    child: const Center(child: CircularProgressIndicator()),
                   ),
                 ),
             ],

@@ -27,8 +27,9 @@ void main() {
   });
 
   test('should return list of branches on success', () async {
-    when(() => mockRepo.getBranches())
-        .thenAnswer((_) async => const Right([tBranch]));
+    when(
+      () => mockRepo.getBranches(),
+    ).thenAnswer((_) async => const Right([tBranch]));
 
     final result = await usecase(NoParams());
 
@@ -37,8 +38,9 @@ void main() {
   });
 
   test('should return ServerFailure when repository fails', () async {
-    when(() => mockRepo.getBranches())
-        .thenAnswer((_) async => const Left(ServerFailure('خطأ في الجلب')));
+    when(
+      () => mockRepo.getBranches(),
+    ).thenAnswer((_) async => const Left(ServerFailure('خطأ في الجلب')));
 
     final result = await usecase(NoParams());
 
@@ -46,8 +48,7 @@ void main() {
   });
 
   test('should return empty list when no branches exist', () async {
-    when(() => mockRepo.getBranches())
-        .thenAnswer((_) async => const Right([]));
+    when(() => mockRepo.getBranches()).thenAnswer((_) async => const Right([]));
 
     final result = await usecase(NoParams());
 

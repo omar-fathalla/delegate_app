@@ -35,8 +35,9 @@ void main() {
   });
 
   test('should return created branch on success', () async {
-    when(() => mockRepo.addBranch(any()))
-        .thenAnswer((_) async => const Right(tBranchWithId));
+    when(
+      () => mockRepo.addBranch(any()),
+    ).thenAnswer((_) async => const Right(tBranchWithId));
 
     final result = await usecase(const AddBranchParams(branch: tBranch));
 
@@ -45,8 +46,9 @@ void main() {
   });
 
   test('should return ServerFailure when add fails', () async {
-    when(() => mockRepo.addBranch(any())).thenAnswer(
-        (_) async => const Left(ServerFailure('فشل في إضافة الفرع.')));
+    when(
+      () => mockRepo.addBranch(any()),
+    ).thenAnswer((_) async => const Left(ServerFailure('فشل في إضافة الفرع.')));
 
     final result = await usecase(const AddBranchParams(branch: tBranch));
 

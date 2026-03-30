@@ -663,5 +663,281 @@
     "swPointUaePhone": "United Arab Emirates WhatsApp: +971 55 871 5615",
     "@swPointUaePhone": {
         "description": "SwitchPoint UAE phone value"
+    },
+    "createAdmin": "Create Admin",
+    "@createAdmin": {
+        "description": "Create admin screen title and button"
+    },
+    "adminName": "Admin Name",
+    "@adminName": {
+        "description": "Admin name field label"
+    },
+    "adminPhone": "Phone Number",
+    "@adminPhone": {
+        "description": "Admin phone field label"
+    },
+    "adminEmail": "Email Address",
+    "@adminEmail": {
+        "description": "Admin email field label"
+    },
+    "pleaseEnterAdminName": "Please enter admin name",
+    "@pleaseEnterAdminName": {
+        "description": "Admin name validation error"
+    },
+    "pleaseEnterAdminPhone": "Please enter phone number",
+    "@pleaseEnterAdminPhone": {
+        "description": "Admin phone validation error"
+    },
+    "pleaseEnterAdminEmail": "Please enter email address",
+    "@pleaseEnterAdminEmail": {
+        "description": "Admin email validation error"
+    },
+    "invalidPhoneNumber": "Invalid phone number",
+    "@invalidPhoneNumber": {
+        "description": "Invalid phone number validation error"
+    },
+    "invalidEmail": "Invalid email address",
+    "@invalidEmail": {
+        "description": "Invalid email validation error"
+    },
+    "adminCreatedSuccessfully": "Admin account created successfully! Activation email sent.",
+    "@adminCreatedSuccessfully": {
+        "description": "Admin created success message"
+    },
+    "manageAdmins": "Manage Admins",
+    "@manageAdmins": {
+        "description": "Manage admins menu item"
+    },
+    "noAdminsFound": "No admins found",
+    "@noAdminsFound": {
+        "description": "Empty admins list message"
+    },
+    "suspended": "Suspended",
+    "@suspended": {
+        "description": "Suspended status badge"
+    },
+    "editAdmin": "Edit",
+    "@editAdmin": {
+        "description": "Edit admin action"
+    },
+    "deleteAdmin": "Delete",
+    "@deleteAdmin": {
+        "description": "Delete admin action"
+    },
+    "suspendAdmin": "Suspend",
+    "@suspendAdmin": {
+        "description": "Suspend admin action"
+    },
+    "activateAdmin": "Activate",
+    "@activateAdmin": {
+        "description": "Activate admin action"
+    },
+    "deleteAdminConfirmation": "Are you sure you want to delete this admin? This action cannot be undone.",
+    "@deleteAdminConfirmation": {
+        "description": "Delete admin confirmation message"
+    },
+    "cancel": "Cancel",
+    "@cancel": {
+        "description": "Cancel button text"
+    },
+    "companyDelegates": "Company Delegates",
+    "@companyDelegates": {
+        "description": "Company delegates screen title"
+    },
+    "viewAttendance": "View Attendance",
+    "@viewAttendance": {
+        "description": "View attendance button"
+    },
+    "noDelegatesFound": "No delegates found",
+    "@noDelegatesFound": {
+        "description": "Empty delegates list message"
+    },
+    "viewProfileData": "View Profile",
+    "@viewProfileData": {
+        "description": "View profile data button text"
+    },
+    "addDelegate": "Add Delegate",
+    "@addDelegate": {
+        "description": "Add delegate button text"
+    },
+    "addDelegateViaWeb": "Add via Web",
+    "@addDelegateViaWeb": {
+        "description": "Add delegate via web title"
+    },
+    "tasks": "Tasks",
+    "@tasks": {
+        "description": "Tasks tab or screen title"
+    },
+    "todayOverview": "Today's Overview",
+    "@todayOverview": {
+        "description": "Dashboard section title"
+    },
+    "totalDelegates": "Total Delegates",
+    "@totalDelegates": {
+        "description": "Total delegates card title"
+    },
+    "checkedInToday": "Checked In Today",
+    "@checkedInToday": {
+        "description": "Checked in today card title"
+    },
+    "absentToday": "Absent Today",
+    "addTask": "Add Task",
+    "@addTask": {
+        "description": "Button text to add a new task"
+    },
+    "taskTitle": "Task Title",
+    "@taskTitle": {
+        "description": "Label for task title input"
+    },
+    "taskDescription": "Task Description",
+    "@taskDescription": {
+        "description": "Label for task description input"
+    },
+    "taskPriority": "Priority",
+    "@taskPriority": {
+        "description": "Label for task priority selection"
+    },
+    "high": "High",
+    "@high": {
+        "description": "High priority label"
+    },
+    "medium": "Medium",
+    "@medium": {
+        "description": "Medium priority label"
+    },
+    "low": "Low",
+    "@low": {
+        "description": "Low priority label"
+    },
+    "taskDueDate": "Due Date",
+    "@taskDueDate": {
+        "description": "Label for task due date input"
+    },
+    "assignTo": "Assign To",
+    "@assignTo": {
+        "description": "Label for assigning task to a delegate"
+    },
+    "allDelegates": "All Delegates",
+    "@allDelegates": {
+        "description": "Option for assigning task to all delegates"
+    },
+    "createTask": "Create Task",
+    "@createTask": {
+        "description": "Button text to create a task"
+    },
+    "taskCreatedSuccessfully": "Task created successfully",
+    "@taskCreatedSuccessfully": {
+        "description": "Success message after creating a task"
+    },
+    "taskUpdatedSuccessfully": "Task updated successfully",
+    "@taskUpdatedSuccessfully": {
+        "description": "Success message after updating a task"
+    },
+    "noTasksFound": "No tasks found",
+    "@noTasksFound": {
+        "description": "Message shown when no tasks match the filter"
+    },
+    "taskStatus": "Task Status",
+    "@taskStatus": {
+        "description": "Label for task status selection"
+    },
+    "taskPending": "Pending",
+    "@taskPending": {
+        "description": "Pending task status label"
+    },
+    "taskInProgress": "In Progress",
+    "@taskInProgress": {
+        "description": "In Progress task status label"
+    },
+    "taskCompleted": "Completed",
+    "@taskCompleted": {
+        "description": "Completed task status label"
+    },
+    "all": "All",
+    "@all": {
+        "description": "Filter option for all items"
+    },
+    "today": "Today",
+    "@today": {
+        "description": "Today label"
+    },
+    "yesterday": "Yesterday",
+    "@yesterday": {
+        "description": "Yesterday label"
+    },
+    "taskCancelled": "Cancelled",
+    "@taskCancelled": {
+        "description": "Cancelled task status label"
+    },
+    "taskDetails": "Task Details",
+    "@taskDetails": {
+        "description": "Task details title"
+    },
+    "taskSchedule": "Schedule",
+    "@taskSchedule": {
+        "description": "Task schedule title"
+    },
+    "selectDelegate": "Select Delegate",
+    "@selectDelegate": {
+        "description": "Select delegate label"
+    },
+    "errorFieldRequired": "This field is required",
+    "addTaskToGetStarted": "Add a task to get started",
+    "@addTaskToGetStarted": {
+        "description": "Message when no tasks are found and user is prompted to add one"
+    },
+    "@errorFieldRequired": {
+        "description": "Validation error for required field"
+    },
+    "myTasks": "My Tasks",
+    "@myTasks": {
+        "description": "Title for the delegate's tasks screen"
+    },
+    "noTasksYet": "No tasks yet",
+    "@noTasksYet": {
+        "description": "Message when no tasks are assigned to the delegate"
+    },
+    "complete": "Complete",
+    "@complete": {
+        "description": "Button text to complete a task"
+    },
+    "delete": "Delete",
+    "@delete": {
+        "description": "General delete button text"
+    },
+    "deleteTask": "Delete Task",
+    "@deleteTask": {
+        "description": "Title for delete task dialog/button"
+    },
+    "deleteTaskConfirmation": "Are you sure you want to delete this task? This action cannot be undone.",
+    "@deleteTaskConfirmation": {
+        "description": "Confirmation message for deleting a task"
+    },
+    "notes": "Notes",
+    "@notes": {
+        "description": "Label for task notes"
+    },
+    "@absentToday": {
+        "description": "Absent today card title"
+    },
+    "tasksSummary": "Tasks Summary",
+    "@tasksSummary": {
+        "description": "Title for the task summary card on home screen"
+    },
+    "total": "Total",
+    "@total": {
+        "description": "Label for total count"
+    },
+    "searchDelegates": "Search delegates...",
+    "@searchDelegates": {
+      "description": "Placeholder for searching delegates"
+    },
+    "filterByStatus": "Filter by status",
+    "@filterByStatus": {
+      "description": "Label for status filter"
+    },
+    "noDelegateSearchResults": "No delegates match your search",
+    "@noDelegateSearchResults": {
+      "description": "Message shown when no delegates match search or filter"
     }
 }

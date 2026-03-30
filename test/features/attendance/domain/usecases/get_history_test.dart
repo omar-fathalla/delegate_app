@@ -44,11 +44,14 @@ void main() {
 
   test('should return attendance history from repository', () async {
     // arrange
-    when(() => mockRepository.getHistory(any(), any()))
-        .thenAnswer((_) async => Right(tAttendanceList));
+    when(
+      () => mockRepository.getHistory(any(), any()),
+    ).thenAnswer((_) async => Right(tAttendanceList));
 
     // act
-    final result = await usecase(const GetHistoryParams(userId: tUserId, organizationId: tOrganizationId));
+    final result = await usecase(
+      const GetHistoryParams(userId: tUserId, organizationId: tOrganizationId),
+    );
 
     // assert
     expect(result, Right(tAttendanceList));
@@ -57,11 +60,14 @@ void main() {
 
   test('should return empty list when no history', () async {
     // arrange
-    when(() => mockRepository.getHistory(any(), any()))
-        .thenAnswer((_) async => const Right([]));
+    when(
+      () => mockRepository.getHistory(any(), any()),
+    ).thenAnswer((_) async => const Right([]));
 
     // act
-    final result = await usecase(const GetHistoryParams(userId: tUserId, organizationId: tOrganizationId));
+    final result = await usecase(
+      const GetHistoryParams(userId: tUserId, organizationId: tOrganizationId),
+    );
 
     // assert
     expect(result, const Right(<Attendance>[]));
@@ -70,18 +76,24 @@ void main() {
   test('should return failure when getHistory fails', () async {
     // arrange
     const tFailure = ServerFailure('فشل جلب السجل');
-    when(() => mockRepository.getHistory(any(), any()))
-        .thenAnswer((_) async => const Left(tFailure));
+    when(
+      () => mockRepository.getHistory(any(), any()),
+    ).thenAnswer((_) async => const Left(tFailure));
 
     // act
-    final result = await usecase(const GetHistoryParams(userId: tUserId, organizationId: tOrganizationId));
+    final result = await usecase(
+      const GetHistoryParams(userId: tUserId, organizationId: tOrganizationId),
+    );
 
     // assert
     expect(result, const Left(tFailure));
   });
 
   test('GetHistoryParams props should contain userId and organizationId', () {
-    const params = GetHistoryParams(userId: tUserId, organizationId: tOrganizationId);
+    const params = GetHistoryParams(
+      userId: tUserId,
+      organizationId: tOrganizationId,
+    );
     expect(params.props, [tUserId, tOrganizationId]);
   });
 }

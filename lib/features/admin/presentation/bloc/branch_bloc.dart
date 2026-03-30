@@ -69,7 +69,9 @@ class BranchBloc extends Bloc<BranchEvent, BranchState> {
     Emitter<BranchState> emit,
   ) async {
     emit(BranchLoading());
-    final result = await deleteBranch(DeleteBranchParams(branchId: event.branchId));
+    final result = await deleteBranch(
+      DeleteBranchParams(branchId: event.branchId),
+    );
     result.fold(
       (failure) => emit(BranchError(message: failure.message)),
       (_) => emit(const BranchDeleteSuccess()),

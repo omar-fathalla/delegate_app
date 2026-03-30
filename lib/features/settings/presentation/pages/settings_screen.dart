@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
+
 import 'package:delegate_app/main.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -21,7 +21,6 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AdminHeader(subtitle: l10n.settings),
       body: SafeArea(
         child: Column(
           children: [
@@ -103,40 +102,6 @@ class SettingsScreen extends StatelessWidget {
                               ).colorScheme.primary,
                             ),
                           ),
-                          Divider(
-                            height: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            indent: 64,
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isArabic ? 'ألوان التطبيق' : 'App Colors',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceAround,
-                                  children: AppColorSchemes.seedColors
-                                      .map((c) => _buildColorOption(context, c))
-                                      .toList(),
-                                ),
-                              ],
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -201,6 +166,44 @@ class SettingsScreen extends StatelessWidget {
                             hideTrailingIcon: true,
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withValues(alpha: 0.2),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isArabic ? 'ألوان التطبيق' : 'App Colors',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: AppColorSchemes.seedColors
+                                  .map((c) => _buildColorOption(context, c))
+                                  .toList(),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 

@@ -7,22 +7,28 @@ import 'package:url_launcher/url_launcher.dart';
 
 class ProfileScreen extends StatelessWidget {
   final Delegate delegate;
+  final bool showBackButton;
 
-  const ProfileScreen({super.key, required this.delegate});
+  const ProfileScreen({
+    super.key,
+    required this.delegate,
+    this.showBackButton = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 3,
-      child: _ProfileBody(delegate: delegate),
+      child: _ProfileBody(delegate: delegate, showBackButton: showBackButton),
     );
   }
 }
 
 class _ProfileBody extends StatelessWidget {
   final Delegate delegate;
+  final bool showBackButton;
 
-  const _ProfileBody({required this.delegate});
+  const _ProfileBody({required this.delegate, this.showBackButton = false});
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +37,13 @@ class _ProfileBody extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
+      appBar: showBackButton
+          ? AppBar(
+              title: Text(delegate.fullName),
+              backgroundColor: colorScheme.surface,
+              scrolledUnderElevation: 0,
+            )
+          : null,
       backgroundColor: colorScheme.surface,
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {

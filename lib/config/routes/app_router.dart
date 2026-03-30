@@ -7,6 +7,8 @@ import 'package:delegate_app/features/admin/presentation/pages/branch_details_sc
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
 import 'package:delegate_app/features/changelog/presentation/pages/changelog_screen.dart';
+import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
+import 'package:delegate_app/features/tasks/presentation/pages/task_details_screen.dart';
 import 'package:go_router/go_router.dart';
 
 final appRouter = GoRouter(
@@ -33,6 +35,17 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final branch = state.extra as BranchModel;
         return BranchDetailsScreen(branch: branch);
+      },
+    ),
+    GoRoute(
+      path: '/task-details',
+      builder: (context, state) {
+        final extras = state.extra as Map<String, dynamic>;
+        return TaskDetailsScreen(
+          task: extras['task'] as TaskEntity,
+          isAdmin: extras['isAdmin'] as bool,
+          organizationId: extras['organizationId'] as String,
+        );
       },
     ),
     GoRoute(

@@ -4,6 +4,7 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class Login implements UseCase<List<Delegate>, LoginParams> {
   final AuthRepository repository;
@@ -17,9 +18,32 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
 
     return result.fold((failure) => Left(failure), (delegates) async {
       // 2. تصفية المندوبين بناء على مقارنة الرقم القومي (Password Check)
-      final matched = delegates
-          .where((delegate) => delegate.nationalityID == params.password)
-          .toList();
+      //    أو التحقق عبر Firebase Auth للـ admins
+      final matched = <Delegate>[];
+
+      for (final delegate in delegates) {
+        if (delegate.nationalityID.startsWith('__firebase_auth__:')) {
+          // Admin login: verify password via Firebase Auth
+          final email = delegate.nationalityID.substring(
+            '__firebase_auth__:'.length,
+          );
+          if (email.isNotEmpty) {
+            try {
+              await FirebaseAuth.instance.signInWithEmailAndPassword(
+                email: email,
+                password: params.password,
+              );
+              // Firebase Auth succeeded — admin password is correct
+              matched.add(delegate);
+            } on FirebaseAuthException catch (_) {
+              // Wrong password or auth error — skip this entry
+            }
+          }
+        } else if (delegate.nationalityID == params.password) {
+          // Delegate login: direct password comparison
+          matched.add(delegate);
+        }
+      }
 
       if (matched.isEmpty) {
         return const Left(

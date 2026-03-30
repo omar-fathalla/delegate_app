@@ -6,8 +6,7 @@ import 'package:flutter/foundation.dart';
 class CrashlyticsService {
   CrashlyticsService._();
 
-  static final FirebaseCrashlytics _crashlytics =
-      FirebaseCrashlytics.instance;
+  static final FirebaseCrashlytics _crashlytics = FirebaseCrashlytics.instance;
 
   /// تهيئة Crashlytics - يتم استدعاؤها في main()
   static Future<void> initialize() async {

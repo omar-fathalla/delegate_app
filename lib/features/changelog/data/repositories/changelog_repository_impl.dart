@@ -27,7 +27,9 @@ class ChangelogRepositoryImpl implements ChangelogRepository {
     } on Failure catch (e) {
       return Left(e);
     } catch (e) {
-      return const Left(ServerFailure('حدث خطأ غير متوقع أثناء جلب التحديثات.'));
+      return const Left(
+        ServerFailure('حدث خطأ غير متوقع أثناء جلب التحديثات.'),
+      );
     }
   }
 
@@ -44,7 +46,9 @@ class ChangelogRepositoryImpl implements ChangelogRepository {
     } on Failure catch (e) {
       return Left(e);
     } catch (e) {
-      return const Left(ServerFailure('حدث خطأ غير متوقع أثناء جلب التحديثات الجديدة.'));
+      return const Left(
+        ServerFailure('حدث خطأ غير متوقع أثناء جلب التحديثات الجديدة.'),
+      );
     }
   }
 

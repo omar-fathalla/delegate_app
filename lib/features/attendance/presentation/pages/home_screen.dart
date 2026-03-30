@@ -5,6 +5,9 @@ import 'package:delegate_app/features/attendance/presentation/widgets/attendance
 import 'package:delegate_app/features/attendance/presentation/widgets/attendance_history_list.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/current_status_card.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/home_app_bar.dart';
+import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
+import 'package:delegate_app/features/tasks/domain/usecases/get_delegate_tasks.dart';
+import 'package:delegate_app/features/tasks/presentation/widgets/task_summary_card.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -28,12 +31,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     return BlocProvider(
-      create: (context) =>
-          sl<AttendanceBloc>()
-            ..add(HistoryRequested(
-              userId: widget.delegate.uid,
-              organizationId: widget.delegate.organizationUID,
-            )),
+      create: (context) => sl<AttendanceBloc>()
+        ..add(
+          HistoryRequested(
+            userId: widget.delegate.uid,
+            organizationId: widget.delegate.organizationUID,
+          ),
+        ),
       child: Scaffold(
         backgroundColor: theme.colorScheme.surface,
         appBar: HomeAppBar(delegate: widget.delegate),
@@ -115,7 +119,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
+
+                  // ── Task Summary ──
+                  _DelegateTaskSummary(delegate: widget.delegate),
+
+                  const SizedBox(height: 24),
                   Text(
                     l10n.recentHistory,
                     style: TextStyle(
@@ -183,6 +192,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+    );
+  }
+}
+
+/// Fetches delegate tasks and displays them in a [TaskSummaryCard].
+class _DelegateTaskSummary extends StatefulWidget {
+  final Delegate delegate;
+
+  const _DelegateTaskSummary({required this.delegate});
+
+  @override
+  State<_DelegateTaskSummary> createState() => _DelegateTaskSummaryState();
+}
+
+class _DelegateTaskSummaryState extends State<_DelegateTaskSummary> {
+  late Future<List<TaskEntity>> _tasksFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _tasksFuture = _fetchTasks();
+  }
+
+  Future<List<TaskEntity>> _fetchTasks() async {
+    final getDelegateTasks = sl<GetDelegateTasks>();
+    final result = await getDelegateTasks(
+      widget.delegate.organizationUID,
+      widget.delegate.uid,
+      widget.delegate.companyUID,
+    );
+    return result.fold((_) => [], (tasks) => tasks);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<TaskEntity>>(
+      future: _tasksFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const TaskSummaryCard(tasks: [], isLoading: true);
+        }
+        return TaskSummaryCard(tasks: snapshot.data ?? []);
+      },
     );
   }
 }

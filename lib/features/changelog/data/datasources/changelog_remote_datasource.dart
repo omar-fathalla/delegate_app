@@ -50,7 +50,9 @@ class ChangelogRemoteDataSourceImpl implements ChangelogRemoteDataSource {
           .map((doc) => AppUpdateModel.fromJson(doc.data(), doc.id))
           .toList();
     } catch (e) {
-      throw ServerFailure('حدث خطأ أثناء جلب التحديثات الجديدة: ${e.toString()}');
+      throw ServerFailure(
+        'حدث خطأ أثناء جلب التحديثات الجديدة: ${e.toString()}',
+      );
     }
   }
 }

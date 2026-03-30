@@ -3,9 +3,11 @@ import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
+import 'package:delegate_app/features/attendance/domain/entities/attendance_pagination_result.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/get_history_paginated.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,11 +21,16 @@ class MockGetHistory extends Mock implements GetHistory {}
 
 class MockSyncAttendance extends Mock implements SyncAttendance {}
 
+class MockGetHistoryPaginated extends Mock implements GetHistoryPaginated {}
+
 class FakeCheckInParams extends Fake implements CheckInParams {}
 
 class FakeCheckOutParams extends Fake implements CheckOutParams {}
 
 class FakeGetHistoryParams extends Fake implements GetHistoryParams {}
+
+class FakeGetHistoryPaginatedParams extends Fake
+    implements GetHistoryPaginatedParams {}
 
 class FakeNoParams extends Fake implements NoParams {}
 
@@ -33,6 +40,7 @@ void main() {
   late MockCheckOut mockCheckOut;
   late MockGetHistory mockGetHistory;
   late MockSyncAttendance mockSyncAttendance;
+  late MockGetHistoryPaginated mockGetHistoryPaginated;
 
   final tAttendance = Attendance(
     id: 'att-1',
@@ -61,6 +69,7 @@ void main() {
     registerFallbackValue(FakeCheckInParams());
     registerFallbackValue(FakeCheckOutParams());
     registerFallbackValue(FakeGetHistoryParams());
+    registerFallbackValue(FakeGetHistoryPaginatedParams());
     registerFallbackValue(FakeNoParams());
   });
 
@@ -69,10 +78,12 @@ void main() {
     mockCheckOut = MockCheckOut();
     mockGetHistory = MockGetHistory();
     mockSyncAttendance = MockSyncAttendance();
+    mockGetHistoryPaginated = MockGetHistoryPaginated();
     bloc = AttendanceBloc(
       checkIn: mockCheckIn,
       checkOut: mockCheckOut,
       getHistory: mockGetHistory,
+      getHistoryPaginated: mockGetHistoryPaginated,
       syncAttendance: mockSyncAttendance,
     );
   });
@@ -191,32 +202,55 @@ void main() {
     blocTest<AttendanceBloc, AttendanceState>(
       'emits [Loading, HistoryLoaded] with activeAttendanceId for active session',
       build: () {
-        when(
-          () => mockGetHistory(any()),
-        ).thenAnswer((_) async => Right(tHistory));
+        when(() => mockGetHistoryPaginated(any())).thenAnswer(
+          (_) async => Right(
+            AttendancePaginationResult(
+              items: tHistory,
+              hasReachedMax: true,
+              lastDoc: null,
+            ),
+          ),
+        );
         return bloc;
       },
-      act: (bloc) => bloc.add(const HistoryRequested(userId: 'user-1', organizationId: 'org-1')),
+      act: (bloc) => bloc.add(
+        const HistoryRequested(userId: 'user-1', organizationId: 'org-1'),
+      ),
       expect: () => [
         AttendanceLoading(),
-        AttendanceHistoryLoaded(history: tHistory, activeAttendanceId: 'att-1'),
+        AttendanceHistoryLoaded(
+          history: tHistory,
+          activeAttendanceId: 'att-1',
+          hasReachedMax: true,
+          lastDoc: null,
+        ),
       ],
     );
 
     blocTest<AttendanceBloc, AttendanceState>(
       'emits [Loading, HistoryLoaded] with activeAttendanceId null when no active session',
       build: () {
-        when(
-          () => mockGetHistory(any()),
-        ).thenAnswer((_) async => Right([tAttendanceWithCheckOut]));
+        when(() => mockGetHistoryPaginated(any())).thenAnswer(
+          (_) async => Right(
+            AttendancePaginationResult(
+              items: [tAttendanceWithCheckOut],
+              hasReachedMax: true,
+              lastDoc: null,
+            ),
+          ),
+        );
         return bloc;
       },
-      act: (bloc) => bloc.add(const HistoryRequested(userId: 'user-1', organizationId: 'org-1')),
+      act: (bloc) => bloc.add(
+        const HistoryRequested(userId: 'user-1', organizationId: 'org-1'),
+      ),
       expect: () => [
         AttendanceLoading(),
         AttendanceHistoryLoaded(
           history: [tAttendanceWithCheckOut],
           activeAttendanceId: null,
+          hasReachedMax: true,
+          lastDoc: null,
         ),
       ],
     );
@@ -225,11 +259,13 @@ void main() {
       'emits [Loading, Error] when history fetch fails',
       build: () {
         when(
-          () => mockGetHistory(any()),
+          () => mockGetHistoryPaginated(any()),
         ).thenAnswer((_) async => const Left(ServerFailure('فشل جلب السجل')));
         return bloc;
       },
-      act: (bloc) => bloc.add(const HistoryRequested(userId: 'user-1', organizationId: 'org-1')),
+      act: (bloc) => bloc.add(
+        const HistoryRequested(userId: 'user-1', organizationId: 'org-1'),
+      ),
       expect: () => [
         AttendanceLoading(),
         const AttendanceError(message: 'فشل جلب السجل'),

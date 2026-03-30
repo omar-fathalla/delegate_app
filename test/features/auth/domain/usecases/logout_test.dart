@@ -26,9 +26,9 @@ void main() {
 
   test('should call clearCache on the repository', () async {
     // arrange
-    when(() => mockRepository.clearCache()).thenAnswer(
-      (_) async => const Right(null),
-    );
+    when(
+      () => mockRepository.clearCache(),
+    ).thenAnswer((_) async => const Right(null));
     // act
     final result = await usecase(NoParams());
     // assert
@@ -38,9 +38,9 @@ void main() {
 
   test('should return failure when clearCache fails', () async {
     // arrange
-    when(() => mockRepository.clearCache()).thenAnswer(
-      (_) async => const Left(CacheFailure('فشل مسح البيانات')),
-    );
+    when(
+      () => mockRepository.clearCache(),
+    ).thenAnswer((_) async => const Left(CacheFailure('فشل مسح البيانات')));
     // act
     final result = await usecase(NoParams());
     // assert

@@ -4,8 +4,10 @@ import 'package:delegate_app/features/attendance/data/datasources/attendance_loc
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
+import 'package:delegate_app/features/attendance/domain/entities/attendance_pagination_result.dart';
 import 'package:delegate_app/features/attendance/domain/repositories/attendance_repository.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -146,33 +148,41 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }) async {
     try {
       if (!await _hasConnection()) {
-         try {
-           final localHistory = await localDataSource.getLastAttendanceHistory();
-           final activeSessionIndex = localHistory.indexWhere((element) => element.id == attendanceId);
+        try {
+          final localHistory = await localDataSource.getLastAttendanceHistory();
+          final activeSessionIndex = localHistory.indexWhere(
+            (element) => element.id == attendanceId,
+          );
 
-           if (activeSessionIndex != -1) {
-             final activeSession = localHistory[activeSessionIndex];
-             // Safely use copyWith from AttendanceModel
-             final updatedSession = activeSession.copyWith(
-               checkOutTime: DateTime.now(),
-               isSynced: false,
-             );
+          if (activeSessionIndex != -1) {
+            final activeSession = localHistory[activeSessionIndex];
+            // Safely use copyWith from AttendanceModel
+            final updatedSession = activeSession.copyWith(
+              checkOutTime: DateTime.now(),
+              isSynced: false,
+            );
 
-             await localDataSource.updateAttendance(updatedSession);
-             await offlineQueue.addToQueue({
-               'type': 'check_out',
-               'relatedCheckInId': attendanceId,
-               'delegateId': userId,
-               'organizationId': organizationId,
-               'location': {'latitude': lat, 'longitude': long},
-             });
-             return Right(updatedSession);
-           } else {
-             return const Left(ServerFailure('لم يتم العثور على سجل مسبق محلياً لإتمام الانصراف، يرجى الاتصال بالإنترنت.'));
-           }
-         } catch (_) {
-            return const Left(ServerFailure('حدث خطأ أثناء حفظ الانصراف محلياً.'));
-         }
+            await localDataSource.updateAttendance(updatedSession);
+            await offlineQueue.addToQueue({
+              'type': 'check_out',
+              'relatedCheckInId': attendanceId,
+              'delegateId': userId,
+              'organizationId': organizationId,
+              'location': {'latitude': lat, 'longitude': long},
+            });
+            return Right(updatedSession);
+          } else {
+            return const Left(
+              ServerFailure(
+                'لم يتم العثور على سجل مسبق محلياً لإتمام الانصراف، يرجى الاتصال بالإنترنت.',
+              ),
+            );
+          }
+        } catch (_) {
+          return const Left(
+            ServerFailure('حدث خطأ أثناء حفظ الانصراف محلياً.'),
+          );
+        }
       }
 
       // --- Anti-Fraud Geofencing for Check-Out (Non-Blocking) ---
@@ -220,36 +230,94 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   @override
   Future<Either<Failure, List<Attendance>>> getHistory(
     String userId,
-    String organizationId,
-  ) async {
+    String organizationId, {
+    String? nationalityID,
+    String? phoneNumber,
+  }) async {
     try {
       if (!await _hasConnection()) {
-        throw const ServerFailure('No internet connection (offline mode)');
+        throw const ServerFailure('لا يوجد اتصال بالإنترنت (وضع عدم الاتصال)');
       }
 
-      // Firestore is the single source of truth (already filtered by delegateId and organizationId)
-      final remoteHistory = await remoteDataSource.getHistory(userId, organizationId);
+      final remoteHistory = await remoteDataSource.getHistory(
+        userId,
+        organizationId,
+        nationalityID: nationalityID,
+        phoneNumber: phoneNumber,
+      );
 
-      // Cache this delegate's data for offline fallback
       try {
         await localDataSource.overwriteHistory(remoteHistory);
-      } catch (_) {
-        // Cache failure is non-critical
-      }
+      } catch (_) {}
 
       return Right(remoteHistory);
     } on Failure catch (e) {
-      // Offline fallback: use local cache but filter by userId
       try {
         final localHistory = await localDataSource.getLastAttendanceHistory();
         final filtered = localHistory.where((a) => a.userId == userId).toList();
         if (filtered.isNotEmpty) {
           return Right(filtered);
         }
-      } catch (_) {
-        // If local also fails, return the original remote failure
-      }
+      } catch (_) {}
       return Left(e);
+    }
+  }
+
+  @override
+  Future<Either<Failure, AttendancePaginationResult>> getHistoryPaginated(
+    String userId,
+    String organizationId, {
+    String? nationalityID,
+    String? phoneNumber,
+    int limit = 20,
+    dynamic lastDoc,
+  }) async {
+    try {
+      if (!await _hasConnection()) {
+        // Fallback to local history for the first page if offline
+        if (lastDoc == null) {
+          final localHistory = await localDataSource.getLastAttendanceHistory();
+          final filtered = localHistory
+              .where((a) => a.userId == userId)
+              .toList();
+          return Right(
+            AttendancePaginationResult(
+              items: filtered,
+              hasReachedMax: true,
+              lastDoc: null,
+            ),
+          );
+        }
+        return const Left(
+          ServerFailure('لا يوجد اتصال بالإنترنت لتحميل المزيد.'),
+        );
+      }
+
+      final response = await remoteDataSource.getHistoryPaginated(
+        userId,
+        organizationId,
+        limit: limit,
+        startAfter: lastDoc as DocumentSnapshot?,
+      );
+
+      // Cache the first page locally
+      if (lastDoc == null && response.items.isNotEmpty) {
+        try {
+          await localDataSource.overwriteHistory(response.items);
+        } catch (_) {}
+      }
+
+      return Right(
+        AttendancePaginationResult(
+          items: response.items,
+          lastDoc: response.lastDoc,
+          hasReachedMax: response.hasReachedMax,
+        ),
+      );
+    } on Failure catch (e) {
+      return Left(e);
+    } catch (e) {
+      return const Left(ServerFailure('فشل في تحميل سجل الحضور.'));
     }
   }
 
@@ -262,7 +330,10 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       if (!await _hasConnection()) {
         throw const ServerFailure('No internet connection (offline mode)');
       }
-      final result = await remoteDataSource.findActiveAttendance(userId, organizationId);
+      final result = await remoteDataSource.findActiveAttendance(
+        userId,
+        organizationId,
+      );
       return Right(result);
     } on Failure catch (e) {
       return Left(e);

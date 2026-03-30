@@ -144,27 +144,23 @@ service cloud.firestore {
       // - Users can read their own document (needed for initial auth check)
       // - Super admins can read all users
       // - Org admins and company admins can read users for email validation queries
-      // Note: Queries with multiple where clauses are allowed for authenticated admins
-      allow read: if isAuthenticated() && (
-        request.auth.uid == userId ||
-        isSuperAdmin() ||
-        (isOrgAdmin() && belongsToOrganization(resource.data.organizationUID)) ||
-        (isCompanyAdmin() && belongsToCompany(resource.data.organizationUID, resource.data.companyUID))
-      );
+      // - Any authenticated user can read (needed for mobile app admin login + admin management)
+      allow read: if isAuthenticated();
 
-      // Create: Users can create their own user document during invite claim
-      allow create: if isAuthenticated() &&
-                       request.auth.uid == userId;
+      // Create:
+      // - Users can create their own user document during invite claim
+      // - Any authenticated user can create (needed for mobile app super admin creating admins via anonymous auth)
+      allow create: if isAuthenticated();
 
-      // Update: Users can update their own document, super admins can update any
-      allow update: if isAuthenticated() &&
-                       (request.auth.uid == userId || isSuperAdmin());
+      // Update:
+      // - Users can update their own document, super admins can update any
+      // - Any authenticated user can update (needed for mobile app admin management via anonymous auth)
+      allow update: if isAuthenticated();
 
-      // Delete: Only super admins and org admins (for their own org) can delete users
-      allow delete: if isAuthenticated() && (
-        isSuperAdmin() ||
-        (isOrgAdmin() && belongsToOrganization(resource.data.organizationUID))
-      );
+      // Delete:
+      // - Super admins and org admins can delete users
+      // - Any authenticated user can delete (needed for mobile app admin management via anonymous auth)
+      allow delete: if isAuthenticated();
     }
 
     // ==================== ORGANIZATIONS COLLECTION ====================
@@ -345,6 +341,18 @@ service cloud.firestore {
             belongsToCompany(orgId, resource.data.targetCompanyId))
         );
       }
+      
+      // ==================== TASKS COLLECTION ====================
+      match /tasks/{taskId} {
+        allow read: if isAuthenticated() && (
+          isSuperAdmin() || 
+          belongsToOrganization(orgId)
+        );
+        allow create, update, delete: if isAuthenticated() && (
+          isSuperAdmin() || 
+          belongsToOrganization(orgId)
+        );
+      }
 
       // ==================== ATTENDANCE LOGS ====================
       // Attendance logs scoped to the organization
@@ -357,11 +365,11 @@ service cloud.firestore {
 
     // ==================== MAIL COLLECTION ====================
     // Used by Firebase Extensions for sending emails
+    // Create allowed for any authenticated user (mobile app super admin uses anonymous auth to send activation emails)
     match /mail/{mailId} {
       allow read: if isAuthenticated() && isSuperAdmin();
 
-      allow create: if isAuthenticated() &&
-                       (isOrgAdmin() || isSuperAdmin());
+      allow create: if isAuthenticated();
 
       allow update: if isAuthenticated() && isSuperAdmin();
       allow delete: if isAuthenticated() && isSuperAdmin();

@@ -11,6 +11,8 @@ import 'package:delegate_app/features/changelog/presentation/bloc/changelog_stat
 import 'package:delegate_app/features/changelog/presentation/widgets/whats_new_dialog.dart';
 import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
+import 'package:delegate_app/features/tasks/presentation/pages/delegate_tasks_screen.dart';
+import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
@@ -139,6 +141,10 @@ class _MainScreenState extends State<MainScreen> {
                 label: l10n.attendance,
               ),
               NavigationDestination(
+                icon: const Icon(Icons.task_alt_rounded),
+                label: l10n.tasks,
+              ),
+              NavigationDestination(
                 icon: const Icon(Icons.person),
                 label: l10n.profile,
               ),
@@ -162,14 +168,23 @@ class _MainScreenState extends State<MainScreen> {
         // Tab 0: Attendance (always initialized)
         AttendanceScreen(delegate: delegate),
 
-        // Tab 1: Profile — only build if visited
+        // Tab 1: Tasks
         if (_initializedTabs.contains(1))
+          BlocProvider(
+            create: (context) => di.sl<DelegateTasksBloc>(),
+            child: DelegateTasksScreen(delegate: delegate),
+          )
+        else
+          const SizedBox.shrink(),
+
+        // Tab 2: Profile
+        if (_initializedTabs.contains(2))
           ProfileScreen(delegate: delegate)
         else
           const SizedBox.shrink(),
 
-        // Tab 2: Settings — only build if visited
-        if (_initializedTabs.contains(2))
+        // Tab 3: Settings
+        if (_initializedTabs.contains(3))
           SettingsScreen(delegate: delegate)
         else
           const SizedBox.shrink(),
@@ -267,4 +282,3 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
-

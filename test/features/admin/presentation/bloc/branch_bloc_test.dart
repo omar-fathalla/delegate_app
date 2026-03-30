@@ -72,15 +72,13 @@ void main() {
     blocTest<BranchBloc, BranchState>(
       'emits [BranchLoading, BranchLoaded] on success',
       build: () {
-        when(() => mockGetBranches(any()))
-            .thenAnswer((_) async => const Right([tBranch]));
+        when(
+          () => mockGetBranches(any()),
+        ).thenAnswer((_) async => const Right([tBranch]));
         return bloc;
       },
       act: (b) => b.add(const BranchLoadRequested()),
-      expect: () => [
-        isA<BranchLoading>(),
-        isA<BranchLoaded>(),
-      ],
+      expect: () => [isA<BranchLoading>(), isA<BranchLoaded>()],
       verify: (_) {
         verify(() => mockGetBranches(any())).called(1);
       },
@@ -89,22 +87,21 @@ void main() {
     blocTest<BranchBloc, BranchState>(
       'emits [BranchLoading, BranchError] on failure',
       build: () {
-        when(() => mockGetBranches(any())).thenAnswer(
-            (_) async => const Left(ServerFailure('خطأ في الجلب')));
+        when(
+          () => mockGetBranches(any()),
+        ).thenAnswer((_) async => const Left(ServerFailure('خطأ في الجلب')));
         return bloc;
       },
       act: (b) => b.add(const BranchLoadRequested()),
-      expect: () => [
-        isA<BranchLoading>(),
-        isA<BranchError>(),
-      ],
+      expect: () => [isA<BranchLoading>(), isA<BranchError>()],
     );
 
     blocTest<BranchBloc, BranchState>(
       'BranchLoaded contains correct branches list',
       build: () {
-        when(() => mockGetBranches(any()))
-            .thenAnswer((_) async => const Right([tBranch]));
+        when(
+          () => mockGetBranches(any()),
+        ).thenAnswer((_) async => const Right([tBranch]));
         return bloc;
       },
       act: (b) => b.add(const BranchLoadRequested()),
@@ -119,27 +116,24 @@ void main() {
     blocTest<BranchBloc, BranchState>(
       'emits [BranchLoading, BranchActionSuccess] on success',
       build: () {
-        when(() => mockAddBranch(any()))
-            .thenAnswer((_) async => const Right(tBranch));
+        when(
+          () => mockAddBranch(any()),
+        ).thenAnswer((_) async => const Right(tBranch));
         return bloc;
       },
-      act: (b) =>
-          b.add(const BranchAddRequested(branch: tBranch)),
-      expect: () => [
-        isA<BranchLoading>(),
-        isA<BranchActionSuccess>(),
-      ],
+      act: (b) => b.add(const BranchAddRequested(branch: tBranch)),
+      expect: () => [isA<BranchLoading>(), isA<BranchActionSuccess>()],
     );
 
     blocTest<BranchBloc, BranchState>(
       'emits [BranchLoading, BranchError] on failure',
       build: () {
         when(() => mockAddBranch(any())).thenAnswer(
-            (_) async => const Left(ServerFailure('فشل في إضافة الفرع.')));
+          (_) async => const Left(ServerFailure('فشل في إضافة الفرع.')),
+        );
         return bloc;
       },
-      act: (b) =>
-          b.add(const BranchAddRequested(branch: tBranch)),
+      act: (b) => b.add(const BranchAddRequested(branch: tBranch)),
       expect: () => [
         isA<BranchLoading>(),
         BranchError(message: 'فشل في إضافة الفرع.'),
@@ -151,27 +145,24 @@ void main() {
     blocTest<BranchBloc, BranchState>(
       'emits [BranchLoading, BranchDeleteSuccess] on success',
       build: () {
-        when(() => mockDeleteBranch(any()))
-            .thenAnswer((_) async => const Right(unit));
+        when(
+          () => mockDeleteBranch(any()),
+        ).thenAnswer((_) async => const Right(unit));
         return bloc;
       },
-      act: (b) =>
-          b.add(const BranchDeleteRequested(branchId: 'b1')),
-      expect: () => [
-        isA<BranchLoading>(),
-        isA<BranchDeleteSuccess>(),
-      ],
+      act: (b) => b.add(const BranchDeleteRequested(branchId: 'b1')),
+      expect: () => [isA<BranchLoading>(), isA<BranchDeleteSuccess>()],
     );
 
     blocTest<BranchBloc, BranchState>(
       'emits [BranchLoading, BranchError] on failure',
       build: () {
         when(() => mockDeleteBranch(any())).thenAnswer(
-            (_) async => const Left(ServerFailure('فشل في حذف الفرع.')));
+          (_) async => const Left(ServerFailure('فشل في حذف الفرع.')),
+        );
         return bloc;
       },
-      act: (b) =>
-          b.add(const BranchDeleteRequested(branchId: 'b1')),
+      act: (b) => b.add(const BranchDeleteRequested(branchId: 'b1')),
       expect: () => [
         isA<BranchLoading>(),
         BranchError(message: 'فشل في حذف الفرع.'),
@@ -183,15 +174,13 @@ void main() {
     blocTest<BranchBloc, BranchState>(
       'emits [BranchLoading, BranchUpdateSuccess] on success',
       build: () {
-        when(() => mockUpdateBranch(any()))
-            .thenAnswer((_) async => const Right(tBranch));
+        when(
+          () => mockUpdateBranch(any()),
+        ).thenAnswer((_) async => const Right(tBranch));
         return bloc;
       },
       act: (b) => b.add(const BranchUpdateRequested(branch: tBranch)),
-      expect: () => [
-        isA<BranchLoading>(),
-        isA<BranchUpdateSuccess>(),
-      ],
+      expect: () => [isA<BranchLoading>(), isA<BranchUpdateSuccess>()],
       verify: (b) {
         final state = b.state as BranchUpdateSuccess;
         expect(state.branch.id, 'b1');
@@ -203,7 +192,8 @@ void main() {
       'emits [BranchLoading, BranchError] on failure',
       build: () {
         when(() => mockUpdateBranch(any())).thenAnswer(
-            (_) async => const Left(ServerFailure('فشل في تحديث الفرع.')));
+          (_) async => const Left(ServerFailure('فشل في تحديث الفرع.')),
+        );
         return bloc;
       },
       act: (b) => b.add(const BranchUpdateRequested(branch: tBranch)),
