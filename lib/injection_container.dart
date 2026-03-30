@@ -66,6 +66,17 @@ import 'package:delegate_app/features/tasks/domain/usecases/update_task_status.d
 import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_bloc.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/create_task_bloc.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_bloc.dart';
+import 'package:delegate_app/features/notifications/data/datasources/notification_remote_data_source.dart';
+import 'package:delegate_app/features/notifications/data/repositories/notification_repository_impl.dart';
+import 'package:delegate_app/features/notifications/domain/repositories/notification_repository.dart';
+import 'package:delegate_app/features/notifications/domain/usecases/get_notifications.dart';
+import 'package:delegate_app/features/notifications/domain/usecases/get_unread_count.dart';
+import 'package:delegate_app/features/notifications/domain/usecases/mark_all_notifications_read.dart';
+import 'package:delegate_app/features/notifications/domain/usecases/mark_notification_read.dart';
+import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
+import 'package:delegate_app/core/services/push_notification_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get_it/get_it.dart';
 
 final sl = GetIt.instance;
@@ -75,6 +86,15 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => sharedPreferences);
   sl.registerLazySingleton(() => LocaleProvider(sharedPreferences));
   sl.registerLazySingleton(() => ThemeCubit(sl()));
+
+  // Push Notification Service
+  sl.registerLazySingleton(
+    () => PushNotificationService(
+      firestore: sl(),
+      messaging: FirebaseMessaging.instance,
+      localNotifications: FlutterLocalNotificationsPlugin(),
+    ),
+  );
 
   // ! Features - Auth
   // Bloc
@@ -275,6 +295,33 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // Data source
   sl.registerLazySingleton<TaskRemoteDataSource>(
     () => TaskRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  // ! Features - Notifications
+  // Bloc
+  sl.registerFactory(
+    () => NotificationBloc(
+      getNotifications: sl(),
+      getUnreadCount: sl(),
+      markNotificationRead: sl(),
+      markAllNotificationsRead: sl(),
+    ),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(() => GetNotifications(sl()));
+  sl.registerLazySingleton(() => GetUnreadCount(sl()));
+  sl.registerLazySingleton(() => MarkNotificationRead(sl()));
+  sl.registerLazySingleton(() => MarkAllNotificationsRead(sl()));
+
+  // Repository
+  sl.registerLazySingleton<NotificationRepository>(
+    () => NotificationRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data source
+  sl.registerLazySingleton<NotificationRemoteDataSource>(
+    () => NotificationRemoteDataSourceImpl(firestore: sl()),
   );
 
   // ! Core

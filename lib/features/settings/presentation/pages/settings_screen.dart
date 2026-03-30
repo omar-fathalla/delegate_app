@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 
 import 'package:delegate_app/main.dart';
@@ -388,6 +390,12 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             onPressed: () {
+              // Clear FCM token before logout
+              sl<PushNotificationService>()
+                  .clearToken(delegate.uid)
+                  .catchError((e) {
+                debugPrint('FCM clear token error: $e');
+              });
               Navigator.pop(dialogContext);
               context.go('/login');
             },

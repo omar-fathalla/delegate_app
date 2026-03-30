@@ -877,6 +877,18 @@
     "@taskCancelled": {
         "description": "Cancelled task status label"
     },
+    "taskDetails": "تفاصيل المهمة",
+    "@taskDetails": {
+        "description": "Task details title"
+    },
+    "taskSchedule": "الجدول الزمني",
+    "@taskSchedule": {
+        "description": "Task schedule title"
+    },
+    "selectDelegate": "اختر المندوب",
+    "@selectDelegate": {
+        "description": "Select delegate label"
+    },
     "myTasks": "مهامي",
     "@myTasks": {
         "description": "Title for the delegate's tasks screen"
@@ -927,5 +939,21 @@
     "noDelegateSearchResults": "لا توجد نتائج مطابقة لبحثك",
     "@noDelegateSearchResults": {
       "description": "Message shown when no delegates match search or filter"
+    },
+    "notifications": "الإشعارات",
+    "@notifications": {
+        "description": "Notifications page title"
+    },
+    "noNotifications": "لا توجد إشعارات",
+    "@noNotifications": {
+        "description": "Message when there are no notifications"
+    },
+    "markAllRead": "تعليم الكل كمقروء",
+    "@markAllRead": {
+        "description": "Button to mark all notifications as read"
+    },
+    "newNotification": "إشعار جديد",
+    "@newNotification": {
+        "description": "New notification label"
     }
 }

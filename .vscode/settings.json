@@ -13,5 +13,6 @@
         "/opt/homebrew/**",
         "**/.dart_tool/**",
         "**/.idea/**"
-    ]
+    ],
+    "kiroAgent.configureMCP": "Enabled"
 }

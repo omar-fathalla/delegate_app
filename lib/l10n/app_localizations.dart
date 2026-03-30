@@ -1393,6 +1393,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No delegates match your search'**
   String get noDelegateSearchResults;
+
+  /// Notifications page title
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notifications;
+
+  /// Message when there are no notifications
+  ///
+  /// In en, this message translates to:
+  /// **'No notifications'**
+  String get noNotifications;
+
+  /// Button to mark all notifications as read
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all as read'**
+  String get markAllRead;
+
+  /// New notification label
+  ///
+  /// In en, this message translates to:
+  /// **'New notification'**
+  String get newNotification;
 }
 
 class _AppLocalizationsDelegate

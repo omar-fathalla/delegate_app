@@ -695,4 +695,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noDelegateSearchResults => 'No delegates match your search';
+
+  @override
+  String get notifications => 'Notifications';
+
+  @override
+  String get noNotifications => 'No notifications';
+
+  @override
+  String get markAllRead => 'Mark all as read';
+
+  @override
+  String get newNotification => 'New notification';
 }

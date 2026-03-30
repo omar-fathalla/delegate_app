@@ -13,6 +13,7 @@ import 'package:delegate_app/features/auth/domain/repositories/auth_repository.d
 import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/delegate_tasks_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_bloc.dart';
+import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
@@ -113,18 +114,46 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ],
                   ),
-                  actions: _allDelegates.length > 1
-                      ? [
-                          IconButton(
-                            icon: const Icon(Icons.swap_horiz_rounded),
-                            tooltip: isArabic
-                                ? 'تبديل المنظمة'
-                                : 'Switch Organization',
-                            onPressed: () =>
-                                _showOrgSwitcher(context, colorScheme),
+                  actions: [
+                    // Notification Bell with Badge
+                    BlocProvider(
+                      create: (_) => di.sl<NotificationBloc>()
+                        ..add(
+                          SubscribeToUnreadCount(
+                            delegateUid: delegate.uid,
+                            organizationId: delegate.organizationUID,
                           ),
-                        ]
-                      : null,
+                        ),
+                      child: BlocBuilder<NotificationBloc, NotificationState>(
+                        builder: (context, state) {
+                          final unreadCount = state is NotificationLoaded
+                              ? state.unreadCount
+                              : 0;
+
+                          return Badge(
+                            label: Text('$unreadCount'),
+                            isLabelVisible: unreadCount > 0,
+                            child: IconButton(
+                              icon: const Icon(Icons.notifications_outlined),
+                              tooltip: l10n.notifications,
+                              onPressed: () {
+                                context.push('/notifications', extra: delegate);
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    // Organization Switcher
+                    if (_allDelegates.length > 1)
+                      IconButton(
+                        icon: const Icon(Icons.swap_horiz_rounded),
+                        tooltip: isArabic
+                            ? 'تبديل المنظمة'
+                            : 'Switch Organization',
+                        onPressed: () => _showOrgSwitcher(context, colorScheme),
+                      ),
+                  ],
                 ),
           body: _buildBody(delegate),
           bottomNavigationBar: NavigationBar(

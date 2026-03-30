@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -92,6 +93,12 @@ class _LoginScreenState extends State<LoginScreen>
                 state.rememberMe,
               );
             } else if (state is AuthAuthenticated) {
+              // Initialize FCM with delegate UID for token storage
+              sl<PushNotificationService>()
+                  .initialize(state.delegate.uid)
+                  .catchError((e) {
+                debugPrint('FCM Init Error: $e');
+              });
               // تأخير بسيط للتأكد من إغلاق أي dialog/bottom sheet أولاً
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;

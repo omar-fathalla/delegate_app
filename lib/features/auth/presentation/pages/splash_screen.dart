@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -52,6 +53,12 @@ class _SplashScreenState extends State<SplashScreen>
         listener: (context, state) {
           if (state is AuthAuthenticated) {
             final delegate = state.delegate;
+            // Initialize FCM with delegate UID for token storage
+            sl<PushNotificationService>()
+                .initialize(delegate.uid)
+                .catchError((e) {
+              debugPrint('FCM Init Error: $e');
+            });
             if (delegate.role == UserRole.superAdmin ||
                 delegate.role == UserRole.admin) {
               context.go('/admin/home', extra: delegate);

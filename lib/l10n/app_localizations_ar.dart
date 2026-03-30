@@ -643,13 +643,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get taskCancelled => 'ملغاة';
 
   @override
-  String get taskDetails => 'Task Details';
+  String get taskDetails => 'تفاصيل المهمة';
 
   @override
-  String get taskSchedule => 'Schedule';
+  String get taskSchedule => 'الجدول الزمني';
 
   @override
-  String get selectDelegate => 'Select Delegate';
+  String get selectDelegate => 'اختر المندوب';
 
   @override
   String get errorFieldRequired => 'هذا الحقل مطلوب';
@@ -693,4 +693,16 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noDelegateSearchResults => 'لا توجد نتائج مطابقة لبحثك';
+
+  @override
+  String get notifications => 'الإشعارات';
+
+  @override
+  String get noNotifications => 'لا توجد إشعارات';
+
+  @override
+  String get markAllRead => 'تعليم الكل كمقروء';
+
+  @override
+  String get newNotification => 'إشعار جديد';
 }

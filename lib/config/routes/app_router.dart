@@ -9,6 +9,7 @@ import 'package:delegate_app/features/settings/presentation/pages/privacy_policy
 import 'package:delegate_app/features/changelog/presentation/pages/changelog_screen.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/task_details_screen.dart';
+import 'package:delegate_app/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:go_router/go_router.dart';
 
 final appRouter = GoRouter(
@@ -55,6 +56,13 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/changelog',
       builder: (context, state) => const ChangelogScreen(),
+    ),
+    GoRoute(
+      path: '/notifications',
+      builder: (context, state) {
+        final delegate = state.extra as Delegate;
+        return NotificationsPage(delegate: delegate);
+      },
     ),
   ],
 );

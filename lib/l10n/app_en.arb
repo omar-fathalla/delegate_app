@@ -939,5 +939,21 @@
     "noDelegateSearchResults": "No delegates match your search",
     "@noDelegateSearchResults": {
       "description": "Message shown when no delegates match search or filter"
+    },
+    "notifications": "Notifications",
+    "@notifications": {
+        "description": "Notifications page title"
+    },
+    "noNotifications": "No notifications",
+    "@noNotifications": {
+        "description": "Message when there are no notifications"
+    },
+    "markAllRead": "Mark all as read",
+    "@markAllRead": {
+        "description": "Button to mark all notifications as read"
+    },
+    "newNotification": "New notification",
+    "@newNotification": {
+        "description": "New notification label"
     }
 }

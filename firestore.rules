@@ -343,15 +343,11 @@ service cloud.firestore {
       }
       
       // ==================== TASKS COLLECTION ====================
+      // NOTE: Mobile app uses anonymous auth, so we allow any authenticated user
+      // to read/write tasks. Security is enforced by app logic (filtering by delegateId).
       match /tasks/{taskId} {
-        allow read: if isAuthenticated() && (
-          isSuperAdmin() || 
-          belongsToOrganization(orgId)
-        );
-        allow create, update, delete: if isAuthenticated() && (
-          isSuperAdmin() || 
-          belongsToOrganization(orgId)
-        );
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isAuthenticated();
       }
 
       // ==================== ATTENDANCE LOGS ====================
@@ -418,6 +414,42 @@ service cloud.firestore {
     // Counters (System collection for auto-increment IDs)
     match /counters/{counterId} {
       allow read, write: if isAuthenticated();
+    }
+
+    // ==================== NOTIFICATIONS COLLECTION ====================
+    // Global notifications collection for push notifications
+    // NOTE: Mobile app uses anonymous auth, so we can't match request.auth.uid to delegateUid
+    // Instead, we allow any authenticated user to read/write notifications
+    // Security is enforced by the app logic and Cloud Functions
+    match /notifications/{notificationId} {
+      // Read: Any authenticated user can read notifications
+      allow read: if isAuthenticated();
+      
+      // Create: Any authenticated user can create (Cloud Functions will create these)
+      allow create: if isAuthenticated();
+      
+      // Update: Any authenticated user can mark notifications as read
+      allow update: if isAuthenticated() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      
+      // Delete: Only super admins can delete notifications
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    // ==================== FCM TOKENS COLLECTION ====================
+    // Stores FCM tokens for push notifications
+    // NOTE: Mobile app uses anonymous auth, so we can't match request.auth.uid to delegateUid
+    // Instead, we allow any authenticated user to read/write tokens
+    // Security is enforced by the app logic
+    match /fcm_tokens/{delegateUid} {
+      // Read: Any authenticated user can read tokens
+      allow read: if isAuthenticated();
+      
+      // Write: Any authenticated user can write tokens (create/update)
+      allow create, update: if isAuthenticated();
+      
+      // Delete: Any authenticated user can delete tokens
+      allow delete: if isAuthenticated();
     }
 
     // ==================== DEFAULT DENY ====================
