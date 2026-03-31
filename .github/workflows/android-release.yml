@@ -91,8 +91,9 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: app-release-${{ github.run_number }}
           path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 7
 
       # 9. الرفع لـ Google Play (Internal Testing) بناءً على خيار التشغيل
       - name: Upload to Google Play
@@ -104,6 +105,14 @@ jobs:
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
           track: internal
           status: completed
+
+      # Clean up old artifacts to free storage
+      - name: Delete old artifacts
+        if: always()
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: app-release-*
+          failOnError: false
 
       # 10. إرسال "ما الجديد؟" تلقائياً للمندوبين عبر Firestore
       - name: Authenticate with Google Cloud
