@@ -21,6 +21,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Delete old artifacts to free up storage quota
+      - name: Delete old artifacts
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: |
+            app-release
+          failOnError: false
+
       # 0. تحديث رقم البناء (Build Number) في pubspec.yaml تلقائياً
       - name: Auto-increment Build Number
         run: |
