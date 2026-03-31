@@ -25,7 +25,7 @@ class NotificationListItem extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       color: notification.isRead
           ? colorScheme.surface
-          : colorScheme.primaryContainer.withOpacity(0.3),
+          : colorScheme.primaryContainer.withValues(alpha: 0.3),
       child: InkWell(
         onTap: () {
           // Mark as read

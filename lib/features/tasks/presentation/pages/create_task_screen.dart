@@ -206,8 +206,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                             label: Text(_getPriorityName(l10n, p)),
                             selected: isSelected,
                             onSelected: (selected) {
-                              if (selected)
+                              if (selected) {
                                 setState(() => _selectedPriority = p);
+                              }
                             },
                             showCheckmark: true,
                             selectedColor: color.withValues(alpha: 0.2),
