@@ -23,11 +23,13 @@ jobs:
 
       # Delete old artifacts to free up storage quota
       - name: Delete old artifacts
-        uses: geekyeggo/delete-artifact@v2
-        with:
-          name: |
-            app-release
-          failOnError: false
+        run: |
+          # Delete artifacts older than 7 days using GitHub CLI
+          gh api repos/${{ github.repository }}/actions/artifacts \
+            --paginate -q '.artifacts[] | select(.name | startswith("app-release")) | "\(.id)"' \
+            | xargs -I {} gh api --method DELETE repos/${{ github.repository }}/actions/artifacts/{} || true
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       # 0. تحديث رقم البناء (Build Number) في pubspec.yaml تلقائياً
       - name: Auto-increment Build Number
@@ -107,12 +109,16 @@ jobs:
           status: completed
 
       # Clean up old artifacts to free storage
-      - name: Delete old artifacts
+      - name: Clean up old artifacts after upload
         if: always()
-        uses: geekyeggo/delete-artifact@v2
-        with:
-          name: app-release-*
-          failOnError: false
+        run: |
+          # Keep only the last 3 artifacts
+          gh api repos/${{ github.repository }}/actions/artifacts \
+            --paginate -q '.artifacts[] | select(.name | startswith("app-release")) | "\(.id) \(.created_at)"' \
+            | sort -k2 -r | tail -n +4 | awk '{print $1}' \
+            | xargs -I {} gh api --method DELETE repos/${{ github.repository }}/actions/artifacts/{} || true
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       # 10. إرسال "ما الجديد؟" تلقائياً للمندوبين عبر Firestore
       - name: Authenticate with Google Cloud
