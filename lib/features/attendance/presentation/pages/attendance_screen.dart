@@ -140,11 +140,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             phoneNumber: widget.delegate.phoneNumber,
           ),
         );
+        // Delay sync request to allow history to load first
         Future.delayed(const Duration(seconds: 2), () {
           if (!bloc.isClosed) {
             bloc.add(const SyncRequested());
           }
-        });
+        }).ignore();
         return bloc;
       },
       child: BlocConsumer<AttendanceBloc, AttendanceState>(

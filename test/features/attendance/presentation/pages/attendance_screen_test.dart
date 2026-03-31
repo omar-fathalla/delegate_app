@@ -181,8 +181,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Pump for the 1 second delay in AttendanceSyncSuccess listener
-    await tester.pump(const Duration(seconds: 1));
+    // Pump for the 2 second delay in BlocProvider create + 1 second in listener
+    await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
 
     // Verify Previous Month Button
