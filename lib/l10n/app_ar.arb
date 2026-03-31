@@ -955,5 +955,13 @@
     "newNotification": "إشعار جديد",
     "@newNotification": {
         "description": "New notification label"
+    },
+    "showPassword": "إظهار كلمة المرور",
+    "@showPassword": {
+        "description": "Tooltip for showing password"
+    },
+    "hidePassword": "إخفاء كلمة المرور",
+    "@hidePassword": {
+        "description": "Tooltip for hiding password"
     }
 }

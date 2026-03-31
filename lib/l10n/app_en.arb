@@ -955,5 +955,13 @@
     "newNotification": "New notification",
     "@newNotification": {
         "description": "New notification label"
+    },
+    "showPassword": "Show password",
+    "@showPassword": {
+        "description": "Tooltip for showing password"
+    },
+    "hidePassword": "Hide password",
+    "@hidePassword": {
+        "description": "Tooltip for hiding password"
     }
 }

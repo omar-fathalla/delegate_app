@@ -705,4 +705,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get newNotification => 'إشعار جديد';
+
+  @override
+  String get showPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
 }
