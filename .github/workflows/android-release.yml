@@ -186,5 +186,6 @@ jobs:
           echo "Changelog published for version ${VERSION}"
 
           # Tag this release for future changelog diffs
-          git tag "v${VERSION}"
-          git push origin "v${VERSION}" || true
+          # Use -f to force update if tag already exists
+          git tag -f "v${VERSION}"
+          git push -f origin "v${VERSION}" || true
