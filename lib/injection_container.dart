@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delegate_app/features/admin/data/datasources/admin_remote_data_source.dart';
 import 'package:delegate_app/features/admin/data/repositories/admin_repository_impl.dart';
 import 'package:delegate_app/features/admin/domain/repositories/admin_repository.dart';
@@ -77,6 +78,8 @@ import 'package:delegate_app/features/notifications/presentation/bloc/notificati
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:delegate_app/features/feedback/feedback_injection.dart';
 import 'package:get_it/get_it.dart';
 
 final sl = GetIt.instance;
@@ -125,7 +128,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
     () => AuthLocalDataSourceImpl(sharedPreferences: sl()),
   );
   sl.registerLazySingleton<AuthRemoteDataSource>(
-    () => AuthRemoteDataSourceImpl(firestore: sl()),
+    () => AuthRemoteDataSourceImpl(firestore: sl(), firebaseAuth: sl()),
   );
 
   // ! Features - Profile
@@ -324,6 +327,9 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
     () => NotificationRemoteDataSourceImpl(firestore: sl()),
   );
 
+  // ! Features - Feedback
+  initFeedbackDependencies();
+
   // ! Core
 
   // ! External
@@ -332,4 +338,6 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // accessed unless Firebase.initializeApp() is actually called.
 
   sl.registerLazySingleton(() => FirebaseFirestore.instance);
+  sl.registerLazySingleton(() => FirebaseAuth.instance);
+  sl.registerLazySingleton(() => FirebaseStorage.instance);
 }

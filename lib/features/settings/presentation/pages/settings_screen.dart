@@ -32,12 +32,6 @@ class SettingsScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildSectionHeader(context, l10n.settings),
-                    ),
-                    const SizedBox(height: 12),
-
                     Container(
                       decoration: BoxDecoration(
                         color: Theme.of(context)
@@ -141,6 +135,41 @@ class SettingsScreen extends StatelessWidget {
                             icon: Icons.auto_awesome_rounded,
                             title: isArabic ? 'ما الجديد؟' : "What's New?",
                             onTap: () => context.push('/changelog'),
+                          ),
+                          Divider(
+                            height: 1,
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                            indent: 64,
+                          ),
+                          _buildSettingsTile(
+                            context: context,
+                            icon: Icons.feedback_outlined,
+                            title: isArabic ? 'إرسال مقترح' : 'Submit Feedback',
+                            onTap: () => context.push(
+                              '/submit-feedback',
+                              extra: delegate,
+                            ),
+                          ),
+                          Divider(
+                            height: 1,
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                            indent: 64,
+                          ),
+                          _buildSettingsTile(
+                            context: context,
+                            icon: Icons.history_rounded,
+                            title: delegate.role == UserRole.superAdmin
+                                ? (isArabic
+                                      ? 'إدارة المقترحات'
+                                      : 'Manage Feedbacks')
+                                : (isArabic ? 'مقترحاتي' : 'My Feedbacks'),
+                            onTap: () {
+                              if (delegate.role == UserRole.superAdmin) {
+                                context.push('/admin/feedbacks');
+                              } else {
+                                context.push('/my-feedbacks', extra: delegate);
+                              }
+                            },
                           ),
                           Divider(
                             height: 1,
@@ -391,11 +420,11 @@ class SettingsScreen extends StatelessWidget {
             ),
             onPressed: () {
               // Clear FCM token before logout
-              sl<PushNotificationService>()
-                  .clearToken(delegate.uid)
-                  .catchError((e) {
-                debugPrint('FCM clear token error: $e');
-              });
+              sl<PushNotificationService>().clearToken(delegate.uid).catchError(
+                (e) {
+                  debugPrint('FCM clear token error: $e');
+                },
+              );
               Navigator.pop(dialogContext);
               context.go('/login');
             },

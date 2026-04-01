@@ -11,4 +11,8 @@ abstract class AuthRepository {
   Future<Either<Failure, void>> cacheAllDelegates(List<Delegate> delegates);
   Future<Either<Failure, List<Delegate>>> getCachedAllDelegates();
   Future<Either<Failure, void>> clearCache();
+  Future<Either<Failure, bool>> verifyAdminPassword(
+    String email,
+    String password,
+  );
 }

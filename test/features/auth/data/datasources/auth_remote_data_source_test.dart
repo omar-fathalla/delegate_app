@@ -1,15 +1,21 @@
 import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   late AuthRemoteDataSourceImpl dataSource;
   late FakeFirebaseFirestore fakeFirestore;
+  late MockFirebaseAuth mockFirebaseAuth;
 
   setUp(() {
     fakeFirestore = FakeFirebaseFirestore();
-    dataSource = AuthRemoteDataSourceImpl(firestore: fakeFirestore);
+    mockFirebaseAuth = MockFirebaseAuth();
+    dataSource = AuthRemoteDataSourceImpl(
+      firestore: fakeFirestore,
+      firebaseAuth: mockFirebaseAuth,
+    );
   });
 
   group('getDelegatesByPhone', () {

@@ -748,7 +748,7 @@
     "@cancel": {
         "description": "Cancel button text"
     },
-    "companyDelegates": "مناديب الشركة",
+    "companyDelegates": "المناديب",
     "@companyDelegates": {
         "description": "Company delegates screen title"
     },

@@ -740,7 +740,7 @@
     "@cancel": {
         "description": "Cancel button text"
     },
-    "companyDelegates": "Company Delegates",
+    "companyDelegates": "Delegates",
     "@companyDelegates": {
         "description": "Company delegates screen title"
     },

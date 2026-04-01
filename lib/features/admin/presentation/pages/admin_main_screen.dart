@@ -10,6 +10,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:go_router/go_router.dart';
 
 class AdminMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -25,37 +26,36 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
 
   void _onMenuSelected(String value) {
     switch (value) {
-      case 'settings':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => SettingsScreen(delegate: widget.delegate),
-          ),
-        );
-        break;
       case 'manage_admins':
         Navigator.of(
           context,
         ).push(MaterialPageRoute(builder: (_) => const ManageAdminsScreen()));
         break;
+      case 'manage_feedbacks':
+        context.push('/admin/feedbacks');
+        break;
     }
   }
+
+  bool get isSuperAdmin => widget.delegate.role == UserRole.superAdmin;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
-    final isSuperAdmin = delegate.role == UserRole.superAdmin;
 
     final screens = isSuperAdmin
         ? [
             const AdminBranchesScreen(),
             const AddBranchScreen(),
             const CreateAdminScreen(),
+            SettingsScreen(delegate: delegate),
           ]
         : [
             AdminHomeScreen(adminDelegate: delegate),
             AdminDelegatesScreen(adminDelegate: delegate),
             AdminTasksScreen(adminDelegate: delegate),
+            SettingsScreen(delegate: delegate),
           ];
 
     final subtitle = isSuperAdmin
@@ -63,18 +63,22 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ? l10n.helloUser(delegate.firstName)
               : _currentIndex == 1
               ? l10n.addBranch
-              : l10n.createAdmin)
+              : _currentIndex == 2
+              ? l10n.createAdmin
+              : l10n.settings)
         : (_currentIndex == 0
               ? l10n.helloUser(delegate.firstName)
               : _currentIndex == 1
               ? l10n.companyDelegates
-              : l10n.tasks);
+              : _currentIndex == 2
+              ? l10n.tasks
+              : l10n.settings);
 
     return Scaffold(
       appBar: AdminHeader(
         subtitle: subtitle,
         menuItems: [
-          if (isSuperAdmin)
+          if (isSuperAdmin) ...[
             PopupMenuItem(
               value: 'manage_admins',
               child: ListTile(
@@ -84,15 +88,16 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
             ),
-          PopupMenuItem(
-            value: 'settings',
-            child: ListTile(
-              leading: const Icon(Icons.settings_rounded),
-              title: Text(l10n.settings),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
+            PopupMenuItem(
+              value: 'manage_feedbacks',
+              child: ListTile(
+                leading: const Icon(Icons.feedback_outlined),
+                title: const Text('إدارة المقترحات'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
-          ),
+          ],
         ],
         onMenuSelected: _onMenuSelected,
       ),
@@ -118,6 +123,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   icon: const Icon(Icons.admin_panel_settings_rounded),
                   label: l10n.createAdmin,
                 ),
+                NavigationDestination(
+                  icon: const Icon(Icons.settings_outlined),
+                  selectedIcon: const Icon(Icons.settings_rounded),
+                  label: l10n.settings,
+                ),
               ],
             )
           : NavigationBar(
@@ -142,6 +152,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   icon: const Icon(Icons.task_alt_outlined),
                   selectedIcon: const Icon(Icons.task_alt_rounded),
                   label: l10n.tasks,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.settings_outlined),
+                  selectedIcon: const Icon(Icons.settings_rounded),
+                  label: l10n.settings,
                 ),
               ],
             ),

@@ -10,6 +10,13 @@ import 'package:delegate_app/features/changelog/presentation/pages/changelog_scr
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/task_details_screen.dart';
 import 'package:delegate_app/features/notifications/presentation/pages/notifications_page.dart';
+import 'package:delegate_app/features/feedback/presentation/pages/submit_feedback_screen.dart';
+import 'package:delegate_app/features/feedback/presentation/pages/my_feedbacks_screen.dart';
+import 'package:delegate_app/features/feedback/presentation/pages/admin_feedbacks_screen.dart';
+import 'package:delegate_app/features/feedback/presentation/bloc/feedback_bloc.dart';
+import 'package:delegate_app/features/feedback/presentation/bloc/admin_feedback_bloc.dart';
+import 'package:delegate_app/injection_container.dart' as di;
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 final appRouter = GoRouter(
@@ -62,6 +69,35 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final delegate = state.extra as Delegate;
         return NotificationsPage(delegate: delegate);
+      },
+    ),
+    GoRoute(
+      path: '/submit-feedback',
+      builder: (context, state) {
+        final delegate = state.extra as Delegate;
+        return BlocProvider(
+          create: (_) => di.sl<FeedbackBloc>(),
+          child: SubmitFeedbackScreen(delegate: delegate),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/my-feedbacks',
+      builder: (context, state) {
+        final delegate = state.extra as Delegate;
+        return BlocProvider(
+          create: (_) => di.sl<FeedbackBloc>(),
+          child: MyFeedbacksScreen(delegate: delegate),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/admin/feedbacks',
+      builder: (context, state) {
+        return BlocProvider(
+          create: (_) => di.sl<AdminFeedbackBloc>(),
+          child: const AdminFeedbacksScreen(),
+        );
       },
     ),
   ],

@@ -127,6 +127,10 @@ class _ChangelogViewState extends State<_ChangelogView> {
     final title = isArabic ? update.title : update.titleEn;
     final description = isArabic ? update.description : update.descriptionEn;
     final isExpanded = _expandedIndex == index;
+    final formattedDate = DateFormat(
+      'dd MMM yyyy',
+      isArabic ? 'ar' : 'en',
+    ).format(update.createdAt);
 
     return InkWell(
       onTap: () {
@@ -183,14 +187,18 @@ class _ChangelogViewState extends State<_ChangelogView> {
               ],
             ),
             const SizedBox(height: 10),
+            // العنوان - يظهر دائماً
             Text(
-              title,
+              isExpanded
+                  ? title
+                  : '${isArabic ? 'إصدارات التحديث' : 'Update Releases'} - $formattedDate',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: colorScheme.onSurface,
               ),
             ),
+            // المحتوى - يظهر فقط عند التوسيع
             AnimatedCrossFade(
               firstChild: const SizedBox(width: double.infinity),
               secondChild: Column(
@@ -208,10 +216,7 @@ class _ChangelogViewState extends State<_ChangelogView> {
                   ..._buildHighlights(context, update),
                   const SizedBox(height: 12),
                   Text(
-                    DateFormat(
-                      'dd MMM yyyy',
-                      isArabic ? 'ar' : 'en',
-                    ).format(update.createdAt),
+                    formattedDate,
                     style: TextStyle(
                       fontSize: 11,
                       color: colorScheme.onSurfaceVariant.withValues(

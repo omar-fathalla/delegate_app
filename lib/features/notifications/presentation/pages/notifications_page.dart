@@ -116,6 +116,7 @@ class NotificationsPage extends StatelessWidget {
                     return NotificationListItem(
                       notification: notification,
                       delegate: delegate,
+                      isFirst: index == 0, // فقط الأول يكون مفتوح
                     );
                   },
                 ),

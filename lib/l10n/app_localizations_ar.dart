@@ -544,7 +544,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cancel => 'إلغاء';
 
   @override
-  String get companyDelegates => 'مناديب الشركة';
+  String get companyDelegates => 'المناديب';
 
   @override
   String get viewAttendance => 'عرض الحضور';

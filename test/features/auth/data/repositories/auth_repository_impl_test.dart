@@ -30,6 +30,16 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       return signInAnonymouslyStub!();
     }
   }
+
+  Future<bool> Function(String, String)? verifyAdminPasswordStub;
+
+  @override
+  Future<bool> verifyAdminPassword(String email, String password) async {
+    if (verifyAdminPasswordStub != null) {
+      return verifyAdminPasswordStub!(email, password);
+    }
+    return false;
+  }
 }
 
 class MockAuthLocalDataSource implements AuthLocalDataSource {

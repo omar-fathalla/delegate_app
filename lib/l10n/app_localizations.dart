@@ -1097,7 +1097,7 @@ abstract class AppLocalizations {
   /// Company delegates screen title
   ///
   /// In en, this message translates to:
-  /// **'Company Delegates'**
+  /// **'Delegates'**
   String get companyDelegates;
 
   /// View attendance button

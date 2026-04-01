@@ -12,12 +12,19 @@ abstract class AuthRemoteDataSource {
 
   /// Signs in the user anonymously to satisfy Firestore rules.
   Future<void> signInAnonymously();
+
+  /// Verifies admin password using Firebase Authentication
+  Future<bool> verifyAdminPassword(String email, String password);
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseFirestore firestore;
+  final FirebaseAuth firebaseAuth;
 
-  AuthRemoteDataSourceImpl({required this.firestore});
+  AuthRemoteDataSourceImpl({
+    required this.firestore,
+    required this.firebaseAuth,
+  });
 
   /// Normalises a phone number by stripping common Egyptian prefixes
   /// (`+2`, `+20`, `002`, `0020`) so queries match the bare format
@@ -82,6 +89,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       // ──────────────────────────────────────────────────────────────
 
+      // Sign in anonymously first to query Firestore
+      // (will be replaced by admin auth if admin is found)
+      await signInAnonymously();
+
       final querySnapshot = await firestore
           .collectionGroup('delegates')
           .where('phoneNumber', isEqualTo: normalizedPhone)
@@ -109,11 +120,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           if (userRole == 'company-admin' ||
               userRole == 'organization-admin' ||
               userRole == 'Supervisor') {
-            // Get admin email to use for Firebase Auth verification
+            // Get admin email from Firestore
             final adminEmail = userData['email'] as String? ?? '';
 
-            // Use a special marker in nationalityID to indicate Firebase Auth login
-            // The actual password verification will happen via Firebase Auth in the login usecase
+            // Admin login: mark with special flag for Firebase Auth verification
             delegates.add(
               DelegateModel(
                 uid: userDoc.id,
@@ -121,7 +131,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 middleName: '',
                 lastName: '',
                 fullName: userData['displayName'] ?? 'Admin',
-                nationalityID: '__firebase_auth__:$adminEmail',
+                nationalityID:
+                    '__firebase_auth__:$adminEmail', // Mark for Firebase Auth verification
                 motherName: '',
                 city: '',
                 phoneNumber: normalizedPhone,
@@ -170,6 +181,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await FirebaseAuth.instance.signInAnonymously();
     } catch (_) {
       throw const ServerFailure('فشل في تهيئة جلسة المستخدم.');
+    }
+  }
+
+  @override
+  Future<bool> verifyAdminPassword(String email, String password) async {
+    try {
+      // Try to sign in with email and password
+      final credential = await firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // DON'T sign out - keep the user authenticated for Firestore access
+      // The user needs to stay signed in to access Firestore data
+
+      return credential.user != null;
+    } on FirebaseAuthException catch (_) {
+      return false;
+    } catch (_) {
+      return false;
     }
   }
 }

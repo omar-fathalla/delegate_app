@@ -10,6 +10,8 @@ class MockAuthRepository implements AuthRepository {
   getDelegatesByPhoneStub;
   Future<Either<Failure, void>> Function(Delegate)? cacheDelegateStub;
   Future<Either<Failure, void>> Function(List<Delegate>)? cacheAllDelegatesStub;
+  Future<Either<Failure, bool>> Function(String, String)?
+  verifyAdminPasswordStub;
 
   int getDelegatesByPhoneCallCount = 0;
   int cacheDelegateCallCount = 0;
@@ -65,6 +67,17 @@ class MockAuthRepository implements AuthRepository {
   @override
   Future<Either<Failure, List<Delegate>>> getCachedAllDelegates() async {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<Either<Failure, bool>> verifyAdminPassword(
+    String email,
+    String password,
+  ) async {
+    if (verifyAdminPasswordStub != null) {
+      return verifyAdminPasswordStub!(email, password);
+    }
+    return const Right(false);
   }
 }
 

@@ -20,10 +20,7 @@ class AuthRepositoryImpl implements AuthRepository {
     String phoneNumber,
   ) async {
     try {
-      // 1. Sign in anonymously FIRST to satisfy Firestore rules (request.auth != null)
-      await remoteDataSource.signInAnonymously();
-
-      // 2. Now fetch the delegate data
+      // Fetch the delegate data (will handle authentication internally)
       final delegates = await remoteDataSource.getDelegatesByPhone(phoneNumber);
       if (delegates.isEmpty) {
         return const Left(AuthFailure('رقم الهاتف غير مسجل'));
@@ -116,6 +113,24 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(failure);
     } catch (e) {
       return Left(CacheFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> verifyAdminPassword(
+    String email,
+    String password,
+  ) async {
+    try {
+      final isValid = await remoteDataSource.verifyAdminPassword(
+        email,
+        password,
+      );
+      return Right(isValid);
+    } on Failure catch (failure) {
+      return Left(failure);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
     }
   }
 }

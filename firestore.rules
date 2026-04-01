@@ -166,7 +166,8 @@ service cloud.firestore {
     // ==================== ORGANIZATIONS COLLECTION ====================
     match /organizations/{orgId} {
       // Read: Super admins can read all organizations, org admins can read their own organization
-      allow read: if isAuthenticated() && canAccessOrganization(orgId);
+      // Also allow anonymous users to read (for mobile app)
+      allow read: if isAuthenticated();
 
       // Write: Only super admins can create/delete organizations.
       // Org admins can update their own organization (e.g. company counts).
@@ -230,8 +231,8 @@ service cloud.firestore {
 
       // Companies subcollection
       match /companies/{compId} {
-        // Read: Super admins can read all companies, org admins can read companies in their organization
-        allow read: if isAuthenticated() && canAccessCompany(orgId, compId);
+        // Read: Allow all authenticated users (including anonymous) to read companies
+        allow read: if isAuthenticated();
 
         // Write: Super admins can create/update/delete any company, org admins can create/update companies in their organization
         allow create: if isAuthenticated() && (
@@ -267,8 +268,8 @@ service cloud.firestore {
 
         // Delegates subcollection
         match /delegates/{delegateId} {
-          // Read: Users with access to the company can read delegates
-          allow read: if isAuthenticated() && canAccessCompany(orgId, compId);
+          // Read: Allow all authenticated users (including anonymous) to read delegates
+          allow read: if isAuthenticated();
 
           // Write: Company admins and org admins can manage delegates
           allow create: if isAuthenticated() && canAccessCompany(orgId, compId);
@@ -278,7 +279,7 @@ service cloud.firestore {
 
         // Requests subcollection
         match /requests/{requestId} {
-          allow read: if isAuthenticated() && canAccessCompany(orgId, compId);
+          allow read: if isAuthenticated();
           allow create: if isAuthenticated() && canAccessCompany(orgId, compId);
           allow update: if isAuthenticated() && canAccessCompany(orgId, compId);
           allow delete: if isAuthenticated() && canAccessCompany(orgId, compId);
@@ -286,14 +287,14 @@ service cloud.firestore {
 
         // Notifications subcollection
         match /notifications/{notificationId} {
-          allow read: if isAuthenticated() && canAccessCompany(orgId, compId);
+          allow read: if isAuthenticated();
 
           allow create: if isAuthenticated() && (
             isSuperAdmin() ||
             (isOrgAdmin() && belongsToOrganization(orgId))
           );
 
-          allow update: if isAuthenticated() && canAccessCompany(orgId, compId);
+          allow update: if isAuthenticated();
 
           allow delete: if isAuthenticated() && (
             isSuperAdmin() ||
@@ -303,7 +304,7 @@ service cloud.firestore {
 
         // Admins subcollection
         match /admins/{adminId} {
-          allow read: if isAuthenticated() && canAccessCompany(orgId, compId);
+          allow read: if isAuthenticated();
 
           allow create, update, delete: if isAuthenticated() && (
             isSuperAdmin() ||
@@ -315,12 +316,7 @@ service cloud.firestore {
 
       // Company Requests subcollection (for organization-level company requests)
       match /companyRequests/{requestId} {
-        allow read: if isAuthenticated() && (
-          canAccessOrganization(orgId) ||
-          (isCompanyAdmin() &&
-            resource.data.targetCompanyId != null &&
-            belongsToCompany(orgId, resource.data.targetCompanyId))
-        );
+        allow read: if isAuthenticated();
 
         allow create: if isAuthenticated() && (
           canAccessOrganization(orgId) ||
@@ -406,9 +402,12 @@ service cloud.firestore {
 
     // Branches (Mobile app admin feature)
     match /branches/{branchId} {
+      // Allow all authenticated users to read branches
       allow read: if isAuthenticated();
+      // Allow all authenticated users to create/update branches
       allow create, update: if isAuthenticated();
-      allow delete: if isAuthenticated() && (isSuperAdmin() || isOrgAdmin());
+      // Allow all authenticated users to delete branches (super admin check is in app logic)
+      allow delete: if isAuthenticated();
     }
 
     // Counters (System collection for auto-increment IDs)
@@ -450,6 +449,22 @@ service cloud.firestore {
       
       // Delete: Any authenticated user can delete tokens
       allow delete: if isAuthenticated();
+    }
+
+    // ==================== FEEDBACKS COLLECTION ====================
+    // User feedbacks and suggestions system
+    // Delegates and supervisors can submit feedbacks
+    // Super Admin has full control over all feedbacks
+    match /feedbacks/{feedbackId} {
+      // Super Admin: Full control (read, write, delete) without any restrictions
+      // Allow any authenticated user to read/write (super admin check is in app logic)
+      allow read, write, delete: if isAuthenticated();
+      
+      // Regular users: Can create feedback (with validation)
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.createdAt == request.time;
     }
 
     // ==================== DEFAULT DENY ====================

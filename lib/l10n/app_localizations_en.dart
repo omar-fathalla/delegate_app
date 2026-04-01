@@ -546,7 +546,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cancel => 'Cancel';
 
   @override
-  String get companyDelegates => 'Company Delegates';
+  String get companyDelegates => 'Delegates';
 
   @override
   String get viewAttendance => 'View Attendance';

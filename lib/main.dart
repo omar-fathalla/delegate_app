@@ -103,8 +103,8 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => di.sl<ThemeCubit>(),
+    return MultiBlocProvider(
+      providers: [BlocProvider(create: (_) => di.sl<ThemeCubit>())],
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, themeState) {
           return MaterialApp.router(
