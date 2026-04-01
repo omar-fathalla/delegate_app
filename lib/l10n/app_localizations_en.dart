@@ -39,6 +39,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get motherName => 'Mother\'s Name';
 
   @override
+  String get showPassword => 'Show password';
+
+  @override
+  String get hidePassword => 'Hide password';
+
+  @override
   String get enterMobileNumber => 'Please enter mobile number';
 
   @override

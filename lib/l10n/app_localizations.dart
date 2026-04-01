@@ -158,6 +158,18 @@ abstract class AppLocalizations {
   /// **'Mother\'s Name'**
   String get motherName;
 
+  /// Tooltip for show password toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// Tooltip for hide password toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
+
   /// Mobile validation error
   ///
   /// In en, this message translates to:

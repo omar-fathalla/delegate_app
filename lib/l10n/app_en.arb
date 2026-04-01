@@ -40,6 +40,14 @@
     "@motherName": {
         "description": "Mother name field label"
     },
+    "showPassword": "Show password",
+    "@showPassword": {
+        "description": "Tooltip for show password toggle"
+    },
+    "hidePassword": "Hide password",
+    "@hidePassword": {
+        "description": "Tooltip for hide password toggle"
+    },
     "enterMobileNumber": "Please enter mobile number",
     "@enterMobileNumber": {
         "description": "Mobile validation error"

@@ -39,6 +39,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get motherName => 'اسم الأم';
 
   @override
+  String get showPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
+
+  @override
   String get enterMobileNumber => 'يرجى إدخال رقم الموبايل';
 
   @override
