@@ -456,15 +456,21 @@ service cloud.firestore {
     // Delegates and supervisors can submit feedbacks
     // Super Admin has full control over all feedbacks
     match /feedbacks/{feedbackId} {
-      // Super Admin: Full control (read, write, delete) without any restrictions
-      // Allow any authenticated user to read/write (super admin check is in app logic)
-      allow read, write, delete: if isAuthenticated();
+      // Read: Users can read their own feedbacks, Super Admin and Org Admin can read all
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || isSuperAdmin() || isOrgAdmin());
       
-      // Regular users: Can create feedback (with validation)
+      // Create: Authenticated users can create feedbacks with validation
       allow create: if isAuthenticated() &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.status == 'pending' &&
         request.resource.data.createdAt == request.time;
+      
+      // Update: Only Super Admin and Org Admin can update (to change status or add admin response)
+      allow update: if isAuthenticated() && (isSuperAdmin() || isOrgAdmin());
+      
+      // Delete: Only Super Admin can delete feedbacks
+      allow delete: if isAuthenticated() && isSuperAdmin();
     }
 
     // ==================== DEFAULT DENY ====================

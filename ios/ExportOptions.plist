@@ -3,18 +3,21 @@
 <plist version="1.0">
 <dict>
 	<key>method</key>
-	<string>ad-hoc</string>
+	<string>app-store</string>
 	<key>teamID</key>
 	<string>TX5G7GZL6T</string>
-	<key>signingStyle</key>
-	<string>automatic</string>
-	<key>stripSwiftSymbols</key>
+	<key>uploadBitcode</key>
+	<false/>
+	<key>uploadSymbols</key>
 	<true/>
 	<key>compileBitcode</key>
 	<false/>
-	<key>destination</key>
-	<string>export</string>
-	<key>thinning</key>
-	<string>&lt;none&gt;</string>
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>io.flutter.delegate_app</key>
+		<string>Tasheel Delegate App Store</string>
+	</dict>
 </dict>
 </plist>

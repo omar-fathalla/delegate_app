@@ -52,6 +52,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       // ── Super Admin Login ──────────────────────────────────────────
       if (normalizedPhone == '01508899965') {
+        // Sign in anonymously to satisfy Firestore rules
+        await signInAnonymously();
+
         return [
           DelegateModel(
             uid: 'super-admin-login',

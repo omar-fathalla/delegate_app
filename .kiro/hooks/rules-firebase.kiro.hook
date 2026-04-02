@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "rules firebase ",
+  "description": "مش عاوز امسح في ال ملف rules المتواجد في firebase اقوم فقط بالاضافه",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "مش عاوز امسح في ال ملف rules المتواجد في firebase اقوم فقط بالاضافه"
+  }
+}
