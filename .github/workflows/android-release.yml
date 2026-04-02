@@ -1,6 +1,12 @@
-name: Build Signed AAB
+name: Google Play
 
 on:
+  push:
+    branches:
+      - main
+      - release/*
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       upload_to_play_store:

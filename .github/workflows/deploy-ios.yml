@@ -1,4 +1,4 @@
-name: Deploy iOS to App Store
+name: App Store
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
     inputs:
       upload_to_app_store:
         description: 'Upload directly to App Store (TestFlight)?'
-        required: true
+        required: false
         type: boolean
         default: false
 
@@ -26,7 +26,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.1'
+          flutter-version: '3.41.2'
           channel: 'stable'
           cache: true
 
