@@ -13,7 +13,7 @@ on:
         description: 'Upload directly to App Store (TestFlight)?'
         required: true
         type: boolean
-        default: true
+        default: false
 
 jobs:
   deploy-ios:
