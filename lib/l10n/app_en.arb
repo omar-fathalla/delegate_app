@@ -33,6 +33,8 @@
         "description": "Mobile number field label"
     },
     "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "@password": {
         "description": "Password field label"
     },

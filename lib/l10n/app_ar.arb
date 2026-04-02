@@ -41,6 +41,8 @@
         "description": "Mobile number field label"
     },
     "password": "كلمة المرور",
+    "showPassword": "إظهار كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور",
     "@password": {
         "description": "Password field label"
     },
