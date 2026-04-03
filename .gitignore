@@ -52,6 +52,11 @@ package-lock.json
 # Local env files
 .env*
 
-# Keystore files
+# Keystore and credentials files
 android/key.properties
+key.properties
 android/app/upload-keystore.jks
+*.jks
+*.p12
+*.p8
+*.mobileprovision

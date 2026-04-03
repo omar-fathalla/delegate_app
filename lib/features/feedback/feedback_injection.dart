@@ -5,6 +5,7 @@ import 'package:delegate_app/features/feedback/domain/usecases/get_user_feedback
 import 'package:delegate_app/features/feedback/domain/usecases/submit_feedback_usecase.dart';
 import 'package:delegate_app/features/feedback/domain/usecases/get_all_feedbacks_usecase.dart';
 import 'package:delegate_app/features/feedback/domain/usecases/update_feedback_status_usecase.dart';
+import 'package:delegate_app/features/feedback/domain/usecases/delete_feedback_usecase.dart';
 import 'package:delegate_app/features/feedback/presentation/bloc/feedback_bloc.dart';
 import 'package:delegate_app/features/feedback/presentation/bloc/admin_feedback_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -24,6 +25,7 @@ void initFeedbackDependencies() {
     () => AdminFeedbackBloc(
       getAllFeedbacksUseCase: sl(),
       updateFeedbackStatusUseCase: sl(),
+      deleteFeedbackUseCase: sl(),
     ),
   );
 
@@ -32,6 +34,7 @@ void initFeedbackDependencies() {
   sl.registerLazySingleton(() => GetUserFeedbacksUseCase(sl()));
   sl.registerLazySingleton(() => GetAllFeedbacksUseCase(sl()));
   sl.registerLazySingleton(() => UpdateFeedbackStatusUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteFeedbackUseCase(sl()));
 
   // Repository
   sl.registerLazySingleton<FeedbackRepository>(

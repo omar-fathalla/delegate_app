@@ -14,6 +14,7 @@ abstract class FeedbackRemoteDataSource {
     required FeedbackStatus status,
     String? adminResponse,
   });
+  Future<void> deleteFeedback(String feedbackId);
 }
 
 class FeedbackRemoteDataSourceImpl implements FeedbackRemoteDataSource {
@@ -98,5 +99,10 @@ class FeedbackRemoteDataSourceImpl implements FeedbackRemoteDataSource {
     }
 
     await firestore.collection('feedbacks').doc(feedbackId).update(updateData);
+  }
+
+  @override
+  Future<void> deleteFeedback(String feedbackId) async {
+    await firestore.collection('feedbacks').doc(feedbackId).delete();
   }
 }

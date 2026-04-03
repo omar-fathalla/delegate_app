@@ -28,3 +28,13 @@ class UpdateFeedbackStatusEvent extends AdminFeedbackEvent {
   @override
   List<Object?> get props => [feedbackId, status, adminResponse];
 }
+
+/// حدث لحذف مقترح
+class DeleteFeedbackEvent extends AdminFeedbackEvent {
+  final String feedbackId;
+
+  const DeleteFeedbackEvent(this.feedbackId);
+
+  @override
+  List<Object?> get props => [feedbackId];
+}

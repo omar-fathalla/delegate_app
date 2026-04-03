@@ -88,4 +88,14 @@ class FeedbackRepositoryImpl implements FeedbackRepository {
       return Left(ServerFailure('فشل تحديث المقترح: ${e.toString()}'));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> deleteFeedback(String feedbackId) async {
+    try {
+      await remoteDataSource.deleteFeedback(feedbackId);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure('فشل حذف المقترح: ${e.toString()}'));
+    }
+  }
 }

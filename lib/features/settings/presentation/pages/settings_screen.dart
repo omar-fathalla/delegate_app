@@ -329,12 +329,13 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
             ),
-            if (trailing != null) trailing,
-            if (trailing == null && !hideTrailingIcon)
-              Icon(
-                Icons.chevron_right_rounded,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+            trailing ??
+                (!hideTrailingIcon
+                    ? Icon(
+                        Icons.chevron_right_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      )
+                    : const SizedBox.shrink()),
           ],
         ),
       ),

@@ -311,12 +311,10 @@ class _AdminFeedbacksView extends StatelessWidget {
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
             onPressed: () {
-              // TODO: Implement delete functionality
-              // For now, just close the dialog
+              context.read<AdminFeedbackBloc>().add(
+                    DeleteFeedbackEvent(feedback.id ?? ''),
+                  );
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('حذف المقترح قيد التطوير')),
-              );
             },
             child: const Text('حذف'),
           ),

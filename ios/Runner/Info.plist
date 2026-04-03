@@ -29,7 +29,11 @@
 		<key>NSCameraUsageDescription</key>
 		<string>We need access to your camera to take a selfie for attendance check-in.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>We need access to your location to verify your attendance check-in at the correct branch.</string>
+		<string>We need access to your location to verify delegate locations and accurately record attendance check-ins and check-outs.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>We need access to your location even in the background to track delegate routes and update task statuses in real-time.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>We need access to your location to ensure all app features work correctly while performing your tasks.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
 		<string>We need permission to save the generated QR code to your photo library.</string>
 		<key>NSPhotoLibraryUsageDescription</key>

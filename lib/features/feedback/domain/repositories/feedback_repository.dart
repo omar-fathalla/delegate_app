@@ -29,4 +29,7 @@ abstract class FeedbackRepository {
     required FeedbackStatus status,
     String? adminResponse,
   });
+
+  /// حذف مقترح (للـ Super Admin فقط)
+  Future<Either<Failure, void>> deleteFeedback(String feedbackId);
 }
