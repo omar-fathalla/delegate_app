@@ -60,3 +60,8 @@ android/app/upload-keystore.jks
 *.p12
 *.p8
 *.mobileprovision
+
+# iOS Certificates (sensitive - never commit)
+*.p12
+Certificates.p12
+Certificates_modern.p12

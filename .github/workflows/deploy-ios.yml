@@ -59,10 +59,28 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
           
-          # Import certificate
-          echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
-          security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          # Decode certificate - strip whitespace/newlines for macOS base64 compatibility
+          echo "$CERTIFICATE_BASE64" | tr -d '\n\r ' | base64 --decode > certificate.p12
+          
+          # Verify the decoded file is a valid P12
+          if ! file certificate.p12 | grep -q "data"; then
+            echo "❌ ERROR: certificate.p12 is not a valid binary file"
+            file certificate.p12
+            exit 1
+          fi
+          
+          # Import certificate with -A flag (allow all apps) for CI environments
+          security import certificate.p12 \
+            -k build.keychain \
+            -P "$P12_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security \
+            -A
+          
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          
+          # Verify import succeeded
+          security find-identity -v -p codesigning build.keychain
 
       - name: 📱 Import provisioning profile
         env:
