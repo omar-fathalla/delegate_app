@@ -76,6 +76,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: l10n.retry,
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadTasks,
           ),
