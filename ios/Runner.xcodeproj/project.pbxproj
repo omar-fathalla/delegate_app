@@ -502,6 +502,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.tashil.delegate;
 				PROVISIONING_PROFILE_SPECIFIER = Tashil_Delegates;
+				DEVELOPMENT_TEAM = TX5G7GZL6T;
+				PROVISIONING_PROFILE = "6be83d36-3d5c-40c2-afe3-6fb10c29699a";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -687,6 +689,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.tashil.delegate;
 				PROVISIONING_PROFILE_SPECIFIER = Tashil_Delegates;
+				DEVELOPMENT_TEAM = TX5G7GZL6T;
+				PROVISIONING_PROFILE = "6be83d36-3d5c-40c2-afe3-6fb10c29699a";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -712,6 +716,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.tashil.delegate;
 				PROVISIONING_PROFILE_SPECIFIER = Tashil_Delegates;
+				DEVELOPMENT_TEAM = TX5G7GZL6T;
+				PROVISIONING_PROFILE = "6be83d36-3d5c-40c2-afe3-6fb10c29699a";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
