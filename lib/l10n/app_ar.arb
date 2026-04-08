@@ -56,6 +56,14 @@
     "@enterPassword": {
         "description": "Password validation error"
     },
+    "showPassword": "إظهار كلمة المرور",
+    "@showPassword": {
+        "description": "Tooltip to show password"
+    },
+    "hidePassword": "إخفاء كلمة المرور",
+    "@hidePassword": {
+        "description": "Tooltip to hide password"
+    },
     "rememberMe": "تذكرني",
     "@rememberMe": {
         "description": "Remember me checkbox label"
