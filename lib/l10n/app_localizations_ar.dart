@@ -45,6 +45,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get enterPassword => 'يرجى إدخال كلمة المرور';
 
   @override
+  String get showPassword => 'عرض كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
+
+  @override
   String get rememberMe => 'تذكرني';
 
   @override

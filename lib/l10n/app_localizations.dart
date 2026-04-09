@@ -170,6 +170,18 @@ abstract class AppLocalizations {
   /// **'Please enter password'**
   String get enterPassword;
 
+  /// Tooltip for show password button
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// Tooltip for hide password button
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
+
   /// Remember me checkbox label
   ///
   /// In en, this message translates to:
