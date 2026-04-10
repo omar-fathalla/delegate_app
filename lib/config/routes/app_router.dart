@@ -3,7 +3,6 @@ import 'package:delegate_app/features/auth/presentation/pages/splash_screen.dart
 import 'package:delegate_app/features/home/presentation/pages/main_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_main_screen.dart';
-import 'package:delegate_app/features/marketing/presentation/pages/marketing_main_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/branch_details_screen.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
@@ -37,13 +36,6 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final delegate = state.extra as Delegate;
         return AdminMainScreen(delegate: delegate);
-      },
-    ),
-    GoRoute(
-      path: '/marketing/home',
-      builder: (context, state) {
-        final delegate = state.extra as Delegate;
-        return MarketingMainScreen(delegate: delegate);
       },
     ),
     GoRoute(

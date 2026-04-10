@@ -7,29 +7,17 @@ abstract class CreateAdminEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadOrganizations extends CreateAdminEvent {}
-
 class CreateAdminSubmitted extends CreateAdminEvent {
   final String phoneNumber;
   final String email;
   final String displayName;
-  final String role;
-  final String? organizationUID;
 
   const CreateAdminSubmitted({
     required this.phoneNumber,
     required this.email,
     required this.displayName,
-    required this.role,
-    this.organizationUID,
   });
 
   @override
-  List<Object?> get props => [
-        phoneNumber,
-        email,
-        displayName,
-        role,
-        organizationUID,
-      ];
+  List<Object?> get props => [phoneNumber, email, displayName];
 }

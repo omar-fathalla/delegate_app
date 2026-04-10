@@ -9,33 +9,6 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get createUser => 'إنشاء مستخدم';
-
-  @override
-  String get userType => 'نوع المستخدم';
-
-  @override
-  String get marketingRole => 'تسويق';
-
-  @override
-  String get adminRole => 'أدمن';
-
-  @override
-  String get selectOrganization => 'اختر المنظمة';
-
-  @override
-  String get marketingUserCreated => 'تم إنشاء حساب التسويق بنجاح!';
-
-  @override
-  String get browse => 'تصفح';
-
-  @override
-  String get search => 'البحث';
-
-  @override
-  String get organizationRequired => 'يرجى اختيار المنظمة';
-
-  @override
   String get appTitle => 'تسهيل';
 
   @override
@@ -732,7 +705,4 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get newNotification => 'إشعار جديد';
-
-  @override
-  String get companies => 'الشركات';
 }

@@ -1,14 +1,5 @@
 {
     "@@locale": "ar",
-    "createUser": "إنشاء مستخدم",
-    "userType": "نوع المستخدم",
-    "marketingRole": "تسويق",
-    "adminRole": "أدمن",
-    "selectOrganization": "اختر المنظمة",
-    "marketingUserCreated": "تم إنشاء حساب التسويق بنجاح!",
-    "browse": "تصفح",
-    "search": "البحث",
-    "organizationRequired": "يرجى اختيار المنظمة",
     "appTitle": "تسهيل",
     "@appTitle": {
         "description": "App title"
@@ -964,9 +955,5 @@
     "newNotification": "إشعار جديد",
     "@newNotification": {
         "description": "New notification label"
-    },
-    "companies": "الشركات",
-    "@companies": {
-        "description": "Companies label"
     }
 }

@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/features/admin/data/models/admin_user_model.dart';
@@ -7,7 +6,6 @@ import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 
 abstract class AdminRemoteDataSource {
-  Future<List<Map<String, dynamic>>> getOrganizations();
   Future<List<BranchModel>> getBranches();
   Future<BranchModel> addBranch(BranchModel branch);
   Future<BranchModel> updateBranch(BranchModel branch);
@@ -32,26 +30,10 @@ abstract class AdminRemoteDataSource {
 
 class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   final FirebaseFirestore firestore;
-  final FirebaseAuth firebaseAuth;
 
-  AdminRemoteDataSourceImpl({
-    required this.firestore,
-    required this.firebaseAuth,
-  });
+  AdminRemoteDataSourceImpl({required this.firestore});
 
   CollectionReference get _branches => firestore.collection('branches');
-
-  @override
-  Future<List<Map<String, dynamic>>> getOrganizations() async {
-    try {
-      final snapshot = await firestore.collection('organizations').get();
-      return snapshot.docs
-          .map((doc) => {'uid': doc.id, ...doc.data()})
-          .toList();
-    } on FirebaseException catch (e) {
-      throwFirestoreFailure(e, 'فشل في جلب المنظمات.');
-    }
-  }
 
   @override
   Future<List<BranchModel>> getBranches() async {
@@ -103,23 +85,7 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   @override
   Future<AdminUserModel> createAdmin(AdminUserModel admin) async {
     try {
-      // 1. Save user document in Firestore
       final ref = await firestore.collection('users').add(admin.toMap());
-
-      // 2. Also create Firebase Auth account so signInWithEmailAndPassword works
-      try {
-        await firebaseAuth.createUserWithEmailAndPassword(
-          email: admin.email,
-          password: admin.temporaryPassword,
-        );
-        // Sign back in anonymously so the super admin session continues
-        await firebaseAuth.signInAnonymously();
-      } catch (authError) {
-        // Firebase Auth creation failed (e.g. account already exists)
-        // The Firestore fallback will still work
-        // Silently continue - user document is already created in Firestore
-      }
-
       return AdminUserModel(
         uid: ref.id,
         phoneNumber: admin.phoneNumber,
@@ -267,8 +233,9 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
       try {
         // Try optimized query with composite index
         snapshot = await firestore
+            .collection('organizations')
+            .doc(organizationId)
             .collection(kAttendanceCollection)
-            .where('organizationId', isEqualTo: organizationId)
             .where('type', isEqualTo: 'check_in')
             .where('companyId', isEqualTo: companyId)
             .where(
@@ -281,8 +248,9 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
         // Fallback: query without timestamp range (no composite index needed)
         // Filter by date client-side
         snapshot = await firestore
+            .collection('organizations')
+            .doc(organizationId)
             .collection(kAttendanceCollection)
-            .where('organizationId', isEqualTo: organizationId)
             .where('type', isEqualTo: 'check_in')
             .where('companyId', isEqualTo: companyId)
             .get();

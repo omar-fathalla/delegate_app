@@ -1,14 +1,5 @@
 {
     "@@locale": "en",
-    "createUser": "Create User",
-    "userType": "User Type",
-    "marketingRole": "Marketing",
-    "adminRole": "Admin",
-    "selectOrganization": "Select Organization",
-    "marketingUserCreated": "Marketing account created successfully!",
-    "browse": "Browse",
-    "search": "Search",
-    "organizationRequired": "Please select organization",
     "appTitle": "Tashil",
     "@appTitle": {
         "description": "App title"
@@ -964,9 +955,5 @@
     "newNotification": "New notification",
     "@newNotification": {
         "description": "New notification label"
-    },
-    "companies": "Companies",
-    "@companies": {
-        "description": "Companies label"
     }
 }

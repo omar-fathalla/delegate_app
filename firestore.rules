@@ -41,12 +41,6 @@ service cloud.firestore {
              getUserData().role == 'company-admin';
     }
 
-    // Helper function to check if user is marketing
-    function isMarketing() {
-      return isAuthenticated() &&
-             getUserData().role == 'marketing';
-    }
-
     // Helper function to check if user belongs to organization
     function belongsToOrganization(orgId) {
       return isAuthenticated() &&
@@ -63,16 +57,14 @@ service cloud.firestore {
     // Helper function to check if user can access organization
     function canAccessOrganization(orgId) {
       return isSuperAdmin() ||
-             (isOrgAdmin() && belongsToOrganization(orgId)) ||
-             (isMarketing() && belongsToOrganization(orgId));
+             (isOrgAdmin() && belongsToOrganization(orgId));
     }
 
     // Helper function to check if user can access company
     function canAccessCompany(orgId, compId) {
       return isSuperAdmin() ||
              (isOrgAdmin() && belongsToOrganization(orgId)) ||
-             (isCompanyAdmin() && belongsToCompany(orgId, compId)) ||
-             (isMarketing() && belongsToOrganization(orgId));
+             (isCompanyAdmin() && belongsToCompany(orgId, compId));
     }
 
     // Helper function to check if the update is only incrementing the admin count
@@ -240,11 +232,9 @@ service cloud.firestore {
       // Companies subcollection
       match /companies/{compId} {
         // Read: Allow all authenticated users (including anonymous) to read companies
-        // Marketing users can read companies in their organization
         allow read: if isAuthenticated();
 
         // Write: Super admins can create/update/delete any company, org admins can create/update companies in their organization
-        // Marketing users can read but not write
         allow create: if isAuthenticated() && (
           isSuperAdmin() ||
           (isOrgAdmin() && belongsToOrganization(orgId))
@@ -279,11 +269,9 @@ service cloud.firestore {
         // Delegates subcollection
         match /delegates/{delegateId} {
           // Read: Allow all authenticated users (including anonymous) to read delegates
-          // Marketing users can read delegates in their organization
           allow read: if isAuthenticated();
 
           // Write: Company admins and org admins can manage delegates
-          // Marketing users can read but not write
           allow create: if isAuthenticated() && canAccessCompany(orgId, compId);
           allow update: if isAuthenticated() && canAccessCompany(orgId, compId);
           allow delete: if isAuthenticated() && canAccessCompany(orgId, compId);

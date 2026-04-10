@@ -98,60 +98,6 @@ abstract class AppLocalizations {
     Locale('en'),
   ];
 
-  /// No description provided for @createUser.
-  ///
-  /// In en, this message translates to:
-  /// **'Create User'**
-  String get createUser;
-
-  /// No description provided for @userType.
-  ///
-  /// In en, this message translates to:
-  /// **'User Type'**
-  String get userType;
-
-  /// No description provided for @marketingRole.
-  ///
-  /// In en, this message translates to:
-  /// **'Marketing'**
-  String get marketingRole;
-
-  /// No description provided for @adminRole.
-  ///
-  /// In en, this message translates to:
-  /// **'Admin'**
-  String get adminRole;
-
-  /// No description provided for @selectOrganization.
-  ///
-  /// In en, this message translates to:
-  /// **'Select Organization'**
-  String get selectOrganization;
-
-  /// No description provided for @marketingUserCreated.
-  ///
-  /// In en, this message translates to:
-  /// **'Marketing account created successfully!'**
-  String get marketingUserCreated;
-
-  /// No description provided for @browse.
-  ///
-  /// In en, this message translates to:
-  /// **'Browse'**
-  String get browse;
-
-  /// No description provided for @search.
-  ///
-  /// In en, this message translates to:
-  /// **'Search'**
-  String get search;
-
-  /// No description provided for @organizationRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Please select organization'**
-  String get organizationRequired;
-
   /// App title
   ///
   /// In en, this message translates to:
@@ -1471,12 +1417,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New notification'**
   String get newNotification;
-
-  /// Companies label
-  ///
-  /// In en, this message translates to:
-  /// **'Companies'**
-  String get companies;
 }
 
 class _AppLocalizationsDelegate

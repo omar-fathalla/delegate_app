@@ -14,18 +14,11 @@ import 'package:delegate_app/features/admin/domain/usecases/suspend_admin_user.d
 import 'package:delegate_app/features/admin/domain/usecases/update_admin_user.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_dashboard_summary.dart';
-import 'package:delegate_app/features/admin/domain/usecases/get_organizations.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/create_admin_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/manage_admins_bloc.dart';
-import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
-import 'package:delegate_app/features/marketing/data/repositories/marketing_repository_impl.dart';
-import 'package:delegate_app/features/marketing/domain/repositories/marketing_repository.dart';
-import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_companies.dart';
-import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_delegates.dart';
-import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
@@ -206,9 +199,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   );
 
   // Create Admin BLoC
-  sl.registerFactory(
-    () => CreateAdminBloc(createAdmin: sl(), getOrganizations: sl()),
-  );
+  sl.registerFactory(() => CreateAdminBloc(createAdmin: sl()));
 
   // Manage Admins BLoC
   sl.registerFactory(
@@ -238,7 +229,6 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => UpdateAdminUser(sl()));
   sl.registerLazySingleton(() => GetCompanyDelegates(sl()));
   sl.registerLazySingleton(() => GetDashboardSummary(sl()));
-  sl.registerLazySingleton(() => GetOrganizations(sl()));
 
   // Repository
   sl.registerLazySingleton<AdminRepository>(
@@ -247,31 +237,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   // Data source
   sl.registerLazySingleton<AdminRemoteDataSource>(
-    () => AdminRemoteDataSourceImpl(firestore: sl(), firebaseAuth: sl()),
-  );
-
-  // ! Features - Marketing
-  // Bloc
-  sl.registerFactory(
-    () => MarketingBloc(
-      getCompanies: sl(),
-      getDelegates: sl(),
-      remoteDataSource: sl(),
-    ),
-  );
-
-  // Use cases
-  sl.registerLazySingleton(() => GetMarketingCompanies(sl()));
-  sl.registerLazySingleton(() => GetMarketingDelegates(sl()));
-
-  // Repository
-  sl.registerLazySingleton<MarketingRepository>(
-    () => MarketingRepositoryImpl(remoteDataSource: sl()),
-  );
-
-  // Data source
-  sl.registerLazySingleton<MarketingRemoteDataSource>(
-    () => MarketingRemoteDataSourceImpl(firestore: sl()),
+    () => AdminRemoteDataSourceImpl(firestore: sl()),
   );
 
   // ! Features - Changelog

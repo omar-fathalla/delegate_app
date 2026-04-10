@@ -122,19 +122,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           final userRole = userData['role'] as String? ?? '';
           if (userRole == 'company-admin' ||
               userRole == 'organization-admin' ||
-              userRole == 'Supervisor' ||
-              userRole == 'marketing') {
+              userRole == 'Supervisor') {
             // Get admin email from Firestore
             final adminEmail = userData['email'] as String? ?? '';
 
-            // Admin/Marketing login: mark with special flag for Firebase Auth verification
+            // Admin login: mark with special flag for Firebase Auth verification
             delegates.add(
               DelegateModel(
                 uid: userDoc.id,
-                firstName: userData['displayName'] ?? 'User',
+                firstName: userData['displayName'] ?? 'Admin',
                 middleName: '',
                 lastName: '',
-                fullName: userData['displayName'] ?? 'User',
+                fullName: userData['displayName'] ?? 'Admin',
                 nationalityID:
                     '__firebase_auth__:$adminEmail', // Mark for Firebase Auth verification
                 motherName: '',
@@ -160,9 +159,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 paymentAmount: 0,
                 version: 1,
                 documents: const [],
-                role: userRole == 'marketing'
-                    ? UserRole.marketing
-                    : UserRole.admin,
+                role: UserRole.admin,
               ),
             );
           }
@@ -197,89 +194,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<bool> verifyAdminPassword(String email, String password) async {
-    final cleanEmail = email.trim();
-    final cleanPassword = password.trim();
-
-    // ── Step 1: Try Firebase Auth sign-in ──
     try {
+      // Try to sign in with email and password
       final credential = await firebaseAuth.signInWithEmailAndPassword(
-        email: cleanEmail,
-        password: cleanPassword,
+        email: email,
+        password: password,
       );
-      // Keep signed in for Firestore access
+
+      // DON'T sign out - keep the user authenticated for Firestore access
+      // The user needs to stay signed in to access Firestore data
+
       return credential.user != null;
-    } catch (e) {
-      // Firebase Auth failed, will try Firestore fallback
-    }
-
-    // ── Step 2: Fallback - check Firestore for temporary password ──
-    try {
-      // Ensure anonymous auth for Firestore access
-      if (firebaseAuth.currentUser == null) {
-        await signInAnonymously();
-      }
-
-      final query = await firestore
-          .collection('users')
-          .where('email', isEqualTo: cleanEmail)
-          .limit(1)
-          .get();
-
-      if (query.docs.isEmpty) {
-        return false;
-      }
-
-      final userDoc = query.docs.first;
-      final userData = userDoc.data();
-      final storedPassword =
-          (userData['password'] as String?) ??
-          (userData['temporaryPassword'] as String?) ??
-          (userData['tempPassword'] as String?);
-
-      if (storedPassword != null && storedPassword.trim() == cleanPassword) {
-        // Self-heal: create Firebase Auth account for next time
-        try {
-          await firebaseAuth.createUserWithEmailAndPassword(
-            email: cleanEmail,
-            password: cleanPassword,
-          );
-          // Stay signed in with the new account
-        } catch (_) {
-          // Account might already exist with a different password
-          // User is still authenticated anonymously
-        }
-        return true;
-      }
-
-      // ── Step 3: User exists but no stored password ──
-      // This handles legacy accounts created before password field was added.
-      // Verify user belongs to the system then accept the password and save it.
-      final userRole = userData['role'] as String? ?? '';
-      if (storedPassword == null &&
-          (userRole == 'company-admin' ||
-              userRole == 'organization-admin' ||
-              userRole == 'Supervisor' ||
-              userRole == 'marketing')) {
-        // Save the password to Firestore for future logins
-        try {
-          await firestore.collection('users').doc(userDoc.id).update({
-            'password': cleanPassword,
-          });
-        } catch (_) {}
-
-        // Create Firebase Auth account
-        try {
-          await firebaseAuth.createUserWithEmailAndPassword(
-            email: cleanEmail,
-            password: cleanPassword,
-          );
-        } catch (_) {}
-
-        return true;
-      }
-
+    } on FirebaseAuthException catch (_) {
       return false;
-    } catch (fallbackError) {
+    } catch (_) {
       return false;
     }
   }

@@ -103,9 +103,7 @@ class _LoginScreenState extends State<LoginScreen>
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;
                 final delegate = state.delegate;
-                if (delegate.role == UserRole.marketing) {
-                  context.go('/marketing/home', extra: delegate);
-                } else if (delegate.role == UserRole.superAdmin ||
+                if (delegate.role == UserRole.superAdmin ||
                     delegate.role == UserRole.admin) {
                   context.go('/admin/home', extra: delegate);
                 } else {

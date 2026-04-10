@@ -77,7 +77,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     return Scaffold(
       appBar: AdminHeader(
         subtitle: subtitle,
-        userName: delegate.fullName, // ✅ إضافة اسم المستخدم
         menuItems: [
           if (isSuperAdmin) ...[
             PopupMenuItem(
