@@ -7,6 +7,7 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onBackPressed;
   final List<PopupMenuEntry<String>>? menuItems;
   final ValueChanged<String>? onMenuSelected;
+  final String? userName; // ✅ إضافة
 
   const AdminHeader({
     super.key,
@@ -15,6 +16,7 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
     this.onBackPressed,
     this.menuItems,
     this.onMenuSelected,
+    this.userName, // ✅ إضافة
   });
 
   @override
@@ -39,7 +41,8 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            l10n.admin,
+            userName ??
+                l10n.admin, // ✅ عرض اسم المستخدم إذا كان موجوداً، وإلا "المدير"
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,

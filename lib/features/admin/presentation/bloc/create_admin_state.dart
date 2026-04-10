@@ -9,6 +9,15 @@ abstract class CreateAdminState extends Equatable {
 
 class CreateAdminInitial extends CreateAdminState {}
 
+class OrganizationsLoading extends CreateAdminState {}
+
+class OrganizationsLoaded extends CreateAdminState {
+  final List<Map<String, dynamic>> organizations;
+  const OrganizationsLoaded({required this.organizations});
+  @override
+  List<Object?> get props => [organizations];
+}
+
 class CreateAdminLoading extends CreateAdminState {}
 
 class CreateAdminSuccess extends CreateAdminState {

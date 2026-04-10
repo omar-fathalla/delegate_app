@@ -11,7 +11,7 @@ class CreateAdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => di.sl<CreateAdminBloc>(),
+      create: (_) => di.sl<CreateAdminBloc>()..add(LoadOrganizations()),
       child: const _CreateAdminView(),
     );
   }
@@ -29,6 +29,10 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _nameController = TextEditingController();
+  
+  String _selectedRole = 'company-admin';
+  String? _selectedOrganizationUID;
+  List<Map<String, dynamic>> _organizations = [];
 
   @override
   void dispose() {
@@ -41,11 +45,24 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
   void _submitForm() {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_selectedRole == 'marketing' && _selectedOrganizationUID == null) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.organizationRequired),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+
     context.read<CreateAdminBloc>().add(
       CreateAdminSubmitted(
         phoneNumber: _phoneController.text.trim(),
         email: _emailController.text.trim(),
         displayName: _nameController.text.trim(),
+        role: _selectedRole,
+        organizationUID: _selectedRole == 'marketing' ? _selectedOrganizationUID : null,
       ),
     );
   }
@@ -57,13 +74,20 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
 
     return BlocConsumer<CreateAdminBloc, CreateAdminState>(
       listener: (context, state) {
-        if (state is CreateAdminSuccess) {
+        if (state is OrganizationsLoaded) {
+           setState(() {
+             _organizations = state.organizations;
+           });
+        } else if (state is CreateAdminSuccess) {
           _phoneController.clear();
           _emailController.clear();
           _nameController.clear();
+          setState(() {
+            _selectedOrganizationUID = null;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(l10n.adminCreatedSuccessfully),
+              content: Text(_selectedRole == 'marketing' ? l10n.marketingUserCreated : l10n.adminCreatedSuccessfully),
               backgroundColor: Colors.green,
             ),
           );
@@ -78,6 +102,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
       },
       builder: (context, state) {
         final isLoading = state is CreateAdminLoading;
+        final isOrgsLoading = state is OrganizationsLoading;
 
         return Scaffold(
           backgroundColor: colorScheme.surface,
@@ -102,7 +127,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.admin_panel_settings_rounded,
+                          _selectedRole == 'marketing' ? Icons.analytics_rounded : Icons.admin_panel_settings_rounded,
                           size: 40,
                           color: colorScheme.onPrimaryContainer,
                         ),
@@ -111,7 +136,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                     const SizedBox(height: 16),
                     Center(
                       child: Text(
-                        l10n.createAdmin,
+                        l10n.createUser,
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
                               fontWeight: FontWeight.bold,
@@ -120,6 +145,69 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                       ),
                     ),
                     const SizedBox(height: 32),
+                    
+                    // User Type Segmented Button
+                    Center(
+                      child: SegmentedButton<String>(
+                        segments: [
+                          ButtonSegment<String>(
+                            value: 'company-admin',
+                            label: Text(l10n.adminRole),
+                            icon: const Icon(Icons.shield_outlined),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'marketing',
+                            label: Text(l10n.marketingRole),
+                            icon: const Icon(Icons.analytics_outlined),
+                          ),
+                        ],
+                        selected: {_selectedRole},
+                        onSelectionChanged: (Set<String> newSelection) {
+                          setState(() {
+                            _selectedRole = newSelection.first;
+                          });
+                        },
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 32),
+
+                    // Organization Dropdown (Only for Marketing)
+                    if (_selectedRole == 'marketing') ...[
+                      if (isOrgsLoading)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedOrganizationUID,
+                          decoration: InputDecoration(
+                            labelText: l10n.selectOrganization,
+                            prefixIcon: const Icon(Icons.business),
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest,
+                            border: UnderlineInputBorder(
+                              borderSide: BorderSide(color: colorScheme.outline),
+                            ),
+                          ),
+                          items: _organizations.map((org) {
+                            return DropdownMenuItem<String>(
+                              value: org['uid'] as String,
+                              child: Text(org['name'] ?? 'Unnamed Organization'),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedOrganizationUID = value;
+                            });
+                          },
+                          validator: (value) {
+                            if (_selectedRole == 'marketing' && (value == null || value.isEmpty)) {
+                              return l10n.organizationRequired;
+                            }
+                            return null;
+                          },
+                        ),
+                      const SizedBox(height: 20),
+                    ],
 
                     // Display Name
                     TextFormField(
@@ -262,7 +350,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                                 ),
                               )
                             : Text(
-                                l10n.createAdmin,
+                                l10n.createUser,
                                 style: GoogleFonts.cairo(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,

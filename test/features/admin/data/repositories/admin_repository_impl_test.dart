@@ -99,6 +99,11 @@ class MockAdminRemoteDataSource implements AdminRemoteDataSource {
   Future<int> getTodayCheckedInCount(String organizationId, String companyId) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getOrganizations() {
+    throw UnimplementedError();
+  }
 }
 
 void main() {

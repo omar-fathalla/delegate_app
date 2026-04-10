@@ -17,7 +17,7 @@ enum DocumentKey {
 
 enum DocumentStatus { pending, approved, rejected, notProvided }
 
-enum UserRole { delegate, admin, superAdmin }
+enum UserRole { delegate, admin, superAdmin, marketing }
 
 class Delegate extends Equatable {
   final String uid;

@@ -77,6 +77,8 @@ class DelegateModel extends Delegate {
           return UserRole.superAdmin;
         case 'admin':
           return UserRole.admin;
+        case 'marketing':
+          return UserRole.marketing;
         default:
           return UserRole.delegate;
       }
@@ -134,6 +136,8 @@ class DelegateModel extends Delegate {
         return 'super_admin';
       case UserRole.admin:
         return 'admin';
+      case UserRole.marketing:
+        return 'marketing';
       case UserRole.delegate:
         return 'delegate';
     }

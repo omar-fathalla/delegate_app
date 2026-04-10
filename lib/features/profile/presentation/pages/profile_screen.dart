@@ -8,11 +8,13 @@ import 'package:url_launcher/url_launcher.dart';
 class ProfileScreen extends StatelessWidget {
   final Delegate delegate;
   final bool showBackButton;
+  final bool isReadOnly;
 
   const ProfileScreen({
     super.key,
     required this.delegate,
     this.showBackButton = false,
+    this.isReadOnly = false,
   });
 
   @override

@@ -9,6 +9,33 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get createUser => 'Create User';
+
+  @override
+  String get userType => 'User Type';
+
+  @override
+  String get marketingRole => 'Marketing';
+
+  @override
+  String get adminRole => 'Admin';
+
+  @override
+  String get selectOrganization => 'Select Organization';
+
+  @override
+  String get marketingUserCreated => 'Marketing account created successfully!';
+
+  @override
+  String get browse => 'Browse';
+
+  @override
+  String get search => 'Search';
+
+  @override
+  String get organizationRequired => 'Please select organization';
+
+  @override
   String get appTitle => 'Tashil';
 
   @override
@@ -707,4 +734,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newNotification => 'New notification';
+
+  @override
+  String get companies => 'Companies';
 }
