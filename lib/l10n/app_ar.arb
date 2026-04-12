@@ -8,6 +8,14 @@
     "@delegateApp": {
         "description": "Delegate app subtitle"
     },
+    "showPassword": "عرض كلمة المرور",
+    "@showPassword": {
+        "description": "Tooltip for showing password"
+    },
+    "hidePassword": "إخفاء كلمة المرور",
+    "@hidePassword": {
+        "description": "Tooltip for hiding password"
+    },
     "login": "تسجيل الدخول",
     "@login": {
         "description": "Login label"

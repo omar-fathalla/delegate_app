@@ -110,6 +110,18 @@ abstract class AppLocalizations {
   /// **'Delegate App'**
   String get delegateApp;
 
+  /// Tooltip for showing password
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// Tooltip for hiding password
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
+
   /// Login label
   ///
   /// In en, this message translates to:

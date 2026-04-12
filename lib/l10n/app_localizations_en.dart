@@ -15,6 +15,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get delegateApp => 'Delegate App';
 
   @override
+  String get showPassword => 'Show password';
+
+  @override
+  String get hidePassword => 'Hide password';
+
+  @override
   String get login => 'Login';
 
   @override

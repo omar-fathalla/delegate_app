@@ -15,6 +15,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get delegateApp => 'تطبيق المندوب';
 
   @override
+  String get showPassword => 'عرض كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
+
+  @override
   String get login => 'تسجيل الدخول';
 
   @override

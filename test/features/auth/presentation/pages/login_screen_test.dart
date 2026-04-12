@@ -106,6 +106,12 @@ void main() {
     );
     expect(visibilityOffIconFinder, findsOneWidget);
 
+    final tooltipFinder = find.byType(Tooltip);
+
+    var tooltipWidget = tester.widget<Tooltip>(tooltipFinder.first);
+
+    expect(tooltipWidget.message, isNotNull);
+
     // Tap the visibility toggle button
     await tester.tap(visibilityOffIconFinder);
     await tester.pump();
@@ -120,6 +126,9 @@ void main() {
       matching: find.byIcon(Icons.visibility_outlined),
     );
     expect(visibilityOnIconFinder, findsOneWidget);
+
+    tooltipWidget = tester.widget<Tooltip>(tooltipFinder.first);
+    expect(tooltipWidget.message, isNotNull);
 
     // Tap the visibility toggle button again
     await tester.tap(visibilityOnIconFinder);
