@@ -48,6 +48,14 @@
     "@enterPassword": {
         "description": "Password validation error"
     },
+    "showPassword": "Show password",
+    "@showPassword": {
+        "description": "Tooltip for show password button"
+    },
+    "hidePassword": "Hide password",
+    "@hidePassword": {
+        "description": "Tooltip for hide password button"
+    },
     "rememberMe": "Remember Me",
     "@rememberMe": {
         "description": "Remember me checkbox label"
