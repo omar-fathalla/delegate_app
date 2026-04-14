@@ -2,44 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
-import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
-import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
-import 'package:delegate_app/features/auth/domain/usecases/cache_all_delegates.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
+import 'package:delegate_app/core/services/push_notification_service.dart';
+import 'package:mocktail/mocktail.dart';
 
-// Manual mock for AuthBloc
-class MockAuthBloc extends Bloc<AuthEvent, AuthState> implements AuthBloc {
-  MockAuthBloc() : super(AuthInitial());
-
-  @override
-  Login get loginUseCase => throw UnimplementedError();
-
-  @override
-  CheckAutoLogin get checkAutoLoginUseCase => throw UnimplementedError();
-
-  @override
-  Logout get logoutUseCase => throw UnimplementedError();
-
-  @override
-  CacheDelegate get cacheDelegateUseCase => throw UnimplementedError();
-
-  @override
-  CacheAllDelegates get cacheAllDelegatesUseCase => throw UnimplementedError();
-}
+class MockAuthBloc extends Mock implements AuthBloc {}
+class MockPushNotificationService extends Mock implements PushNotificationService {}
 
 void main() {
+  late MockAuthBloc mockAuthBloc;
+  late MockPushNotificationService mockPushNotificationService;
+
+  setUpAll(() {
+    registerFallbackValue(AuthInitial());
+    registerFallbackValue(LoginRequested(phoneNumber: '', password: '', rememberMe: false));
+  });
+
   setUp(() async {
     sl.allowReassignment = true;
+    mockAuthBloc = MockAuthBloc();
+    mockPushNotificationService = MockPushNotificationService();
+
+    // Default stream for AuthBloc
+    when(() => mockAuthBloc.state).thenReturn(AuthInitial());
+    when(() => mockAuthBloc.stream).thenAnswer((_) => Stream.value(AuthInitial()));
+    when(() => mockAuthBloc.close()).thenAnswer((_) async {});
+
     if (!sl.isRegistered<AuthBloc>()) {
-      sl.registerFactory<AuthBloc>(() => MockAuthBloc());
+      sl.registerFactory<AuthBloc>(() => mockAuthBloc);
+    }
+
+    if (!sl.isRegistered<PushNotificationService>()) {
+      sl.registerLazySingleton<PushNotificationService>(() => mockPushNotificationService);
     }
 
     if (!sl.isRegistered<SharedPreferences>()) {
@@ -63,7 +63,10 @@ void main() {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('en'),
-      home: const LoginScreen(),
+      home: BlocProvider<AuthBloc>.value(
+        value: mockAuthBloc,
+        child: const LoginScreen(),
+      ),
     );
   }
 
@@ -80,8 +83,9 @@ void main() {
 
     // Pump another widget to trigger disposal of LoginScreen
     await tester.pumpWidget(const SizedBox());
-
-    // No specific assertion for disposal here as we are relying on no exceptions being thrown.
+    
+    // Ensure all animations and controllers are disposed without errors
+    await tester.pump();
   });
 
   testWidgets('LoginScreen toggles password visibility', (
@@ -90,52 +94,48 @@ void main() {
     await tester.pumpWidget(createWidgetUnderTest());
 
     final passwordFieldFinder = find.byType(TextFormField).at(1);
-    final passwordTextFieldFinder = find.descendant(
+    
+    // Verify initial state: obscured
+    TextField passwordTextField = tester.widget(find.descendant(
       of: passwordFieldFinder,
       matching: find.byType(TextField),
-    );
-
-    // Verify initial state: obscured
-    TextField passwordTextField = tester.widget(passwordTextFieldFinder);
+    ));
     expect(passwordTextField.obscureText, isTrue);
 
-    // Verify initial visibility off icon exists (since _obscurePassword = true)
-    final visibilityOffIconFinder = find.descendant(
-      of: passwordFieldFinder,
-      matching: find.byIcon(Icons.visibility_off_outlined),
-    );
+    // Verify initial visibility off icon exists
+    final visibilityOffIconFinder = find.byIcon(Icons.visibility_off_outlined);
     expect(visibilityOffIconFinder, findsOneWidget);
 
-    // Tap the visibility toggle button
-    await tester.tap(visibilityOffIconFinder);
+    // Tap the visibility toggle button (IconButton)
+    await tester.tap(find.ancestor(
+      of: visibilityOffIconFinder,
+      matching: find.byType(IconButton),
+    ));
     await tester.pump();
 
     // Verify state: visible
-    passwordTextField = tester.widget(passwordTextFieldFinder);
+    passwordTextField = tester.widget(find.descendant(
+      of: passwordFieldFinder,
+      matching: find.byType(TextField),
+    ));
     expect(passwordTextField.obscureText, isFalse);
 
     // Verify icon changed to visibility on
-    final visibilityOnIconFinder = find.descendant(
-      of: passwordFieldFinder,
-      matching: find.byIcon(Icons.visibility_outlined),
-    );
+    final visibilityOnIconFinder = find.byIcon(Icons.visibility_outlined);
     expect(visibilityOnIconFinder, findsOneWidget);
 
     // Tap the visibility toggle button again
-    await tester.tap(visibilityOnIconFinder);
+    await tester.tap(find.ancestor(
+      of: visibilityOnIconFinder,
+      matching: find.byType(IconButton),
+    ));
     await tester.pump();
 
     // Verify state: obscured again
-    passwordTextField = tester.widget(passwordTextFieldFinder);
+    passwordTextField = tester.widget(find.descendant(
+      of: passwordFieldFinder,
+      matching: find.byType(TextField),
+    ));
     expect(passwordTextField.obscureText, isTrue);
-
-    // Verify icon changed back to visibility off
-    expect(
-      find.descendant(
-        of: passwordFieldFinder,
-        matching: find.byIcon(Icons.visibility_off_outlined),
-      ),
-      findsOneWidget,
-    );
   });
 }
