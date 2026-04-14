@@ -1,12 +1,6 @@
 name: App Store
 
 on:
-  push:
-    branches:
-      - main
-      - release/*
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       upload_to_app_store:
