@@ -10,17 +10,37 @@ import 'package:delegate_app/features/admin/domain/usecases/update_branch.dart';
 import 'package:delegate_app/features/admin/domain/usecases/create_admin.dart';
 import 'package:delegate_app/features/admin/domain/usecases/delete_admin_user.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_admins.dart';
+import 'package:delegate_app/features/admin/domain/usecases/get_organizations.dart';
 import 'package:delegate_app/features/admin/domain/usecases/suspend_admin_user.dart';
 import 'package:delegate_app/features/admin/domain/usecases/update_admin_user.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_dashboard_summary.dart';
+import 'package:delegate_app/features/admin/domain/usecases/search_companies_by_code.dart';
+import 'package:delegate_app/features/admin/domain/usecases/get_companies.dart';
+import 'package:delegate_app/features/admin/domain/repositories/company_repository.dart';
+import 'package:delegate_app/features/admin/data/repositories/company_repository_impl.dart';
+import 'package:delegate_app/features/admin/data/datasources/company_remote_datasource.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/create_admin_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/manage_admins_bloc.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/company_search_bloc.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
+import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
+import 'package:delegate_app/features/marketing/data/repositories/marketing_repository_impl.dart';
+import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
+import 'package:delegate_app/features/marketing/domain/repositories/marketing_repository.dart';
+import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_companies.dart';
+import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_delegates.dart';
+import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
+import 'package:delegate_app/features/marketing_search/data/datasources/marketing_search_remote_datasource.dart';
+import 'package:delegate_app/features/marketing_search/data/repositories/marketing_search_repository_impl.dart';
+import 'package:delegate_app/features/marketing_search/domain/repositories/marketing_search_repository.dart';
+import 'package:delegate_app/features/marketing_search/domain/usecases/search_company_by_code.dart';
+import 'package:delegate_app/features/marketing_search/domain/usecases/search_delegate_by_phone.dart';
+import 'package:delegate_app/features/marketing_search/presentation/bloc/marketing_search_bloc.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
 import 'package:delegate_app/features/auth/data/repositories/auth_repository_impl.dart';
@@ -199,7 +219,9 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   );
 
   // Create Admin BLoC
-  sl.registerFactory(() => CreateAdminBloc(createAdmin: sl()));
+  sl.registerFactory(
+    () => CreateAdminBloc(createAdmin: sl(), getOrganizations: sl()),
+  );
 
   // Manage Admins BLoC
   sl.registerFactory(
@@ -217,6 +239,9 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // Admin Dashboard BLoC
   sl.registerFactory(() => AdminDashboardBloc(getDashboardSummary: sl()));
 
+  // Company Search BLoC
+  sl.registerFactory(() => CompanySearchBloc(searchCompaniesByCode: sl()));
+
   // Use cases
   sl.registerLazySingleton(() => GetBranches(sl()));
   sl.registerLazySingleton(() => AddBranch(sl()));
@@ -224,20 +249,33 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => DeleteBranch(sl()));
   sl.registerLazySingleton(() => CreateAdmin(sl()));
   sl.registerLazySingleton(() => GetAdmins(sl()));
+  sl.registerLazySingleton(() => GetOrganizations(sl()));
   sl.registerLazySingleton(() => DeleteAdminUser(sl()));
   sl.registerLazySingleton(() => SuspendAdminUser(sl()));
   sl.registerLazySingleton(() => UpdateAdminUser(sl()));
   sl.registerLazySingleton(() => GetCompanyDelegates(sl()));
   sl.registerLazySingleton(() => GetDashboardSummary(sl()));
+  sl.registerLazySingleton(() => SearchCompaniesByCode(sl()));
+  sl.registerLazySingleton(() => GetCompanies(sl()));
 
   // Repository
   sl.registerLazySingleton<AdminRepository>(
     () => AdminRepositoryImpl(remoteDataSource: sl()),
   );
 
+  // Company Repository
+  sl.registerLazySingleton<CompanyRepository>(
+    () => CompanyRepositoryImpl(remoteDataSource: sl()),
+  );
+
   // Data source
   sl.registerLazySingleton<AdminRemoteDataSource>(
     () => AdminRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  // Company Data source
+  sl.registerLazySingleton<CompanyRemoteDataSource>(
+    () => CompanyRemoteDataSourceImpl(firestore: sl()),
   );
 
   // ! Features - Changelog
@@ -329,6 +367,50 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   // ! Features - Feedback
   initFeedbackDependencies();
+
+  // ! Features - Marketing
+  sl.registerLazySingleton(
+    () => BranchPreferenceService(prefs: sl()),
+  );
+  sl.registerFactory(
+    () => MarketingBloc(
+      getCompanies: sl(),
+      getDelegates: sl(),
+      remoteDataSource: sl(),
+      branchPreferenceService: sl(),
+    ),
+  );
+  sl.registerLazySingleton(() => GetMarketingCompanies(sl()));
+  sl.registerLazySingleton(() => GetMarketingDelegates(sl()));
+  sl.registerLazySingleton<MarketingRepository>(
+    () => MarketingRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerLazySingleton<MarketingRemoteDataSource>(
+    () => MarketingRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  // ! Features - Marketing Search
+  // Bloc
+  sl.registerFactory(
+    () => MarketingSearchBloc(
+      searchCompanyByCode: sl(),
+      searchDelegateByPhone: sl(),
+    ),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(() => SearchCompanyByCode(sl()));
+  sl.registerLazySingleton(() => SearchDelegateByPhone(sl()));
+
+  // Repository
+  sl.registerLazySingleton<MarketingSearchRepository>(
+    () => MarketingSearchRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data source
+  sl.registerLazySingleton<MarketingSearchRemoteDataSource>(
+    () => MarketingSearchRemoteDataSourceImpl(firestore: sl()),
+  );
 
   // ! Core
 

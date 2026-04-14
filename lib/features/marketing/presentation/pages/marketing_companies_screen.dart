@@ -36,6 +36,8 @@ class _MarketingCompaniesView extends StatefulWidget {
 
 class _MarketingCompaniesViewState extends State<_MarketingCompaniesView> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -47,14 +49,13 @@ class _MarketingCompaniesViewState extends State<_MarketingCompaniesView> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   void _onScroll() {
-    // Check if user scrolled to bottom (with 200px threshold)
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
-      // Load more companies
       context.read<MarketingBloc>().add(
         LoadCompaniesPaginated(organizationUID: widget.organizationUID),
       );
@@ -63,103 +64,157 @@ class _MarketingCompaniesViewState extends State<_MarketingCompaniesView> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      body: BlocBuilder<MarketingBloc, MarketingState>(
-        builder: (context, state) {
-          if (state is CompaniesLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (state is CompaniesError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    state.message,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      context.read<MarketingBloc>().add(
-                        LoadCompaniesPaginated(
-                          organizationUID: widget.organizationUID,
-                          isInitialLoad: true,
-                        ),
-                      );
-                    },
-                    child: const Text('إعادة المحاولة'),
-                  ),
-                ],
+      body: Column(
+        children: [
+          // Search bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (v) =>
+                  setState(() => _searchQuery = v.trim().toLowerCase()),
+              decoration: InputDecoration(
+                hintText: 'ابحث باسم الشركة أو الكود...',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: colorScheme.surfaceContainerHighest,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
               ),
-            );
-          } else if (state is CompaniesLoaded) {
-            if (state.companies.isEmpty) {
-              return const Center(
-                child: Text('لا توجد شركات مسجلة في المنظمة.'),
-              );
-            }
-            return ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: state.companies.length + (state.hasMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                // Show loading indicator at the end if there are more companies
-                if (index == state.companies.length) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Center(
-                      child: state.isLoadingMore
-                          ? const CircularProgressIndicator()
-                          : const SizedBox.shrink(),
+            ),
+          ),
+
+          // Companies list
+          Expanded(
+            child: BlocBuilder<MarketingBloc, MarketingState>(
+              builder: (context, state) {
+                if (state is CompaniesLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (state is CompaniesError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          state.message,
+                          style: TextStyle(color: colorScheme.error),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => context.read<MarketingBloc>().add(
+                            LoadCompaniesPaginated(
+                              organizationUID: widget.organizationUID,
+                              isInitialLoad: true,
+                            ),
+                          ),
+                          child: const Text('إعادة المحاولة'),
+                        ),
+                      ],
                     ),
                   );
-                }
+                } else if (state is CompaniesLoaded) {
+                  // Filter by search query (name or code)
+                  final filtered = _searchQuery.isEmpty
+                      ? state.companies
+                      : state.companies.where((c) {
+                          final name = (c['name'] as String? ?? '')
+                              .toLowerCase();
+                          final code = (c['code'] as String? ?? '')
+                              .toLowerCase();
+                          final uid = (c['uid'] as String? ?? '').toLowerCase();
+                          return name.contains(_searchQuery) ||
+                              code.contains(_searchQuery) ||
+                              uid.contains(_searchQuery);
+                        }).toList();
 
-                final company = state.companies[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer,
-                      child: Icon(
-                        Icons.business,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    title: Text(
-                      company['name'] ?? 'شركة بدون اسم',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      company['marketingUserName'] != null
-                          ? 'موظف التسويق: ${company['marketingUserName']}'
-                          : company['address'] ?? 'لا يوجد عنوان',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => MarketingDelegatesScreen(
-                            organizationUID: widget.organizationUID,
-                            companyUID: company['uid'],
-                            companyName: company['name'] ?? 'الشركة',
+                  if (filtered.isEmpty) {
+                    return const Center(child: Text('لا توجد شركات مطابقة.'));
+                  }
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    itemCount:
+                        filtered.length +
+                        (state.hasMore && _searchQuery.isEmpty ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == filtered.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: state.isLoadingMore
+                                ? const CircularProgressIndicator()
+                                : const SizedBox.shrink(),
+                          ),
+                        );
+                      }
+
+                      final company = filtered[index];
+                      final marketingUser =
+                          company['marketingUserName'] as String?;
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: colorScheme.primaryContainer,
+                            child: Icon(
+                              Icons.business_rounded,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                          title: Text(
+                            company['name'] ?? 'شركة بدون اسم',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: marketingUser != null
+                              ? Text(
+                                  'موظف التسويق: $marketingUser',
+                                  style: TextStyle(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                )
+                              : null,
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => MarketingDelegatesScreen(
+                                organizationUID: widget.organizationUID,
+                                companyUID: company['uid'],
+                                companyName: company['name'] ?? 'الشركة',
+                              ),
+                            ),
                           ),
                         ),
                       );
                     },
-                  ),
-                );
+                  );
+                }
+                return const SizedBox.shrink();
               },
-            );
-          }
-          return const SizedBox.shrink();
-        },
+            ),
+          ),
+        ],
       ),
     );
   }

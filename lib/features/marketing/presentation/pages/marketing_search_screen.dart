@@ -181,7 +181,7 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
                                         MaterialPageRoute(
                                           builder: (_) => ProfileScreen(
                                             delegate: delegate,
-                                            isReadOnly: true,
+                                            showBackButton: true,
                                           ),
                                         ),
                                       );

@@ -6,6 +6,7 @@ import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 
 abstract class AdminRemoteDataSource {
+  Future<List<Map<String, dynamic>>> getOrganizations();
   Future<List<BranchModel>> getBranches();
   Future<BranchModel> addBranch(BranchModel branch);
   Future<BranchModel> updateBranch(BranchModel branch);
@@ -34,6 +35,18 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   AdminRemoteDataSourceImpl({required this.firestore});
 
   CollectionReference get _branches => firestore.collection('branches');
+
+  @override
+  Future<List<Map<String, dynamic>>> getOrganizations() async {
+    try {
+      final snapshot = await firestore.collection('organizations').get();
+      return snapshot.docs
+          .map((doc) => {'uid': doc.id, ...doc.data()})
+          .toList();
+    } on FirebaseException catch (e) {
+      throwFirestoreFailure(e, 'فشل في جلب المنظمات.');
+    }
+  }
 
   @override
   Future<List<BranchModel>> getBranches() async {

@@ -8,11 +8,15 @@ class CreateAdminParams {
   final String phoneNumber;
   final String email;
   final String displayName;
+  final String role;
+  final String organizationUID;
 
   const CreateAdminParams({
     required this.phoneNumber,
     required this.email,
     required this.displayName,
+    this.role = 'company-admin',
+    this.organizationUID = '',
   });
 }
 
@@ -27,6 +31,8 @@ class CreateAdmin implements UseCase<AdminUser, CreateAdminParams> {
       phoneNumber: params.phoneNumber,
       email: params.email,
       displayName: params.displayName,
+      role: params.role,
+      organizationUID: params.organizationUID,
     );
   }
 }

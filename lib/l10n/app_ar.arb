@@ -267,6 +267,14 @@
     "@settings": {
         "description": "Settings menu title"
     },
+    "companies": "الشركات",
+    "@companies": {
+        "description": "Companies tab label"
+    },
+    "search": "بحث",
+    "@search": {
+        "description": "Search tab label"
+    },
     "language": "اللغة",
     "@language": {
         "description": "Language menu item"
@@ -955,5 +963,37 @@
     "newNotification": "إشعار جديد",
     "@newNotification": {
         "description": "New notification label"
+    },
+    "searchCompanies": "البحث عن الشركات",
+    "@searchCompanies": {
+        "description": "Search companies screen title"
+    },
+    "searchCompaniesHint": "ابحث عن الشركات باستخدام كود الشركة",
+    "@searchCompaniesHint": {
+        "description": "Hint text for company search"
+    },
+    "enterCompanyCode": "أدخل كود الشركة",
+    "@enterCompanyCode": {
+        "description": "Placeholder for company code search input"
+    },
+    "clear": "مسح",
+    "@clear": {
+        "description": "Clear button text"
+    },
+    "noCompaniesFound": "لا توجد شركات",
+    "@noCompaniesFound": {
+        "description": "Message when no companies are found"
+    },
+    "searchQuery": "البحث",
+    "@searchQuery": {
+        "description": "Search query label"
+    },
+    "errorOccurred": "حدث خطأ",
+    "@errorOccurred": {
+        "description": "Error occurred message"
+    },
+    "tryAgain": "حاول مرة أخرى",
+    "@tryAgain": {
+        "description": "Try again button text"
     }
 }

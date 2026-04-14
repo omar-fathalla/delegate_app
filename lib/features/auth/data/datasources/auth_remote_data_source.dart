@@ -15,6 +15,9 @@ abstract class AuthRemoteDataSource {
 
   /// Verifies admin password using Firebase Authentication
   Future<bool> verifyAdminPassword(String email, String password);
+
+  /// Verifies marketing/phone-based user password from Firestore
+  Future<bool> verifyPhonePassword(String phoneNumber, String password);
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -122,11 +125,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           final userRole = userData['role'] as String? ?? '';
           if (userRole == 'company-admin' ||
               userRole == 'organization-admin' ||
-              userRole == 'Supervisor') {
+              userRole == 'Supervisor' ||
+              userRole == 'marketing') {
             // Get admin email from Firestore
             final adminEmail = userData['email'] as String? ?? '';
 
-            // Admin login: mark with special flag for Firebase Auth verification
+            // Determine the correct UserRole
+            final mappedRole = userRole == 'marketing'
+                ? UserRole.marketing
+                : UserRole.admin;
+
+            // Marketing: use phone-based password check
+            // Admins: use Firebase Auth (email-based)
+            final nationalityMark = userRole == 'marketing'
+                ? '__phone_auth__:$normalizedPhone'
+                : '__firebase_auth__:$adminEmail';
+
             delegates.add(
               DelegateModel(
                 uid: userDoc.id,
@@ -134,8 +148,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 middleName: '',
                 lastName: '',
                 fullName: userData['displayName'] ?? 'Admin',
-                nationalityID:
-                    '__firebase_auth__:$adminEmail', // Mark for Firebase Auth verification
+                nationalityID: nationalityMark,
                 motherName: '',
                 city: '',
                 phoneNumber: normalizedPhone,
@@ -159,7 +172,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 paymentAmount: 0,
                 version: 1,
                 documents: const [],
-                role: UserRole.admin,
+                role: mappedRole,
+                email: adminEmail,
               ),
             );
           }
@@ -194,19 +208,80 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<bool> verifyAdminPassword(String email, String password) async {
+    // ── Step 1: Try Firebase Authentication ──
     try {
-      // Try to sign in with email and password
       final credential = await firebaseAuth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-
-      // DON'T sign out - keep the user authenticated for Firestore access
-      // The user needs to stay signed in to access Firestore data
-
-      return credential.user != null;
+      if (credential.user != null) return true;
     } on FirebaseAuthException catch (_) {
+      // Firebase Auth failed, try Firestore fallback
+    } catch (_) {
+      // Unexpected error, try Firestore fallback
+    }
+
+    // ── Step 2: Firestore fallback - check stored password ──
+    try {
+      if (firebaseAuth.currentUser == null) {
+        await signInAnonymously();
+      }
+
+      final query = await firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) return false;
+
+      final userData = query.docs.first.data();
+      final storedPassword =
+          (userData['password'] as String?) ??
+          (userData['temporaryPassword'] as String?) ??
+          (userData['tempPassword'] as String?);
+
+      if (storedPassword != null && storedPassword.trim() == password.trim()) {
+        // Self-heal: create Firebase Auth account for next time
+        try {
+          await firebaseAuth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+        } catch (_) {
+          // Account might already exist - that's fine
+        }
+        return true;
+      }
+
       return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> verifyPhonePassword(String phoneNumber, String password) async {
+    try {
+      if (firebaseAuth.currentUser == null) {
+        await signInAnonymously();
+      }
+
+      final query = await firestore
+          .collection('users')
+          .where('phoneNumber', isEqualTo: phoneNumber)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) return false;
+
+      final userData = query.docs.first.data();
+      final storedPassword =
+          (userData['password'] as String?) ??
+          (userData['temporaryPassword'] as String?) ??
+          (userData['tempPassword'] as String?);
+
+      return storedPassword != null && storedPassword.trim() == password.trim();
     } catch (_) {
       return false;
     }

@@ -79,6 +79,14 @@ class MockAuthRepository implements AuthRepository {
     }
     return const Right(false);
   }
+
+  @override
+  Future<Either<Failure, bool>> verifyPhonePassword(
+    String phone,
+    String password,
+  ) async {
+    return const Right(false);
+  }
 }
 
 void main() {

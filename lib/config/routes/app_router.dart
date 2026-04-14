@@ -2,9 +2,13 @@ import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart'
 import 'package:delegate_app/features/auth/presentation/pages/splash_screen.dart';
 import 'package:delegate_app/features/home/presentation/pages/main_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/profile/presentation/pages/user_profile_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_main_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/branch_details_screen.dart';
+import 'package:delegate_app/features/admin/presentation/pages/company_details_screen.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
+import 'package:delegate_app/features/admin/domain/entities/company.dart';
+import 'package:delegate_app/features/marketing/presentation/pages/marketing_main_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
 import 'package:delegate_app/features/changelog/presentation/pages/changelog_screen.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
@@ -13,6 +17,8 @@ import 'package:delegate_app/features/notifications/presentation/pages/notificat
 import 'package:delegate_app/features/feedback/presentation/pages/submit_feedback_screen.dart';
 import 'package:delegate_app/features/feedback/presentation/pages/my_feedbacks_screen.dart';
 import 'package:delegate_app/features/feedback/presentation/pages/admin_feedbacks_screen.dart';
+import 'package:delegate_app/features/admin/presentation/pages/company_search_screen.dart';
+import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
 import 'package:delegate_app/features/feedback/presentation/bloc/feedback_bloc.dart';
 import 'package:delegate_app/features/feedback/presentation/bloc/admin_feedback_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
@@ -36,6 +42,13 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final delegate = state.extra as Delegate;
         return AdminMainScreen(delegate: delegate);
+      },
+    ),
+    GoRoute(
+      path: '/marketing/home',
+      builder: (context, state) {
+        final delegate = state.extra as Delegate;
+        return MarketingMainScreen(delegate: delegate);
       },
     ),
     GoRoute(
@@ -98,6 +111,31 @@ final appRouter = GoRouter(
           create: (_) => di.sl<AdminFeedbackBloc>(),
           child: const AdminFeedbacksScreen(),
         );
+      },
+    ),
+    GoRoute(
+      path: '/admin/company-search',
+      builder: (context, state) {
+        final organizationUID = state.extra as String?;
+        return CompanySearchScreen(organizationUID: organizationUID);
+      },
+    ),
+    GoRoute(
+      path: '/marketing/search',
+      builder: (context, state) {
+        final organizationUID = state.extra as String?;
+        return MarketingSearchScreen(organizationUID: organizationUID);
+      },
+    ),
+    GoRoute(
+      path: '/user-profile',
+      builder: (context, state) => const UserProfileScreen(),
+    ),
+    GoRoute(
+      path: '/admin/company-details',
+      builder: (context, state) {
+        final company = state.extra as Company;
+        return CompanyDetailsScreen(company: company);
       },
     ),
   ],

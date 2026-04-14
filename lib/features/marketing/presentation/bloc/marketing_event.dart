@@ -61,3 +61,78 @@ class SearchDelegates extends MarketingEvent {
     positionFilter,
   ];
 }
+
+// ─── Branch Events ─────────────────────────────────────────────────────
+
+/// Loads all branches from Firestore
+class LoadBranches extends MarketingEvent {
+  const LoadBranches();
+}
+
+/// Loads today's attendance for [branchName]
+class LoadTodayAttendanceByBranch extends MarketingEvent {
+  final String branchName;
+  final String organizationId;
+
+  const LoadTodayAttendanceByBranch({
+    required this.branchName,
+    required this.organizationId,
+  });
+
+  @override
+  List<Object?> get props => [branchName, organizationId];
+}
+
+/// Loads saved branch preferences for [userId]
+class LoadBranchPreferences extends MarketingEvent {
+  final String userId;
+  const LoadBranchPreferences({required this.userId});
+  @override
+  List<Object?> get props => [userId];
+}
+
+/// Adds a branch to the user's favorites
+class AddFavoriteBranch extends MarketingEvent {
+  final String userId;
+  final String branchName;
+  const AddFavoriteBranch({required this.userId, required this.branchName});
+  @override
+  List<Object?> get props => [userId, branchName];
+}
+
+/// Removes a branch from the user's favorites
+class RemoveFavoriteBranch extends MarketingEvent {
+  final String userId;
+  final String branchName;
+  const RemoveFavoriteBranch({required this.userId, required this.branchName});
+  @override
+  List<Object?> get props => [userId, branchName];
+}
+
+/// Sets [branchName] as the currently active (displayed) branch
+class SetActiveBranch extends MarketingEvent {
+  final String userId;
+  final String branchName;
+  final String organizationId;
+  const SetActiveBranch({
+    required this.userId,
+    required this.branchName,
+    required this.organizationId,
+  });
+  @override
+  List<Object?> get props => [userId, branchName, organizationId];
+}
+
+/// Loads today's attendance for ALL favorite branches at once
+class LoadAllFavoriteBranchesAttendance extends MarketingEvent {
+  final List<String> favoriteBranches;
+  final String organizationId;
+
+  const LoadAllFavoriteBranchesAttendance({
+    required this.favoriteBranches,
+    required this.organizationId,
+  });
+
+  @override
+  List<Object?> get props => [favoriteBranches, organizationId];
+}

@@ -21,23 +21,31 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
       final matched = <Delegate>[];
 
       for (final delegate in delegates) {
-        // Check if this is an admin (marked with __firebase_auth__:email)
-        if (delegate.nationalityID.startsWith('__firebase_auth__:')) {
+        // Check if this is a phone-auth user (marketing)
+        if (delegate.nationalityID.startsWith('__phone_auth__:')) {
+          final phone = delegate.nationalityID.replaceFirst(
+            '__phone_auth__:',
+            '',
+          );
+          final isValid = await repository.verifyPhonePassword(
+            phone,
+            params.password,
+          );
+          final valid = isValid.fold((_) => false, (v) => v);
+          if (valid) matched.add(delegate);
+
+          // Check if this is an admin (marked with __firebase_auth__:email)
+        } else if (delegate.nationalityID.startsWith('__firebase_auth__:')) {
           final email = delegate.nationalityID.replaceFirst(
             '__firebase_auth__:',
             '',
           );
-
-          // Verify password using Firebase Authentication
           final verifyResult = await repository.verifyAdminPassword(
             email,
             params.password,
           );
           final isValid = verifyResult.fold((_) => false, (valid) => valid);
-
-          if (isValid) {
-            matched.add(delegate);
-          }
+          if (isValid) matched.add(delegate);
         } else {
           // Regular delegate: compare nationalityID with password
           if (delegate.nationalityID == params.password) {

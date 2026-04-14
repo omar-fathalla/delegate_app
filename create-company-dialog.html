@@ -1,0 +1,178 @@
+<h2 mat-dialog-title class="text-center pt-4!">{{ 'dialog.createCompanyAndAdminAccount' | translate }}</h2>
+<mat-dialog-content>
+  <!-- Success Screen -->
+  <!-- Registration Form -->
+  <div class="flex justify-center items-center">
+    <div class="py-4 w-full">
+      <!-- Stepper -->
+      <mat-stepper class="px-6" labelPosition="bottom" [orientation]="stepperOrientation()" #stepper>
+        <!-- Step 1: create company -->
+        <mat-step [label]="'dialog.createCompany' | translate" class="mt-4">
+          <!--! label of the step -->
+          <ng-template matStepLabel>
+            <div class="flex gap-1 items-center">
+              <mat-icon>corporate_fare</mat-icon>
+              <span>{{ 'dialog.createCompany' | translate }}</span>
+            </div>
+          </ng-template>
+          <!--! content of the step -->
+          <ng-template matStepContent>
+            <form [formGroup]="companyForm" class="space-y-4">
+              <mat-form-field appearance="outline" class="mt-4 w-full">
+                <mat-label>{{ 'dialog.companyName' | translate }}</mat-label>
+                <input matInput [placeholder]="'dialog.enterCompanyName' | translate" formControlName="name" required />
+                @if (companyForm.get('name')?.hasError('required') && companyForm.get('name')?.touched) {
+                <mat-error>{{ 'dialog.companyNameRequired' | translate }}</mat-error>
+                } @else if (companyForm.get('name')?.hasError('minlength') && companyForm.get('name')?.touched) {
+                <mat-error>{{ 'dialog.companyNameMinLength' | translate }}</mat-error>
+                } @else if (companyForm.get('name')?.hasError('maxlength') && companyForm.get('name')?.touched) {
+                <mat-error>{{ 'dialog.companyNameMaxLength' | translate }}</mat-error>
+                } @else if (companyForm.get('name')?.hasError('nameTaken')) {
+                <mat-error>{{ 'dialog.companyNameAlreadyExists' | translate }}</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>{{ 'dialog.companyType' | translate }}</mat-label>
+                <mat-select formControlName="type" required>
+                  @for (companyType of companyTypes(); track $index) {
+                  <mat-option [value]="companyType">{{ 'company.type.' + (companyType | lowercase) | translate }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>{{ 'dialog.companyCode' | translate }}</mat-label>
+                <input matInput [placeholder]="'dialog.uniqueCompanyCode' | translate" formControlName="code" required />
+                @if (companyForm.get('code')?.hasError('required') && companyForm.get('code')?.touched) {
+                <mat-error>{{ 'dialog.companyCodeRequired' | translate }}</mat-error>
+                } @if (companyForm.get('code')?.hasError('codeTaken')) {
+                <mat-error>{{ 'dialog.companyCodeAlreadyExists' | translate }}</mat-error>
+                }
+              </mat-form-field>
+
+              <div class="flex justify-between mt-6">
+                <button type="button" matButton="outlined" (click)="onNoClick()" [disabled]="isLoading()">
+                  {{ 'dialog.cancel' | translate }}
+                </button>
+                <button
+                  type="button"
+                  matButton="filled"
+                  class="spinner-button"
+                  (click)="createCompany()"
+                  [disabled]="isLoading() || companyForm.invalid"
+                >
+                  @if (isLoading()) {
+                  <mat-spinner diameter="20" class="mr-2" />
+                  {{ 'dialog.creating' | translate }} } @else{ {{ 'dialog.createCompany' | translate }} }
+                </button>
+              </div>
+              @if (error()) {
+              <div
+                class="mt-4 p-4 bg-error-container text-on-error-container rounded-lg border-l-4 border-error"
+              >
+                <div class="flex items-center gap-2">
+                  <mat-icon>error</mat-icon>
+                  <p class="font-body-sm m-0">{{ error() }}</p>
+                </div>
+              </div>
+              }
+            </form>
+          </ng-template>
+        </mat-step>
+
+        <!-- Step 2: Create admin Account for company -->
+        <mat-step [label]="'dialog.createAdminAccount' | translate" class="mt-4">
+          <!--! label of the step -->
+          <ng-template matStepLabel>
+            <div class="flex gap-1 items-center">
+              <mat-icon>person_add</mat-icon>
+              <span>{{ 'dialog.createAdminAccount' | translate }}</span>
+            </div>
+          </ng-template>
+          <!--! content of the step -->
+          <ng-template matStepContent>
+            <!-- Admin account form -->
+            <form [formGroup]="adminForm" class="mt-4 space-y-6 ">
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>{{ 'dialog.adminEmail' | translate }}</mat-label>
+                <input
+                  matInput
+                  type="email"
+                  [placeholder]="'dialog.enterEmailAddress' | translate"
+                  formControlName="email"
+                  required
+                  autocomplete="off"
+                />
+                @if (adminForm.get('email')?.pending) {
+                <mat-spinner matSuffix diameter="20" class="me-2" />
+                }
+                @if (adminForm.get('email')?.hasError('required') && adminForm.get('email')?.touched) {
+                <mat-error>{{ 'dialog.emailRequired' | translate }}</mat-error>
+                } @else if (adminForm.get('email')?.hasError('email')) {
+                <mat-error>{{ 'dialog.pleaseEnterValidEmail' | translate }}</mat-error>
+                } @else if (adminForm.get('email')?.hasError('emailTaken')) {
+                <mat-error>{{ 'dialog.adminEmailAlreadyExists' | translate }}</mat-error>
+                } @else if (adminForm.get('email')?.hasError('emailCheckFailed')) {
+                <mat-error>{{ 'dialog.emailCheckFailed' | translate }}</mat-error>
+                }
+
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>{{ 'dialog.adminPhoneNumber' | translate }}</mat-label>
+                <input
+                  matInput
+                  type="tel"
+                  [placeholder]="'dialog.enter11Digits' | translate"
+                  formControlName="phoneNumber"
+                  required
+                  autocomplete="off"
+                />
+                @if (adminForm.get('phoneNumber')?.hasError('required') &&
+                adminForm.get('phoneNumber')?.touched) {
+                <mat-error>{{ 'dialog.phoneNumberRequired' | translate }}</mat-error>
+                } @else if (adminForm.get('phoneNumber')?.hasError('pattern') &&
+                adminForm.get('phoneNumber')?.touched) {
+                <mat-error>{{ 'dialog.phoneNumberMustBe11Digits' | translate }}</mat-error>
+                }
+              </mat-form-field>
+
+              <div class="flex justify-between mt-6">
+                <button
+                  type="button"
+                  matButton="outlined"
+                  (click)="stepper.previous()"
+                  [disabled]="isLoading()"
+                >
+                  {{ 'dialog.back' | translate }}
+                </button>
+                <button
+                  type="button"
+                  matButton="filled"
+                  class="spinner-button"
+                  (click)="createCompanyAdmin()"
+                  [disabled]="isLoading() || adminForm.invalid || adminForm.pending"
+                >
+                  @if (isLoading()) {
+                  <mat-spinner diameter="20" class="mr-2" />
+                  {{ 'dialog.sendingInvitation' | translate }} } @else { {{ 'dialog.sendInvitationEmail' | translate }} }
+                </button>
+              </div>
+              @if (error()) {
+              <div
+                class="mt-4 p-4 bg-error-container text-on-error-container rounded-lg border-l-4 border-error"
+              >
+                <div class="flex items-center gap-2">
+                  <mat-icon>error</mat-icon>
+                  <p class="font-body-sm m-0">{{ error() }}</p>
+                </div>
+              </div>
+              }
+            </form>
+          </ng-template>
+        </mat-step>
+      </mat-stepper>
+    </div>
+  </div>
+</mat-dialog-content>

@@ -40,6 +40,11 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     }
     return false;
   }
+
+  @override
+  Future<bool> verifyPhonePassword(String phone, String password) async {
+    return false;
+  }
 }
 
 class MockAuthLocalDataSource implements AuthLocalDataSource {

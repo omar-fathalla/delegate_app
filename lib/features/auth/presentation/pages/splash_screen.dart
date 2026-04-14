@@ -35,6 +35,8 @@ class _SplashScreenState extends State<SplashScreen>
     // Start animation after first frame renders (prevents jank)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _controller.forward();
+      // Trigger auto-login check using global AuthBloc
+      context.read<AuthBloc>().add(CheckAutoLoginRequested());
     });
   }
 
@@ -47,75 +49,74 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return BlocProvider(
-      create: (context) => sl<AuthBloc>()..add(CheckAutoLoginRequested()),
-      child: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is AuthAuthenticated) {
-            final delegate = state.delegate;
-            // Initialize FCM with delegate UID for token storage
-            sl<PushNotificationService>()
-                .initialize(delegate.uid)
-                .catchError((e) {
-              debugPrint('FCM Init Error: $e');
-            });
-            if (delegate.role == UserRole.superAdmin ||
-                delegate.role == UserRole.admin) {
-              context.go('/admin/home', extra: delegate);
-            } else {
-              context.go('/home', extra: delegate);
-            }
-          } else if (state is AuthUnauthenticated) {
-            context.go('/login');
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthAuthenticated) {
+          final delegate = state.delegate;
+          // Initialize FCM with delegate UID for token storage
+          sl<PushNotificationService>().initialize(delegate.uid).catchError((
+            e,
+          ) {
+            debugPrint('FCM Init Error: $e');
+          });
+          if (delegate.role == UserRole.superAdmin ||
+              delegate.role == UserRole.admin) {
+            context.go('/admin/home', extra: delegate);
+          } else if (delegate.role == UserRole.marketing) {
+            context.go('/marketing/home', extra: delegate);
+          } else {
+            context.go('/home', extra: delegate);
           }
-        },
-        child: Scaffold(
-          backgroundColor: colorScheme.surface,
-          body: SizedBox(
-            width: double.infinity,
-            child: SafeArea(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Spacer(),
-                      Text(
-                        'Tashil',
-                        style:
-                            Theme.of(context).textTheme.displayLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: colorScheme.primary,
-                              letterSpacing: 1.5,
-                            ) ??
-                            TextStyle(
-                              fontSize: 56,
-                              fontWeight: FontWeight.w800,
-                              color: colorScheme.primary,
-                              letterSpacing: 1.5,
-                            ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'تسهيل',
-                        style:
-                            Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary.withValues(alpha: 0.8),
-                            ) ??
-                            TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary.withValues(alpha: 0.8),
-                            ),
-                      ),
-                      const Spacer(),
-                      CircularProgressIndicator(color: colorScheme.primary),
-                      const SizedBox(height: 48),
-                    ],
-                  ),
+        } else if (state is AuthUnauthenticated) {
+          context.go('/login');
+        }
+      },
+      child: Scaffold(
+        backgroundColor: colorScheme.surface,
+        body: SizedBox(
+          width: double.infinity,
+          child: SafeArea(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: ScaleTransition(
+                scale: _scaleAnimation,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Spacer(),
+                    Text(
+                      'Tashil',
+                      style:
+                          Theme.of(context).textTheme.displayLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: colorScheme.primary,
+                            letterSpacing: 1.5,
+                          ) ??
+                          TextStyle(
+                            fontSize: 56,
+                            fontWeight: FontWeight.w800,
+                            color: colorScheme.primary,
+                            letterSpacing: 1.5,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'تسهيل',
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.primary.withValues(alpha: 0.8),
+                          ) ??
+                          TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.primary.withValues(alpha: 0.8),
+                          ),
+                    ),
+                    const Spacer(),
+                    CircularProgressIndicator(color: colorScheme.primary),
+                    const SizedBox(height: 48),
+                  ],
                 ),
               ),
             ),

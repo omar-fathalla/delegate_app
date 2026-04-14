@@ -1,11 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   final Delegate delegate;
   final bool showBackButton;
 
@@ -16,10 +18,40 @@ class ProfileScreen extends StatelessWidget {
   });
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load full delegate profile from Firebase
+    Future.microtask(() {
+      if (mounted) {
+        context.read<ProfileBloc>().add(LoadProfile(uid: widget.delegate.uid));
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: _ProfileBody(delegate: delegate, showBackButton: showBackButton),
+    return BlocBuilder<ProfileBloc, ProfileState>(
+      builder: (context, state) {
+        // Use loaded delegate if available, otherwise use passed delegate
+        final delegate = state is ProfileLoaded
+            ? state.delegate
+            : widget.delegate;
+
+        return DefaultTabController(
+          length: 3,
+          child: _ProfileBody(
+            delegate: delegate,
+            showBackButton: widget.showBackButton,
+            isLoading: state is ProfileLoading,
+            error: state is ProfileError ? state.message : null,
+          ),
+        );
+      },
     );
   }
 }
@@ -27,14 +59,58 @@ class ProfileScreen extends StatelessWidget {
 class _ProfileBody extends StatelessWidget {
   final Delegate delegate;
   final bool showBackButton;
+  final bool isLoading;
+  final String? error;
 
-  const _ProfileBody({required this.delegate, this.showBackButton = false});
+  const _ProfileBody({
+    required this.delegate,
+    this.showBackButton = false,
+    this.isLoading = false,
+    this.error,
+  });
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
+    // Show error state if there's an error
+    if (error != null) {
+      return Scaffold(
+        appBar: showBackButton
+            ? AppBar(
+                title: Text(delegate.fullName),
+                backgroundColor: colorScheme.surface,
+                scrolledUnderElevation: 0,
+              )
+            : null,
+        backgroundColor: colorScheme.surface,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: colorScheme.error),
+              const SizedBox(height: 16),
+              Text(
+                'خطأ في تحميل البيانات',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                error!,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: showBackButton
@@ -45,41 +121,57 @@ class _ProfileBody extends StatelessWidget {
             )
           : null,
       backgroundColor: colorScheme.surface,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            SliverToBoxAdapter(
-              child: _buildProfileHeader(context, colorScheme, l10n),
-            ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _TabBarDelegate(
-                TabBar(
-                  labelColor: colorScheme.primary,
-                  unselectedLabelColor: colorScheme.onSurfaceVariant,
-                  indicatorColor: colorScheme.primary,
-                  indicatorWeight: 3,
-                  labelStyle: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+      body: isLoading
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'جاري تحميل البيانات...',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                  tabs: [
-                    Tab(text: l10n.personalInformation),
-                    Tab(text: l10n.documents),
-                    Tab(text: l10n.requestHistory),
-                  ],
-                ),
+                ],
+              ),
+            )
+          : NestedScrollView(
+              headerSliverBuilder: (context, innerBoxIsScrolled) {
+                return [
+                  SliverToBoxAdapter(
+                    child: _buildProfileHeader(context, colorScheme, l10n),
+                  ),
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _TabBarDelegate(
+                      TabBar(
+                        labelColor: colorScheme.primary,
+                        unselectedLabelColor: colorScheme.onSurfaceVariant,
+                        indicatorColor: colorScheme.primary,
+                        indicatorWeight: 3,
+                        labelStyle: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        tabs: [
+                          Tab(text: l10n.personalInformation),
+                          Tab(text: l10n.documents),
+                          Tab(text: l10n.requestHistory),
+                        ],
+                      ),
+                    ),
+                  ),
+                ];
+              },
+              body: TabBarView(
+                children: [
+                  _buildPersonalInfoTab(context, l10n),
+                  _buildDocumentsTab(context, l10n),
+                  _buildRequestHistoryTab(context, l10n),
+                ],
               ),
             ),
-          ];
-        },
-        body: TabBarView(
-          children: [
-            _buildPersonalInfoTab(context, l10n),
-            _buildDocumentsTab(context, l10n),
-            _buildRequestHistoryTab(context, l10n),
-          ],
-        ),
-      ),
     );
   }
 

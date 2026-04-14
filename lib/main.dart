@@ -20,6 +20,7 @@ import 'package:delegate_app/config/routes/app_router.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Top-level background message handler for FCM.
 /// Must be a top-level function (not a class method).
@@ -104,7 +105,10 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
-      providers: [BlocProvider(create: (_) => di.sl<ThemeCubit>())],
+      providers: [
+        BlocProvider(create: (_) => di.sl<ThemeCubit>()),
+        BlocProvider(create: (_) => di.sl<AuthBloc>()),
+      ],
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, themeState) {
           return MaterialApp.router(

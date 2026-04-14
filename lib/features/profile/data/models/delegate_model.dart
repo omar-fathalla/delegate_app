@@ -39,6 +39,7 @@ class DelegateModel extends Delegate {
     required super.version,
     required super.documents,
     super.role,
+    super.email,
   });
 
   factory DelegateModel.fromJson(Map<String, dynamic> json, String uid) {
@@ -77,6 +78,8 @@ class DelegateModel extends Delegate {
           return UserRole.superAdmin;
         case 'admin':
           return UserRole.admin;
+        case 'marketing':
+          return UserRole.marketing;
         default:
           return UserRole.delegate;
       }
@@ -125,6 +128,7 @@ class DelegateModel extends Delegate {
           )
           .toList(),
       role: parseRole(json['role']),
+      email: json['email'],
     );
   }
 
@@ -134,6 +138,8 @@ class DelegateModel extends Delegate {
         return 'super_admin';
       case UserRole.admin:
         return 'admin';
+      case UserRole.marketing:
+        return 'marketing';
       case UserRole.delegate:
         return 'delegate';
     }
@@ -203,6 +209,7 @@ class DelegateModel extends Delegate {
           .map((doc) => (doc as DelegateDocumentModel).toJson())
           .toList(),
       'role': roleToString(role),
+      'email': email,
     };
   }
 
@@ -271,6 +278,7 @@ class DelegateModel extends Delegate {
           .map((doc) => (doc as DelegateDocumentModel).toLocalJson())
           .toList(),
       'role': roleToString(role),
+      'email': email,
     };
   }
 }

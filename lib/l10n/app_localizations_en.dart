@@ -189,6 +189,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
+  String get companies => 'Companies';
+
+  @override
+  String get search => 'Search';
+
+  @override
   String get language => 'Language';
 
   @override
@@ -707,4 +713,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newNotification => 'New notification';
+
+  @override
+  String get searchCompanies => 'Search Companies';
+
+  @override
+  String get searchCompaniesHint => 'Search for companies using company code';
+
+  @override
+  String get enterCompanyCode => 'Enter company code';
+
+  @override
+  String get clear => 'Clear';
+
+  @override
+  String get noCompaniesFound => 'No companies found';
+
+  @override
+  String get searchQuery => 'Search Query';
+
+  @override
+  String get errorOccurred => 'Error Occurred';
+
+  @override
+  String get tryAgain => 'Try Again';
 }

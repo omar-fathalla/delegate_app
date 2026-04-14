@@ -259,6 +259,14 @@
     "@settings": {
         "description": "Settings menu title"
     },
+    "companies": "Companies",
+    "@companies": {
+        "description": "Companies tab label"
+    },
+    "search": "Search",
+    "@search": {
+        "description": "Search tab label"
+    },
     "language": "Language",
     "@language": {
         "description": "Language menu item"
@@ -955,5 +963,37 @@
     "newNotification": "New notification",
     "@newNotification": {
         "description": "New notification label"
+    },
+    "searchCompanies": "Search Companies",
+    "@searchCompanies": {
+        "description": "Search companies screen title"
+    },
+    "searchCompaniesHint": "Search for companies using company code",
+    "@searchCompaniesHint": {
+        "description": "Hint text for company search"
+    },
+    "enterCompanyCode": "Enter company code",
+    "@enterCompanyCode": {
+        "description": "Placeholder for company code search input"
+    },
+    "clear": "Clear",
+    "@clear": {
+        "description": "Clear button text"
+    },
+    "noCompaniesFound": "No companies found",
+    "@noCompaniesFound": {
+        "description": "Message when no companies are found"
+    },
+    "searchQuery": "Search Query",
+    "@searchQuery": {
+        "description": "Search query label"
+    },
+    "errorOccurred": "Error Occurred",
+    "@errorOccurred": {
+        "description": "Error occurred message"
+    },
+    "tryAgain": "Try Again",
+    "@tryAgain": {
+        "description": "Try again button text"
     }
 }

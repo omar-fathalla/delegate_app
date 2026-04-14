@@ -11,6 +11,15 @@ class CreateAdminInitial extends CreateAdminState {}
 
 class CreateAdminLoading extends CreateAdminState {}
 
+class CreateAdminOrgsLoaded extends CreateAdminState {
+  final List<Map<String, dynamic>> organizations;
+
+  const CreateAdminOrgsLoaded({required this.organizations});
+
+  @override
+  List<Object?> get props => [organizations];
+}
+
 class CreateAdminSuccess extends CreateAdminState {
   final AdminUser adminUser;
 

@@ -5,6 +5,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_companies.dart';
 import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_delegates.dart';
 import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
+import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
 
 part 'marketing_event.dart';
 part 'marketing_state.dart';
@@ -13,6 +14,7 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
   final GetMarketingCompanies getCompanies;
   final GetMarketingDelegates getDelegates;
   final MarketingRemoteDataSource remoteDataSource;
+  final BranchPreferenceService branchPreferenceService;
 
   List<Delegate> _allDelegates = [];
 
@@ -26,11 +28,20 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
     required this.getCompanies,
     required this.getDelegates,
     required this.remoteDataSource,
+    required this.branchPreferenceService,
   }) : super(MarketingInitial()) {
     on<LoadCompanies>(_onLoadCompanies);
     on<LoadCompaniesPaginated>(_onLoadCompaniesPaginated);
     on<LoadDelegates>(_onLoadDelegates);
     on<SearchDelegates>(_onSearchDelegates);
+    // Branch events
+    on<LoadBranches>(_onLoadBranches);
+    on<LoadTodayAttendanceByBranch>(_onLoadTodayAttendanceByBranch);
+    on<LoadBranchPreferences>(_onLoadBranchPreferences);
+    on<AddFavoriteBranch>(_onAddFavoriteBranch);
+    on<RemoveFavoriteBranch>(_onRemoveFavoriteBranch);
+    on<SetActiveBranch>(_onSetActiveBranch);
+    on<LoadAllFavoriteBranchesAttendance>(_onLoadAllFavoriteBranchesAttendance);
   }
 
   Future<void> _onLoadCompanies(
@@ -171,4 +182,143 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
 
     emit(DelegatesLoaded(delegates: filteredDelegates));
   }
+
+  // ─── Branch Handlers ───────────────────────────────────────────────────────
+
+  Future<void> _onLoadBranches(
+    LoadBranches event,
+    Emitter<MarketingState> emit,
+  ) async {
+    emit(BranchesLoading());
+    try {
+      final branches = await remoteDataSource.getBranches();
+      emit(BranchesLoaded(branches: branches));
+    } catch (e) {
+      emit(BranchesError(message: 'فشل في جلب الفروع: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onLoadTodayAttendanceByBranch(
+    LoadTodayAttendanceByBranch event,
+    Emitter<MarketingState> emit,
+  ) async {
+    emit(TodayAttendanceLoading());
+    try {
+      final records = await remoteDataSource.getTodayAttendanceByBranch(
+        branchName: event.branchName,
+        organizationId: event.organizationId,
+      );
+      emit(TodayAttendanceLoaded(
+        records: records,
+        branchName: event.branchName,
+      ));
+    } catch (e) {
+      emit(TodayAttendanceError(
+        message: 'فشل في جلب بيانات الحضور: ${e.toString()}',
+      ));
+    }
+  }
+
+  Future<void> _onLoadBranchPreferences(
+    LoadBranchPreferences event,
+    Emitter<MarketingState> emit,
+  ) async {
+    final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
+    final active = branchPreferenceService.getActiveBranch(event.userId);
+    emit(BranchPreferencesLoaded(
+      favoriteBranches: favorites,
+      activeBranch: active,
+    ));
+  }
+
+  Future<void> _onAddFavoriteBranch(
+    AddFavoriteBranch event,
+    Emitter<MarketingState> emit,
+  ) async {
+    await branchPreferenceService.addFavoriteBranch(
+      event.userId,
+      event.branchName,
+    );
+    final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
+    final active = branchPreferenceService.getActiveBranch(event.userId);
+    emit(BranchPreferencesLoaded(
+      favoriteBranches: favorites,
+      activeBranch: active,
+    ));
+  }
+
+  Future<void> _onRemoveFavoriteBranch(
+    RemoveFavoriteBranch event,
+    Emitter<MarketingState> emit,
+  ) async {
+    await branchPreferenceService.removeFavoriteBranch(
+      event.userId,
+      event.branchName,
+    );
+    final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
+    final active = branchPreferenceService.getActiveBranch(event.userId);
+    emit(BranchPreferencesLoaded(
+      favoriteBranches: favorites,
+      activeBranch: active,
+    ));
+  }
+
+  Future<void> _onSetActiveBranch(
+    SetActiveBranch event,
+    Emitter<MarketingState> emit,
+  ) async {
+    await branchPreferenceService.setActiveBranch(
+      event.userId,
+      event.branchName,
+    );
+    final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
+    emit(BranchPreferencesLoaded(
+      favoriteBranches: favorites,
+      activeBranch: event.branchName,
+    ));
+  }
+
+  // ─── Load ALL favorite branches attendance at once ──────────────────────────
+
+  Future<void> _onLoadAllFavoriteBranchesAttendance(
+    LoadAllFavoriteBranchesAttendance event,
+    Emitter<MarketingState> emit,
+  ) async {
+    if (event.favoriteBranches.isEmpty) {
+      emit(AllBranchesAttendanceLoaded(
+        data: {},
+        favoriteBranches: [],
+      ));
+      return;
+    }
+
+    emit(AllBranchesAttendanceLoading());
+
+    try {
+      // جلب بيانات كل الفروع بالتوازي
+      final futures = event.favoriteBranches.map(
+        (branch) => remoteDataSource.getTodayAttendanceByBranch(
+          branchName: branch,
+          organizationId: event.organizationId,
+        ),
+      );
+
+      final results = await Future.wait(futures);
+
+      final Map<String, List<Map<String, dynamic>>> data = {};
+      for (var i = 0; i < event.favoriteBranches.length; i++) {
+        data[event.favoriteBranches[i]] = results[i];
+      }
+
+      emit(AllBranchesAttendanceLoaded(
+        data: data,
+        favoriteBranches: event.favoriteBranches,
+      ));
+    } catch (e) {
+      emit(AllBranchesAttendanceError(
+        message: 'فشل في جلب بيانات الفروع: ${e.toString()}',
+      ));
+    }
+  }
 }
+

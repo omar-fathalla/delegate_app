@@ -48,7 +48,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         ? [
             const AdminBranchesScreen(),
             const AddBranchScreen(),
-            const CreateAdminScreen(),
+            CreateAdminScreen(organizationUID: delegate.organizationUID),
             SettingsScreen(delegate: delegate),
           ]
         : [

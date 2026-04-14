@@ -21,7 +21,13 @@ class MarketingDelegatesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => di.sl<MarketingBloc>()..add(LoadDelegates(organizationUID: organizationUID, companyUID: companyUID)),
+      create: (_) => di.sl<MarketingBloc>()
+        ..add(
+          LoadDelegates(
+            organizationUID: organizationUID,
+            companyUID: companyUID,
+          ),
+        ),
       child: _MarketingDelegatesView(companyName: companyName),
     );
   }
@@ -33,12 +39,13 @@ class _MarketingDelegatesView extends StatefulWidget {
   const _MarketingDelegatesView({required this.companyName});
 
   @override
-  State<_MarketingDelegatesView> createState() => _MarketingDelegatesViewState();
+  State<_MarketingDelegatesView> createState() =>
+      _MarketingDelegatesViewState();
 }
 
 class _MarketingDelegatesViewState extends State<_MarketingDelegatesView> {
   final TextEditingController _searchController = TextEditingController();
-  
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -46,10 +53,13 @@ class _MarketingDelegatesViewState extends State<_MarketingDelegatesView> {
   }
 
   void _onSearchChanged(String query) {
-    context.read<MarketingBloc>().add(SearchDelegates(
-      organizationUID: '', // Will be ignored by SearchDelegates locally if already loaded
-      query: query,
-    ));
+    context.read<MarketingBloc>().add(
+      SearchDelegates(
+        organizationUID:
+            '', // Will be ignored by SearchDelegates locally if already loaded
+        query: query,
+      ),
+    );
   }
 
   @override
@@ -57,10 +67,7 @@ class _MarketingDelegatesViewState extends State<_MarketingDelegatesView> {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.companyName),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: Text(widget.companyName), centerTitle: true),
       body: Column(
         children: [
           Padding(
@@ -84,13 +91,24 @@ class _MarketingDelegatesViewState extends State<_MarketingDelegatesView> {
                 if (state is DelegatesLoading) {
                   return const Center(child: CircularProgressIndicator());
                 } else if (state is DelegatesError) {
-                  return Center(child: Text(state.message, style: TextStyle(color: Theme.of(context).colorScheme.error)));
+                  return Center(
+                    child: Text(
+                      state.message,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  );
                 } else if (state is DelegatesLoaded) {
                   if (state.delegates.isEmpty) {
                     return const Center(child: Text('لا يوجد مناديب.'));
                   }
                   return ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
+                    padding: const EdgeInsets.only(
+                      bottom: 16,
+                      left: 16,
+                      right: 16,
+                    ),
                     itemCount: state.delegates.length,
                     itemBuilder: (context, index) {
                       final delegate = state.delegates[index];
@@ -104,46 +122,98 @@ class _MarketingDelegatesViewState extends State<_MarketingDelegatesView> {
                               Row(
                                 children: [
                                   CircleAvatar(
-                                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                    child: Text(delegate.fullName.substring(0, 1)),
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer,
+                                    child: Text(
+                                      delegate.fullName.substring(0, 1),
+                                    ),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Text(delegate.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                        Text(delegate.phoneNumber, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                        Text(
+                                          delegate.fullName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        Text(
+                                          delegate.phoneNumber,
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: delegate.status.name == 'active' || delegate.status.name == 'approved' ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+                                      color:
+                                          delegate.status.name == 'active' ||
+                                              delegate.status.name == 'approved'
+                                          ? Colors.green.withValues(alpha: 0.1)
+                                          : Colors.orange.withValues(
+                                              alpha: 0.1,
+                                            ),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
                                       delegate.status.name,
-                                      style: TextStyle(color: delegate.status.name == 'active' || delegate.status.name == 'approved' ? Colors.green : Colors.orange, fontSize: 12),
+                                      style: TextStyle(
+                                        color:
+                                            delegate.status.name == 'active' ||
+                                                delegate.status.name ==
+                                                    'approved'
+                                            ? Colors.green
+                                            : Colors.orange,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                               const Divider(height: 24),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
                                 children: [
                                   TextButton.icon(
                                     onPressed: () {
-                                      Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(delegate: delegate, isReadOnly: true)));
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ProfileScreen(
+                                            delegate: delegate,
+                                            showBackButton: true,
+                                          ),
+                                        ),
+                                      );
                                     },
                                     icon: const Icon(Icons.person_outline),
                                     label: const Text('الملف'),
                                   ),
                                   TextButton.icon(
                                     onPressed: () {
-                                      Navigator.push(context, MaterialPageRoute(builder: (_) => AttendanceScreen(delegate: delegate, viewOnly: true)));
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => AttendanceScreen(
+                                            delegate: delegate,
+                                            viewOnly: true,
+                                          ),
+                                        ),
+                                      );
                                     },
                                     icon: const Icon(Icons.history),
                                     label: const Text('الحضور'),

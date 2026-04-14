@@ -133,4 +133,22 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(ServerFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, bool>> verifyPhonePassword(
+    String phoneNumber,
+    String password,
+  ) async {
+    try {
+      final isValid = await remoteDataSource.verifyPhonePassword(
+        phoneNumber,
+        password,
+      );
+      return Right(isValid);
+    } on Failure catch (failure) {
+      return Left(failure);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 }

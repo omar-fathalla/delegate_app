@@ -19,6 +19,16 @@ abstract class MarketingRemoteDataSource {
     String organizationUID,
     String? companyUID,
   );
+
+  /// Fetch all branches from Firestore
+  Future<List<Map<String, dynamic>>> getBranches();
+
+  /// Fetch today's attendance records for a specific branch,
+  /// enriched with delegate info (fullName, phoneNumber).
+  Future<List<Map<String, dynamic>>> getTodayAttendanceByBranch({
+    required String branchName,
+    required String organizationId,
+  });
 }
 
 class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
@@ -177,4 +187,164 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       throw const ServerFailure('حدث خطأ غير متوقع.');
     }
   }
+
+  // ─────────────────────────────────────────────
+  // Branch Features
+  // ─────────────────────────────────────────────
+
+  @override
+  Future<List<Map<String, dynamic>>> getBranches() async {
+    try {
+      final snapshot = await firestore
+          .collection('branches')
+          .orderBy('branchName')
+          .get();
+      return snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
+    } on FirebaseException catch (e) {
+      throwFirestoreFailure(e, 'فشل في جلب الفروع.');
+    } catch (_) {
+      throw const ServerFailure('حدث خطأ غير متوقع عند جلب الفروع.');
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getTodayAttendanceByBranch({
+    required String branchName,
+    required String organizationId,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final todayEnd = todayStart.add(const Duration(days: 1));
+
+      // ── Step 1: جلب سجلات اليوم بـ timestamp فقط (single-field index موجود افتراضياً) ──
+      // نتجنّب استخدام multi-field composite index غير موجود.
+      final logsSnapshot = await firestore
+          .collection('attendance_logs')
+          .where(
+            'timestamp',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart),
+          )
+          .where('timestamp', isLessThan: Timestamp.fromDate(todayEnd))
+          .get();
+
+      // ── Step 2: فلترة client-side حسب branchName ──
+      final todayLogs = logsSnapshot.docs
+          .where((doc) => doc.data()['branchName'] == branchName)
+          .toList();
+
+      if (todayLogs.isEmpty) return [];
+
+      // ── Step 3: بناء Map لآخر check_in لكل مندوب ──
+      final Map<String, Map<String, dynamic>> checkInByDelegate = {};
+      for (final doc in todayLogs) {
+        final data = doc.data();
+        final type = data['type'] as String? ?? '';
+        if (type != 'check_in') continue;
+
+        final delegateId = data['delegateId'] as String? ??
+            data['userId'] as String? ??
+            '';
+        if (delegateId.isEmpty) continue;
+
+        final ts = data['timestamp'] as Timestamp?;
+        // نحتفظ فقط بأحدث check_in لكل مندوب
+        if (!checkInByDelegate.containsKey(delegateId)) {
+          checkInByDelegate[delegateId] = {
+            'checkInDocId': doc.id,
+            'checkInTime': ts,
+            'delegateId': delegateId,
+            'branchName': data['branchName'],
+            'checkOutTime': null,
+          };
+        } else {
+          final existing =
+              checkInByDelegate[delegateId]!['checkInTime'] as Timestamp?;
+          if (ts != null && (existing == null || ts.compareTo(existing) > 0)) {
+            checkInByDelegate[delegateId]!['checkInTime'] = ts;
+            checkInByDelegate[delegateId]!['checkInDocId'] = doc.id;
+          }
+        }
+      }
+
+      if (checkInByDelegate.isEmpty) return [];
+
+      // ── Step 4: ربط check_out من نفس السجلات (client-side) ──
+      for (final doc in todayLogs) {
+        final data = doc.data();
+        final type = data['type'] as String? ?? '';
+        if (type != 'check_out') continue;
+
+        final delegateId = data['delegateId'] as String? ??
+            data['userId'] as String? ??
+            '';
+        if (checkInByDelegate.containsKey(delegateId)) {
+          final existingOut =
+              checkInByDelegate[delegateId]!['checkOutTime'] as Timestamp?;
+          final ts = data['timestamp'] as Timestamp?;
+          // نحتفظ بأحدث check_out
+          if (ts != null &&
+              (existingOut == null || ts.compareTo(existingOut) > 0)) {
+            checkInByDelegate[delegateId]!['checkOutTime'] = ts;
+          }
+        }
+      }
+
+      // ── Step 5: جلب بيانات المناديب من collectionGroup بـ organizationUID ──
+      // نجلب كل المناديب في المنظمة مرة واحدة ثم نصفّيهم في Dart
+      // (يتجنّب استخدام FieldPath.documentId whereIn على collectionGroup)
+      final delegateIds = checkInByDelegate.keys.toSet();
+
+      final delegatesSnapshot = await firestore
+          .collectionGroup('delegates')
+          .where('organizationUID', isEqualTo: organizationId)
+          .get();
+
+      final delegateLookup = <String, Map<String, dynamic>>{};
+      for (final doc in delegatesSnapshot.docs) {
+        if (delegateIds.contains(doc.id)) {
+          delegateLookup[doc.id] = {'uid': doc.id, ...doc.data()};
+        }
+      }
+
+      // ── Step 6: بناء القائمة النهائية ──
+      final results = <Map<String, dynamic>>[];
+      for (final delegateId in delegateIds) {
+        final record = Map<String, dynamic>.from(checkInByDelegate[delegateId]!);
+        final delegateData = delegateLookup[delegateId];
+        record['fullName'] = delegateData?['fullName'] ?? 'مندوب';
+        record['phoneNumber'] = delegateData?['phoneNumber'] ?? '';
+        record['companyName'] = delegateData?['companyName'] ?? '';
+        record['companyUID'] = delegateData?['companyUID'] ?? '';
+        record['imageUrl'] = delegateData?['personalPhotoURL'];
+        record['delegateData'] = delegateData;
+        results.add(record);
+      }
+
+      // ترتيب: الأحدث check_in أولاً
+      results.sort((a, b) {
+        final at = a['checkInTime'] as Timestamp?;
+        final bt = b['checkInTime'] as Timestamp?;
+        if (at == null && bt == null) return 0;
+        if (at == null) return 1;
+        if (bt == null) return -1;
+        return bt.compareTo(at);
+      });
+
+      return results;
+    } on FirebaseException catch (e) {
+      // نُظهر الخطأ الحقيقي من Firebase لتسهيل التشخيص
+      throwFirestoreFailure(
+        e,
+        'فشل في جلب بيانات الحضور للفرع (${e.code}): ${e.message}',
+      );
+    } catch (e, st) {
+      // نُظهر الخطأ الفعلي بدلاً من رسالة عامة
+      throw ServerFailure('خطأ غير متوقع: $e\n$st');
+    }
+  }
 }
+
+

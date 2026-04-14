@@ -422,6 +422,18 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settings;
 
+  /// Companies tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Companies'**
+  String get companies;
+
+  /// Search tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get search;
+
   /// Language menu item
   ///
   /// In en, this message translates to:
@@ -1417,6 +1429,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New notification'**
   String get newNotification;
+
+  /// Search companies screen title
+  ///
+  /// In en, this message translates to:
+  /// **'Search Companies'**
+  String get searchCompanies;
+
+  /// Hint text for company search
+  ///
+  /// In en, this message translates to:
+  /// **'Search for companies using company code'**
+  String get searchCompaniesHint;
+
+  /// Placeholder for company code search input
+  ///
+  /// In en, this message translates to:
+  /// **'Enter company code'**
+  String get enterCompanyCode;
+
+  /// Clear button text
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clear;
+
+  /// Message when no companies are found
+  ///
+  /// In en, this message translates to:
+  /// **'No companies found'**
+  String get noCompaniesFound;
+
+  /// Search query label
+  ///
+  /// In en, this message translates to:
+  /// **'Search Query'**
+  String get searchQuery;
+
+  /// Error occurred message
+  ///
+  /// In en, this message translates to:
+  /// **'Error Occurred'**
+  String get errorOccurred;
+
+  /// Try again button text
+  ///
+  /// In en, this message translates to:
+  /// **'Try Again'**
+  String get tryAgain;
 }
 
 class _AppLocalizationsDelegate

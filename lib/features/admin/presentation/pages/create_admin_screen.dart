@@ -6,19 +6,24 @@ import 'package:google_fonts/google_fonts.dart';
 import '../bloc/create_admin_bloc.dart';
 
 class CreateAdminScreen extends StatelessWidget {
-  const CreateAdminScreen({super.key});
+  final String organizationUID;
+
+  const CreateAdminScreen({super.key, required this.organizationUID});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => di.sl<CreateAdminBloc>(),
-      child: const _CreateAdminView(),
+      create: (_) =>
+          di.sl<CreateAdminBloc>()..add(LoadOrganizationsRequested()),
+      child: _CreateAdminView(organizationUID: organizationUID),
     );
   }
 }
 
 class _CreateAdminView extends StatefulWidget {
-  const _CreateAdminView();
+  final String organizationUID;
+
+  const _CreateAdminView({required this.organizationUID});
 
   @override
   State<_CreateAdminView> createState() => _CreateAdminViewState();
@@ -29,6 +34,14 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _nameController = TextEditingController();
+  String _selectedRole = 'company-admin';
+  String? _selectedOrgUID;
+  List<Map<String, dynamic>> _organizations = [];
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   void dispose() {
@@ -40,12 +53,20 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
 
   void _submitForm() {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedOrgUID == null || _selectedOrgUID!.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('يرجى اختيار المنظمة')));
+      return;
+    }
 
     context.read<CreateAdminBloc>().add(
       CreateAdminSubmitted(
         phoneNumber: _phoneController.text.trim(),
         email: _emailController.text.trim(),
         displayName: _nameController.text.trim(),
+        role: _selectedRole,
+        organizationUID: _selectedOrgUID!,
       ),
     );
   }
@@ -57,10 +78,21 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
 
     return BlocConsumer<CreateAdminBloc, CreateAdminState>(
       listener: (context, state) {
+        if (state is CreateAdminOrgsLoaded) {
+          setState(() {
+            _organizations = state.organizations;
+            if (widget.organizationUID.isNotEmpty) {
+              _selectedOrgUID = widget.organizationUID;
+            }
+          });
+        }
         if (state is CreateAdminSuccess) {
           _phoneController.clear();
           _emailController.clear();
           _nameController.clear();
+          setState(() {
+            _selectedOrgUID = null;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(l10n.adminCreatedSuccessfully),
@@ -125,15 +157,8 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                     TextFormField(
                       controller: _nameController,
                       textInputAction: TextInputAction.next,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: colorScheme.onSurface,
-                      ),
                       decoration: InputDecoration(
                         labelText: l10n.adminName,
-                        labelStyle: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
                         prefixIcon: Icon(
                           Icons.person_outline,
                           color: colorScheme.onSurfaceVariant,
@@ -150,12 +175,9 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                           borderSide: BorderSide(color: colorScheme.primary),
                         ),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return l10n.pleaseEnterAdminName;
-                        }
-                        return null;
-                      },
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? l10n.pleaseEnterAdminName
+                          : null,
                     ),
                     const SizedBox(height: 20),
 
@@ -164,15 +186,8 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                       controller: _phoneController,
                       textInputAction: TextInputAction.next,
                       keyboardType: TextInputType.phone,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: colorScheme.onSurface,
-                      ),
                       decoration: InputDecoration(
                         labelText: l10n.adminPhone,
-                        labelStyle: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
                         prefixIcon: Icon(
                           Icons.phone_outlined,
                           color: colorScheme.onSurfaceVariant,
@@ -189,11 +204,11 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                           borderSide: BorderSide(color: colorScheme.primary),
                         ),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
                           return l10n.pleaseEnterAdminPhone;
                         }
-                        if (value.trim().length < 10) {
+                        if (v.trim().length < 10) {
                           return l10n.invalidPhoneNumber;
                         }
                         return null;
@@ -206,15 +221,8 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                       controller: _emailController,
                       textInputAction: TextInputAction.done,
                       keyboardType: TextInputType.emailAddress,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: colorScheme.onSurface,
-                      ),
                       decoration: InputDecoration(
                         labelText: l10n.adminEmail,
-                        labelStyle: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
                         prefixIcon: Icon(
                           Icons.email_outlined,
                           color: colorScheme.onSurfaceVariant,
@@ -231,17 +239,135 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                           borderSide: BorderSide(color: colorScheme.primary),
                         ),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
                           return l10n.pleaseEnterAdminEmail;
                         }
                         if (!RegExp(
-                          r'^[^@]+@[^@]+\.[^@]+$',
-                        ).hasMatch(value.trim())) {
+                          r'^[^@]+@[^@]+\.[^@]+',
+                        ).hasMatch(v.trim())) {
                           return l10n.invalidEmail;
                         }
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Organization Dropdown
+                    Text(
+                      'المنظمة',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: _organizations.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : DropdownButtonFormField<String>(
+                              initialValue: _selectedOrgUID,
+                              decoration: InputDecoration(
+                                prefixIcon: Icon(
+                                  Icons.corporate_fare_rounded,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                              ),
+                              hint: const Text('اختر المنظمة'),
+                              items: _organizations.map((org) {
+                                return DropdownMenuItem<String>(
+                                  value: org['uid'] as String,
+                                  child: Text(
+                                    org['name'] as String? ??
+                                        org['uid'] as String,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                setState(() {
+                                  _selectedOrgUID = val;
+                                });
+                              },
+                            ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Role Selector
+                    Text(
+                      'نوع المستخدم',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          _RoleTile(
+                            title: 'موظف تسويق',
+                            subtitle: 'Marketing',
+                            icon: Icons.campaign_rounded,
+                            value: 'marketing',
+                            isSelected: _selectedRole == 'marketing',
+                            onTap: () {
+                              setState(() => _selectedRole = 'marketing');
+                            },
+                          ),
+                          Divider(
+                            height: 1,
+                            color: colorScheme.outline.withValues(alpha: 0.3),
+                          ),
+                          _RoleTile(
+                            title: 'مدير قطاع',
+                            subtitle: 'Company Admin',
+                            icon: Icons.business_rounded,
+                            value: 'company-admin',
+                            isSelected: _selectedRole == 'company-admin',
+                            onTap: () {
+                              setState(() => _selectedRole = 'company-admin');
+                            },
+                          ),
+                          Divider(
+                            height: 1,
+                            color: colorScheme.outline.withValues(alpha: 0.3),
+                          ),
+                          _RoleTile(
+                            title: 'مدير عام',
+                            subtitle: 'Organization Admin',
+                            icon: Icons.corporate_fare_rounded,
+                            value: 'organization-admin',
+                            isSelected: _selectedRole == 'organization-admin',
+                            onTap: () {
+                              setState(
+                                () => _selectedRole = 'organization-admin',
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 40),
 
@@ -286,6 +412,84 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
           ),
         );
       },
+    );
+  }
+}
+
+class _RoleTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String value;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _RoleTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.value,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        child: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? colorScheme.primary : colorScheme.outline,
+                  width: isSelected ? 8 : 2,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? colorScheme.primary
+                          : colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

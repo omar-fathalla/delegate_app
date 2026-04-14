@@ -188,6 +188,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settings => 'الإعدادات';
 
   @override
+  String get companies => 'الشركات';
+
+  @override
+  String get search => 'بحث';
+
+  @override
   String get language => 'اللغة';
 
   @override
@@ -705,4 +711,28 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get newNotification => 'إشعار جديد';
+
+  @override
+  String get searchCompanies => 'البحث عن الشركات';
+
+  @override
+  String get searchCompaniesHint => 'ابحث عن الشركات باستخدام كود الشركة';
+
+  @override
+  String get enterCompanyCode => 'أدخل كود الشركة';
+
+  @override
+  String get clear => 'مسح';
+
+  @override
+  String get noCompaniesFound => 'لا توجد شركات';
+
+  @override
+  String get searchQuery => 'البحث';
+
+  @override
+  String get errorOccurred => 'حدث خطأ';
+
+  @override
+  String get tryAgain => 'حاول مرة أخرى';
 }

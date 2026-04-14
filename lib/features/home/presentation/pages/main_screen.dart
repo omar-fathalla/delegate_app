@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
+import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/changelog/presentation/bloc/changelog_bloc.dart';
@@ -208,7 +209,10 @@ class _MainScreenState extends State<MainScreen> {
 
         // Tab 2: Profile
         if (_initializedTabs.contains(2))
-          ProfileScreen(delegate: delegate)
+          BlocProvider(
+            create: (context) => di.sl<ProfileBloc>(),
+            child: ProfileScreen(delegate: delegate),
+          )
         else
           const SizedBox.shrink(),
 

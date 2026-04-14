@@ -15,4 +15,8 @@ abstract class AuthRepository {
     String email,
     String password,
   );
+  Future<Either<Failure, bool>> verifyPhonePassword(
+    String phoneNumber,
+    String password,
+  );
 }
