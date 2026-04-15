@@ -33,7 +33,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   /// (`+2`, `+20`, `002`, `0020`) so queries match the bare format
   /// stored in Firestore (e.g. `"01274114404"`).
   String _normalizePhone(String phone) {
+    // Replace Arabic digits with English digits
+    const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    
     String normalized = phone.trim();
+    
+    // Remove any spaces or invisible characters that might be added by phone keyboards
+    normalized = normalized.replaceAll(RegExp(r'[^\d+٠-٩]'), '');
+
+    for (int i = 0; i < arabic.length; i++) {
+      normalized = normalized.replaceAll(arabic[i], english[i]);
+    }
 
     if (normalized.startsWith('+20')) {
       normalized = '0${normalized.substring(3)}';
