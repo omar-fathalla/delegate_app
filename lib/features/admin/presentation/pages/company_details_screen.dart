@@ -456,7 +456,7 @@ class CompanyDetailsScreen extends StatelessWidget {
                   ),
                 ),
               );
-              // TODO: Implement edit company navigation when screen is ready
+              // Note: Implement edit company navigation when screen is ready
               // Navigator.push(
               //   context,
               //   MaterialPageRoute(
@@ -488,7 +488,7 @@ class CompanyDetailsScreen extends StatelessWidget {
                   ),
                 ),
               );
-              // TODO: Implement delegates navigation when screen is ready
+              // Note: Implement delegates navigation when screen is ready
               // Navigator.push(
               //   context,
               //   MaterialPageRoute(

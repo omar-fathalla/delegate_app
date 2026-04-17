@@ -21,7 +21,7 @@ class LoadProfile extends ProfileEvent {
   @override
   List<Object> get props => [
         uid,
-        if (organizationUID != null) organizationUID!,
-        if (companyUID != null) companyUID!,
+        ?organizationUID,
+        ?companyUID,
       ];
 }

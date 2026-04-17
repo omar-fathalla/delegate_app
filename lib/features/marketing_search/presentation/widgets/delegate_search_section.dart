@@ -113,7 +113,7 @@ class DelegateSearchSection extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.search_rounded, size: 22),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Text(
                   'بحث عن المندوب',
                   style: TextStyle(
