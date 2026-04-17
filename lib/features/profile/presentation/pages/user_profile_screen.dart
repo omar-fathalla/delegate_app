@@ -127,7 +127,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     ThemeData theme,
     Delegate? delegate,
   ) {
-    final displayName = delegate?.fullName ?? _currentUser?.displayName ?? 'مستخدم';
+    final displayName =
+        delegate?.fullName ?? _currentUser?.displayName ?? 'مستخدم';
     final email = delegate?.email ?? _currentUser?.email ?? '';
 
     return Card(
@@ -237,7 +238,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             _buildInfoRow(
               icon: Icons.badge_outlined,
               label: 'الاسم',
-              value: delegate?.fullName ?? _currentUser?.displayName ?? 'غير محدد',
+              value:
+                  delegate?.fullName ?? _currentUser?.displayName ?? 'غير محدد',
               colorScheme: colorScheme,
               theme: theme,
             ),
@@ -255,7 +257,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             _buildInfoRow(
               icon: Icons.phone_outlined,
               label: 'رقم الموبايل',
-              value: delegate?.phoneNumber ?? _currentUser?.phoneNumber ?? 'غير محدد',
+              value:
+                  delegate?.phoneNumber ??
+                  _currentUser?.phoneNumber ??
+                  'غير محدد',
               colorScheme: colorScheme,
               theme: theme,
               showDivider: false,
@@ -570,6 +575,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     return AlertDialog(
       title: const Row(
@@ -593,6 +599,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   labelText: 'كلمة المرور الحالية',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
+                    tooltip: _obscureCurrentPassword
+                        ? l10n.showPassword
+                        : l10n.hidePassword,
                     icon: Icon(
                       _obscureCurrentPassword
                           ? Icons.visibility_outlined
@@ -626,6 +635,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   labelText: 'كلمة المرور الجديدة',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
+                    tooltip: _obscureNewPassword
+                        ? l10n.showPassword
+                        : l10n.hidePassword,
                     icon: Icon(
                       _obscureNewPassword
                           ? Icons.visibility_outlined
@@ -662,6 +674,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   labelText: 'تأكيد كلمة المرور',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
+                    tooltip: _obscureConfirmPassword
+                        ? l10n.showPassword
+                        : l10n.hidePassword,
                     icon: Icon(
                       _obscureConfirmPassword
                           ? Icons.visibility_outlined

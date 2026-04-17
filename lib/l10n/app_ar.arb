@@ -996,4 +996,19 @@
     "@tryAgain": {
         "description": "Try again button text"
     }
+,
+    "showPassword": "إظهار كلمة المرور",
+    "@showPassword": {
+        "description": "Tooltip for showing password"
+    }
+,
+    "hidePassword": "إخفاء كلمة المرور",
+    "@hidePassword": {
+        "description": "Tooltip for hiding password"
+    }
+,
+    "close": "إغلاق",
+    "@close": {
+        "description": "Tooltip for closing dialogs or screens"
+    }
 }

@@ -735,4 +735,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get tryAgain => 'حاول مرة أخرى';
+
+  @override
+  String get showPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
+
+  @override
+  String get close => 'إغلاق';
 }

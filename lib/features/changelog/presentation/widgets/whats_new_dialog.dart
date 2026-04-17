@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:delegate_app/features/changelog/domain/entities/app_update.dart';
 import 'package:delegate_app/main.dart';
 import 'package:intl/intl.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 /// A beautiful bottom sheet dialog showing new app updates.
 class WhatsNewDialog extends StatelessWidget {
@@ -32,6 +33,7 @@ class WhatsNewDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isArabic = localeProvider.isArabic;
+    final l10n = AppLocalizations.of(context)!;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.65,
@@ -106,6 +108,7 @@ class WhatsNewDialog extends StatelessWidget {
                       ),
                     ),
                     IconButton(
+                      tooltip: l10n.close,
                       onPressed: () {
                         onDismiss();
                         Navigator.pop(context);
