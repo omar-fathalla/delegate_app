@@ -13,7 +13,11 @@ class MockProfileRemoteDataSource implements ProfileRemoteDataSource {
   String? lastUid;
 
   @override
-  Future<DelegateModel> getDelegateProfile(String uid) {
+  Future<DelegateModel> getDelegateProfile(
+    String uid, {
+    String? organizationUID,
+    String? companyUID,
+  }) {
     callCount++;
     lastUid = uid;
     if (getDelegateProfileStub != null) return getDelegateProfileStub!(uid);
