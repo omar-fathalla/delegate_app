@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
 import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
+import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
@@ -193,9 +194,12 @@ class _MarketingDelegatesViewState extends State<_MarketingDelegatesView> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => ProfileScreen(
-                                            delegate: delegate,
-                                            showBackButton: true,
+                                          builder: (_) => BlocProvider(
+                                            create: (_) => di.sl<ProfileBloc>(),
+                                            child: ProfileScreen(
+                                              delegate: delegate,
+                                              showBackButton: true,
+                                            ),
                                           ),
                                         ),
                                       );

@@ -230,20 +230,18 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           .where('timestamp', isLessThan: Timestamp.fromDate(todayEnd))
           .get();
 
-      // ── Step 2: فلترة client-side حسب branchName ──
-      final todayLogs = logsSnapshot.docs
-          .where((doc) => doc.data()['branchName'] == branchName)
-          .toList();
+      // ── Step 2: عزل الحضور الخاص بهذا الفرع فقط ──
+      final checkInLogs = logsSnapshot.docs.where((doc) {
+        final data = doc.data();
+        return data['type'] == 'check_in' && data['branchName'] == branchName;
+      }).toList();
 
-      if (todayLogs.isEmpty) return [];
+      if (checkInLogs.isEmpty) return [];
 
       // ── Step 3: بناء Map لآخر check_in لكل مندوب ──
       final Map<String, Map<String, dynamic>> checkInByDelegate = {};
-      for (final doc in todayLogs) {
+      for (final doc in checkInLogs) {
         final data = doc.data();
-        final type = data['type'] as String? ?? '';
-        if (type != 'check_in') continue;
-
         final delegateId = data['delegateId'] as String? ??
             data['userId'] as String? ??
             '';
@@ -271,31 +269,48 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
 
       if (checkInByDelegate.isEmpty) return [];
 
-      // ── Step 4: ربط check_out من نفس السجلات (client-side) ──
-      for (final doc in todayLogs) {
+      final delegateIds = checkInByDelegate.keys.toSet();
+
+      // ── Step 4: ربط check_out من نفس سجلات اليوم لكافة المندوبين بالفرع ──
+      // حتى لو لم يكن يحتوي الانصراف على branchName
+      final checkOutLogs = logsSnapshot.docs.where((doc) {
         final data = doc.data();
         final type = data['type'] as String? ?? '';
-        if (type != 'check_out') continue;
-
         final delegateId = data['delegateId'] as String? ??
             data['userId'] as String? ??
             '';
-        if (checkInByDelegate.containsKey(delegateId)) {
-          final existingOut =
-              checkInByDelegate[delegateId]!['checkOutTime'] as Timestamp?;
-          final ts = data['timestamp'] as Timestamp?;
-          // نحتفظ بأحدث check_out
-          if (ts != null &&
-              (existingOut == null || ts.compareTo(existingOut) > 0)) {
-            checkInByDelegate[delegateId]!['checkOutTime'] = ts;
-          }
+        return type == 'check_out' && delegateIds.contains(delegateId);
+      }).toList();
+
+      for (final doc in checkOutLogs) {
+        final data = doc.data();
+        final delegateId = data['delegateId'] as String? ??
+            data['userId'] as String? ??
+            '';
+        
+        final existingOut =
+            checkInByDelegate[delegateId]!['checkOutTime'] as Timestamp?;
+        final ts = data['timestamp'] as Timestamp?;
+        
+        // قد يكون هناك انصراف خاص بحضور آخر لنفس المندوب في نفس اليوم بفرع آخر
+        // لزيادة الدقة يمكننا التأكد أن relatedCheckInId يطابق checkInDocId، إن وُجد.
+        final relatedId = data['relatedCheckInId'] as String?;
+        final currentCheckInDocId = checkInByDelegate[delegateId]!['checkInDocId'];
+        
+        if (relatedId != null && relatedId != currentCheckInDocId) {
+          continue; // انصراف لا يخص هذا الحضور
+        }
+
+        // نحتفظ بأحدث check_out
+        if (ts != null &&
+            (existingOut == null || ts.compareTo(existingOut) > 0)) {
+          checkInByDelegate[delegateId]!['checkOutTime'] = ts;
         }
       }
 
       // ── Step 5: جلب بيانات المناديب من collectionGroup بـ organizationUID ──
       // نجلب كل المناديب في المنظمة مرة واحدة ثم نصفّيهم في Dart
       // (يتجنّب استخدام FieldPath.documentId whereIn على collectionGroup)
-      final delegateIds = checkInByDelegate.keys.toSet();
 
       final delegatesSnapshot = await firestore
           .collectionGroup('delegates')

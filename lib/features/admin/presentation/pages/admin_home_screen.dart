@@ -182,56 +182,58 @@ class _AdminHomeBody extends StatelessWidget {
           ),
 
           // ── Quick Actions ──
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Icon(
-                Icons.dashboard_rounded,
-                color: theme.colorScheme.primary,
-                size: 28,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'الإجراءات السريعة',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
+          if (adminDelegate.role == UserRole.marketing || adminDelegate.role == UserRole.superAdmin) ...[
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Icon(
+                  Icons.dashboard_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 28,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+                const SizedBox(width: 10),
+                Text(
+                  'الإجراءات السريعة',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
-          // Quick Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/admin/company-search');
-                  },
-                  icon: const Icon(Icons.search_rounded),
-                  label: const Text('البحث عن الشركات'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+            // Quick Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/admin/company-search');
+                    },
+                    icon: const Icon(Icons.search_rounded),
+                    label: const Text('البحث عن الشركات'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // يمكن إضافة إجراءات أخرى هنا
-                  },
-                  icon: const Icon(Icons.business_rounded),
-                  label: const Text('إدارة الشركات'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      // يمكن إضافة إجراءات أخرى هنا
+                    },
+                    icon: const Icon(Icons.business_rounded),
+                    label: const Text('إدارة الشركات'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
 
           // ── Task Summary ──
           const SizedBox(height: 24),

@@ -15,14 +15,24 @@ class GetDelegateProfile
   Future<Either<Failure, Delegate>> call(
     GetDelegateProfileParams params,
   ) async {
-    return await repository.getDelegateProfile(params.uid);
+    return await repository.getDelegateProfile(
+      params.uid,
+      organizationUID: params.organizationUID,
+      companyUID: params.companyUID,
+    );
   }
 }
 
 class GetDelegateProfileParams extends Equatable {
   final String uid;
+  final String? organizationUID;
+  final String? companyUID;
 
-  const GetDelegateProfileParams({required this.uid});
+  const GetDelegateProfileParams({
+    required this.uid,
+    this.organizationUID,
+    this.companyUID,
+  });
 
   @override
   List<Object> get props => [uid];

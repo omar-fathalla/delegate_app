@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -107,7 +108,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 const SizedBox(height: 16),
 
                 // Security Card
-                _buildSecurityCard(colorScheme, theme, l10n),
+                _buildSecurityCard(colorScheme, theme, l10n, delegate),
 
                 const SizedBox(height: 24),
 
@@ -271,6 +272,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     ColorScheme colorScheme,
     ThemeData theme,
     AppLocalizations l10n,
+    Delegate? delegate,
   ) {
     return Card(
       elevation: 0,
@@ -315,7 +317,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => _showChangePasswordDialog(context),
+                onPressed: () => _showChangePasswordSheet(context, delegate),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colorScheme.secondaryContainer,
                   foregroundColor: colorScheme.onSecondaryContainer,
@@ -423,11 +425,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  // ─── Change Password Dialog ─────────────────────────────────────
-  void _showChangePasswordDialog(BuildContext context) {
-    showDialog(
+  // ─── Change Password Sheet ──────────────────────────────────────
+  void _showChangePasswordSheet(BuildContext context, Delegate? delegate) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => const _ChangePasswordDialog(),
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ChangePasswordBottomSheet(delegate: delegate),
     );
   }
 
@@ -466,17 +471,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Change Password Dialog
+// Change Password Bottom Sheet
 // ═══════════════════════════════════════════════════════════════════
 
-class _ChangePasswordDialog extends StatefulWidget {
-  const _ChangePasswordDialog();
+class _ChangePasswordBottomSheet extends StatefulWidget {
+  final Delegate? delegate;
+  const _ChangePasswordBottomSheet({this.delegate});
 
   @override
-  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+  State<_ChangePasswordBottomSheet> createState() => _ChangePasswordBottomSheetState();
 }
 
-class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> {
   final _formKey = GlobalKey<FormState>();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -497,26 +503,66 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
 
   Future<void> _changePassword() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('لم يتم العثور على المستخدم');
+      final String currentPass = _currentPasswordController.text.trim();
+      final String newPass = _newPasswordController.text.trim();
 
-      // Re-authenticate user
-      final email = user.email;
-      if (email == null) throw Exception('البريد الإلكتروني غير موجود');
+      bool passwordUpdated = false;
 
-      final credential = EmailAuthProvider.credential(
-        email: email,
-        password: _currentPasswordController.text,
-      );
+      // 1. Try Firebase Auth (if user exists and has email)
+      final fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser != null && fbUser.email != null) {
+        try {
+          final credential = EmailAuthProvider.credential(
+            email: fbUser.email!,
+            password: currentPass,
+          );
+          await fbUser.reauthenticateWithCredential(credential);
+          await fbUser.updatePassword(newPass);
+          passwordUpdated = true;
+        } catch (e) {
+          // Might fail if they log in via anonymous/phone, proceed to Firestore as fallback.
+        }
+      }
 
-      await user.reauthenticateWithCredential(credential);
+      // 2. Try Firestore 'users' collection (for Admin / Marketing phone users)
+      if (widget.delegate != null) {
+        final delegate = widget.delegate!;
+        final db = FirebaseFirestore.instance;
+        
+        // Find user by email or phone number
+        Query query = db.collection('users');
+        if (delegate.email != null && delegate.email!.isNotEmpty) {
+           query = query.where('email', isEqualTo: delegate.email);
+        } else if (delegate.phoneNumber.isNotEmpty) {
+           query = query.where('phoneNumber', isEqualTo: delegate.phoneNumber);
+        }
 
-      // Update password
-      await user.updatePassword(_newPasswordController.text);
+        final snapshot = await query.limit(1).get();
+        if (snapshot.docs.isNotEmpty) {
+          final doc = snapshot.docs.first;
+          final data = doc.data() as Map<String, dynamic>;
+          final storedPass = data['password'] ?? data['temporaryPassword'] ?? data['tempPassword'];
+
+          if (storedPass == currentPass) {
+             // Correct current password, update it
+             await doc.reference.update({
+               'password': newPass,
+               'temporaryPassword': FieldValue.delete(),
+               'tempPassword': FieldValue.delete(),
+             });
+             passwordUpdated = true;
+          } else if (!passwordUpdated) {
+             throw Exception('كلمة المرور الحالية غير صحيحة');
+          }
+        }
+      }
+
+      if (!passwordUpdated) {
+        throw Exception('البيانات غير صحيحة أو لا يوجد حساب مرتبط بكلمة المرور هذه.');
+      }
 
       if (mounted) {
         Navigator.pop(context);
@@ -524,29 +570,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           const SnackBar(
             content: Text('✅ تم تغيير كلمة المرور بنجاح'),
             backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      String errorMessage = 'حدث خطأ أثناء تغيير كلمة المرور';
-
-      switch (e.code) {
-        case 'wrong-password':
-          errorMessage = 'كلمة المرور الحالية غير صحيحة';
-          break;
-        case 'weak-password':
-          errorMessage = 'كلمة المرور الجديدة ضعيفة جداً';
-          break;
-        case 'requires-recent-login':
-          errorMessage = 'يرجى تسجيل الدخول مرة أخرى ثم المحاولة';
-          break;
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ $errorMessage'),
-            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -554,8 +578,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ حدث خطأ: ${e.toString()}'),
+            content: Text('❌ ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -566,48 +591,104 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     }
   }
 
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required bool obscureText,
+    required VoidCallback onToggleVisibility,
+    required String? Function(String?) validator,
+    required ColorScheme colorScheme,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        prefixIcon: Icon(Icons.lock_outline, color: colorScheme.onSurfaceVariant),
+        suffixIcon: IconButton(
+          icon: Icon(
+            obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          onPressed: onToggleVisibility,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: colorScheme.outlineVariant, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+        ),
+      ),
+      validator: validator,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.lock_reset_rounded),
-          SizedBox(width: 12),
-          Text('تغيير كلمة المرور'),
-        ],
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      content: Form(
+      padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottomInset),
+      child: Form(
         key: _formKey,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Current Password
-              TextFormField(
-                controller: _currentPasswordController,
-                obscureText: _obscureCurrentPassword,
-                decoration: InputDecoration(
-                  labelText: 'كلمة المرور الحالية',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureCurrentPassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscureCurrentPassword = !_obscureCurrentPassword;
-                      });
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              // Drag Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.lock_reset_rounded, size: 28, color: colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Text(
+                    'تغيير كلمة المرور',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // Current Password
+              _buildTextField(
+                controller: _currentPasswordController,
+                label: 'كلمة المرور الحالية',
+                obscureText: _obscureCurrentPassword,
+                colorScheme: colorScheme,
+                onToggleVisibility: () {
+                  setState(() => _obscureCurrentPassword = !_obscureCurrentPassword);
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'يرجى إدخال كلمة المرور الحالية';
@@ -619,28 +700,14 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
               const SizedBox(height: 16),
 
               // New Password
-              TextFormField(
+              _buildTextField(
                 controller: _newPasswordController,
+                label: 'كلمة المرور الجديدة',
                 obscureText: _obscureNewPassword,
-                decoration: InputDecoration(
-                  labelText: 'كلمة المرور الجديدة',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureNewPassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscureNewPassword = !_obscureNewPassword;
-                      });
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+                colorScheme: colorScheme,
+                onToggleVisibility: () {
+                  setState(() => _obscureNewPassword = !_obscureNewPassword);
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'يرجى إدخال كلمة المرور الجديدة';
@@ -655,28 +722,14 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
               const SizedBox(height: 16),
 
               // Confirm Password
-              TextFormField(
+              _buildTextField(
                 controller: _confirmPasswordController,
+                label: 'تأكيد كلمة المرور',
                 obscureText: _obscureConfirmPassword,
-                decoration: InputDecoration(
-                  labelText: 'تأكيد كلمة المرور',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureConfirmPassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscureConfirmPassword = !_obscureConfirmPassword;
-                      });
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+                colorScheme: colorScheme,
+                onToggleVisibility: () {
+                  setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'يرجى تأكيد كلمة المرور';
@@ -687,27 +740,50 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   return null;
                 },
               ),
+
+              const SizedBox(height: 32),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text('إلغاء', style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _isLoading ? null : _changePassword,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('تغيير', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.pop(context),
-          child: const Text('إلغاء'),
-        ),
-        FilledButton(
-          onPressed: _isLoading ? null : _changePassword,
-          style: FilledButton.styleFrom(backgroundColor: colorScheme.primary),
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('تغيير'),
-        ),
-      ],
     );
   }
 }
+

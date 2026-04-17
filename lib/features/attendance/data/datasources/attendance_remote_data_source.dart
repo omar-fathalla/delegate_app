@@ -143,6 +143,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             'type': 'check_out',
             'location': {'latitude': lat, 'longitude': long},
             'relatedCheckInId': attendanceId,
+            if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
           })
           .timeout(const Duration(seconds: 5));
 

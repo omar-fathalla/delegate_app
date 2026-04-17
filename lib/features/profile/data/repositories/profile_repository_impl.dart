@@ -11,9 +11,17 @@ class ProfileRepositoryImpl implements ProfileRepository {
   ProfileRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<Either<Failure, Delegate>> getDelegateProfile(String uid) async {
+  Future<Either<Failure, Delegate>> getDelegateProfile(
+    String uid, {
+    String? organizationUID,
+    String? companyUID,
+  }) async {
     try {
-      final remoteProfile = await remoteDataSource.getDelegateProfile(uid);
+      final remoteProfile = await remoteDataSource.getDelegateProfile(
+        uid,
+        organizationUID: organizationUID,
+        companyUID: companyUID,
+      );
       return Right(remoteProfile);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));

@@ -3,7 +3,11 @@ import 'package:delegate_app/core/error/exceptions.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 
 abstract class ProfileRemoteDataSource {
-  Future<DelegateModel> getDelegateProfile(String uid);
+  Future<DelegateModel> getDelegateProfile(
+    String uid, {
+    String? organizationUID,
+    String? companyUID,
+  });
 }
 
 class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
@@ -12,41 +16,50 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   ProfileRemoteDataSourceImpl({required this.firestore});
 
   @override
-  Future<DelegateModel> getDelegateProfile(String uid) async {
+  Future<DelegateModel> getDelegateProfile(
+    String uid, {
+    String? organizationUID,
+    String? companyUID,
+  }) async {
     try {
-      // 1. Fetch User Data to get Org/Comp IDs
-      final userDoc = await firestore.collection('users').doc(uid).get();
+      String? orgId = organizationUID;
+      String? compId = companyUID;
 
-      if (!userDoc.exists) {
-        throw ServerException('User not found');
-      }
+      if (orgId == null || compId == null) {
+        // 1. Fetch User Data to get Org/Comp IDs
+        final userDoc = await firestore.collection('users').doc(uid).get();
 
-      final userData = userDoc.data();
-      if (userData == null) {
-        throw ServerException('User data is empty');
-      }
+        if (!userDoc.exists) {
+          throw ServerException('User not found');
+        }
 
-      final String? role = userData['role'];
+        final userData = userDoc.data();
+        if (userData == null) {
+          throw ServerException('User data is empty');
+        }
 
-      if (role != 'delegate') {
-        throw ServerException('User is not a delegate');
-      }
+        final String? role = userData['role'];
 
-      String? organizationUID = userData['organizationUID'];
-      String? companyUID = userData['companyUID'];
+        if (role != 'delegate') {
+          throw ServerException('User is not a delegate');
+        }
 
-      if (organizationUID == null || companyUID == null) {
-        throw ServerException(
-          'User profile incomplete (Missing Org/Company ID). Please contact admin.',
-        );
+        orgId = userData['organizationUID'] as String?;
+        compId = userData['companyUID'] as String?;
+
+        if (orgId == null || compId == null) {
+          throw ServerException(
+            'User profile incomplete (Missing Org/Company ID). Please contact admin.',
+          );
+        }
       }
 
       // 2. Fetch Delegate Data using the constructed path
       final delegateRef = firestore
           .collection('organizations')
-          .doc(organizationUID)
+          .doc(orgId)
           .collection('companies')
-          .doc(companyUID)
+          .doc(compId)
           .collection('delegates')
           .doc(uid);
 

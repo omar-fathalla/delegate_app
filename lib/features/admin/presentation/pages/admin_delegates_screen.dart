@@ -2,6 +2,7 @@ import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bl
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_event.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
+import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_state.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_delegate_web_screen.dart';
@@ -421,9 +422,12 @@ class _DelegateCard extends StatelessWidget {
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => ProfileScreen(
-                            delegate: delegate,
-                            showBackButton: true,
+                          builder: (_) => BlocProvider(
+                            create: (_) => sl<ProfileBloc>(),
+                            child: ProfileScreen(
+                              delegate: delegate,
+                              showBackButton: true,
+                            ),
                           ),
                         ),
                       );

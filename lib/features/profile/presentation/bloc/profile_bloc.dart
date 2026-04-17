@@ -19,7 +19,11 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   ) async {
     emit(ProfileLoading());
     final result = await getDelegateProfile(
-      GetDelegateProfileParams(uid: event.uid),
+      GetDelegateProfileParams(
+        uid: event.uid,
+        organizationUID: event.organizationUID,
+        companyUID: event.companyUID,
+      ),
     );
     result.fold(
       (failure) => emit(ProfileError(message: failure.message)),

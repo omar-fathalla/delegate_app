@@ -28,7 +28,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Load full delegate profile from Firebase
     Future.microtask(() {
       if (mounted) {
-        context.read<ProfileBloc>().add(LoadProfile(uid: widget.delegate.uid));
+        context.read<ProfileBloc>().add(
+          LoadProfile(
+            uid: widget.delegate.uid,
+            organizationUID: widget.delegate.organizationUID,
+            companyUID: widget.delegate.companyUID,
+          ),
+        );
       }
     });
   }
