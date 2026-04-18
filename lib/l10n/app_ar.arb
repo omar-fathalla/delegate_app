@@ -938,15 +938,15 @@
     },
     "searchDelegates": "البحث عن مندوب...",
     "@searchDelegates": {
-      "description": "Placeholder for searching delegates"
+        "description": "Placeholder for searching delegates"
     },
     "filterByStatus": "تصفية حسب الحالة",
     "@filterByStatus": {
-      "description": "Label for status filter"
+        "description": "Label for status filter"
     },
     "noDelegateSearchResults": "لا توجد نتائج مطابقة لبحثك",
     "@noDelegateSearchResults": {
-      "description": "Message shown when no delegates match search or filter"
+        "description": "Message shown when no delegates match search or filter"
     },
     "notifications": "الإشعارات",
     "@notifications": {
@@ -995,5 +995,13 @@
     "tryAgain": "حاول مرة أخرى",
     "@tryAgain": {
         "description": "Try again button text"
+    },
+    "close": "إغلاق",
+    "@close": {
+        "description": "Close label for dialogs or menus"
+    },
+    "back": "رجوع",
+    "@back": {
+        "description": "Back label for navigation"
     }
 }

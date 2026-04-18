@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:delegate_app/features/changelog/domain/entities/app_update.dart';
 import 'package:delegate_app/main.dart';
 import 'package:intl/intl.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 /// A beautiful bottom sheet dialog showing new app updates.
 class WhatsNewDialog extends StatelessWidget {
@@ -106,6 +107,7 @@ class WhatsNewDialog extends StatelessWidget {
                       ),
                     ),
                     IconButton(
+                      tooltip: AppLocalizations.of(context)?.close ?? (isArabic ? 'إغلاق' : 'Close'),
                       onPressed: () {
                         onDismiss();
                         Navigator.pop(context);
