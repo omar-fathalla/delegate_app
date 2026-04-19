@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/changelog/domain/entities/app_update.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:intl/intl.dart';
 
@@ -110,6 +111,7 @@ class WhatsNewDialog extends StatelessWidget {
                         onDismiss();
                         Navigator.pop(context);
                       },
+                      tooltip: AppLocalizations.of(context)!.close,
                       icon: Icon(
                         Icons.close_rounded,
                         color: colorScheme.onSurfaceVariant,

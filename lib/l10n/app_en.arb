@@ -938,15 +938,15 @@
     },
     "searchDelegates": "Search delegates...",
     "@searchDelegates": {
-      "description": "Placeholder for searching delegates"
+        "description": "Placeholder for searching delegates"
     },
     "filterByStatus": "Filter by status",
     "@filterByStatus": {
-      "description": "Label for status filter"
+        "description": "Label for status filter"
     },
     "noDelegateSearchResults": "No delegates match your search",
     "@noDelegateSearchResults": {
-      "description": "Message shown when no delegates match search or filter"
+        "description": "Message shown when no delegates match search or filter"
     },
     "notifications": "Notifications",
     "@notifications": {
@@ -995,5 +995,13 @@
     "tryAgain": "Try Again",
     "@tryAgain": {
         "description": "Try again button text"
+    },
+    "close": "Close",
+    "@close": {
+        "description": "Close tooltip"
+    },
+    "back": "Back",
+    "@back": {
+        "description": "Back tooltip"
     }
 }
