@@ -5,3 +5,7 @@
 ## 2024-05-22 - [Auth] Password Visibility Toggle
 **Learning:** Obscured text fields without a visibility toggle frustrate users who need to verify complex passwords or names.
 **Action:** Always include a suffix icon toggle for `obscureText` fields, ensuring the icon state (eye vs slashed eye) matches the *action* (Show vs Hide) or *state* (Visible vs Hidden) consistently with the design system.
+
+## 2025-04-20 - Adding Tooltips to Password Visibility Toggles
+**Learning:** Icon-only buttons used for toggling password visibility need descriptive ARIA labels/tooltips (e.g. "Show password", "Hide password") to ensure they are accessible for screen reader users. The localized tooltip should dynamically update based on the state.
+**Action:** Always include a `tooltip` property to the `IconButton` used for password toggling and dynamically provide standard localized strings from `AppLocalizations` corresponding to its state.
