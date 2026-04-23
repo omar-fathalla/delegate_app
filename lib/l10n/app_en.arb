@@ -988,6 +988,14 @@
     "@searchQuery": {
         "description": "Search query label"
     },
+    "showPassword": "Show password",
+    "@showPassword": {
+        "description": "Tooltip for showing password"
+    },
+    "hidePassword": "Hide password",
+    "@hidePassword": {
+        "description": "Tooltip for hiding password"
+    },
     "errorOccurred": "Error Occurred",
     "@errorOccurred": {
         "description": "Error occurred message"

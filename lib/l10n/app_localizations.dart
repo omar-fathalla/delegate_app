@@ -1466,6 +1466,18 @@ abstract class AppLocalizations {
   /// **'Search Query'**
   String get searchQuery;
 
+  /// Tooltip for showing password
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// Tooltip for hiding password
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
+
   /// Error occurred message
   ///
   /// In en, this message translates to:

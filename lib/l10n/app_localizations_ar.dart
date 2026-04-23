@@ -731,6 +731,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get searchQuery => 'البحث';
 
   @override
+  String get showPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
+
+  @override
   String get errorOccurred => 'حدث خطأ';
 
   @override
