@@ -737,4 +737,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tryAgain => 'Try Again';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get back => 'Back';
 }

@@ -996,4 +996,13 @@
     "@tryAgain": {
         "description": "Try again button text"
     }
+    ,
+    "close": "إغلاق",
+    "@close": {
+        "description": "Close button tooltip"
+    },
+    "back": "رجوع",
+    "@back": {
+        "description": "Back button tooltip"
+    }
 }
