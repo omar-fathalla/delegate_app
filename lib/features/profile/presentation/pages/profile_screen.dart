@@ -885,6 +885,7 @@ class _FullScreenImageViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Scaffold(
@@ -900,6 +901,7 @@ class _FullScreenImageViewer extends StatelessWidget {
           ),
         ),
         leading: IconButton(
+          tooltip: l10n.close,
           icon: Icon(
             Icons.close_rounded,
             color: colorScheme.onInverseSurface,

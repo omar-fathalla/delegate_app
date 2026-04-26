@@ -299,6 +299,9 @@ class _LoginScreenState extends State<LoginScreen>
                                       prefixIcon: Icons.lock_rounded,
                                       colorScheme: colorScheme,
                                       suffixIcon: IconButton(
+                                        tooltip: _obscurePassword
+                                            ? AppLocalizations.of(context)!.showPassword
+                                            : AppLocalizations.of(context)!.hidePassword,
                                         icon: Icon(
                                           _obscurePassword
                                               ? Icons.visibility_off_outlined

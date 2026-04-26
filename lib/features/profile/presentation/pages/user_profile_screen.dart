@@ -608,6 +608,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
         fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         prefixIcon: Icon(Icons.lock_outline, color: colorScheme.onSurfaceVariant),
         suffixIcon: IconButton(
+          tooltip: obscureText ? AppLocalizations.of(context)!.showPassword : AppLocalizations.of(context)!.hidePassword,
           icon: Icon(
             obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
             color: colorScheme.onSurfaceVariant,
