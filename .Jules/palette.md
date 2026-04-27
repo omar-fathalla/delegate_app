@@ -5,3 +5,7 @@
 ## 2024-05-22 - [Auth] Password Visibility Toggle
 **Learning:** Obscured text fields without a visibility toggle frustrate users who need to verify complex passwords or names.
 **Action:** Always include a suffix icon toggle for `obscureText` fields, ensuring the icon state (eye vs slashed eye) matches the *action* (Show vs Hide) or *state* (Visible vs Hidden) consistently with the design system.
+
+## 2024-05-22 - [Auth/Profile] Password Visibility Toggle
+**Learning:** Obscured text fields without a descriptive tooltip for the visibility toggle frustrate screen reader users who need to verify complex passwords. Using dynamically translated strings like `AppLocalizations.of(context)!.showPassword` creates a fully accessible experience.
+**Action:** Always include a suffix icon toggle for `obscureText` fields with a dynamic `tooltip` property to ensure proper accessibility.

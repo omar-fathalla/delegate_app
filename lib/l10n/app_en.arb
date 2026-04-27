@@ -32,6 +32,14 @@
     "@mobileNumber": {
         "description": "Mobile number field label"
     },
+    "showPassword": "Show Password",
+    "@showPassword": {
+        "description": "Tooltip for show password toggle"
+    },
+    "hidePassword": "Hide Password",
+    "@hidePassword": {
+        "description": "Tooltip for hide password toggle"
+    },
     "password": "Password",
     "@password": {
         "description": "Password field label"
