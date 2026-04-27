@@ -735,4 +735,78 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get tryAgain => 'حاول مرة أخرى';
+
+  @override
+  String get manageMarketing => 'إدارة موظفي التسويق';
+
+  @override
+  String get noMarketingEmployeesFound => 'لا يوجد موظفي تسويق';
+
+  @override
+  String get searchByPhone => 'البحث برقم الموبايل...';
+
+  @override
+  String get filterByOrganization => 'تصفية حسب المنظمة';
+
+  @override
+  String get allOrganizations => 'جميع المنظمات';
+
+  @override
+  String get marketingEmployee => 'موظف تسويق';
+
+  @override
+  String get editMarketingEmployee => 'تعديل بيانات الموظف';
+
+  @override
+  String get deleteMarketingEmployee => 'حذف الموظف';
+
+  @override
+  String get deleteMarketingEmployeeConfirmation =>
+      'هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
+  String get suspendMarketingEmployee => 'إيقاف الموظف';
+
+  @override
+  String get activateMarketingEmployee => 'تفعيل الموظف';
+
+  @override
+  String get employeeSuspended => 'تم إيقاف الموظف';
+
+  @override
+  String get employeeActivated => 'تم تفعيل الموظف';
+
+  @override
+  String get employeeDeleted => 'تم حذف الموظف بنجاح';
+
+  @override
+  String get employeeUpdated => 'تم تحديث بيانات الموظف بنجاح';
+
+  @override
+  String get employeeName => 'اسم الموظف';
+
+  @override
+  String get employeePhone => 'رقم الهاتف';
+
+  @override
+  String get employeeEmail => 'البريد الإلكتروني';
+
+  @override
+  String get organization => 'المنظمة';
+
+  @override
+  String get forgotCheckoutTitle => 'تنبيه حضور معلق';
+
+  @override
+  String forgotCheckoutMessage(String oldBranch, String newBranch) {
+    return 'لديك حضور معلق في $oldBranch. هل تريد تسجيل الانصراف منه وتسجيل الحضور في $newBranch؟';
+  }
+
+  @override
+  String previousDayCheckoutMessage(String oldBranch, String newBranch) {
+    return 'لديك حضور معلق من يوم سابق في $oldBranch. سيتم إغلاقه وتسجيل حضورك لليوم في $newBranch.';
+  }
+
+  @override
+  String get confirmAction => 'تأكيد';
 }

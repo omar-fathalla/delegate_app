@@ -30,6 +30,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     on<HistoryRequested>(_onGetHistory);
     on<LoadMoreHistoryRequested>(_onLoadMoreHistory);
     on<SyncRequested>(_onSync);
+    on<CheckOutAndCheckInRequested>(_onCheckOutAndCheckIn);
   }
 
   Future<void> _onCheckIn(
@@ -46,6 +47,9 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         lat: event.lat,
         long: event.long,
         branchName: event.branchName,
+        currentHistory: state is AttendanceHistoryLoaded
+            ? (state as AttendanceHistoryLoaded).history
+            : null,
       ),
     );
     result.fold(
@@ -94,20 +98,19 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       (failure) => emit(AttendanceError(message: failure.message)),
       (result) {
         // Check for any active check-in (checkOutTime is null)
-        String? activeAttendanceId;
+        Attendance? activeAttendance;
         try {
-          final activeAttendance = result.items.firstWhere(
+          activeAttendance = result.items.firstWhere(
             (element) => element.checkOutTime == null,
           );
-          activeAttendanceId = activeAttendance.id;
         } catch (_) {
-          activeAttendanceId = null;
+          activeAttendance = null;
         }
 
         emit(
           AttendanceHistoryLoaded(
             history: result.items,
-            activeAttendanceId: activeAttendanceId,
+            activeAttendance: activeAttendance,
             lastDoc: result.lastDoc,
             hasReachedMax: result.hasReachedMax,
           ),
@@ -185,6 +188,50 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
             ),
           );
         }
+      },
+    );
+  }
+
+  Future<void> _onCheckOutAndCheckIn(
+    CheckOutAndCheckInRequested event,
+    Emitter<AttendanceState> emit,
+  ) async {
+    emit(AttendanceLoading());
+    // 1. Check out of the old attendance
+    final checkOutResult = await checkOut(
+      CheckOutParams(
+        attendanceId: event.oldAttendanceId,
+        userId: event.userId,
+        organizationId: event.organizationId,
+        lat: event.lat,
+        long: event.long,
+      ),
+    );
+
+    await checkOutResult.fold(
+      (failure) async => emit(AttendanceError(message: failure.message)),
+      (attendance) async {
+        // 2. If check-out is successful, proceed to check-in to the new branch
+        final checkInResult = await checkIn(
+          CheckInParams(
+            userId: event.userId,
+            companyId: event.companyId,
+            organizationId: event.organizationId,
+            deviceInfo: event.deviceInfo,
+            lat: event.lat,
+            long: event.long,
+            branchName: event.branchName,
+            currentHistory: state is AttendanceHistoryLoaded
+                ? (state as AttendanceHistoryLoaded).history
+                : null,
+          ),
+        );
+
+        checkInResult.fold(
+          (failure) => emit(AttendanceError(message: failure.message)),
+          (newAttendance) =>
+              emit(AttendanceCheckedIn(attendance: newAttendance)),
+        );
       },
     );
   }

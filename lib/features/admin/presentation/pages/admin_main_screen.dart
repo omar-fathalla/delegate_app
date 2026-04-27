@@ -3,6 +3,7 @@ import 'package:delegate_app/features/admin/presentation/pages/add_branch_screen
 import 'package:delegate_app/features/admin/presentation/pages/admin_branches_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/create_admin_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/manage_admins_screen.dart';
+import 'package:delegate_app/features/admin/presentation/pages/manage_marketing_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
@@ -30,6 +31,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         Navigator.of(
           context,
         ).push(MaterialPageRoute(builder: (_) => const ManageAdminsScreen()));
+        break;
+      case 'manage_marketing':
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const ManageMarketingScreen()));
         break;
       case 'manage_feedbacks':
         context.push('/admin/feedbacks');
@@ -84,6 +90,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               child: ListTile(
                 leading: const Icon(Icons.group_rounded),
                 title: Text(l10n.manageAdmins),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            PopupMenuItem(
+              value: 'manage_marketing',
+              child: ListTile(
+                leading: const Icon(Icons.campaign_rounded),
+                title: Text(l10n.manageMarketing),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
               ),

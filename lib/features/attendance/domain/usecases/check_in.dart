@@ -12,6 +12,20 @@ class CheckIn implements UseCase<Attendance, CheckInParams> {
 
   @override
   Future<Either<Failure, Attendance>> call(CheckInParams params) async {
+    if (params.currentHistory != null && params.branchName != null) {
+      final now = DateTime.now();
+      final hasVisitedToday = params.currentHistory!.any((attendance) {
+        final isSameDay = attendance.checkInTime.year == now.year &&
+            attendance.checkInTime.month == now.month &&
+            attendance.checkInTime.day == now.day;
+        return isSameDay && attendance.branchName == params.branchName;
+      });
+
+      if (hasVisitedToday) {
+        return const Left(ServerFailure('لا يمكن تكرار زيارة نفس الفرع في نفس اليوم'));
+      }
+    }
+
     return await repository.checkIn(
       params.userId,
       params.lat,
@@ -32,6 +46,7 @@ class CheckInParams extends Equatable {
   final double lat;
   final double long;
   final String? branchName;
+  final List<Attendance>? currentHistory;
 
   const CheckInParams({
     required this.userId,
@@ -41,6 +56,7 @@ class CheckInParams extends Equatable {
     required this.lat,
     required this.long,
     this.branchName,
+    this.currentHistory,
   });
 
   @override
@@ -52,5 +68,6 @@ class CheckInParams extends Equatable {
     lat,
     long,
     branchName,
+    currentHistory,
   ];
 }

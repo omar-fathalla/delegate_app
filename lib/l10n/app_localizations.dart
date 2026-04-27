@@ -1477,6 +1477,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Try Again'**
   String get tryAgain;
+
+  /// Manage marketing employees menu item
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Marketing Employees'**
+  String get manageMarketing;
+
+  /// Empty marketing employees list message
+  ///
+  /// In en, this message translates to:
+  /// **'No marketing employees found'**
+  String get noMarketingEmployeesFound;
+
+  /// Search by phone number placeholder
+  ///
+  /// In en, this message translates to:
+  /// **'Search by phone number...'**
+  String get searchByPhone;
+
+  /// Filter by organization label
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by organization'**
+  String get filterByOrganization;
+
+  /// All organizations filter option
+  ///
+  /// In en, this message translates to:
+  /// **'All Organizations'**
+  String get allOrganizations;
+
+  /// Marketing employee label
+  ///
+  /// In en, this message translates to:
+  /// **'Marketing Employee'**
+  String get marketingEmployee;
+
+  /// Edit marketing employee action
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Employee'**
+  String get editMarketingEmployee;
+
+  /// Delete marketing employee action
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Employee'**
+  String get deleteMarketingEmployee;
+
+  /// Delete marketing employee confirmation
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this employee? This action cannot be undone.'**
+  String get deleteMarketingEmployeeConfirmation;
+
+  /// Suspend marketing employee action
+  ///
+  /// In en, this message translates to:
+  /// **'Suspend Employee'**
+  String get suspendMarketingEmployee;
+
+  /// Activate marketing employee action
+  ///
+  /// In en, this message translates to:
+  /// **'Activate Employee'**
+  String get activateMarketingEmployee;
+
+  /// Employee suspended success message
+  ///
+  /// In en, this message translates to:
+  /// **'Employee suspended'**
+  String get employeeSuspended;
+
+  /// Employee activated success message
+  ///
+  /// In en, this message translates to:
+  /// **'Employee activated'**
+  String get employeeActivated;
+
+  /// Employee deleted success message
+  ///
+  /// In en, this message translates to:
+  /// **'Employee deleted successfully'**
+  String get employeeDeleted;
+
+  /// Employee updated success message
+  ///
+  /// In en, this message translates to:
+  /// **'Employee updated successfully'**
+  String get employeeUpdated;
+
+  /// Employee name field label
+  ///
+  /// In en, this message translates to:
+  /// **'Employee Name'**
+  String get employeeName;
+
+  /// Employee phone field label
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Number'**
+  String get employeePhone;
+
+  /// Employee email field label
+  ///
+  /// In en, this message translates to:
+  /// **'Email Address'**
+  String get employeeEmail;
+
+  /// Organization label
+  ///
+  /// In en, this message translates to:
+  /// **'Organization'**
+  String get organization;
+
+  /// Title for forgot checkout dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Check-in Alert'**
+  String get forgotCheckoutTitle;
+
+  /// Message for forgot checkout in a different branch
+  ///
+  /// In en, this message translates to:
+  /// **'You have a pending check-in at {oldBranch}. Do you want to check out from it and check in to {newBranch}?'**
+  String forgotCheckoutMessage(String oldBranch, String newBranch);
+
+  /// Message for forgot checkout from a previous day
+  ///
+  /// In en, this message translates to:
+  /// **'You have a pending check-in from a previous day at {oldBranch}. The system will check you out from it and check you in today at {newBranch}.'**
+  String previousDayCheckoutMessage(String oldBranch, String newBranch);
+
+  /// Confirm button text
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirmAction;
 }
 
 class _AppLocalizationsDelegate

@@ -228,12 +228,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         },
         builder: (context, state) {
           bool isCheckedIn = false;
-          String? activeAttendanceId;
+          Attendance? activeAttendance;
           bool isSyncing = false;
 
           if (state is AttendanceHistoryLoaded) {
-            isCheckedIn = state.activeAttendanceId != null;
-            activeAttendanceId = state.activeAttendanceId;
+            isCheckedIn = state.activeAttendance != null;
+            activeAttendance = state.activeAttendance;
             isSyncing = state.syncStatus == SyncStatus.inProgress;
           }
 
@@ -261,7 +261,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         : () => _showQRScanner(
                             context,
                             isCheckedIn,
-                            activeAttendanceId,
+                            activeAttendance,
                           ),
                     backgroundColor: isCheckedIn
                         ? Theme.of(context).colorScheme.errorContainer
@@ -744,7 +744,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   void _showQRScanner(
     BuildContext context,
     bool isCheckedIn,
-    String? activeAttendanceId,
+    Attendance? activeAttendance,
   ) {
     final l10n = AppLocalizations.of(context)!;
     final attendanceBloc = BlocProvider.of<AttendanceBloc>(context);
@@ -763,16 +763,43 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
         final position = await _getCurrentLocation(parentContext);
         if (position != null && parentContext.mounted) {
-          if (isCheckedIn && activeAttendanceId != null) {
-            attendanceBloc.add(
-              CheckOutRequested(
-                attendanceId: activeAttendanceId,
-                userId: widget.delegate.uid,
-                organizationId: widget.delegate.organizationUID,
-                lat: position.latitude,
-                long: position.longitude,
-              ),
-            );
+          if (isCheckedIn && activeAttendance != null) {
+            final now = DateTime.now();
+            final isPreviousDay =
+                activeAttendance.checkInTime.year != now.year ||
+                activeAttendance.checkInTime.month != now.month ||
+                activeAttendance.checkInTime.day != now.day;
+
+            if (isPreviousDay) {
+              _showPreviousDayCheckoutDialog(
+                parentContext,
+                activeAttendance,
+                scannedBranch,
+                position,
+                attendanceBloc,
+                l10n,
+              );
+            } else if (activeAttendance.branchName == scannedBranch ||
+                activeAttendance.branchName == null) {
+              attendanceBloc.add(
+                CheckOutRequested(
+                  attendanceId: activeAttendance.id,
+                  userId: widget.delegate.uid,
+                  organizationId: widget.delegate.organizationUID,
+                  lat: position.latitude,
+                  long: position.longitude,
+                ),
+              );
+            } else {
+              _showForgotCheckoutDialog(
+                parentContext,
+                activeAttendance,
+                scannedBranch,
+                position,
+                attendanceBloc,
+                l10n,
+              );
+            }
           } else {
             await _checkIn(attendanceBloc, scannedBranch, position);
             if (parentContext.mounted) {
@@ -876,6 +903,98 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
     } catch (_) {}
     return 'Unknown Device';
+  }
+
+  void _showForgotCheckoutDialog(
+    BuildContext context,
+    Attendance activeAttendance,
+    String newBranch,
+    Position position,
+    AttendanceBloc bloc,
+    AppLocalizations l10n,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(l10n.forgotCheckoutTitle),
+          content: Text(
+            l10n.forgotCheckoutMessage(activeAttendance.branchName ?? l10n.unspecifiedBranch, newBranch),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final deviceInfo = await _getDeviceInfo();
+                bloc.add(
+                  CheckOutAndCheckInRequested(
+                    oldAttendanceId: activeAttendance.id,
+                    userId: widget.delegate.uid,
+                    companyId: widget.delegate.companyUID,
+                    organizationId: widget.delegate.organizationUID,
+                    deviceInfo: deviceInfo,
+                    lat: position.latitude,
+                    long: position.longitude,
+                    branchName: newBranch,
+                  ),
+                );
+              },
+              child: Text(l10n.confirmAction),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPreviousDayCheckoutDialog(
+    BuildContext context,
+    Attendance activeAttendance,
+    String newBranch,
+    Position position,
+    AttendanceBloc bloc,
+    AppLocalizations l10n,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(l10n.forgotCheckoutTitle),
+          content: Text(
+            l10n.previousDayCheckoutMessage(activeAttendance.branchName ?? l10n.unspecifiedBranch, newBranch),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final deviceInfo = await _getDeviceInfo();
+                bloc.add(
+                  CheckOutAndCheckInRequested(
+                    oldAttendanceId: activeAttendance.id,
+                    userId: widget.delegate.uid,
+                    companyId: widget.delegate.companyUID,
+                    organizationId: widget.delegate.organizationUID,
+                    deviceInfo: deviceInfo,
+                    lat: position.latitude,
+                    long: position.longitude,
+                    branchName: newBranch,
+                  ),
+                );
+              },
+              child: Text(l10n.confirmAction),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   /// Shimmer skeleton that mimics the attendance history cards while loading.

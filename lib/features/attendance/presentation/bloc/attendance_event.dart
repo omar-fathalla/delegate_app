@@ -104,3 +104,37 @@ class LoadMoreHistoryRequested extends AttendanceEvent {
 class SyncRequested extends AttendanceEvent {
   const SyncRequested();
 }
+
+class CheckOutAndCheckInRequested extends AttendanceEvent {
+  final String oldAttendanceId;
+  final String userId;
+  final String companyId;
+  final String organizationId;
+  final String deviceInfo;
+  final double lat;
+  final double long;
+  final String? branchName;
+
+  const CheckOutAndCheckInRequested({
+    required this.oldAttendanceId,
+    required this.userId,
+    required this.companyId,
+    required this.organizationId,
+    required this.deviceInfo,
+    required this.lat,
+    required this.long,
+    this.branchName,
+  });
+
+  @override
+  List<Object?> get props => [
+    oldAttendanceId,
+    userId,
+    companyId,
+    organizationId,
+    deviceInfo,
+    lat,
+    long,
+    branchName,
+  ];
+}

@@ -391,7 +391,7 @@ void main() {
         expect(state.history.length, 1);
         expect(state.history.first.id, 'att_1');
         // The active attendance is an open check-in (no checkout time)
-        expect(state.activeAttendanceId, 'att_1');
+        expect(state.activeAttendance?.id, 'att_1');
       },
     );
 

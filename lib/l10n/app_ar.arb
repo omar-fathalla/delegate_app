@@ -995,5 +995,113 @@
     "tryAgain": "حاول مرة أخرى",
     "@tryAgain": {
         "description": "Try again button text"
+    },
+    "manageMarketing": "إدارة موظفي التسويق",
+    "@manageMarketing": {
+        "description": "Manage marketing employees menu item"
+    },
+    "noMarketingEmployeesFound": "لا يوجد موظفي تسويق",
+    "@noMarketingEmployeesFound": {
+        "description": "Empty marketing employees list message"
+    },
+    "searchByPhone": "البحث برقم الموبايل...",
+    "@searchByPhone": {
+        "description": "Search by phone number placeholder"
+    },
+    "filterByOrganization": "تصفية حسب المنظمة",
+    "@filterByOrganization": {
+        "description": "Filter by organization label"
+    },
+    "allOrganizations": "جميع المنظمات",
+    "@allOrganizations": {
+        "description": "All organizations filter option"
+    },
+    "marketingEmployee": "موظف تسويق",
+    "@marketingEmployee": {
+        "description": "Marketing employee label"
+    },
+    "editMarketingEmployee": "تعديل بيانات الموظف",
+    "@editMarketingEmployee": {
+        "description": "Edit marketing employee action"
+    },
+    "deleteMarketingEmployee": "حذف الموظف",
+    "@deleteMarketingEmployee": {
+        "description": "Delete marketing employee action"
+    },
+    "deleteMarketingEmployeeConfirmation": "هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.",
+    "@deleteMarketingEmployeeConfirmation": {
+        "description": "Delete marketing employee confirmation"
+    },
+    "suspendMarketingEmployee": "إيقاف الموظف",
+    "@suspendMarketingEmployee": {
+        "description": "Suspend marketing employee action"
+    },
+    "activateMarketingEmployee": "تفعيل الموظف",
+    "@activateMarketingEmployee": {
+        "description": "Activate marketing employee action"
+    },
+    "employeeSuspended": "تم إيقاف الموظف",
+    "@employeeSuspended": {
+        "description": "Employee suspended success message"
+    },
+    "employeeActivated": "تم تفعيل الموظف",
+    "@employeeActivated": {
+        "description": "Employee activated success message"
+    },
+    "employeeDeleted": "تم حذف الموظف بنجاح",
+    "@employeeDeleted": {
+        "description": "Employee deleted success message"
+    },
+    "employeeUpdated": "تم تحديث بيانات الموظف بنجاح",
+    "@employeeUpdated": {
+        "description": "Employee updated success message"
+    },
+    "employeeName": "اسم الموظف",
+    "@employeeName": {
+        "description": "Employee name field label"
+    },
+    "employeePhone": "رقم الهاتف",
+    "@employeePhone": {
+        "description": "Employee phone field label"
+    },
+    "employeeEmail": "البريد الإلكتروني",
+    "@employeeEmail": {
+        "description": "Employee email field label"
+    },
+    "organization": "المنظمة",
+    "@organization": {
+        "description": "Organization label"
+    },
+    "forgotCheckoutTitle": "تنبيه حضور معلق",
+    "@forgotCheckoutTitle": {
+        "description": "Title for forgot checkout dialog"
+    },
+    "forgotCheckoutMessage": "لديك حضور معلق في {oldBranch}. هل تريد تسجيل الانصراف منه وتسجيل الحضور في {newBranch}؟",
+    "@forgotCheckoutMessage": {
+        "description": "Message for forgot checkout in a different branch",
+        "placeholders": {
+            "oldBranch": {
+                "type": "String"
+            },
+            "newBranch": {
+                "type": "String"
+            }
+        }
+    },
+    "previousDayCheckoutMessage": "لديك حضور معلق من يوم سابق في {oldBranch}. سيتم إغلاقه وتسجيل حضورك لليوم في {newBranch}.",
+    "@previousDayCheckoutMessage": {
+        "description": "Message for forgot checkout from a previous day",
+        "placeholders": {
+            "oldBranch": {
+                "type": "String"
+            },
+            "newBranch": {
+                "type": "String"
+            }
+        }
+    },
+    "confirmAction": "تأكيد",
+    "@confirmAction": {
+        "description": "Confirm button text"
     }
 }

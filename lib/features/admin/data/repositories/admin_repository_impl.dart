@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/admin/data/datasources/admin_remote_data_source.dart';
+import 'package:delegate_app/features/admin/data/datasources/manage_marketing_remote_datasource.dart';
 import 'package:delegate_app/features/admin/data/models/admin_user_model.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/admin_user.dart';
@@ -13,8 +14,13 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 class AdminRepositoryImpl implements AdminRepository {
   final AdminRemoteDataSource remoteDataSource;
+  final ManageMarketingRemoteDataSource marketingDataSource;
 
-  AdminRepositoryImpl({required this.remoteDataSource});
+  AdminRepositoryImpl({
+    required this.remoteDataSource,
+    required this.marketingDataSource,
+  });
+
 
   @override
   Future<Either<Failure, List<Map<String, dynamic>>>> getOrganizations() async {
@@ -243,6 +249,72 @@ class AdminRepositoryImpl implements AdminRepository {
           absentToday: absentToday,
         ),
       );
+    } on Failure catch (f) {
+      return Left(f);
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ غير متوقع.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<AdminUser>>> getMarketingEmployees() async {
+    try {
+      final employees = await marketingDataSource.getMarketingEmployees();
+      return Right(employees);
+    } on Failure catch (f) {
+      return Left(f);
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ غير متوقع.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> updateMarketingEmployee(
+    AdminUser employee,
+  ) async {
+    try {
+      final model = AdminUserModel(
+        uid: employee.uid,
+        phoneNumber: employee.phoneNumber,
+        email: employee.email,
+        displayName: employee.displayName,
+        role: employee.role,
+        createdAt: employee.createdAt,
+        createdBy: employee.createdBy,
+        temporaryPassword: employee.temporaryPassword,
+        isActive: employee.isActive,
+      );
+      await marketingDataSource.updateMarketingEmployee(model);
+      return const Right(unit);
+    } on Failure catch (f) {
+      return Left(f);
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ غير متوقع.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> deleteMarketingEmployee(
+    String employeeId,
+  ) async {
+    try {
+      await marketingDataSource.deleteMarketingEmployee(employeeId);
+      return const Right(unit);
+    } on Failure catch (f) {
+      return Left(f);
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ غير متوقع.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> suspendMarketingEmployee(
+    String employeeId,
+    bool suspend,
+  ) async {
+    try {
+      await marketingDataSource.suspendMarketingEmployee(employeeId, suspend);
+      return const Right(unit);
     } on Failure catch (f) {
       return Left(f);
     } catch (_) {

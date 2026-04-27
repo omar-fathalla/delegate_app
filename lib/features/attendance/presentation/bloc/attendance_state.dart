@@ -33,7 +33,7 @@ enum SyncStatus { initial, inProgress, success, failure }
 
 class AttendanceHistoryLoaded extends AttendanceState {
   final List<Attendance> history;
-  final String? activeAttendanceId;
+  final Attendance? activeAttendance;
   final SyncStatus syncStatus;
   final dynamic lastDoc;
   final bool isLoadingMore;
@@ -41,7 +41,7 @@ class AttendanceHistoryLoaded extends AttendanceState {
 
   const AttendanceHistoryLoaded({
     required this.history,
-    this.activeAttendanceId,
+    this.activeAttendance,
     this.syncStatus = SyncStatus.initial,
     this.lastDoc,
     this.hasReachedMax = false,
@@ -50,7 +50,7 @@ class AttendanceHistoryLoaded extends AttendanceState {
 
   AttendanceHistoryLoaded copyWith({
     List<Attendance>? history,
-    String? activeAttendanceId,
+    Attendance? activeAttendance,
     SyncStatus? syncStatus,
     dynamic lastDoc,
     bool? hasReachedMax,
@@ -58,7 +58,7 @@ class AttendanceHistoryLoaded extends AttendanceState {
   }) {
     return AttendanceHistoryLoaded(
       history: history ?? this.history,
-      activeAttendanceId: activeAttendanceId ?? this.activeAttendanceId,
+      activeAttendance: activeAttendance ?? this.activeAttendance,
       syncStatus: syncStatus ?? this.syncStatus,
       lastDoc: lastDoc ?? this.lastDoc,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
@@ -69,7 +69,7 @@ class AttendanceHistoryLoaded extends AttendanceState {
   @override
   List<Object?> get props => [
     history,
-    activeAttendanceId,
+    activeAttendance,
     syncStatus,
     lastDoc,
     hasReachedMax,

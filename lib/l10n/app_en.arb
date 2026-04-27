@@ -995,5 +995,113 @@
     "tryAgain": "Try Again",
     "@tryAgain": {
         "description": "Try again button text"
+    },
+    "manageMarketing": "Manage Marketing Employees",
+    "@manageMarketing": {
+        "description": "Manage marketing employees menu item"
+    },
+    "noMarketingEmployeesFound": "No marketing employees found",
+    "@noMarketingEmployeesFound": {
+        "description": "Empty marketing employees list message"
+    },
+    "searchByPhone": "Search by phone number...",
+    "@searchByPhone": {
+        "description": "Search by phone number placeholder"
+    },
+    "filterByOrganization": "Filter by organization",
+    "@filterByOrganization": {
+        "description": "Filter by organization label"
+    },
+    "allOrganizations": "All Organizations",
+    "@allOrganizations": {
+        "description": "All organizations filter option"
+    },
+    "marketingEmployee": "Marketing Employee",
+    "@marketingEmployee": {
+        "description": "Marketing employee label"
+    },
+    "editMarketingEmployee": "Edit Employee",
+    "@editMarketingEmployee": {
+        "description": "Edit marketing employee action"
+    },
+    "deleteMarketingEmployee": "Delete Employee",
+    "@deleteMarketingEmployee": {
+        "description": "Delete marketing employee action"
+    },
+    "deleteMarketingEmployeeConfirmation": "Are you sure you want to delete this employee? This action cannot be undone.",
+    "@deleteMarketingEmployeeConfirmation": {
+        "description": "Delete marketing employee confirmation"
+    },
+    "suspendMarketingEmployee": "Suspend Employee",
+    "@suspendMarketingEmployee": {
+        "description": "Suspend marketing employee action"
+    },
+    "activateMarketingEmployee": "Activate Employee",
+    "@activateMarketingEmployee": {
+        "description": "Activate marketing employee action"
+    },
+    "employeeSuspended": "Employee suspended",
+    "@employeeSuspended": {
+        "description": "Employee suspended success message"
+    },
+    "employeeActivated": "Employee activated",
+    "@employeeActivated": {
+        "description": "Employee activated success message"
+    },
+    "employeeDeleted": "Employee deleted successfully",
+    "@employeeDeleted": {
+        "description": "Employee deleted success message"
+    },
+    "employeeUpdated": "Employee updated successfully",
+    "@employeeUpdated": {
+        "description": "Employee updated success message"
+    },
+    "employeeName": "Employee Name",
+    "@employeeName": {
+        "description": "Employee name field label"
+    },
+    "employeePhone": "Phone Number",
+    "@employeePhone": {
+        "description": "Employee phone field label"
+    },
+    "employeeEmail": "Email Address",
+    "@employeeEmail": {
+        "description": "Employee email field label"
+    },
+    "organization": "Organization",
+    "@organization": {
+        "description": "Organization label"
+    },
+    "forgotCheckoutTitle": "Pending Check-in Alert",
+    "@forgotCheckoutTitle": {
+        "description": "Title for forgot checkout dialog"
+    },
+    "forgotCheckoutMessage": "You have a pending check-in at {oldBranch}. Do you want to check out from it and check in to {newBranch}?",
+    "@forgotCheckoutMessage": {
+        "description": "Message for forgot checkout in a different branch",
+        "placeholders": {
+            "oldBranch": {
+                "type": "String"
+            },
+            "newBranch": {
+                "type": "String"
+            }
+        }
+    },
+    "previousDayCheckoutMessage": "You have a pending check-in from a previous day at {oldBranch}. The system will check you out from it and check you in today at {newBranch}.",
+    "@previousDayCheckoutMessage": {
+        "description": "Message for forgot checkout from a previous day",
+        "placeholders": {
+            "oldBranch": {
+                "type": "String"
+            },
+            "newBranch": {
+                "type": "String"
+            }
+        }
+    },
+    "confirmAction": "Confirm",
+    "@confirmAction": {
+        "description": "Confirm button text"
     }
 }

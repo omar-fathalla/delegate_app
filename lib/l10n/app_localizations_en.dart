@@ -737,4 +737,78 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tryAgain => 'Try Again';
+
+  @override
+  String get manageMarketing => 'Manage Marketing Employees';
+
+  @override
+  String get noMarketingEmployeesFound => 'No marketing employees found';
+
+  @override
+  String get searchByPhone => 'Search by phone number...';
+
+  @override
+  String get filterByOrganization => 'Filter by organization';
+
+  @override
+  String get allOrganizations => 'All Organizations';
+
+  @override
+  String get marketingEmployee => 'Marketing Employee';
+
+  @override
+  String get editMarketingEmployee => 'Edit Employee';
+
+  @override
+  String get deleteMarketingEmployee => 'Delete Employee';
+
+  @override
+  String get deleteMarketingEmployeeConfirmation =>
+      'Are you sure you want to delete this employee? This action cannot be undone.';
+
+  @override
+  String get suspendMarketingEmployee => 'Suspend Employee';
+
+  @override
+  String get activateMarketingEmployee => 'Activate Employee';
+
+  @override
+  String get employeeSuspended => 'Employee suspended';
+
+  @override
+  String get employeeActivated => 'Employee activated';
+
+  @override
+  String get employeeDeleted => 'Employee deleted successfully';
+
+  @override
+  String get employeeUpdated => 'Employee updated successfully';
+
+  @override
+  String get employeeName => 'Employee Name';
+
+  @override
+  String get employeePhone => 'Phone Number';
+
+  @override
+  String get employeeEmail => 'Email Address';
+
+  @override
+  String get organization => 'Organization';
+
+  @override
+  String get forgotCheckoutTitle => 'Pending Check-in Alert';
+
+  @override
+  String forgotCheckoutMessage(String oldBranch, String newBranch) {
+    return 'You have a pending check-in at $oldBranch. Do you want to check out from it and check in to $newBranch?';
+  }
+
+  @override
+  String previousDayCheckoutMessage(String oldBranch, String newBranch) {
+    return 'You have a pending check-in from a previous day at $oldBranch. The system will check you out from it and check you in today at $newBranch.';
+  }
+
+  @override
+  String get confirmAction => 'Confirm';
 }

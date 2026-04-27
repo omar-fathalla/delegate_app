@@ -30,4 +30,12 @@ abstract class AdminRepository {
     String organizationUID,
     String companyUID,
   );
+  Future<Either<Failure, List<AdminUser>>> getMarketingEmployees();
+  Future<Either<Failure, Unit>> updateMarketingEmployee(AdminUser employee);
+  Future<Either<Failure, Unit>> deleteMarketingEmployee(String employeeId);
+  Future<Either<Failure, Unit>> suspendMarketingEmployee(
+    String employeeId,
+    bool suspend,
+  );
 }
+

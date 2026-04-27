@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/admin/data/datasources/admin_remote_data_source.dart';
+import 'package:delegate_app/features/admin/data/datasources/manage_marketing_remote_datasource.dart';
 import 'package:delegate_app/features/admin/data/models/admin_user_model.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/data/repositories/admin_repository_impl.dart';
@@ -106,13 +107,41 @@ class MockAdminRemoteDataSource implements AdminRemoteDataSource {
   }
 }
 
+class MockManageMarketingRemoteDataSource
+    implements ManageMarketingRemoteDataSource {
+  @override
+  Future<List<AdminUserModel>> getMarketingEmployees() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> updateMarketingEmployee(AdminUserModel employee) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> deleteMarketingEmployee(String employeeId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> suspendMarketingEmployee(String employeeId, bool suspend) {
+    throw UnimplementedError();
+  }
+}
+
 void main() {
   late AdminRepositoryImpl repository;
   late MockAdminRemoteDataSource mockDataSource;
+  late MockManageMarketingRemoteDataSource mockMarketingDataSource;
 
   setUp(() {
     mockDataSource = MockAdminRemoteDataSource();
-    repository = AdminRepositoryImpl(remoteDataSource: mockDataSource);
+    mockMarketingDataSource = MockManageMarketingRemoteDataSource();
+    repository = AdminRepositoryImpl(
+      remoteDataSource: mockDataSource,
+      marketingDataSource: mockMarketingDataSource,
+    );
   });
 
   const tBranch = BranchModel(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
+import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/attendance_action_button.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/attendance_history_list.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/current_status_card.dart';
@@ -65,11 +66,11 @@ class _HomeScreenState extends State<HomeScreen> {
           },
           builder: (context, state) {
             bool isCheckedIn = false;
-            String? activeAttendanceId;
+            Attendance? activeAttendance;
 
             if (state is AttendanceHistoryLoaded) {
-              isCheckedIn = state.activeAttendanceId != null;
-              activeAttendanceId = state.activeAttendanceId;
+              isCheckedIn = state.activeAttendance != null;
+              activeAttendance = state.activeAttendance;
             }
 
             return Padding(
@@ -90,10 +91,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (position == null || !context.mounted) return;
 
                         if (isCheckedIn) {
-                          if (activeAttendanceId == null) return;
+                          if (activeAttendance == null) return;
                           context.read<AttendanceBloc>().add(
                             CheckOutRequested(
-                              attendanceId: activeAttendanceId,
+                              attendanceId: activeAttendance.id,
                               userId: widget.delegate.uid,
                               organizationId: widget.delegate.organizationUID,
                               lat: position.latitude,

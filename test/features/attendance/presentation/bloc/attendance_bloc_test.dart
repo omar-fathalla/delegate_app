@@ -200,7 +200,7 @@ void main() {
 
   group('HistoryRequested', () {
     blocTest<AttendanceBloc, AttendanceState>(
-      'emits [Loading, HistoryLoaded] with activeAttendanceId for active session',
+      'emits [Loading, HistoryLoaded] with activeAttendance for active session',
       build: () {
         when(() => mockGetHistoryPaginated(any())).thenAnswer(
           (_) async => Right(
@@ -220,7 +220,7 @@ void main() {
         AttendanceLoading(),
         AttendanceHistoryLoaded(
           history: tHistory,
-          activeAttendanceId: 'att-1',
+          activeAttendance: tAttendance,
           hasReachedMax: true,
           lastDoc: null,
         ),
@@ -228,7 +228,7 @@ void main() {
     );
 
     blocTest<AttendanceBloc, AttendanceState>(
-      'emits [Loading, HistoryLoaded] with activeAttendanceId null when no active session',
+      'emits [Loading, HistoryLoaded] with activeAttendance null when no active session',
       build: () {
         when(() => mockGetHistoryPaginated(any())).thenAnswer(
           (_) async => Right(
@@ -248,7 +248,7 @@ void main() {
         AttendanceLoading(),
         AttendanceHistoryLoaded(
           history: [tAttendanceWithCheckOut],
-          activeAttendanceId: null,
+          activeAttendance: null,
           hasReachedMax: true,
           lastDoc: null,
         ),
@@ -284,18 +284,18 @@ void main() {
       },
       seed: () => AttendanceHistoryLoaded(
         history: tHistory,
-        activeAttendanceId: 'att-1',
+        activeAttendance: tAttendance,
       ),
       act: (bloc) => bloc.add(const SyncRequested()),
       expect: () => [
         AttendanceHistoryLoaded(
           history: tHistory,
-          activeAttendanceId: 'att-1',
+          activeAttendance: tAttendance,
           syncStatus: SyncStatus.inProgress,
         ),
         AttendanceHistoryLoaded(
           history: tHistory,
-          activeAttendanceId: 'att-1',
+          activeAttendance: tAttendance,
           syncStatus: SyncStatus.success,
         ),
       ],
@@ -311,18 +311,18 @@ void main() {
       },
       seed: () => AttendanceHistoryLoaded(
         history: tHistory,
-        activeAttendanceId: 'att-1',
+        activeAttendance: tAttendance,
       ),
       act: (bloc) => bloc.add(const SyncRequested()),
       expect: () => [
         AttendanceHistoryLoaded(
           history: tHistory,
-          activeAttendanceId: 'att-1',
+          activeAttendance: tAttendance,
           syncStatus: SyncStatus.inProgress,
         ),
         AttendanceHistoryLoaded(
           history: tHistory,
-          activeAttendanceId: 'att-1',
+          activeAttendance: tAttendance,
           syncStatus: SyncStatus.failure,
         ),
       ],
