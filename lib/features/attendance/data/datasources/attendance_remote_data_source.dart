@@ -94,7 +94,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             'deviceInfo': deviceInfo,
             'branchName': branchName,
           })
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
 
       return AttendanceModel(
         id: docRef.id,
@@ -124,7 +124,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     try {
       final lastCheckInSnapshot = await _attendanceCollection(
         organizationId,
-      ).doc(attendanceId).get().timeout(const Duration(seconds: 5));
+      ).doc(attendanceId).get().timeout(const Duration(seconds: 15));
 
       if (!lastCheckInSnapshot.exists) {
         throw const ServerFailure('سجل الحضور غير موجود.');
@@ -145,7 +145,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             'relatedCheckInId': attendanceId,
             if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
           })
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
 
       return AttendanceModel(
         id: attendanceId,
@@ -319,7 +319,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           .orderBy('timestamp', descending: true)
           .limit(1)
           .get()
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
 
       if (querySnapshot.docs.isEmpty) return null;
 
@@ -381,7 +381,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         batch.set(newDocRef, data);
       }
 
-      await batch.commit().timeout(const Duration(seconds: 10));
+      await batch.commit().timeout(const Duration(seconds: 20));
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في مزامنة البيانات المؤجلة.');
     } on TimeoutException {
@@ -396,18 +396,22 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     try {
       final querySnapshot = await firestore
           .collection('branches')
-          .where('branchName', isEqualTo: branchName)
+          .where('branchName', isEqualTo: branchName.trim())
           .limit(1)
           .get()
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
 
       if (querySnapshot.docs.isEmpty) {
         return null;
       }
 
       return querySnapshot.docs.first.data();
+    } on FirebaseException catch (e) {
+      throwFirestoreFailure(e, 'فشل في جلب بيانات الفرع. يرجى المحاولة مرة أخرى.');
+    } on TimeoutException {
+      throwTimeoutFailure('انتهت مهلة الاتصال بالخادم أثناء جلب بيانات الفرع.');
     } catch (_) {
-      return null;
+      throwUnexpectedFailure('حدث خطأ غير متوقع أثناء البحث عن الفرع.');
     }
   }
 
@@ -424,7 +428,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           .where('branchName', isEqualTo: branchName)
           .limit(1)
           .get()
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
 
       final Map<String, dynamic> data = {
         'branchName': branchName,
@@ -437,11 +441,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         await firestore
             .collection('branches')
             .add(data)
-            .timeout(const Duration(seconds: 5));
+            .timeout(const Duration(seconds: 15));
       } else {
         await querySnapshot.docs.first.reference
             .update(data)
-            .timeout(const Duration(seconds: 5));
+            .timeout(const Duration(seconds: 15));
       }
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في حفظ بيانات الفرع.');

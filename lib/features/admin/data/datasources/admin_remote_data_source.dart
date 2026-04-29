@@ -246,11 +246,10 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
       try {
         // Try optimized query with composite index
         snapshot = await firestore
-            .collection('organizations')
-            .doc(organizationId)
             .collection(kAttendanceCollection)
-            .where('type', isEqualTo: 'check_in')
+            .where('organizationId', isEqualTo: organizationId)
             .where('companyId', isEqualTo: companyId)
+            .where('type', isEqualTo: 'check_in')
             .where(
               'timestamp',
               isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
@@ -261,11 +260,10 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
         // Fallback: query without timestamp range (no composite index needed)
         // Filter by date client-side
         snapshot = await firestore
-            .collection('organizations')
-            .doc(organizationId)
             .collection(kAttendanceCollection)
-            .where('type', isEqualTo: 'check_in')
+            .where('organizationId', isEqualTo: organizationId)
             .where('companyId', isEqualTo: companyId)
+            .where('type', isEqualTo: 'check_in')
             .get();
       }
 

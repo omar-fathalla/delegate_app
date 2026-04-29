@@ -2,7 +2,6 @@ import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
-import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance_pagination_result.dart';
 import 'package:delegate_app/features/attendance/domain/repositories/attendance_repository.dart';
@@ -41,7 +40,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required String branchName,
     required bool isCheckIn,
   }) async {
-    final branchData = await remoteDataSource.getBranchByName(branchName);
+    final branchData = await remoteDataSource.getBranchByName(branchName.trim());
     if (branchData == null) {
       throw const ServerFailure(
         'لم يتم العثور على بيانات الفرع. يرجى التأكد من الرمز.',
@@ -64,11 +63,14 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       branch.longitude,
     );
 
-    if (distance > branch.geofenceRadius) {
+    // تم إضافة 50 متر كمسافة احتياطية لمعالجة عدم دقة الـ GPS داخل المباني
+    final double allowedRadius = branch.geofenceRadius + 50.0;
+
+    if (distance > allowedRadius) {
       final action = isCheckIn ? 'تسجيل الحضور' : 'تسجيل الانصراف';
       throw ServerFailure(
         'أنت خارج نطاق الفرع (${distance.toInt()} متر). '
-        'النطاق المسموح: ${branch.geofenceRadius.toInt()} متر لـ$action.',
+        'النطاق المسموح: ${allowedRadius.toInt()} متر لـ$action.',
       );
     }
   }
@@ -85,30 +87,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }) async {
     try {
       if (!await _hasConnection()) {
-        final localDocId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
-        final localAttendance = AttendanceModel(
-          id: localDocId,
-          userId: userId,
-          organizationId: organizationId,
-          checkInTime: DateTime.now(),
-          latitude: lat,
-          longitude: long,
-          branchName: branchName,
-          isSynced: false,
+        throw const ServerFailure(
+          'لا يوجد اتصال بالإنترنت. يرجى التأكد من اتصالك بالشبكة لتسجيل الحضور.',
         );
-
-        await localDataSource.cacheAttendance(localAttendance);
-        await offlineQueue.addToQueue({
-          'type': 'check_in',
-          'delegateId': userId,
-          'companyId': companyId,
-          'organizationId': organizationId,
-          'location': {'latitude': lat, 'longitude': long},
-          'deviceInfo': deviceInfo,
-          'branchName': branchName,
-        });
-
-        return Right(localAttendance);
       }
 
       // --- Anti-Fraud Geofencing ---
@@ -148,41 +129,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }) async {
     try {
       if (!await _hasConnection()) {
-        try {
-          final localHistory = await localDataSource.getLastAttendanceHistory();
-          final activeSessionIndex = localHistory.indexWhere(
-            (element) => element.id == attendanceId,
-          );
-
-          if (activeSessionIndex != -1) {
-            final activeSession = localHistory[activeSessionIndex];
-            // Safely use copyWith from AttendanceModel
-            final updatedSession = activeSession.copyWith(
-              checkOutTime: DateTime.now(),
-              isSynced: false,
-            );
-
-            await localDataSource.updateAttendance(updatedSession);
-            await offlineQueue.addToQueue({
-              'type': 'check_out',
-              'relatedCheckInId': attendanceId,
-              'delegateId': userId,
-              'organizationId': organizationId,
-              'location': {'latitude': lat, 'longitude': long},
-            });
-            return Right(updatedSession);
-          } else {
-            return const Left(
-              ServerFailure(
-                'لم يتم العثور على سجل مسبق محلياً لإتمام الانصراف، يرجى الاتصال بالإنترنت.',
-              ),
-            );
-          }
-        } catch (_) {
-          return const Left(
-            ServerFailure('حدث خطأ أثناء حفظ الانصراف محلياً.'),
-          );
-        }
+        throw const ServerFailure(
+          'لا يوجد اتصال بالإنترنت. يرجى التأكد من اتصالك بالشبكة لتسجيل الانصراف.',
+        );
       }
 
       // --- Anti-Fraud Geofencing for Check-Out (Non-Blocking) ---
