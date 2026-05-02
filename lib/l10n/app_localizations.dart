@@ -152,6 +152,18 @@ abstract class AppLocalizations {
   /// **'Password'**
   String get password;
 
+  /// Tooltip for show password toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// Tooltip for hide password toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
+
   /// Mother name field label
   ///
   /// In en, this message translates to:
