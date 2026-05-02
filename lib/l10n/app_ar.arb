@@ -1103,5 +1103,13 @@
     "confirmAction": "تأكيد",
     "@confirmAction": {
         "description": "Confirm button text"
+    },
+    "showPassword": "عرض كلمة المرور",
+    "@showPassword": {
+        "description": "Tooltip for showing password"
+    },
+    "hidePassword": "إخفاء كلمة المرور",
+    "@hidePassword": {
+        "description": "Tooltip for hiding password"
     }
 }

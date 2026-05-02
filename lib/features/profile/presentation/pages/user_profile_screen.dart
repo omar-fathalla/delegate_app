@@ -128,7 +128,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     ThemeData theme,
     Delegate? delegate,
   ) {
-    final displayName = delegate?.fullName ?? _currentUser?.displayName ?? 'مستخدم';
+    final displayName =
+        delegate?.fullName ?? _currentUser?.displayName ?? 'مستخدم';
     final email = delegate?.email ?? _currentUser?.email ?? '';
 
     return Card(
@@ -238,7 +239,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             _buildInfoRow(
               icon: Icons.badge_outlined,
               label: 'الاسم',
-              value: delegate?.fullName ?? _currentUser?.displayName ?? 'غير محدد',
+              value:
+                  delegate?.fullName ?? _currentUser?.displayName ?? 'غير محدد',
               colorScheme: colorScheme,
               theme: theme,
             ),
@@ -256,7 +258,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             _buildInfoRow(
               icon: Icons.phone_outlined,
               label: 'رقم الموبايل',
-              value: delegate?.phoneNumber ?? _currentUser?.phoneNumber ?? 'غير محدد',
+              value:
+                  delegate?.phoneNumber ??
+                  _currentUser?.phoneNumber ??
+                  'غير محدد',
               colorScheme: colorScheme,
               theme: theme,
               showDivider: false,
@@ -479,10 +484,12 @@ class _ChangePasswordBottomSheet extends StatefulWidget {
   const _ChangePasswordBottomSheet({this.delegate});
 
   @override
-  State<_ChangePasswordBottomSheet> createState() => _ChangePasswordBottomSheetState();
+  State<_ChangePasswordBottomSheet> createState() =>
+      _ChangePasswordBottomSheetState();
 }
 
-class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> {
+class _ChangePasswordBottomSheetState
+    extends State<_ChangePasswordBottomSheet> {
   final _formKey = GlobalKey<FormState>();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -531,37 +538,42 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
       if (widget.delegate != null) {
         final delegate = widget.delegate!;
         final db = FirebaseFirestore.instance;
-        
+
         // Find user by email or phone number
         Query query = db.collection('users');
         if (delegate.email != null && delegate.email!.isNotEmpty) {
-           query = query.where('email', isEqualTo: delegate.email);
+          query = query.where('email', isEqualTo: delegate.email);
         } else if (delegate.phoneNumber.isNotEmpty) {
-           query = query.where('phoneNumber', isEqualTo: delegate.phoneNumber);
+          query = query.where('phoneNumber', isEqualTo: delegate.phoneNumber);
         }
 
         final snapshot = await query.limit(1).get();
         if (snapshot.docs.isNotEmpty) {
           final doc = snapshot.docs.first;
           final data = doc.data() as Map<String, dynamic>;
-          final storedPass = data['password'] ?? data['temporaryPassword'] ?? data['tempPassword'];
+          final storedPass =
+              data['password'] ??
+              data['temporaryPassword'] ??
+              data['tempPassword'];
 
           if (storedPass == currentPass) {
-             // Correct current password, update it
-             await doc.reference.update({
-               'password': newPass,
-               'temporaryPassword': FieldValue.delete(),
-               'tempPassword': FieldValue.delete(),
-             });
-             passwordUpdated = true;
+            // Correct current password, update it
+            await doc.reference.update({
+              'password': newPass,
+              'temporaryPassword': FieldValue.delete(),
+              'tempPassword': FieldValue.delete(),
+            });
+            passwordUpdated = true;
           } else if (!passwordUpdated) {
-             throw Exception('كلمة المرور الحالية غير صحيحة');
+            throw Exception('كلمة المرور الحالية غير صحيحة');
           }
         }
       }
 
       if (!passwordUpdated) {
-        throw Exception('البيانات غير صحيحة أو لا يوجد حساب مرتبط بكلمة المرور هذه.');
+        throw Exception(
+          'البيانات غير صحيحة أو لا يوجد حساب مرتبط بكلمة المرور هذه.',
+        );
       }
 
       if (mounted) {
@@ -606,10 +618,18 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
         labelText: label,
         filled: true,
         fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        prefixIcon: Icon(Icons.lock_outline, color: colorScheme.onSurfaceVariant),
+        prefixIcon: Icon(
+          Icons.lock_outline,
+          color: colorScheme.onSurfaceVariant,
+        ),
         suffixIcon: IconButton(
+          tooltip: obscureText
+              ? AppLocalizations.of(context)!.showPassword
+              : AppLocalizations.of(context)!.hidePassword,
           icon: Icon(
-            obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            obscureText
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
             color: colorScheme.onSurfaceVariant,
           ),
           onPressed: onToggleVisibility,
@@ -662,12 +682,16 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.lock_reset_rounded, size: 28, color: colorScheme.primary),
+                  Icon(
+                    Icons.lock_reset_rounded,
+                    size: 28,
+                    color: colorScheme.primary,
+                  ),
                   const SizedBox(width: 12),
                   Text(
                     'تغيير كلمة المرور',
@@ -687,7 +711,9 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 obscureText: _obscureCurrentPassword,
                 colorScheme: colorScheme,
                 onToggleVisibility: () {
-                  setState(() => _obscureCurrentPassword = !_obscureCurrentPassword);
+                  setState(
+                    () => _obscureCurrentPassword = !_obscureCurrentPassword,
+                  );
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -728,7 +754,9 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 obscureText: _obscureConfirmPassword,
                 colorScheme: colorScheme,
                 onToggleVisibility: () {
-                  setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                  setState(
+                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                  );
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -748,14 +776,19 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: const Text('إلغاء', style: TextStyle(fontSize: 16)),
+                      child: const Text(
+                        'إلغاء',
+                        style: TextStyle(fontSize: 16),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -772,9 +805,18 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
-                          : const Text('تغيير', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : const Text(
+                              'تغيير',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -786,4 +828,3 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
     );
   }
 }
-

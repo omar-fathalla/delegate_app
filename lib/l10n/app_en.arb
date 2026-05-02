@@ -1103,5 +1103,13 @@
     "confirmAction": "Confirm",
     "@confirmAction": {
         "description": "Confirm button text"
+    },
+    "showPassword": "Show password",
+    "@showPassword": {
+        "description": "Tooltip for showing password"
+    },
+    "hidePassword": "Hide password",
+    "@hidePassword": {
+        "description": "Tooltip for hiding password"
     }
 }
