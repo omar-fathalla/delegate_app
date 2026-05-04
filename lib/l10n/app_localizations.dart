@@ -1610,6 +1610,18 @@ abstract class AppLocalizations {
   /// **'You have a pending check-in from a previous day at {oldBranch}. The system will check you out from it and check you in today at {newBranch}.'**
   String previousDayCheckoutMessage(String oldBranch, String newBranch);
 
+  /// Tooltip for show password icon
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// Tooltip for hide password icon
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
+
   /// Confirm button text
   ///
   /// In en, this message translates to:

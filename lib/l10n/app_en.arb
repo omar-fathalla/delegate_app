@@ -1100,6 +1100,14 @@
             }
         }
     },
+    "showPassword": "Show password",
+    "@showPassword": {
+        "description": "Tooltip for show password icon"
+    },
+    "hidePassword": "Hide password",
+    "@hidePassword": {
+        "description": "Tooltip for hide password icon"
+    },
     "confirmAction": "Confirm",
     "@confirmAction": {
         "description": "Confirm button text"
