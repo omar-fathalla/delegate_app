@@ -1274,7 +1274,7 @@ class _ScannerModalState extends State<_ScannerModal> {
             child: CircleAvatar(
               backgroundColor: colorScheme.surface.withValues(alpha: 0.3),
               child: IconButton(
-                tooltip: 'Close Scanner',
+                tooltip: l10n.close,
                 icon: Icon(Icons.close, color: colorScheme.surface),
                 onPressed: () {
                   Navigator.pop(context);

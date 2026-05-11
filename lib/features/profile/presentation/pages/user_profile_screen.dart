@@ -607,12 +607,18 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
         filled: true,
         fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         prefixIcon: Icon(Icons.lock_outline, color: colorScheme.onSurfaceVariant),
-        suffixIcon: IconButton(
-          icon: Icon(
-            obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          onPressed: onToggleVisibility,
+        suffixIcon: Builder(
+          builder: (context) {
+            final l10n = AppLocalizations.of(context)!;
+            return IconButton(
+              tooltip: obscureText ? l10n.showPassword : l10n.hidePassword,
+              icon: Icon(
+                obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              onPressed: onToggleVisibility,
+            );
+          }
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
