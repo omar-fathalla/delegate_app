@@ -31,7 +31,10 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+ios/build/
 /coverage/
+*.xcbuilddata/
+chrome_log*.txt
 
 # Symbolication related
 app.*.symbols
