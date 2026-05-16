@@ -95,7 +95,9 @@ jobs:
             -archivePath $PWD/build/Runner.xcarchive \
             archive \
             -allowProvisioningUpdates \
-            DEVELOPMENT_TEAM=TX5G7GZL6T
+            DEVELOPMENT_TEAM=TX5G7GZL6T \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="Tashil_Delegates"
 
       - name: 📦 Export IPA
         run: |
