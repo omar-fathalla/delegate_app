@@ -9,6 +9,18 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
+  String get hidePassword => 'إخفاء كلمة المرور';
+
+  @override
+  String get showPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get back => 'رجوع';
+
+  @override
+  String get close => 'إغلاق';
+
+  @override
   String get appTitle => 'تسهيل';
 
   @override

@@ -9,6 +9,18 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get hidePassword => 'Hide Password';
+
+  @override
+  String get showPassword => 'Show Password';
+
+  @override
+  String get back => 'Back';
+
+  @override
+  String get close => 'Close';
+
+  @override
   String get appTitle => 'Tashil';
 
   @override

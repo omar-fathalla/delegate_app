@@ -98,6 +98,30 @@ abstract class AppLocalizations {
     Locale('en'),
   ];
 
+  /// Hide password toggle tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Password'**
+  String get hidePassword;
+
+  /// Show password toggle tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Show Password'**
+  String get showPassword;
+
+  /// Back button tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get back;
+
+  /// Close button tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
+
   /// App title
   ///
   /// In en, this message translates to:
