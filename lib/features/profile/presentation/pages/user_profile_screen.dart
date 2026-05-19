@@ -598,6 +598,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
     required VoidCallback onToggleVisibility,
     required String? Function(String?) validator,
     required ColorScheme colorScheme,
+    required AppLocalizations l10n,
   }) {
     return TextFormField(
       controller: controller,
@@ -608,6 +609,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
         fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         prefixIcon: Icon(Icons.lock_outline, color: colorScheme.onSurfaceVariant),
         suffixIcon: IconButton(
+          tooltip: obscureText ? l10n.showPassword : l10n.hidePassword,
           icon: Icon(
             obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
             color: colorScheme.onSurfaceVariant,
@@ -636,6 +638,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       decoration: BoxDecoration(
@@ -695,6 +698,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                   }
                   return null;
                 },
+                l10n: l10n,
               ),
 
               const SizedBox(height: 16),
@@ -717,6 +721,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                   }
                   return null;
                 },
+                l10n: l10n,
               ),
 
               const SizedBox(height: 16),
@@ -739,6 +744,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                   }
                   return null;
                 },
+                l10n: l10n,
               ),
 
               const SizedBox(height: 32),
