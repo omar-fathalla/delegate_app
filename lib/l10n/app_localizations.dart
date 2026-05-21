@@ -146,6 +146,18 @@ abstract class AppLocalizations {
   /// **'Phone Number'**
   String get mobileNumber;
 
+  /// Tooltip for showing password
+  ///
+  /// In en, this message translates to:
+  /// **'Show Password'**
+  String get showPassword;
+
+  /// Tooltip for hiding password
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Password'**
+  String get hidePassword;
+
   /// Password field label
   ///
   /// In en, this message translates to:

@@ -40,6 +40,14 @@
     "@mobileNumber": {
         "description": "Mobile number field label"
     },
+    "showPassword": "إظهار كلمة المرور",
+    "@showPassword": {
+        "description": "Tooltip for showing password"
+    },
+    "hidePassword": "إخفاء كلمة المرور",
+    "@hidePassword": {
+        "description": "Tooltip for hiding password"
+    },
     "password": "كلمة المرور",
     "@password": {
         "description": "Password field label"
