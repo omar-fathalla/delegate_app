@@ -45,6 +45,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get enterPassword => 'Please enter password';
 
   @override
+  String get showPassword => 'Show Password';
+
+  @override
+  String get hidePassword => 'Hide Password';
+
+  @override
   String get rememberMe => 'Remember Me';
 
   @override

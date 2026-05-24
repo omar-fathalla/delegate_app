@@ -598,7 +598,9 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
     required VoidCallback onToggleVisibility,
     required String? Function(String?) validator,
     required ColorScheme colorScheme,
+    required BuildContext context,
   }) {
+    final l10n = AppLocalizations.of(context)!;
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
@@ -608,6 +610,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
         fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         prefixIcon: Icon(Icons.lock_outline, color: colorScheme.onSurfaceVariant),
         suffixIcon: IconButton(
+          tooltip: obscureText ? l10n.showPassword : l10n.hidePassword,
           icon: Icon(
             obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
             color: colorScheme.onSurfaceVariant,
@@ -686,6 +689,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 label: 'كلمة المرور الحالية',
                 obscureText: _obscureCurrentPassword,
                 colorScheme: colorScheme,
+                context: context,
                 onToggleVisibility: () {
                   setState(() => _obscureCurrentPassword = !_obscureCurrentPassword);
                 },
@@ -705,6 +709,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 label: 'كلمة المرور الجديدة',
                 obscureText: _obscureNewPassword,
                 colorScheme: colorScheme,
+                context: context,
                 onToggleVisibility: () {
                   setState(() => _obscureNewPassword = !_obscureNewPassword);
                 },
@@ -727,6 +732,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 label: 'تأكيد كلمة المرور',
                 obscureText: _obscureConfirmPassword,
                 colorScheme: colorScheme,
+                context: context,
                 onToggleVisibility: () {
                   setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
                 },
