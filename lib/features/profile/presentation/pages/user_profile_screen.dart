@@ -598,6 +598,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
     required VoidCallback onToggleVisibility,
     required String? Function(String?) validator,
     required ColorScheme colorScheme,
+    required AppLocalizations l10n,
   }) {
     return TextFormField(
       controller: controller,
@@ -612,6 +613,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
             obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
             color: colorScheme.onSurfaceVariant,
           ),
+          tooltip: obscureText ? l10n.showPassword : l10n.hidePassword,
           onPressed: onToggleVisibility,
         ),
         border: OutlineInputBorder(
@@ -635,6 +637,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Container(
@@ -686,6 +689,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 label: 'كلمة المرور الحالية',
                 obscureText: _obscureCurrentPassword,
                 colorScheme: colorScheme,
+                l10n: l10n,
                 onToggleVisibility: () {
                   setState(() => _obscureCurrentPassword = !_obscureCurrentPassword);
                 },
@@ -705,6 +709,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 label: 'كلمة المرور الجديدة',
                 obscureText: _obscureNewPassword,
                 colorScheme: colorScheme,
+                l10n: l10n,
                 onToggleVisibility: () {
                   setState(() => _obscureNewPassword = !_obscureNewPassword);
                 },
@@ -727,6 +732,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 label: 'تأكيد كلمة المرور',
                 obscureText: _obscureConfirmPassword,
                 colorScheme: colorScheme,
+                l10n: l10n,
                 onToggleVisibility: () {
                   setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
                 },
