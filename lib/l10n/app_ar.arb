@@ -1104,4 +1104,7 @@
     "@confirmAction": {
         "description": "Confirm button text"
     }
+,
+    "showPassword": "إظهار كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور"
 }

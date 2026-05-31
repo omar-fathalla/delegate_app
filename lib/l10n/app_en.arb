@@ -1104,4 +1104,7 @@
     "@confirmAction": {
         "description": "Confirm button text"
     }
+,
+    "showPassword": "Show Password",
+    "hidePassword": "Hide Password"
 }
