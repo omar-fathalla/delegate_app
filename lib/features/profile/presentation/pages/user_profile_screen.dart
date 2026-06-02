@@ -591,7 +591,8 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
     }
   }
 
-  Widget _buildTextField({
+  Widget _buildTextField(
+    BuildContext context, {
     required TextEditingController controller,
     required String label,
     required bool obscureText,
@@ -608,6 +609,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
         fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         prefixIcon: Icon(Icons.lock_outline, color: colorScheme.onSurfaceVariant),
         suffixIcon: IconButton(
+          tooltip: obscureText ? AppLocalizations.of(context)!.showPassword : AppLocalizations.of(context)!.hidePassword,
           icon: Icon(
             obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
             color: colorScheme.onSurfaceVariant,
@@ -682,6 +684,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
 
               // Current Password
               _buildTextField(
+                context,
                 controller: _currentPasswordController,
                 label: 'كلمة المرور الحالية',
                 obscureText: _obscureCurrentPassword,
@@ -701,6 +704,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
 
               // New Password
               _buildTextField(
+                context,
                 controller: _newPasswordController,
                 label: 'كلمة المرور الجديدة',
                 obscureText: _obscureNewPassword,
@@ -723,6 +727,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
 
               // Confirm Password
               _buildTextField(
+                context,
                 controller: _confirmPasswordController,
                 label: 'تأكيد كلمة المرور',
                 obscureText: _obscureConfirmPassword,
