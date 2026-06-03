@@ -36,6 +36,7 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
+            tooltip: isArabic ? 'تصفية' : 'Filter',
             onPressed: () => _showFilterDialog(context, isArabic),
           ),
         ],
