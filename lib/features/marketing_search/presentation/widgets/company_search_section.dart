@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// قسم البحث عن الشركات
@@ -16,6 +17,7 @@ class CompanySearchSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,6 +65,7 @@ class CompanySearchSection extends StatelessWidget {
             ),
             suffixIcon: controller.text.isNotEmpty
                 ? IconButton(
+                    tooltip: l10n.clear,
                     icon: Icon(Icons.clear_rounded, color: colorScheme.outline),
                     onPressed: () {
                       controller.clear();
