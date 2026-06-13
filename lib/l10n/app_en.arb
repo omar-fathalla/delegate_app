@@ -938,15 +938,15 @@
     },
     "searchDelegates": "Search delegates...",
     "@searchDelegates": {
-      "description": "Placeholder for searching delegates"
+        "description": "Placeholder for searching delegates"
     },
     "filterByStatus": "Filter by status",
     "@filterByStatus": {
-      "description": "Label for status filter"
+        "description": "Label for status filter"
     },
     "noDelegateSearchResults": "No delegates match your search",
     "@noDelegateSearchResults": {
-      "description": "Message shown when no delegates match search or filter"
+        "description": "Message shown when no delegates match search or filter"
     },
     "notifications": "Notifications",
     "@notifications": {
@@ -1103,5 +1103,13 @@
     "confirmAction": "Confirm",
     "@confirmAction": {
         "description": "Confirm button text"
+    },
+    "showPassword": "Show Password",
+    "@showPassword": {
+        "description": "Tooltip for showing password"
+    },
+    "hidePassword": "Hide Password",
+    "@hidePassword": {
+        "description": "Tooltip for hiding password"
     }
 }
