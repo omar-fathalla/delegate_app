@@ -81,6 +81,9 @@ class _MarketingCompaniesViewState extends State<_MarketingCompaniesView> {
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
+                        tooltip: MaterialLocalizations.of(
+                          context,
+                        ).closeButtonTooltip,
                         icon: const Icon(Icons.clear_rounded),
                         onPressed: () {
                           _searchController.clear();

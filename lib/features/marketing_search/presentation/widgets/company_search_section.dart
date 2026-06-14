@@ -63,6 +63,9 @@ class CompanySearchSection extends StatelessWidget {
             ),
             suffixIcon: controller.text.isNotEmpty
                 ? IconButton(
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).closeButtonTooltip,
                     icon: Icon(Icons.clear_rounded, color: colorScheme.outline),
                     onPressed: () {
                       controller.clear();
