@@ -53,10 +53,7 @@ class ManageMarketingRemoteDataSourceImpl
   }
 
   @override
-  Future<void> suspendMarketingEmployee(
-    String employeeId,
-    bool suspend,
-  ) async {
+  Future<void> suspendMarketingEmployee(String employeeId, bool suspend) async {
     try {
       await firestore.collection('users').doc(employeeId).update({
         'isActive': !suspend,

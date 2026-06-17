@@ -21,7 +21,6 @@ class AdminRepositoryImpl implements AdminRepository {
     required this.marketingDataSource,
   });
 
-
   @override
   Future<Either<Failure, List<Map<String, dynamic>>>> getOrganizations() async {
     try {

@@ -125,7 +125,9 @@ class BranchPreferencesLoaded extends MarketingState {
   }) {
     return BranchPreferencesLoaded(
       favoriteBranches: favoriteBranches ?? this.favoriteBranches,
-      activeBranch: clearActiveBranch ? null : (activeBranch ?? this.activeBranch),
+      activeBranch: clearActiveBranch
+          ? null
+          : (activeBranch ?? this.activeBranch),
     );
   }
 }
@@ -154,4 +156,3 @@ class AllBranchesAttendanceError extends MarketingState {
   @override
   List<Object?> get props => [message];
 }
-

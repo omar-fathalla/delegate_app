@@ -40,7 +40,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required String branchName,
     required bool isCheckIn,
   }) async {
-    final branchData = await remoteDataSource.getBranchByName(branchName.trim());
+    final branchData = await remoteDataSource.getBranchByName(
+      branchName.trim(),
+    );
     if (branchData == null) {
       throw const ServerFailure(
         'لم يتم العثور على بيانات الفرع. يرجى التأكد من الرمز.',

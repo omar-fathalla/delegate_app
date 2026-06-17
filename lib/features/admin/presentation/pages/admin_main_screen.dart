@@ -33,9 +33,9 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         ).push(MaterialPageRoute(builder: (_) => const ManageAdminsScreen()));
         break;
       case 'manage_marketing':
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const ManageMarketingScreen()));
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ManageMarketingScreen()),
+        );
         break;
       case 'manage_feedbacks':
         context.push('/admin/feedbacks');

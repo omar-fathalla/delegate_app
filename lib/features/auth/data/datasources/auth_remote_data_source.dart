@@ -36,9 +36,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     // Replace Arabic digits with English digits
     const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
     const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    
+
     String normalized = phone.trim();
-    
+
     // Remove any spaces or invisible characters that might be added by phone keyboards
     normalized = normalized.replaceAll(RegExp(r'[^\d+٠-٩]'), '');
 

@@ -306,6 +306,9 @@ class _LoginScreenState extends State<LoginScreen>
                                           color: colorScheme.onSurfaceVariant,
                                           size: 22,
                                         ),
+                                        tooltip: _obscurePassword
+                                            ? l10n.showPassword
+                                            : l10n.hidePassword,
                                         onPressed: () {
                                           setState(() {
                                             _obscurePassword =
@@ -339,8 +342,9 @@ class _LoginScreenState extends State<LoginScreen>
                                           },
                                           activeColor: colorScheme.primary,
                                           shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(4),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -365,15 +369,12 @@ class _LoginScreenState extends State<LoginScreen>
                                           ? null
                                           : () => _submitLogin(context),
                                       style: FilledButton.styleFrom(
-                                        minimumSize: const Size.fromHeight(
-                                          64,
-                                        ),
+                                        minimumSize: const Size.fromHeight(64),
                                         padding: const EdgeInsets.symmetric(
                                           vertical: 12,
                                         ),
                                         backgroundColor: colorScheme.primary,
-                                        foregroundColor:
-                                            colorScheme.onPrimary,
+                                        foregroundColor: colorScheme.onPrimary,
                                         disabledBackgroundColor: colorScheme
                                             .primary
                                             .withValues(alpha: 0.6),
@@ -387,12 +388,10 @@ class _LoginScreenState extends State<LoginScreen>
                                           ? SizedBox(
                                               height: 22,
                                               width: 22,
-                                              child:
-                                                  CircularProgressIndicator(
-                                                    color:
-                                                        colorScheme.onPrimary,
-                                                    strokeWidth: 2.5,
-                                                  ),
+                                              child: CircularProgressIndicator(
+                                                color: colorScheme.onPrimary,
+                                                strokeWidth: 2.5,
+                                              ),
                                             )
                                           : Text(
                                               l10n.loginButton,

@@ -38,4 +38,3 @@ abstract class AdminRepository {
     bool suspend,
   );
 }
-

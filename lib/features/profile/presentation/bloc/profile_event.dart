@@ -12,16 +12,8 @@ class LoadProfile extends ProfileEvent {
   final String? organizationUID;
   final String? companyUID;
 
-  const LoadProfile({
-    required this.uid,
-    this.organizationUID,
-    this.companyUID,
-  });
+  const LoadProfile({required this.uid, this.organizationUID, this.companyUID});
 
   @override
-  List<Object> get props => [
-        uid,
-        ?organizationUID,
-        ?companyUID,
-      ];
+  List<Object> get props => [uid, ?organizationUID, ?companyUID];
 }

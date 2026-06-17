@@ -247,10 +247,8 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   // Manage Marketing BLoC
   sl.registerFactory(
-    () => ManageMarketingBloc(
-      getMarketingEmployees: sl(),
-      adminRepository: sl(),
-    ),
+    () =>
+        ManageMarketingBloc(getMarketingEmployees: sl(), adminRepository: sl()),
   );
 
   // Use cases
@@ -272,10 +270,8 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   // Repository
   sl.registerLazySingleton<AdminRepository>(
-    () => AdminRepositoryImpl(
-      remoteDataSource: sl(),
-      marketingDataSource: sl(),
-    ),
+    () =>
+        AdminRepositoryImpl(remoteDataSource: sl(), marketingDataSource: sl()),
   );
 
   // Company Repository
@@ -389,9 +385,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   initFeedbackDependencies();
 
   // ! Features - Marketing
-  sl.registerLazySingleton(
-    () => BranchPreferenceService(prefs: sl()),
-  );
+  sl.registerLazySingleton(() => BranchPreferenceService(prefs: sl()));
   sl.registerFactory(
     () => MarketingBloc(
       getCompanies: sl(),

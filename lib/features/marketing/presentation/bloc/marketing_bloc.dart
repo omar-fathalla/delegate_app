@@ -208,14 +208,15 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
         branchName: event.branchName,
         organizationId: event.organizationId,
       );
-      emit(TodayAttendanceLoaded(
-        records: records,
-        branchName: event.branchName,
-      ));
+      emit(
+        TodayAttendanceLoaded(records: records, branchName: event.branchName),
+      );
     } catch (e) {
-      emit(TodayAttendanceError(
-        message: 'فشل في جلب بيانات الحضور: ${e.toString()}',
-      ));
+      emit(
+        TodayAttendanceError(
+          message: 'فشل في جلب بيانات الحضور: ${e.toString()}',
+        ),
+      );
     }
   }
 
@@ -225,10 +226,12 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
   ) async {
     final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
     final active = branchPreferenceService.getActiveBranch(event.userId);
-    emit(BranchPreferencesLoaded(
-      favoriteBranches: favorites,
-      activeBranch: active,
-    ));
+    emit(
+      BranchPreferencesLoaded(
+        favoriteBranches: favorites,
+        activeBranch: active,
+      ),
+    );
   }
 
   Future<void> _onAddFavoriteBranch(
@@ -241,10 +244,12 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
     );
     final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
     final active = branchPreferenceService.getActiveBranch(event.userId);
-    emit(BranchPreferencesLoaded(
-      favoriteBranches: favorites,
-      activeBranch: active,
-    ));
+    emit(
+      BranchPreferencesLoaded(
+        favoriteBranches: favorites,
+        activeBranch: active,
+      ),
+    );
   }
 
   Future<void> _onRemoveFavoriteBranch(
@@ -257,10 +262,12 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
     );
     final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
     final active = branchPreferenceService.getActiveBranch(event.userId);
-    emit(BranchPreferencesLoaded(
-      favoriteBranches: favorites,
-      activeBranch: active,
-    ));
+    emit(
+      BranchPreferencesLoaded(
+        favoriteBranches: favorites,
+        activeBranch: active,
+      ),
+    );
   }
 
   Future<void> _onSetActiveBranch(
@@ -272,10 +279,12 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
       event.branchName,
     );
     final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
-    emit(BranchPreferencesLoaded(
-      favoriteBranches: favorites,
-      activeBranch: event.branchName,
-    ));
+    emit(
+      BranchPreferencesLoaded(
+        favoriteBranches: favorites,
+        activeBranch: event.branchName,
+      ),
+    );
   }
 
   // ─── Load ALL favorite branches attendance at once ──────────────────────────
@@ -285,10 +294,7 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
     Emitter<MarketingState> emit,
   ) async {
     if (event.favoriteBranches.isEmpty) {
-      emit(AllBranchesAttendanceLoaded(
-        data: {},
-        favoriteBranches: [],
-      ));
+      emit(AllBranchesAttendanceLoaded(data: {}, favoriteBranches: []));
       return;
     }
 
@@ -310,15 +316,18 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
         data[event.favoriteBranches[i]] = results[i];
       }
 
-      emit(AllBranchesAttendanceLoaded(
-        data: data,
-        favoriteBranches: event.favoriteBranches,
-      ));
+      emit(
+        AllBranchesAttendanceLoaded(
+          data: data,
+          favoriteBranches: event.favoriteBranches,
+        ),
+      );
     } catch (e) {
-      emit(AllBranchesAttendanceError(
-        message: 'فشل في جلب بيانات الفروع: ${e.toString()}',
-      ));
+      emit(
+        AllBranchesAttendanceError(
+          message: 'فشل في جلب بيانات الفروع: ${e.toString()}',
+        ),
+      );
     }
   }
 }
-

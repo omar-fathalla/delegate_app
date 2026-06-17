@@ -10,7 +10,9 @@ class MarketingRepositoryImpl implements MarketingRepository {
   MarketingRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<Either<Failure, List<Map<String, dynamic>>>> getCompanies(String organizationUID) async {
+  Future<Either<Failure, List<Map<String, dynamic>>>> getCompanies(
+    String organizationUID,
+  ) async {
     try {
       final companies = await remoteDataSource.getCompanies(organizationUID);
       return Right(companies);
@@ -22,9 +24,15 @@ class MarketingRepositoryImpl implements MarketingRepository {
   }
 
   @override
-  Future<Either<Failure, List<Delegate>>> getDelegates(String organizationUID, String? companyUID) async {
+  Future<Either<Failure, List<Delegate>>> getDelegates(
+    String organizationUID,
+    String? companyUID,
+  ) async {
     try {
-      final delegates = await remoteDataSource.getDelegates(organizationUID, companyUID);
+      final delegates = await remoteDataSource.getDelegates(
+        organizationUID,
+        companyUID,
+      );
       return Right(delegates);
     } on Failure catch (f) {
       return Left(f);

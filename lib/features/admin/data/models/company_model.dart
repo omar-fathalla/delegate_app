@@ -34,20 +34,26 @@ class CompanyModel extends Company {
       organizationUID: data['organizationUID']?.toString() ?? '',
       type: data['type']?.toString() ?? '',
       status: data['status']?.toString() ?? 'active',
-      createdAt: data['createdAt'] is Timestamp 
-          ? (data['createdAt'] as Timestamp).toDate() 
-          : DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: data['updatedAt'] is Timestamp 
-          ? (data['updatedAt'] as Timestamp).toDate() 
-          : DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt: data['createdAt'] is Timestamp
+          ? (data['createdAt'] as Timestamp).toDate()
+          : DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+                DateTime.now(),
+      updatedAt: data['updatedAt'] is Timestamp
+          ? (data['updatedAt'] as Timestamp).toDate()
+          : DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+                DateTime.now(),
       admins: int.tryParse(data['admins']?.toString() ?? '0') ?? 0,
       delegates: int.tryParse(data['delegates']?.toString() ?? '0') ?? 0,
-      deferredPayment: data['deferredPayment'] == true || data['deferredPayment']?.toString() == 'true',
+      deferredPayment:
+          data['deferredPayment'] == true ||
+          data['deferredPayment']?.toString() == 'true',
       description: data['description']?.toString(),
       address: data['address']?.toString(),
       phone: data['phone']?.toString(),
       email: data['email']?.toString(),
-      code: data['code'] != null ? int.tryParse(data['code'].toString()) : null, // إضافة حقل الكود
+      code: data['code'] != null
+          ? int.tryParse(data['code'].toString())
+          : null, // إضافة حقل الكود
     );
   }
 
@@ -62,18 +68,24 @@ class CompanyModel extends Company {
       status: json['status']?.toString() ?? 'active',
       createdAt: json['createdAt'] is Timestamp
           ? (json['createdAt'] as Timestamp).toDate()
-          : DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+          : DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+                DateTime.now(),
       updatedAt: json['updatedAt'] is Timestamp
           ? (json['updatedAt'] as Timestamp).toDate()
-          : DateTime.tryParse(json['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+          : DateTime.tryParse(json['updatedAt']?.toString() ?? '') ??
+                DateTime.now(),
       admins: int.tryParse(json['admins']?.toString() ?? '0') ?? 0,
       delegates: int.tryParse(json['delegates']?.toString() ?? '0') ?? 0,
-      deferredPayment: json['deferredPayment'] == true || json['deferredPayment']?.toString() == 'true',
+      deferredPayment:
+          json['deferredPayment'] == true ||
+          json['deferredPayment']?.toString() == 'true',
       description: json['description']?.toString(),
       address: json['address']?.toString(),
       phone: json['phone']?.toString(),
       email: json['email']?.toString(),
-      code: json['code'] != null ? int.tryParse(json['code'].toString()) : null, // إضافة حقل الكود
+      code: json['code'] != null
+          ? int.tryParse(json['code'].toString())
+          : null, // إضافة حقل الكود
     );
   }
 

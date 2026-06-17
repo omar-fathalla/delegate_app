@@ -199,9 +199,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           .collection('branches')
           .orderBy('branchName')
           .get();
-      return snapshot.docs
-          .map((doc) => {'id': doc.id, ...doc.data()})
-          .toList();
+      return snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في جلب الفروع.');
     } catch (_) {
@@ -242,9 +240,8 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       final Map<String, Map<String, dynamic>> checkInByDelegate = {};
       for (final doc in checkInLogs) {
         final data = doc.data();
-        final delegateId = data['delegateId'] as String? ??
-            data['userId'] as String? ??
-            '';
+        final delegateId =
+            data['delegateId'] as String? ?? data['userId'] as String? ?? '';
         if (delegateId.isEmpty) continue;
 
         final ts = data['timestamp'] as Timestamp?;
@@ -276,27 +273,26 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       final checkOutLogs = logsSnapshot.docs.where((doc) {
         final data = doc.data();
         final type = data['type'] as String? ?? '';
-        final delegateId = data['delegateId'] as String? ??
-            data['userId'] as String? ??
-            '';
+        final delegateId =
+            data['delegateId'] as String? ?? data['userId'] as String? ?? '';
         return type == 'check_out' && delegateIds.contains(delegateId);
       }).toList();
 
       for (final doc in checkOutLogs) {
         final data = doc.data();
-        final delegateId = data['delegateId'] as String? ??
-            data['userId'] as String? ??
-            '';
-        
+        final delegateId =
+            data['delegateId'] as String? ?? data['userId'] as String? ?? '';
+
         final existingOut =
             checkInByDelegate[delegateId]!['checkOutTime'] as Timestamp?;
         final ts = data['timestamp'] as Timestamp?;
-        
+
         // قد يكون هناك انصراف خاص بحضور آخر لنفس المندوب في نفس اليوم بفرع آخر
         // لزيادة الدقة يمكننا التأكد أن relatedCheckInId يطابق checkInDocId، إن وُجد.
         final relatedId = data['relatedCheckInId'] as String?;
-        final currentCheckInDocId = checkInByDelegate[delegateId]!['checkInDocId'];
-        
+        final currentCheckInDocId =
+            checkInByDelegate[delegateId]!['checkInDocId'];
+
         if (relatedId != null && relatedId != currentCheckInDocId) {
           continue; // انصراف لا يخص هذا الحضور
         }
@@ -327,7 +323,9 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       // ── Step 6: بناء القائمة النهائية ──
       final results = <Map<String, dynamic>>[];
       for (final delegateId in delegateIds) {
-        final record = Map<String, dynamic>.from(checkInByDelegate[delegateId]!);
+        final record = Map<String, dynamic>.from(
+          checkInByDelegate[delegateId]!,
+        );
         final delegateData = delegateLookup[delegateId];
         record['fullName'] = delegateData?['fullName'] ?? 'مندوب';
         record['phoneNumber'] = delegateData?['phoneNumber'] ?? '';
@@ -361,5 +359,3 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
     }
   }
 }
-
-

@@ -919,7 +919,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         return AlertDialog(
           title: Text(l10n.forgotCheckoutTitle),
           content: Text(
-            l10n.forgotCheckoutMessage(activeAttendance.branchName ?? l10n.unspecifiedBranch, newBranch),
+            l10n.forgotCheckoutMessage(
+              activeAttendance.branchName ?? l10n.unspecifiedBranch,
+              newBranch,
+            ),
           ),
           actions: [
             TextButton(
@@ -965,7 +968,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         return AlertDialog(
           title: Text(l10n.forgotCheckoutTitle),
           content: Text(
-            l10n.previousDayCheckoutMessage(activeAttendance.branchName ?? l10n.unspecifiedBranch, newBranch),
+            l10n.previousDayCheckoutMessage(
+              activeAttendance.branchName ?? l10n.unspecifiedBranch,
+              newBranch,
+            ),
           ),
           actions: [
             TextButton(

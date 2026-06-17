@@ -8,16 +8,22 @@ class GetMarketingDelegatesParams {
   final String organizationUID;
   final String? companyUID;
 
-  const GetMarketingDelegatesParams({required this.organizationUID, this.companyUID});
+  const GetMarketingDelegatesParams({
+    required this.organizationUID,
+    this.companyUID,
+  });
 }
 
-class GetMarketingDelegates implements UseCase<List<Delegate>, GetMarketingDelegatesParams> {
+class GetMarketingDelegates
+    implements UseCase<List<Delegate>, GetMarketingDelegatesParams> {
   final MarketingRepository repository;
 
   GetMarketingDelegates(this.repository);
 
   @override
-  Future<Either<Failure, List<Delegate>>> call(GetMarketingDelegatesParams params) {
+  Future<Either<Failure, List<Delegate>>> call(
+    GetMarketingDelegatesParams params,
+  ) {
     return repository.getDelegates(params.organizationUID, params.companyUID);
   }
 }

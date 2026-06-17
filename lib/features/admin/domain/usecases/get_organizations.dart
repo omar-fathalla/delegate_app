@@ -3,7 +3,8 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/features/admin/domain/repositories/admin_repository.dart';
 
-class GetOrganizations implements UseCase<List<Map<String, dynamic>>, NoParams> {
+class GetOrganizations
+    implements UseCase<List<Map<String, dynamic>>, NoParams> {
   final AdminRepository repository;
 
   GetOrganizations(this.repository);

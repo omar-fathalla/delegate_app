@@ -143,7 +143,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             'type': 'check_out',
             'location': {'latitude': lat, 'longitude': long},
             'relatedCheckInId': attendanceId,
-            if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
+            if (lastData['branchName'] != null)
+              'branchName': lastData['branchName'],
           })
           .timeout(const Duration(seconds: 15));
 
@@ -407,7 +408,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
       return querySnapshot.docs.first.data();
     } on FirebaseException catch (e) {
-      throwFirestoreFailure(e, 'فشل في جلب بيانات الفرع. يرجى المحاولة مرة أخرى.');
+      throwFirestoreFailure(
+        e,
+        'فشل في جلب بيانات الفرع. يرجى المحاولة مرة أخرى.',
+      );
     } on TimeoutException {
       throwTimeoutFailure('انتهت مهلة الاتصال بالخادم أثناء جلب بيانات الفرع.');
     } catch (_) {

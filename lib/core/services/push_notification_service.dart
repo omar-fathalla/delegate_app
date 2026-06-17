@@ -32,10 +32,10 @@ class PushNotificationService {
     required FirebaseFirestore firestore,
     required FirebaseMessaging messaging,
     FlutterLocalNotificationsPlugin? localNotifications,
-  })  : _firestore = firestore,
-        _messaging = messaging,
-        _localNotifications =
-            localNotifications ?? FlutterLocalNotificationsPlugin();
+  }) : _firestore = firestore,
+       _messaging = messaging,
+       _localNotifications =
+           localNotifications ?? FlutterLocalNotificationsPlugin();
 
   /// Initializes FCM: requests permissions, saves token, subscribes to topics,
   /// and sets up foreground/tap handlers.
@@ -141,9 +141,10 @@ class PushNotificationService {
     );
 
     // Create Android notification channel
-    final androidPlugin =
-        _localNotifications.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     await androidPlugin?.createNotificationChannel(taskNotificationChannel);
   }
 

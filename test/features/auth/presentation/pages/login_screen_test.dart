@@ -13,7 +13,9 @@ import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockAuthBloc extends Mock implements AuthBloc {}
-class MockPushNotificationService extends Mock implements PushNotificationService {}
+
+class MockPushNotificationService extends Mock
+    implements PushNotificationService {}
 
 void main() {
   late MockAuthBloc mockAuthBloc;
@@ -21,7 +23,9 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(AuthInitial());
-    registerFallbackValue(LoginRequested(phoneNumber: '', password: '', rememberMe: false));
+    registerFallbackValue(
+      LoginRequested(phoneNumber: '', password: '', rememberMe: false),
+    );
   });
 
   setUp(() async {
@@ -31,7 +35,9 @@ void main() {
 
     // Default stream for AuthBloc
     when(() => mockAuthBloc.state).thenReturn(AuthInitial());
-    when(() => mockAuthBloc.stream).thenAnswer((_) => Stream.value(AuthInitial()));
+    when(
+      () => mockAuthBloc.stream,
+    ).thenAnswer((_) => Stream.value(AuthInitial()));
     when(() => mockAuthBloc.close()).thenAnswer((_) async {});
 
     if (!sl.isRegistered<AuthBloc>()) {
@@ -39,7 +45,9 @@ void main() {
     }
 
     if (!sl.isRegistered<PushNotificationService>()) {
-      sl.registerLazySingleton<PushNotificationService>(() => mockPushNotificationService);
+      sl.registerLazySingleton<PushNotificationService>(
+        () => mockPushNotificationService,
+      );
     }
 
     if (!sl.isRegistered<SharedPreferences>()) {
@@ -83,7 +91,7 @@ void main() {
 
     // Pump another widget to trigger disposal of LoginScreen
     await tester.pumpWidget(const SizedBox());
-    
+
     // Ensure all animations and controllers are disposed without errors
     await tester.pump();
   });
@@ -94,12 +102,14 @@ void main() {
     await tester.pumpWidget(createWidgetUnderTest());
 
     final passwordFieldFinder = find.byType(TextFormField).at(1);
-    
+
     // Verify initial state: obscured
-    TextField passwordTextField = tester.widget(find.descendant(
-      of: passwordFieldFinder,
-      matching: find.byType(TextField),
-    ));
+    TextField passwordTextField = tester.widget(
+      find.descendant(
+        of: passwordFieldFinder,
+        matching: find.byType(TextField),
+      ),
+    );
     expect(passwordTextField.obscureText, isTrue);
 
     // Verify initial visibility off icon exists
@@ -107,17 +117,21 @@ void main() {
     expect(visibilityOffIconFinder, findsOneWidget);
 
     // Tap the visibility toggle button (IconButton)
-    await tester.tap(find.ancestor(
-      of: visibilityOffIconFinder,
-      matching: find.byType(IconButton),
-    ));
+    await tester.tap(
+      find.ancestor(
+        of: visibilityOffIconFinder,
+        matching: find.byType(IconButton),
+      ),
+    );
     await tester.pump();
 
     // Verify state: visible
-    passwordTextField = tester.widget(find.descendant(
-      of: passwordFieldFinder,
-      matching: find.byType(TextField),
-    ));
+    passwordTextField = tester.widget(
+      find.descendant(
+        of: passwordFieldFinder,
+        matching: find.byType(TextField),
+      ),
+    );
     expect(passwordTextField.obscureText, isFalse);
 
     // Verify icon changed to visibility on
@@ -125,17 +139,21 @@ void main() {
     expect(visibilityOnIconFinder, findsOneWidget);
 
     // Tap the visibility toggle button again
-    await tester.tap(find.ancestor(
-      of: visibilityOnIconFinder,
-      matching: find.byType(IconButton),
-    ));
+    await tester.tap(
+      find.ancestor(
+        of: visibilityOnIconFinder,
+        matching: find.byType(IconButton),
+      ),
+    );
     await tester.pump();
 
     // Verify state: obscured again
-    passwordTextField = tester.widget(find.descendant(
-      of: passwordFieldFinder,
-      matching: find.byType(TextField),
-    ));
+    passwordTextField = tester.widget(
+      find.descendant(
+        of: passwordFieldFinder,
+        matching: find.byType(TextField),
+      ),
+    );
     expect(passwordTextField.obscureText, isTrue);
   });
 }

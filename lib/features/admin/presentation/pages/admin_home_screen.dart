@@ -182,7 +182,8 @@ class _AdminHomeBody extends StatelessWidget {
           ),
 
           // ── Quick Actions ──
-          if (adminDelegate.role == UserRole.marketing || adminDelegate.role == UserRole.superAdmin) ...[
+          if (adminDelegate.role == UserRole.marketing ||
+              adminDelegate.role == UserRole.superAdmin) ...[
             const SizedBox(height: 24),
             Row(
               children: [

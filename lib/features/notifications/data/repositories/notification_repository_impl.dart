@@ -26,10 +26,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
   }
 
   @override
-  Stream<int> getUnreadCount(
-    String delegateUid,
-    String organizationId,
-  ) {
+  Stream<int> getUnreadCount(String delegateUid, String organizationId) {
     return remoteDataSource.getUnreadCount(delegateUid, organizationId);
   }
 

@@ -8,10 +8,7 @@ abstract class NotificationRepository {
     String organizationId,
   );
 
-  Stream<int> getUnreadCount(
-    String delegateUid,
-    String organizationId,
-  );
+  Stream<int> getUnreadCount(String delegateUid, String organizationId);
 
   Future<Either<Failure, void>> markAsRead(String notificationId);
 

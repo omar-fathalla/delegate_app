@@ -312,8 +312,8 @@ class _AdminFeedbacksView extends StatelessWidget {
             ),
             onPressed: () {
               context.read<AdminFeedbackBloc>().add(
-                    DeleteFeedbackEvent(feedback.id ?? ''),
-                  );
+                DeleteFeedbackEvent(feedback.id ?? ''),
+              );
               Navigator.pop(context);
             },
             child: const Text('حذف'),

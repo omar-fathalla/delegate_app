@@ -81,11 +81,13 @@ class SettingsScreen extends StatelessWidget {
                             title: l10n.darkMode,
                             subtitle:
                                 context.watch<ThemeCubit>().state.isDarkMode
-                                    ? 'On'
-                                    : 'Off',
+                                ? 'On'
+                                : 'Off',
                             trailing: Switch(
-                              value:
-                                  context.watch<ThemeCubit>().state.isDarkMode,
+                              value: context
+                                  .watch<ThemeCubit>()
+                                  .state
+                                  .isDarkMode,
                               onChanged: (val) =>
                                   context.read<ThemeCubit>().toggleTheme(),
                               activeTrackColor: Theme.of(
@@ -158,8 +160,8 @@ class SettingsScreen extends StatelessWidget {
                             icon: Icons.history_rounded,
                             title: delegate.role == UserRole.superAdmin
                                 ? (isArabic
-                                    ? 'إدارة المقترحات'
-                                    : 'Manage Feedbacks')
+                                      ? 'إدارة المقترحات'
+                                      : 'Manage Feedbacks')
                                 : (isArabic ? 'مقترحاتي' : 'My Feedbacks'),
                             onTap: () {
                               if (delegate.role == UserRole.superAdmin) {
@@ -241,8 +243,9 @@ class SettingsScreen extends StatelessWidget {
                     FutureBuilder<PackageInfo>(
                       future: PackageInfo.fromPlatform(),
                       builder: (context, snapshot) {
-                        final version =
-                            snapshot.hasData ? snapshot.data!.version : '...';
+                        final version = snapshot.hasData
+                            ? snapshot.data!.version
+                            : '...';
                         return Center(
                           child: Text(
                             l10n.version(version),

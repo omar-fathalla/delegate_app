@@ -17,8 +17,9 @@ class BranchHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => di.sl<MarketingBloc>()
-        ..add(LoadBranchPreferences(userId: marketingUser.uid)),
+      create: (_) =>
+          di.sl<MarketingBloc>()
+            ..add(LoadBranchPreferences(userId: marketingUser.uid)),
       child: _BranchHomeView(marketingUser: marketingUser),
     );
   }
@@ -385,7 +386,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                       if (!isLast)
                         Divider(
                           height: 1,
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.5,
+                          ),
                           indent: 68,
                         ),
                     ],
@@ -498,7 +501,11 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.chevron_left_rounded, color: colorScheme.outline, size: 18),
+            Icon(
+              Icons.chevron_left_rounded,
+              color: colorScheme.outline,
+              size: 18,
+            ),
           ],
         ),
       ),
@@ -524,7 +531,10 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   }
 
   // ─── Open Attendance History ───────────────────────────────────────────────
-  void _openAttendanceHistory(BuildContext context, Map<String, dynamic> record) {
+  void _openAttendanceHistory(
+    BuildContext context,
+    Map<String, dynamic> record,
+  ) {
     final delegateData = record['delegateData'] as Map<String, dynamic>?;
     final delegateId = record['delegateId'] as String? ?? '';
     if (delegateData == null || delegateId.isEmpty) {
@@ -542,9 +552,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         ),
       );
     } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذّر فتح سجل الحضور')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تعذّر فتح سجل الحضور')));
     }
   }
 
@@ -563,16 +573,20 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         organizationId: widget.marketingUser.organizationUID,
         currentFavorites: _favoriteBranches,
         onBranchSelected: (branchName) {
-          bloc.add(AddFavoriteBranch(
-            userId: widget.marketingUser.uid,
-            branchName: branchName,
-          ));
+          bloc.add(
+            AddFavoriteBranch(
+              userId: widget.marketingUser.uid,
+              branchName: branchName,
+            ),
+          );
           // أعد تحميل كل الفروع بعد الإضافة
           final newFavorites = [..._favoriteBranches, branchName];
-          bloc.add(LoadAllFavoriteBranchesAttendance(
-            favoriteBranches: newFavorites,
-            organizationId: widget.marketingUser.organizationUID,
-          ));
+          bloc.add(
+            LoadAllFavoriteBranchesAttendance(
+              favoriteBranches: newFavorites,
+              organizationId: widget.marketingUser.organizationUID,
+            ),
+          );
         },
       ),
     );
@@ -594,17 +608,22 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             onPressed: () {
               Navigator.pop(context);
               final bloc = context.read<MarketingBloc>();
-              bloc.add(RemoveFavoriteBranch(
-                userId: widget.marketingUser.uid,
-                branchName: branchName,
-              ));
-              final newFavorites =
-                  _favoriteBranches.where((b) => b != branchName).toList();
+              bloc.add(
+                RemoveFavoriteBranch(
+                  userId: widget.marketingUser.uid,
+                  branchName: branchName,
+                ),
+              );
+              final newFavorites = _favoriteBranches
+                  .where((b) => b != branchName)
+                  .toList();
               if (newFavorites.isNotEmpty) {
-                bloc.add(LoadAllFavoriteBranchesAttendance(
-                  favoriteBranches: newFavorites,
-                  organizationId: widget.marketingUser.organizationUID,
-                ));
+                bloc.add(
+                  LoadAllFavoriteBranchesAttendance(
+                    favoriteBranches: newFavorites,
+                    organizationId: widget.marketingUser.organizationUID,
+                  ),
+                );
               }
             },
             child: const Text('حذف'),
@@ -640,8 +659,11 @@ class _BranchSectionSkeleton extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(Icons.location_on_rounded,
-                  color: colorScheme.primary, size: 20),
+              Icon(
+                Icons.location_on_rounded,
+                color: colorScheme.primary,
+                size: 20,
+              ),
               const SizedBox(width: 10),
               Text(
                 branchName,
@@ -721,14 +743,16 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
 
   Future<void> _loadBranches() async {
     try {
-      final snapshot = await di.sl<FirebaseFirestore>()
+      final snapshot = await di
+          .sl<FirebaseFirestore>()
           .collection('branches')
           .orderBy('branchName')
           .get();
       if (mounted) {
         setState(() {
-          _allBranches =
-              snapshot.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+          _allBranches = snapshot.docs
+              .map((d) => {'id': d.id, ...d.data()})
+              .toList();
           _filtered = _allBranches;
           _loading = false;
         });
@@ -749,9 +773,12 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
       _filtered = q.isEmpty
           ? _allBranches
           : _allBranches
-              .where((b) =>
-                  (b['branchName'] as String? ?? '').toLowerCase().contains(q))
-              .toList();
+                .where(
+                  (b) => (b['branchName'] as String? ?? '')
+                      .toLowerCase()
+                      .contains(q),
+                )
+                .toList();
     });
   }
 
@@ -781,7 +808,10 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                Icon(Icons.add_location_alt_rounded, color: colorScheme.primary),
+                Icon(
+                  Icons.add_location_alt_rounded,
+                  color: colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 const Text(
                   'إضافة فرع',
@@ -823,98 +853,98 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline, size: 48),
-                            const SizedBox(height: 8),
-                            Text(_error!),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _loading = true;
-                                  _error = null;
-                                });
-                                _loadBranches();
-                              },
-                              child: const Text('إعادة المحاولة'),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48),
+                        const SizedBox(height: 8),
+                        Text(_error!),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _loading = true;
+                              _error = null;
+                            });
+                            _loadBranches();
+                          },
+                          child: const Text('إعادة المحاولة'),
                         ),
-                      )
-                    : _filtered.isEmpty
-                        ? const Center(child: Text('لا توجد فروع مطابقة'))
-                        : ListView.builder(
-                            controller: scrollController,
-                            itemCount: _filtered.length,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            itemBuilder: (context, index) {
-                              final branch = _filtered[index];
-                              final name =
-                                  branch['branchName'] as String? ?? 'فرع';
-                              final isAlreadyAdded =
-                                  widget.currentFavorites.contains(name);
+                      ],
+                    ),
+                  )
+                : _filtered.isEmpty
+                ? const Center(child: Text('لا توجد فروع مطابقة'))
+                : ListView.builder(
+                    controller: scrollController,
+                    itemCount: _filtered.length,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    itemBuilder: (context, index) {
+                      final branch = _filtered[index];
+                      final name = branch['branchName'] as String? ?? 'فرع';
+                      final isAlreadyAdded = widget.currentFavorites.contains(
+                        name,
+                      );
 
-                              return ListTile(
-                                leading: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: isAlreadyAdded
-                                        ? colorScheme.primaryContainer
-                                        : colorScheme.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    Icons.store_rounded,
-                                    color: isAlreadyAdded
-                                        ? colorScheme.onPrimaryContainer
-                                        : colorScheme.onSurfaceVariant,
-                                    size: 20,
-                                  ),
-                                ),
-                                title: Text(
-                                  name,
-                                  style: TextStyle(
-                                    fontWeight: isAlreadyAdded
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                  ),
-                                ),
-                                trailing: isAlreadyAdded
-                                    ? Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.check_circle_rounded,
-                                            color: colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'مضاف',
-                                            style: TextStyle(
-                                              color: colorScheme.primary,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      )
-                                    : null,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                onTap: isAlreadyAdded
-                                    ? null
-                                    : () {
-                                        Navigator.pop(context);
-                                        widget.onBranchSelected(name);
-                                      },
-                              );
-                            },
+                      return ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isAlreadyAdded
+                                ? colorScheme.primaryContainer
+                                : colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(10),
                           ),
+                          child: Icon(
+                            Icons.store_rounded,
+                            color: isAlreadyAdded
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onSurfaceVariant,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          name,
+                          style: TextStyle(
+                            fontWeight: isAlreadyAdded
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: isAlreadyAdded
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_rounded,
+                                    color: colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'مضاف',
+                                    style: TextStyle(
+                                      color: colorScheme.primary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        onTap: isAlreadyAdded
+                            ? null
+                            : () {
+                                Navigator.pop(context);
+                                widget.onBranchSelected(name);
+                              },
+                      );
+                    },
+                  ),
           ),
         ],
       ),

@@ -12,8 +12,8 @@ class ManageMarketingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => di.sl<ManageMarketingBloc>()
-        ..add(LoadMarketingEmployeesRequested()),
+      create: (_) =>
+          di.sl<ManageMarketingBloc>()..add(LoadMarketingEmployeesRequested()),
       child: const _ManageMarketingView(),
     );
   }
@@ -40,7 +40,8 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
     final query = _searchController.text.trim();
     return employees.where((e) {
       final matchesPhone = query.isEmpty || e.phoneNumber.contains(query);
-      final matchesOrg = _selectedOrganizationUID == null ||
+      final matchesOrg =
+          _selectedOrganizationUID == null ||
           e.organizationUID == _selectedOrganizationUID;
       return matchesPhone && matchesOrg;
     }).toList();
@@ -65,10 +66,7 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AdminHeader(
-        subtitle: l10n.manageMarketing,
-        showBackButton: true,
-      ),
+      appBar: AdminHeader(subtitle: l10n.manageMarketing, showBackButton: true),
       backgroundColor: colorScheme.surface,
       body: BlocConsumer<ManageMarketingBloc, ManageMarketingState>(
         listener: (context, state) {
@@ -150,7 +148,8 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
                 Expanded(
                   child: filteredEmployees.isEmpty
                       ? _EmptyView(
-                          isFiltering: _searchController.text.isNotEmpty ||
+                          isFiltering:
+                              _searchController.text.isNotEmpty ||
                               _selectedOrganizationUID != null,
                           allEmpty: allEmployees.isEmpty,
                         )
@@ -228,8 +227,7 @@ class _SearchFilterBar extends StatelessWidget {
             hintText: l10n.searchByPhone,
             elevation: WidgetStateProperty.all(0),
             backgroundColor: WidgetStateProperty.all(
-              theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.4),
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
             ),
             leading: const Icon(Icons.phone_android_rounded),
             trailing: searchController.text.isNotEmpty
@@ -304,14 +302,13 @@ class _EmptyView extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.5),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.5,
+              ),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              allEmpty
-                  ? Icons.campaign_outlined
-                  : Icons.search_off_rounded,
+              allEmpty ? Icons.campaign_outlined : Icons.search_off_rounded,
               size: 40,
               color: theme.colorScheme.outline,
             ),
@@ -331,10 +328,7 @@ class _EmptyView extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               l10n.searchByPhone,
-              style: TextStyle(
-                fontSize: 13,
-                color: theme.colorScheme.outline,
-              ),
+              style: TextStyle(fontSize: 13, color: theme.colorScheme.outline),
             ),
           ],
         ],
@@ -468,16 +462,18 @@ class _EmployeeCard extends StatelessWidget {
                           Icon(
                             Icons.email_outlined,
                             size: 14,
-                            color: colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.7),
+                            color: colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.7,
+                            ),
                           ),
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
                               employee.email,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.7),
+                                color: colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.7,
+                                ),
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -500,8 +496,9 @@ class _EmployeeCard extends StatelessWidget {
                             child: Text(
                               employee.organizationUID!,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.primary
-                                    .withValues(alpha: 0.8),
+                                color: colorScheme.primary.withValues(
+                                  alpha: 0.8,
+                                ),
                                 fontWeight: FontWeight.w500,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -596,9 +593,7 @@ class _EmployeeCard extends StatelessWidget {
               // Suspend / Activate
               ListTile(
                 leading: Icon(
-                  isSuspended
-                      ? Icons.play_arrow_rounded
-                      : Icons.pause_rounded,
+                  isSuspended ? Icons.play_arrow_rounded : Icons.pause_rounded,
                   color: isSuspended ? Colors.green : Colors.orange,
                 ),
                 title: Text(
@@ -629,8 +624,7 @@ class _EmployeeCard extends StatelessWidget {
 
               // Delete
               ListTile(
-                leading:
-                    Icon(Icons.delete_rounded, color: colorScheme.error),
+                leading: Icon(Icons.delete_rounded, color: colorScheme.error),
                 title: Text(
                   l10n.deleteMarketingEmployee,
                   style: TextStyle(color: colorScheme.error),
@@ -748,10 +742,7 @@ class _EmployeeCard extends StatelessWidget {
     );
   }
 
-  void _showDeleteConfirmation(
-    BuildContext context,
-    ManageMarketingBloc bloc,
-  ) {
+  void _showDeleteConfirmation(BuildContext context, ManageMarketingBloc bloc) {
     final l10n = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -759,11 +750,7 @@ class _EmployeeCard extends StatelessWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          icon: Icon(
-            Icons.warning_rounded,
-            color: colorScheme.error,
-            size: 40,
-          ),
+          icon: Icon(Icons.warning_rounded, color: colorScheme.error, size: 40),
           title: Text(l10n.deleteMarketingEmployee),
           content: Text(l10n.deleteMarketingEmployeeConfirmation),
           actions: [
@@ -772,14 +759,11 @@ class _EmployeeCard extends StatelessWidget {
               child: Text(l10n.cancel),
             ),
             FilledButton(
-              style:
-                  FilledButton.styleFrom(backgroundColor: colorScheme.error),
+              style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
               onPressed: () {
                 Navigator.pop(dialogContext);
                 bloc.add(
-                  DeleteMarketingEmployeeRequested(
-                    employeeId: employee.uid,
-                  ),
+                  DeleteMarketingEmployeeRequested(employeeId: employee.uid),
                 );
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

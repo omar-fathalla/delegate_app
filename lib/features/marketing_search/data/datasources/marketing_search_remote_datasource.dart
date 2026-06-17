@@ -64,10 +64,22 @@ class MarketingSearchRemoteDataSourceImpl
         // إذا كان الإدخال رقماً، نقوم بتنفيذ 3 استعلامات مختلفة دمجاً لنتائجها
         // للبرهنة على عدم حاجتنا لإنشاء Index معقد في فايربيز
         final futures = await Future.wait([
-          companiesRef.where('code', isEqualTo: numericCode).limit(limit + 1).get(),
-          companiesRef.where('companyCodeInOrg', isEqualTo: numericCode).limit(limit + 1).get(),
-          companiesRef.where('companyCodeInOrg', isGreaterThanOrEqualTo: searchCode)
-              .where('companyCodeInOrg', isLessThanOrEqualTo: '$searchCode\uf8ff').limit(limit + 1).get(),
+          companiesRef
+              .where('code', isEqualTo: numericCode)
+              .limit(limit + 1)
+              .get(),
+          companiesRef
+              .where('companyCodeInOrg', isEqualTo: numericCode)
+              .limit(limit + 1)
+              .get(),
+          companiesRef
+              .where('companyCodeInOrg', isGreaterThanOrEqualTo: searchCode)
+              .where(
+                'companyCodeInOrg',
+                isLessThanOrEqualTo: '$searchCode\uf8ff',
+              )
+              .limit(limit + 1)
+              .get(),
         ]);
 
         for (var snapshot in futures) {
@@ -88,7 +100,7 @@ class MarketingSearchRemoteDataSourceImpl
       for (var doc in allDocs) {
         uniqueDocsMap[doc.id] = doc;
       }
-      
+
       final uniqueDocs = uniqueDocsMap.values.toList();
 
       // Check if we have more items than the limit
@@ -120,7 +132,7 @@ class MarketingSearchRemoteDataSourceImpl
       return PaginationResponse<CompanyModel>(
         items: companies,
         hasReachedMax: !hasMore,
-        // Since we query manually, pagination using startAfterDoc is not fully reliable when merged, 
+        // Since we query manually, pagination using startAfterDoc is not fully reliable when merged,
         // but we return the last doc of the merged set.
         lastDoc: itemsToReturn.isNotEmpty ? itemsToReturn.last : null,
       );

@@ -7,10 +7,7 @@ class GetUnreadCount {
   GetUnreadCount(this.repository);
 
   Stream<int> call(GetUnreadCountParams params) {
-    return repository.getUnreadCount(
-      params.delegateUid,
-      params.organizationId,
-    );
+    return repository.getUnreadCount(params.delegateUid, params.organizationId);
   }
 }
 
