@@ -809,4 +809,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get confirmAction => 'تأكيد';
+
+  @override
+  String get showPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
 }

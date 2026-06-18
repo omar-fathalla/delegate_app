@@ -7,6 +7,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 /// الشاشة الرئيسية للفروع - تعرض جميع الفروع المفضلة في نفس الصفحة
 class BranchHomeScreen extends StatelessWidget {
@@ -801,6 +802,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
+                        tooltip: AppLocalizations.of(context)!.clear,
                         icon: const Icon(Icons.clear_rounded),
                         onPressed: () {
                           _searchController.clear();
