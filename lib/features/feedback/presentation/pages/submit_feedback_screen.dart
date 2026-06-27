@@ -235,6 +235,7 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                             child: IconButton(
                               onPressed: _removeImage,
                               icon: const Icon(Icons.close),
+                              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                               style: IconButton.styleFrom(
                                 backgroundColor: Colors.black54,
                                 foregroundColor: Colors.white,
