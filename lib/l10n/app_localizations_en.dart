@@ -811,4 +811,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirmAction => 'Confirm';
+
+  @override
+  String get openInBrowser => 'Open in browser';
+
+  @override
+  String get showPassword => 'Show Password';
+
+  @override
+  String get hidePassword => 'Hide Password';
 }
