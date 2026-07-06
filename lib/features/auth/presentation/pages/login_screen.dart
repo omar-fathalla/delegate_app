@@ -306,6 +306,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           color: colorScheme.onSurfaceVariant,
                                           size: 22,
                                         ),
+                                        tooltip: _obscurePassword ? l10n.showPassword : l10n.hidePassword,
                                         onPressed: () {
                                           setState(() {
                                             _obscurePassword =

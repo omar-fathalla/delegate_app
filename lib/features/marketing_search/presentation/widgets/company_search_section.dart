@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 /// قسم البحث عن الشركات
 /// Company search section widget
@@ -63,6 +64,7 @@ class CompanySearchSection extends StatelessWidget {
             ),
             suffixIcon: controller.text.isNotEmpty
                 ? IconButton(
+                    tooltip: AppLocalizations.of(context)!.clear,
                     icon: Icon(Icons.clear_rounded, color: colorScheme.outline),
                     onPressed: () {
                       controller.clear();

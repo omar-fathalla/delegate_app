@@ -1448,7 +1448,7 @@ abstract class AppLocalizations {
   /// **'Enter company code'**
   String get enterCompanyCode;
 
-  /// Clear button text
+  /// Tooltip to clear input
   ///
   /// In en, this message translates to:
   /// **'Clear'**
@@ -1615,6 +1615,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm'**
   String get confirmAction;
+
+  /// Tooltip to show password
+  ///
+  /// In en, this message translates to:
+  /// **'Show Password'**
+  String get showPassword;
+
+  /// Tooltip to hide password
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Password'**
+  String get hidePassword;
 }
 
 class _AppLocalizationsDelegate

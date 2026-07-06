@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/marketing_delegates_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 class MarketingCompaniesScreen extends StatelessWidget {
   final String organizationUID;
@@ -81,6 +82,7 @@ class _MarketingCompaniesViewState extends State<_MarketingCompaniesView> {
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
+                        tooltip: AppLocalizations.of(context)!.clear,
                         icon: const Icon(Icons.clear_rounded),
                         onPressed: () {
                           _searchController.clear();

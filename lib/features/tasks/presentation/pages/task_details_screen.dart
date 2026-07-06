@@ -116,6 +116,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
                     child: IconButton.filledTonal(
+                      tooltip: _isEditing ? l10n.saveChanges : l10n.editAdmin,
                       icon: Icon(
                         _isEditing ? Icons.check_rounded : Icons.edit_rounded,
                       ),

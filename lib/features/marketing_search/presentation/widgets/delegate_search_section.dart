@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 /// قسم البحث عن المندوبين
 /// Delegate search section widget
@@ -67,6 +68,7 @@ class DelegateSearchSection extends StatelessWidget {
             ),
             suffixIcon: controller.text.isNotEmpty
                 ? IconButton(
+                    tooltip: AppLocalizations.of(context)!.clear,
                     icon: Icon(Icons.clear_rounded, color: colorScheme.outline),
                     onPressed: () {
                       controller.clear();
