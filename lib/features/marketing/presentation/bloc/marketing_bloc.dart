@@ -300,6 +300,7 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
         (branch) => remoteDataSource.getTodayAttendanceByBranch(
           branchName: branch,
           organizationId: event.organizationId,
+          date: event.date,
         ),
       );
 

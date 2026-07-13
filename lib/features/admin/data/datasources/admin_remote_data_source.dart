@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
@@ -51,12 +53,23 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   @override
   Future<List<BranchModel>> getBranches() async {
     try {
+      developer.log('DEBUG: getBranches called');
       final snapshot = await _branches.get();
-      return snapshot.docs
-          .map((doc) => BranchModel.fromFirestore(doc))
+      developer.log('DEBUG: getBranches snapshot size: ${snapshot.docs.length}');
+      final branches = snapshot.docs
+          .map((doc) {
+            developer.log('DEBUG: Parsing branch doc: ${doc.id} -> ${doc.data()}');
+            return BranchModel.fromFirestore(doc);
+          })
           .toList();
+      developer.log('DEBUG: getBranches parsed successfully: ${branches.length} branches');
+      return branches;
     } on FirebaseException catch (e) {
+      developer.log('DEBUG: getBranches FirebaseException: $e');
       throwFirestoreFailure(e, 'فشل في جلب بيانات الفروع.');
+    } catch (e, stack) {
+      developer.log('DEBUG: getBranches Generic Exception: $e\n$stack');
+      rethrow;
     }
   }
 

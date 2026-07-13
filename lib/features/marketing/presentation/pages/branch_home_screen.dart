@@ -35,6 +35,7 @@ class _BranchHomeView extends StatefulWidget {
 class _BranchHomeViewState extends State<_BranchHomeView> {
   List<String> _favoriteBranches = [];
   bool _prefsLoaded = false;
+  DateTime _selectedDate = DateTime.now();
 
   void _loadAllBranches(BuildContext context, List<String> favorites) {
     if (favorites.isEmpty) return;
@@ -42,8 +43,26 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       LoadAllFavoriteBranchesAttendance(
         favoriteBranches: favorites,
         organizationId: widget.marketingUser.organizationUID,
+        date: _selectedDate,
       ),
     );
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2025),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      locale: const Locale('ar'),
+    );
+    if (picked != null && picked != _selectedDate) {
+      if (!mounted) return;
+      setState(() {
+        _selectedDate = picked;
+      });
+      _loadAllBranches(context, _favoriteBranches);
+    }
   }
 
   @override
@@ -207,8 +226,6 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     AllBranchesAttendanceLoaded state,
     ColorScheme colorScheme,
   ) {
-    final today = DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.now());
-
     return RefreshIndicator(
       onRefresh: () async => _loadAllBranches(context, _favoriteBranches),
       child: CustomScrollView(
@@ -217,23 +234,77 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today_rounded,
-                    size: 16,
-                    color: colorScheme.primary,
+              child: Card(
+                elevation: 0,
+                color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.5),
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    today,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
+                ),
+                child: InkWell(
+                  onTap: () => _selectDate(),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_month_rounded,
+                          size: 20,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          DateFormat('EEEE، d MMMM yyyy', 'ar').format(_selectedDate),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_drop_down_rounded,
+                          color: colorScheme.primary,
+                        ),
+                        const Spacer(),
+                        if (!DateUtils.isSameDay(_selectedDate, DateTime.now()))
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _selectedDate = DateTime.now();
+                              });
+                              _loadAllBranches(context, _favoriteBranches);
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 0,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text(
+                              'اليوم',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -405,6 +476,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     ColorScheme colorScheme,
   ) {
     final String fullName = record['fullName'] as String? ?? 'مندوب';
+    final String companyName = record['companyName'] as String? ?? '';
     final checkIn = record['checkInTime'] as Timestamp?;
     final checkOut = record['checkOutTime'] as Timestamp?;
     final bool hasCheckOut = checkOut != null;
@@ -452,6 +524,17 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                       fontSize: 14,
                     ),
                   ),
+                  if (companyName.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      companyName,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Row(
                     children: [

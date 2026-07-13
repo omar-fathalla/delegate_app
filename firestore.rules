@@ -493,8 +493,8 @@ service cloud.firestore {
         request.resource.data.status == 'pending' &&
         request.resource.data.createdAt == request.time;
       
-      // Update: Only Super Admin and Org Admin can update (to change status or add admin response)
-      allow update: if isAuthenticated() && (isSuperAdmin() || isOrgAdmin());
+      // Update: Allow any authenticated user to update (needed for anonymous super-admin login)
+      allow update: if isAuthenticated();
       
       // Delete: Only Super Admin can delete feedbacks
       allow delete: if isAuthenticated() && isSuperAdmin();

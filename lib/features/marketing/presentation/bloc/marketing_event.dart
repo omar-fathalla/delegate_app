@@ -127,12 +127,15 @@ class SetActiveBranch extends MarketingEvent {
 class LoadAllFavoriteBranchesAttendance extends MarketingEvent {
   final List<String> favoriteBranches;
   final String organizationId;
+  final DateTime? date;
 
   const LoadAllFavoriteBranchesAttendance({
     required this.favoriteBranches,
     required this.organizationId,
+    this.date,
   });
 
   @override
-  List<Object?> get props => [favoriteBranches, organizationId];
+  List<Object?> get props => [favoriteBranches, organizationId, date];
 }
+
