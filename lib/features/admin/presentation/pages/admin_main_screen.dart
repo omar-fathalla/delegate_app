@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
+import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/supervisor_permissions_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/super_admin_permissions_report_screen.dart';
+import 'package:delegate_app/features/admin/presentation/pages/super_admin_payment_receipts_report_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_branch_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_branches_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/create_admin_screen.dart';
+import 'package:delegate_app/features/admin/presentation/pages/super_admin_dashboard_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/manage_admins_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/manage_marketing_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_screen.dart';
@@ -24,6 +32,40 @@ class AdminMainScreen extends StatefulWidget {
 
 class _AdminMainScreenState extends State<AdminMainScreen> {
   int _currentIndex = 0;
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    final delegate = widget.delegate;
+    _screens = isSuperAdmin
+        ? [
+            SuperAdminDashboardScreen(
+              delegate: delegate,
+              onNavigateToBranches: () => setState(() => _currentIndex = 1),
+              onNavigateToAddBranch: () => setState(() => _currentIndex = 2),
+              onNavigateToCreateAdmin: () => setState(() => _currentIndex = 3),
+            ),
+            const AdminBranchesScreen(),
+            const AddBranchScreen(),
+            CreateAdminScreen(organizationUID: delegate.organizationUID),
+          ]
+        : [
+            AdminHomeScreen(adminDelegate: delegate),
+            AdminDelegatesScreen(adminDelegate: delegate),
+            AdminTasksScreen(adminDelegate: delegate),
+            MultiBlocProvider(
+              providers: [
+                BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
+                BlocProvider(create: (_) => di.sl<BranchBloc>()),
+              ],
+              child: SupervisorPermissionsScreen(
+                supervisorDelegate: delegate,
+                showAppBar: false,
+              ),
+            ),
+          ];
+  }
 
   void _onMenuSelected(String value) {
     switch (value) {
@@ -40,6 +82,33 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       case 'manage_feedbacks':
         context.push('/admin/feedbacks');
         break;
+      case 'permissions_report':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BlocProvider(
+              create: (_) => di.sl<PhotoPermissionBloc>(),
+              child: SuperAdminPermissionsReportScreen(delegate: widget.delegate),
+            ),
+          ),
+        );
+        break;
+      case 'receipts_report':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SuperAdminPaymentReceiptsReportScreen(delegate: widget.delegate),
+          ),
+        );
+        break;
+      case 'settings':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SettingsScreen(
+              delegate: widget.delegate,
+              showAppBar: true,
+            ),
+          ),
+        );
+        break;
     }
   }
 
@@ -50,38 +119,27 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
 
-    final screens = isSuperAdmin
-        ? [
-            const AdminBranchesScreen(),
-            const AddBranchScreen(),
-            CreateAdminScreen(organizationUID: delegate.organizationUID),
-            SettingsScreen(delegate: delegate),
-          ]
-        : [
-            AdminHomeScreen(adminDelegate: delegate),
-            AdminDelegatesScreen(adminDelegate: delegate),
-            AdminTasksScreen(adminDelegate: delegate),
-            SettingsScreen(delegate: delegate),
-          ];
+    final headerTitle = isSuperAdmin ? null : delegate.companyName;
 
     final subtitle = isSuperAdmin
         ? (_currentIndex == 0
-              ? l10n.helloUser(delegate.firstName)
+              ? l10n.home
               : _currentIndex == 1
-              ? l10n.addBranch
+              ? l10n.adminUser(delegate.firstName)
               : _currentIndex == 2
-              ? l10n.createAdmin
-              : l10n.settings)
+              ? l10n.addBranch
+              : l10n.createAdmin)
         : (_currentIndex == 0
-              ? l10n.helloUser(delegate.firstName)
+              ? l10n.supervisorUser(delegate.firstName)
               : _currentIndex == 1
               ? l10n.companyDelegates
               : _currentIndex == 2
               ? l10n.tasks
-              : l10n.settings);
+              : l10n.photoPermissions);
 
     return Scaffold(
       appBar: AdminHeader(
+        title: headerTitle,
         subtitle: subtitle,
         menuItems: [
           if (isSuperAdmin) ...[
@@ -112,11 +170,38 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
             ),
+            PopupMenuItem(
+              value: 'permissions_report',
+              child: ListTile(
+                leading: const Icon(Icons.analytics_outlined),
+                title: const Text('تقرير أذونات التصوير'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            PopupMenuItem(
+              value: 'receipts_report',
+              child: ListTile(
+                leading: const Icon(Icons.receipt_long_rounded),
+                title: Text(l10n.receiptsReport),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
           ],
+          PopupMenuItem(
+            value: 'settings',
+            child: ListTile(
+              leading: const Icon(Icons.settings_rounded),
+              title: Text(l10n.settings),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
         ],
         onMenuSelected: _onMenuSelected,
       ),
-      body: IndexedStack(index: _currentIndex, children: screens),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: isSuperAdmin
           ? NavigationBar(
               selectedIndex: _currentIndex,
@@ -126,6 +211,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 });
               },
               destinations: [
+                NavigationDestination(
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home_rounded),
+                  label: l10n.home,
+                ),
                 NavigationDestination(
                   icon: const Icon(Icons.storefront_rounded),
                   label: l10n.branches,
@@ -137,11 +227,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 NavigationDestination(
                   icon: const Icon(Icons.admin_panel_settings_rounded),
                   label: l10n.createAdmin,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.settings_outlined),
-                  selectedIcon: const Icon(Icons.settings_rounded),
-                  label: l10n.settings,
                 ),
               ],
             )
@@ -169,9 +254,9 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   label: l10n.tasks,
                 ),
                 NavigationDestination(
-                  icon: const Icon(Icons.settings_outlined),
-                  selectedIcon: const Icon(Icons.settings_rounded),
-                  label: l10n.settings,
+                  icon: const Icon(Icons.collections_outlined),
+                  selectedIcon: const Icon(Icons.collections_rounded),
+                  label: l10n.photoPermissions,
                 ),
               ],
             ),

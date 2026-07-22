@@ -28,6 +28,7 @@ abstract class MarketingRemoteDataSource {
   Future<List<Map<String, dynamic>>> getTodayAttendanceByBranch({
     required String branchName,
     required String organizationId,
+    DateTime? date,
   });
 }
 
@@ -213,10 +214,11 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
   Future<List<Map<String, dynamic>>> getTodayAttendanceByBranch({
     required String branchName,
     required String organizationId,
+    DateTime? date,
   }) async {
     try {
-      final now = DateTime.now();
-      final todayStart = DateTime(now.year, now.month, now.day);
+      final targetDate = date ?? DateTime.now();
+      final todayStart = DateTime(targetDate.year, targetDate.month, targetDate.day);
       final todayEnd = todayStart.add(const Duration(days: 1));
 
       // ── Step 1: جلب سجلات اليوم بـ timestamp فقط (single-field index موجود افتراضياً) ──

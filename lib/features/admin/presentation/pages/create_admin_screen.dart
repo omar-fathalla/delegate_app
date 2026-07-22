@@ -327,13 +327,27 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                       child: Column(
                         children: [
                           _RoleTile(
-                            title: 'موظف تسويق',
-                            subtitle: 'Marketing',
+                            title: 'تسويق الفروع',
+                            subtitle: 'Branch Marketing',
                             icon: Icons.campaign_rounded,
                             value: 'marketing',
                             isSelected: _selectedRole == 'marketing',
                             onTap: () {
                               setState(() => _selectedRole = 'marketing');
+                            },
+                          ),
+                          Divider(
+                            height: 1,
+                            color: colorScheme.outline.withValues(alpha: 0.3),
+                          ),
+                          _RoleTile(
+                            title: 'تسويق العروض',
+                            subtitle: 'Marketing Promotion',
+                            icon: Icons.photo_library_rounded,
+                            value: 'marketing_promotion',
+                            isSelected: _selectedRole == 'marketing_promotion',
+                            onTap: () {
+                              setState(() => _selectedRole = 'marketing_promotion');
                             },
                           ),
                           Divider(

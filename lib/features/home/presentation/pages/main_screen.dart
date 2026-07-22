@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
-import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
-import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/changelog/presentation/bloc/changelog_bloc.dart';
 import 'package:delegate_app/features/changelog/presentation/bloc/changelog_event.dart';
@@ -83,9 +83,7 @@ class _MainScreenState extends State<MainScreen> {
           }
         },
         child: Scaffold(
-          appBar: _currentIndex == 2
-              ? null
-              : AppBar(
+          appBar: AppBar(
                   backgroundColor: colorScheme.surface,
                   foregroundColor: colorScheme.onSurface,
                   surfaceTintColor: colorScheme.surfaceTint,
@@ -116,6 +114,15 @@ class _MainScreenState extends State<MainScreen> {
                     ],
                   ),
                   actions: [
+                    // Profile Button
+                    IconButton(
+                      icon: const Icon(Icons.account_circle_outlined),
+                      tooltip: l10n.profile,
+                      onPressed: () {
+                        context.push('/profile', extra: delegate);
+                      },
+                    ),
+                    const SizedBox(width: 4),
                     // Notification Bell with Badge
                     BlocProvider(
                       create: (_) => di.sl<NotificationBloc>()
@@ -175,8 +182,8 @@ class _MainScreenState extends State<MainScreen> {
                 label: l10n.tasks,
               ),
               NavigationDestination(
-                icon: const Icon(Icons.person),
-                label: l10n.profile,
+                icon: const Icon(Icons.photo_library_rounded),
+                label: isArabic ? 'تقارير الصور' : 'Photo Report',
               ),
               NavigationDestination(
                 icon: const Icon(Icons.menu_rounded),
@@ -207,11 +214,11 @@ class _MainScreenState extends State<MainScreen> {
         else
           const SizedBox.shrink(),
 
-        // Tab 2: Profile
+        // Tab 2: Photo Reports
         if (_initializedTabs.contains(2))
           BlocProvider(
-            create: (context) => di.sl<ProfileBloc>(),
-            child: ProfileScreen(delegate: delegate),
+            create: (context) => di.sl<PhotoPermissionBloc>(),
+            child: MonthlyPhotoReportScreen(delegate: delegate),
           )
         else
           const SizedBox.shrink(),

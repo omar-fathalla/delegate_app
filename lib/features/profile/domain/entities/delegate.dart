@@ -13,11 +13,12 @@ enum DocumentKey {
   insuranceLetter,
   healthCertificate,
   paymentReceipt,
+  electronicPaymentReceipt,
 }
 
 enum DocumentStatus { pending, approved, rejected, notProvided }
 
-enum UserRole { delegate, admin, superAdmin, marketing }
+enum UserRole { delegate, admin, superAdmin, marketing, marketingPromotion }
 
 class Delegate extends Equatable {
   final String uid;

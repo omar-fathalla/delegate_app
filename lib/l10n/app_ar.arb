@@ -380,6 +380,10 @@
     "@paymentReceipt": {
         "description": "Payment receipt document"
     },
+    "electronicPaymentReceipt": "إيصال دفع إلكتروني",
+    "@electronicPaymentReceipt": {
+        "description": "Electronic payment receipt document"
+    },
     "pendingStatus": "قيد الانتظار",
     "@pendingStatus": {
         "description": "Pending status label"
@@ -475,7 +479,7 @@
     "@adminDashboard": {
         "description": "Admin dashboard title"
     },
-    "addBranch": "إضافة فرع جديد",
+    "addBranch": "إضافة فرع",
     "@addBranch": {
         "description": "Add new branch title"
     },
@@ -1103,5 +1107,55 @@
     "confirmAction": "تأكيد",
     "@confirmAction": {
         "description": "Confirm button text"
+    },
+    "photoPermissions": "أذونات التصوير",
+    "@photoPermissions": {
+        "description": "Photo permissions section or screen title"
+    },
+    "photoPermissionsDesc": "إدارة أذونات التصوير ومتابعة تقارير الصور",
+    "@photoPermissionsDesc": {
+        "description": "Description of photo permissions feature"
+    },
+    "supervisor": "مشرف",
+    "@supervisor": {
+        "description": "Supervisor role label"
+    },
+    "supervisorUser": "مشرف: {name}",
+    "@supervisorUser": {
+        "description": "Supervisor greeting label",
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "adminUser": "المدير: {name}",
+    "@adminUser": {
+        "description": "Admin greeting label",
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "paymentReceiptsReport": "تقرير إيصالات الدفع الإلكتروني",
+    "@paymentReceiptsReport": {
+        "description": "Payment receipts upload report screen title"
+    },
+    "uploadsCount": "عدد الإيصالات",
+    "@uploadsCount": {
+        "description": "Uploaded receipts count label"
+    },
+    "totalUploadedReceipts": "إجمالي الإيصالات",
+    "@totalUploadedReceipts": {
+        "description": "Total uploaded receipts summary label"
+    },
+    "companiesWithUploads": "الشركات المفعلة",
+    "@companiesWithUploads": {
+        "description": "Companies with uploaded receipts summary label"
+    },
+    "receiptsReport": "تقرير إيصالات الدفع الإلكتروني",
+    "@receiptsReport": {
+        "description": "Receipts report menu item text"
     }
 }

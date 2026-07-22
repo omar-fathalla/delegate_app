@@ -77,6 +77,11 @@ service firebase.storage {
       );
     }
 
+    // ==================== PHOTO PERMISSION IMAGES ====================
+    match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
+      allow read, write: if isAuthenticated();
+    }
+
     // Files directly under /companies/ (without compId)
     match /companies/{fileName} {
       allow read, write: if isAuthenticated();

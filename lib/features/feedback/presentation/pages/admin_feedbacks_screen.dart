@@ -158,40 +158,65 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
     final pending = feedbacks
         .where((f) => f.status == FeedbackStatus.pending)
         .length;
+    final reviewed = feedbacks
+        .where((f) => f.status == FeedbackStatus.reviewed)
+        .length;
     final inProgress = feedbacks
         .where((f) => f.status == FeedbackStatus.inProgress)
         .length;
     final resolved = feedbacks
         .where((f) => f.status == FeedbackStatus.resolved)
         .length;
+    final rejected = feedbacks
+        .where((f) => f.status == FeedbackStatus.rejected)
+        .length;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem(
-            isArabic ? 'الإجمالي' : 'Total',
-            feedbacks.length.toString(),
-            theme.colorScheme.primary,
-          ),
-          _buildStatItem(
-            isArabic ? 'معلق' : 'Pending',
-            pending.toString(),
-            Colors.orange,
-          ),
-          _buildStatItem(
-            isArabic ? 'قيد التنفيذ' : 'In Progress',
-            inProgress.toString(),
-            Colors.purple,
-          ),
-          _buildStatItem(
-            isArabic ? 'تم الحل' : 'Resolved',
-            resolved.toString(),
-            Colors.green,
-          ),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildStatItem(
+              isArabic ? 'الإجمالي' : 'Total',
+              feedbacks.length.toString(),
+              theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 20),
+            _buildStatItem(
+              isArabic ? 'معلق' : 'Pending',
+              pending.toString(),
+              Colors.orange,
+            ),
+            const SizedBox(width: 20),
+            _buildStatItem(
+              isArabic ? 'مراجَع' : 'Reviewed',
+              reviewed.toString(),
+              Colors.blue,
+            ),
+            const SizedBox(width: 20),
+            _buildStatItem(
+              isArabic ? 'قيد التنفيذ' : 'In Progress',
+              inProgress.toString(),
+              Colors.purple,
+            ),
+            const SizedBox(width: 20),
+            _buildStatItem(
+              isArabic ? 'تم الحل' : 'Resolved',
+              resolved.toString(),
+              Colors.green,
+            ),
+            const SizedBox(width: 20),
+            _buildStatItem(
+              isArabic ? 'مرفوض' : 'Rejected',
+              rejected.toString(),
+              Colors.red,
+            ),
+          ],
+        ),
       ),
     );
   }

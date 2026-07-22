@@ -268,6 +268,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get paymentReceipt => 'Payment Receipt';
 
   @override
+  String get electronicPaymentReceipt => 'Electronic Payment Receipt';
+
+  @override
   String get pendingStatus => 'Pending';
 
   @override
@@ -811,4 +814,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirmAction => 'Confirm';
+
+  @override
+  String get photoPermissions => 'Photo';
+
+  @override
+  String get photoPermissionsDesc =>
+      'Manage photo permissions and view photo reports';
+
+  @override
+  String get supervisor => 'Supervisor';
+
+  @override
+  String supervisorUser(String name) {
+    return 'Supervisor: $name';
+  }
+
+  @override
+  String adminUser(String name) {
+    return 'Admin: $name';
+  }
+
+  @override
+  String get paymentReceiptsReport => 'Payment Receipts Billing Report';
+
+  @override
+  String get uploadsCount => 'Uploads Count';
+
+  @override
+  String get totalUploadedReceipts => 'Total Uploaded Receipts';
+
+  @override
+  String get companiesWithUploads => 'Billed Companies';
+
+  @override
+  String get receiptsReport => 'Receipts Report';
 }
