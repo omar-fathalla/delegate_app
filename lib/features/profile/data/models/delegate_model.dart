@@ -80,6 +80,8 @@ class DelegateModel extends Delegate {
           return UserRole.admin;
         case 'marketing':
           return UserRole.marketing;
+        case 'marketing_promotion':
+          return UserRole.marketingPromotion;
         default:
           return UserRole.delegate;
       }
@@ -140,6 +142,8 @@ class DelegateModel extends Delegate {
         return 'admin';
       case UserRole.marketing:
         return 'marketing';
+      case UserRole.marketingPromotion:
+        return 'marketing_promotion';
       case UserRole.delegate:
         return 'delegate';
     }
@@ -311,6 +315,9 @@ class DelegateDocumentModel extends DelegateDocument {
           return DocumentKey.healthCertificate;
         case 'paymentReceipt':
           return DocumentKey.paymentReceipt;
+        case 'electronicPaymentReceipt':
+        case 'electronic_payment_receipt':
+          return DocumentKey.electronicPaymentReceipt;
         default:
           return DocumentKey.personalPhoto;
       }
@@ -359,6 +366,8 @@ class DelegateDocumentModel extends DelegateDocument {
           return 'healthCertificate';
         case DocumentKey.paymentReceipt:
           return 'paymentReceipt';
+        case DocumentKey.electronicPaymentReceipt:
+          return 'electronicPaymentReceipt';
       }
     }
 
@@ -404,6 +413,8 @@ class DelegateDocumentModel extends DelegateDocument {
           return 'healthCertificate';
         case DocumentKey.paymentReceipt:
           return 'paymentReceipt';
+        case DocumentKey.electronicPaymentReceipt:
+          return 'electronicPaymentReceipt';
       }
     }
 

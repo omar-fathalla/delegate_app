@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 
 class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
+  final String? title;
   final String? subtitle;
   final bool showBackButton;
   final VoidCallback? onBackPressed;
@@ -10,6 +11,7 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
 
   const AdminHeader({
     super.key,
+    this.title,
     this.subtitle,
     this.showBackButton = false,
     this.onBackPressed,
@@ -39,7 +41,7 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            l10n.admin,
+            title ?? l10n.admin,
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,

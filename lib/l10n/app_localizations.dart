@@ -572,6 +572,12 @@ abstract class AppLocalizations {
   /// **'Payment Receipt'**
   String get paymentReceipt;
 
+  /// Electronic payment receipt document
+  ///
+  /// In en, this message translates to:
+  /// **'Electronic Payment Receipt'**
+  String get electronicPaymentReceipt;
+
   /// Pending status label
   ///
   /// In en, this message translates to:
@@ -1615,6 +1621,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm'**
   String get confirmAction;
+
+  /// Photo permissions section or screen title
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get photoPermissions;
+
+  /// Description of photo permissions feature
+  ///
+  /// In en, this message translates to:
+  /// **'Manage photo permissions and view photo reports'**
+  String get photoPermissionsDesc;
+
+  /// Supervisor role label
+  ///
+  /// In en, this message translates to:
+  /// **'Supervisor'**
+  String get supervisor;
+
+  /// Supervisor greeting label
+  ///
+  /// In en, this message translates to:
+  /// **'Supervisor: {name}'**
+  String supervisorUser(String name);
+
+  /// Admin greeting label
+  ///
+  /// In en, this message translates to:
+  /// **'Admin: {name}'**
+  String adminUser(String name);
+
+  /// Payment receipts upload report screen title
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Receipts Billing Report'**
+  String get paymentReceiptsReport;
+
+  /// Uploaded receipts count label
+  ///
+  /// In en, this message translates to:
+  /// **'Uploads Count'**
+  String get uploadsCount;
+
+  /// Total uploaded receipts summary label
+  ///
+  /// In en, this message translates to:
+  /// **'Total Uploaded Receipts'**
+  String get totalUploadedReceipts;
+
+  /// Companies with uploaded receipts summary label
+  ///
+  /// In en, this message translates to:
+  /// **'Billed Companies'**
+  String get companiesWithUploads;
+
+  /// Receipts report menu item text
+  ///
+  /// In en, this message translates to:
+  /// **'Receipts Report'**
+  String get receiptsReport;
 }
 
 class _AppLocalizationsDelegate

@@ -267,6 +267,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get paymentReceipt => 'إيصال الدفع';
 
   @override
+  String get electronicPaymentReceipt => 'إيصال دفع إلكتروني';
+
+  @override
   String get pendingStatus => 'قيد الانتظار';
 
   @override
@@ -333,7 +336,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get adminDashboard => 'لوحة الإدارة';
 
   @override
-  String get addBranch => 'إضافة فرع جديد';
+  String get addBranch => 'إضافة فرع';
 
   @override
   String get branchName => 'اسم الفرع';
@@ -809,4 +812,39 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get confirmAction => 'تأكيد';
+
+  @override
+  String get photoPermissions => 'أذونات التصوير';
+
+  @override
+  String get photoPermissionsDesc =>
+      'إدارة أذونات التصوير ومتابعة تقارير الصور';
+
+  @override
+  String get supervisor => 'مشرف';
+
+  @override
+  String supervisorUser(String name) {
+    return 'مشرف: $name';
+  }
+
+  @override
+  String adminUser(String name) {
+    return 'المدير: $name';
+  }
+
+  @override
+  String get paymentReceiptsReport => 'تقرير إيصالات الدفع الإلكتروني';
+
+  @override
+  String get uploadsCount => 'عدد الإيصالات';
+
+  @override
+  String get totalUploadedReceipts => 'إجمالي الإيصالات';
+
+  @override
+  String get companiesWithUploads => 'الشركات المفعلة';
+
+  @override
+  String get receiptsReport => 'تقرير إيصالات الدفع الإلكتروني';
 }

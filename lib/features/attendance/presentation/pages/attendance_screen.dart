@@ -15,6 +15,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -367,6 +368,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     if (!_loadingSupervisor) ...[
                       _buildSupervisorCard(context),
                     ],
+                    if (!widget.viewOnly && widget.delegate.role == UserRole.delegate) ...[
+                      _buildPhotoCaptureCard(context),
+                    ],
                     Expanded(child: _buildBody(context, state)),
                   ],
                 ),
@@ -509,6 +513,78 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoCaptureCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(top: 12),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: theme.colorScheme.primary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.camera_alt_rounded,
+                color: theme.colorScheme.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isArabic ? 'تصوير العروض الميدانية' : 'Field Offer Photos',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isArabic
+                        ? 'التقاط وإرسال صور العروض والبرندات المعتمدة'
+                        : 'Capture & send approved offer photos',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            FilledButton.icon(
+              onPressed: () {
+                context.push('/photo-permissions/delegate', extra: widget.delegate);
+              },
+              icon: const Icon(Icons.camera_rounded, size: 16),
+              label: Text(isArabic ? 'الكاميرا' : 'Camera'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
+
+// Photo Permission Imports
+import 'package:delegate_app/features/photo_permission/presentation/pages/marketing_permissions_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/injection_container.dart' as di;
 
 class MarketingMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -32,18 +38,38 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
     final delegate = widget.delegate;
     final colorScheme = Theme.of(context).colorScheme;
 
-    final screens = [
-      // ✅ Tab 0: الفروع (بدلاً من الشركات)
-      BranchHomeScreen(marketingUser: delegate),
-      MarketingSearchScreen(organizationUID: delegate.organizationUID),
-      SettingsScreen(delegate: delegate),
-    ];
+    final isPromotionOnly = delegate.role == UserRole.marketingPromotion;
 
-    final subtitle = _currentIndex == 0
-        ? 'الفروع'
-        : _currentIndex == 1
-        ? l10n.search
-        : l10n.settings;
+    final screens = isPromotionOnly
+        ? [
+            BlocProvider(
+              create: (_) => di.sl<PhotoPermissionBloc>(),
+              child: MarketingPermissionsScreen(marketingDelegate: delegate),
+            ),
+            SettingsScreen(delegate: delegate),
+          ]
+        : [
+            BranchHomeScreen(marketingUser: delegate),
+            MarketingSearchScreen(organizationUID: delegate.organizationUID),
+            BlocProvider(
+              create: (_) => di.sl<PhotoPermissionBloc>(),
+              child: MarketingPermissionsScreen(marketingDelegate: delegate),
+            ),
+            SettingsScreen(delegate: delegate),
+          ];
+
+    final String subtitle;
+    if (isPromotionOnly) {
+      subtitle = _currentIndex == 0 ? 'أذونات التصوير' : l10n.settings;
+    } else {
+      subtitle = _currentIndex == 0
+          ? 'الفروع'
+          : _currentIndex == 1
+          ? l10n.search
+          : _currentIndex == 2
+          ? 'أذونات التصوير'
+          : l10n.settings;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -95,23 +121,41 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.store_outlined),
-            selectedIcon: Icon(Icons.store_rounded),
-            label: 'الفروع',
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.search_outlined),
-            selectedIcon: const Icon(Icons.search_rounded),
-            label: l10n.search,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.settings_outlined),
-            selectedIcon: const Icon(Icons.settings_rounded),
-            label: l10n.settings,
-          ),
-        ],
+        destinations: isPromotionOnly
+            ? [
+                const NavigationDestination(
+                  icon: Icon(Icons.photo_library_outlined),
+                  selectedIcon: Icon(Icons.photo_library_rounded),
+                  label: 'أذونات التصوير',
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.settings_outlined),
+                  selectedIcon: const Icon(Icons.settings_rounded),
+                  label: l10n.settings,
+                ),
+              ]
+            : [
+                const NavigationDestination(
+                  icon: Icon(Icons.store_outlined),
+                  selectedIcon: Icon(Icons.store_rounded),
+                  label: 'الفروع',
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.search_outlined),
+                  selectedIcon: const Icon(Icons.search_rounded),
+                  label: l10n.search,
+                ),
+                const NavigationDestination(
+                  icon: Icon(Icons.photo_library_outlined),
+                  selectedIcon: Icon(Icons.photo_library_rounded),
+                  label: 'أذونات التصوير',
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.settings_outlined),
+                  selectedIcon: const Icon(Icons.settings_rounded),
+                  label: l10n.settings,
+                ),
+              ],
       ),
     );
   }

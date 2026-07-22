@@ -109,11 +109,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
                 // Security Card
                 _buildSecurityCard(colorScheme, theme, l10n, delegate),
-
-                const SizedBox(height: 24),
-
-                // Logout Button
-                _buildLogoutButton(colorScheme, theme, l10n),
               ],
             ),
           );
@@ -343,32 +338,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  // ─── Logout Button ──────────────────────────────────────────────
-  Widget _buildLogoutButton(
-    ColorScheme colorScheme,
-    ThemeData theme,
-    AppLocalizations l10n,
-  ) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () => _showLogoutDialog(context),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: colorScheme.error,
-          side: BorderSide(color: colorScheme.error),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        icon: const Icon(Icons.logout_rounded),
-        label: Text(
-          l10n.logout,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-      ),
-    );
-  }
 
   // ─── Info Row Widget ────────────────────────────────────────────
   Widget _buildInfoRow({
@@ -436,38 +405,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  // ─── Logout Dialog ──────────────────────────────────────────────
-  void _showLogoutDialog(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.logout),
-        content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _auth.signOut();
-              if (context.mounted) {
-                Navigator.of(
-                  context,
-                ).pushNamedAndRemoveUntil('/login', (route) => false);
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
-            child: Text(l10n.logout),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════

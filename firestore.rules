@@ -44,7 +44,7 @@ service cloud.firestore {
     // Helper function to check if user is marketing
     function isMarketing() {
       return isAuthenticated() &&
-             getUserData().role == 'marketing';
+             (getUserData().role == 'marketing' || getUserData().role == 'marketing_promotion');
     }
 
     // Helper function to check if user belongs to organization
@@ -115,6 +115,14 @@ service cloud.firestore {
     match /{path=**}/companies/{companyId} {
       // Allow read for all authenticated users (including marketing)
       // Marketing users need this for company search functionality
+      allow read: if isAuthenticated();
+    }
+
+    // Photo Permissions & Captured Photos collectionGroups
+    match /{path=**}/photo_permissions/{permissionId} {
+      allow read: if isAuthenticated();
+    }
+    match /{path=**}/captured_photos/{photoId} {
       allow read: if isAuthenticated();
     }
 
@@ -340,6 +348,17 @@ service cloud.firestore {
             (isOrgAdmin() && belongsToOrganization(orgId)) ||
             (isCompanyAdmin() && belongsToCompany(orgId, compId) && request.auth.uid == adminId)
           );
+        }
+
+        // Photo Permissions subcollection
+        match /photo_permissions/{permissionId} {
+          allow read, create, update: if isAuthenticated();
+
+          // Captured Photos subcollection
+          match /captured_photos/{photoId} {
+            allow read, create: if isAuthenticated();
+            allow update, delete: if false; // Photos are immutable logs
+          }
         }
       }
 

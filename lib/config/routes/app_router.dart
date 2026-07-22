@@ -3,6 +3,8 @@ import 'package:delegate_app/features/auth/presentation/pages/splash_screen.dart
 import 'package:delegate_app/features/home/presentation/pages/main_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/pages/user_profile_screen.dart';
+import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
+import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_main_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/branch_details_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/company_details_screen.dart';
@@ -24,6 +26,13 @@ import 'package:delegate_app/features/feedback/presentation/bloc/admin_feedback_
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
+// Photo Permission Feature Imports
+import 'package:delegate_app/features/photo_permission/presentation/pages/supervisor_permissions_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/marketing_permissions_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/delegate_camera_capture_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -132,10 +141,56 @@ final appRouter = GoRouter(
       builder: (context, state) => const UserProfileScreen(),
     ),
     GoRoute(
+      path: '/profile',
+      builder: (context, state) {
+        final delegate = state.extra as Delegate;
+        return BlocProvider(
+          create: (_) => di.sl<ProfileBloc>(),
+          child: ProfileScreen(
+            delegate: delegate,
+            showBackButton: true,
+          ),
+        );
+      },
+    ),
+    GoRoute(
       path: '/admin/company-details',
       builder: (context, state) {
         final company = state.extra as Company;
         return CompanyDetailsScreen(company: company);
+      },
+    ),
+    GoRoute(
+      path: '/photo-permissions/supervisor',
+      builder: (context, state) {
+        final delegate = state.extra as Delegate;
+        return MultiBlocProvider(
+          providers: [
+            BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
+            BlocProvider(create: (_) => di.sl<BranchBloc>()),
+          ],
+          child: SupervisorPermissionsScreen(supervisorDelegate: delegate),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/photo-permissions/marketing',
+      builder: (context, state) {
+        final delegate = state.extra as Delegate;
+        return BlocProvider(
+          create: (_) => di.sl<PhotoPermissionBloc>(),
+          child: MarketingPermissionsScreen(marketingDelegate: delegate),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/photo-permissions/delegate',
+      builder: (context, state) {
+        final delegate = state.extra as Delegate;
+        return BlocProvider(
+          create: (_) => di.sl<PhotoPermissionBloc>(),
+          child: DelegateCameraCaptureScreen(delegate: delegate),
+        );
       },
     ),
   ],

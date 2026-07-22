@@ -245,62 +245,62 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     String organizationId,
   ) {
     final List<AttendanceModel> history = [];
-    final Map<String, AttendanceModel> openSessions = {};
+    final Map<String, Map<String, dynamic>> checkOuts = {};
+    final List<QueryDocumentSnapshot<Map<String, dynamic>>> checkIns = [];
 
-    // In DESC order: check_out (newer) comes before check_in (older)
+    // Separate check-ins and check-outs
     for (var doc in docs) {
       final data = doc.data();
       final type = data['type'] as String?;
-
       if (type == 'check_out') {
         final relatedId = data['relatedCheckInId'] as String?;
         if (relatedId != null) {
-          openSessions[relatedId] = AttendanceModel(
-            id: relatedId,
-            userId: userId,
-            organizationId: organizationId,
-            checkInTime: DateTime.now(), // Placeholder
-            checkOutTime: data['timestamp'] != null
-                ? (data['timestamp'] as Timestamp).toDate()
-                : DateTime.now(),
-            latitude:
-                (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
-            longitude:
-                (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
-          );
+          checkOuts[relatedId] = data;
         }
       } else if (type == 'check_in') {
-        final checkInId = doc.id;
-        final checkInTime = data['timestamp'] != null
-            ? (data['timestamp'] as Timestamp).toDate()
-            : DateTime.now();
-        final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0;
-        final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0;
-        final branchName = data['branchName'];
+        checkIns.add(doc);
+      }
+    }
 
-        if (openSessions.containsKey(checkInId)) {
-          final session = openSessions.remove(checkInId)!;
-          history.add(
-            session.copyWith(
-              checkInTime: checkInTime,
-              latitude: lat,
-              longitude: lng,
-              branchName: branchName,
-            ),
-          );
-        } else {
-          history.add(
-            AttendanceModel(
-              id: checkInId,
-              userId: userId,
-              organizationId: organizationId,
-              checkInTime: checkInTime,
-              latitude: lat,
-              longitude: lng,
-              branchName: branchName,
-            ),
-          );
-        }
+    // Process check-ins and match with corresponding check-outs if available
+    for (var doc in checkIns) {
+      final checkInId = doc.id;
+      final data = doc.data();
+      final checkInTime = data['timestamp'] != null
+          ? (data['timestamp'] as Timestamp).toDate()
+          : DateTime.now();
+      final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0;
+      final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0;
+      final branchName = data['branchName'];
+
+      if (checkOuts.containsKey(checkInId)) {
+        final outData = checkOuts[checkInId]!;
+        history.add(
+          AttendanceModel(
+            id: checkInId,
+            userId: userId,
+            organizationId: organizationId,
+            checkInTime: checkInTime,
+            checkOutTime: outData['timestamp'] != null
+                ? (outData['timestamp'] as Timestamp).toDate()
+                : DateTime.now(),
+            latitude: lat,
+            longitude: lng,
+            branchName: branchName,
+          ),
+        );
+      } else {
+        history.add(
+          AttendanceModel(
+            id: checkInId,
+            userId: userId,
+            organizationId: organizationId,
+            checkInTime: checkInTime,
+            latitude: lat,
+            longitude: lng,
+            branchName: branchName,
+          ),
+        );
       }
     }
 

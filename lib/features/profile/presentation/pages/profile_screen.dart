@@ -816,6 +816,8 @@ class _DocumentCard extends StatelessWidget {
         return l10n.healthCertificate;
       case DocumentKey.paymentReceipt:
         return l10n.paymentReceipt;
+      case DocumentKey.electronicPaymentReceipt:
+        return l10n.electronicPaymentReceipt;
     }
   }
 
@@ -833,6 +835,8 @@ class _DocumentCard extends StatelessWidget {
         return Icons.local_hospital_outlined;
       case DocumentKey.paymentReceipt:
         return Icons.receipt_long_outlined;
+      case DocumentKey.electronicPaymentReceipt:
+        return Icons.receipt_long_rounded;
     }
   }
 

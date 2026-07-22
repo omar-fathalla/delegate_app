@@ -13,8 +13,13 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends StatelessWidget {
   final Delegate delegate;
+  final bool showAppBar;
 
-  const SettingsScreen({super.key, required this.delegate});
+  const SettingsScreen({
+    super.key,
+    required this.delegate,
+    this.showAppBar = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +28,13 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: showAppBar
+          ? AppBar(
+              title: Text(l10n.settings),
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              elevation: 0,
+            )
+          : null,
       body: SafeArea(
         child: Column(
           children: [
@@ -174,6 +186,32 @@ class SettingsScreen extends StatelessWidget {
                             color: Theme.of(context).colorScheme.outlineVariant,
                             indent: 64,
                           ),
+                          if (delegate.role == UserRole.delegate) ...[
+                            _buildSettingsTile(
+                              context: context,
+                              icon: Icons.camera_alt_rounded,
+                              title: isArabic ? 'أذونات التصوير المتاحة' : 'Photo Permissions',
+                              onTap: () => context.push('/photo-permissions/delegate', extra: delegate),
+                            ),
+                            Divider(
+                              height: 1,
+                              color: Theme.of(context).colorScheme.outlineVariant,
+                              indent: 64,
+                            ),
+                          ],
+                          if (delegate.role == UserRole.admin) ...[
+                            _buildSettingsTile(
+                              context: context,
+                              icon: Icons.camera_alt_rounded,
+                              title: isArabic ? 'إدارة أذونات التصوير' : 'Manage Photo Permissions',
+                              onTap: () => context.push('/photo-permissions/supervisor', extra: delegate),
+                            ),
+                            Divider(
+                              height: 1,
+                              color: Theme.of(context).colorScheme.outlineVariant,
+                              indent: 64,
+                            ),
+                          ],
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.help_outline_rounded,

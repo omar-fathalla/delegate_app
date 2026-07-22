@@ -105,6 +105,20 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/features/feedback/feedback_injection.dart';
 import 'package:get_it/get_it.dart';
 
+// Photo Permission Feature Imports
+import 'package:delegate_app/features/photo_permission/data/datasources/photo_permission_remote_datasource.dart';
+import 'package:delegate_app/features/photo_permission/data/repositories/photo_permission_repository_impl.dart';
+import 'package:delegate_app/features/photo_permission/domain/repositories/photo_permission_repository.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/request_photo_permission.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/approve_photo_permission.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/toggle_photo_permission.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/get_photo_permissions.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/get_ongoing_photo_permissions.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/upload_captured_photo.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/get_captured_photos.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/get_delegate_captured_photos.dart';
+import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+
 final sl = GetIt.instance;
 
 Future<void> init({required SharedPreferences sharedPreferences}) async {
@@ -430,6 +444,44 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // Data source
   sl.registerLazySingleton<MarketingSearchRemoteDataSource>(
     () => MarketingSearchRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  // ! Features - Photo Permission
+  // Bloc
+  sl.registerFactory(
+    () => PhotoPermissionBloc(
+      requestPhotoPermission: sl(),
+      approvePhotoPermission: sl(),
+      togglePhotoPermission: sl(),
+      getPhotoPermissions: sl(),
+      getOngoingPhotoPermissions: sl(),
+      uploadCapturedPhoto: sl(),
+      getCapturedPhotos: sl(),
+      getDelegateCapturedPhotos: sl(),
+    ),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(() => RequestPhotoPermission(sl()));
+  sl.registerLazySingleton(() => ApprovePhotoPermission(sl()));
+  sl.registerLazySingleton(() => TogglePhotoPermission(sl()));
+  sl.registerLazySingleton(() => GetPhotoPermissions(sl()));
+  sl.registerLazySingleton(() => GetOngoingPhotoPermissions(sl()));
+  sl.registerLazySingleton(() => UploadCapturedPhoto(sl()));
+  sl.registerLazySingleton(() => GetCapturedPhotos(sl()));
+  sl.registerLazySingleton(() => GetDelegateCapturedPhotos(sl()));
+
+  // Repository
+  sl.registerLazySingleton<PhotoPermissionRepository>(
+    () => PhotoPermissionRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data source
+  sl.registerLazySingleton<PhotoPermissionRemoteDataSource>(
+    () => PhotoPermissionRemoteDataSourceImpl(
+      firestore: sl(),
+      storage: sl(),
+    ),
   );
 
   // ! Core

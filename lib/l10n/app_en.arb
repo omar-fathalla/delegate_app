@@ -372,6 +372,10 @@
     "@paymentReceipt": {
         "description": "Payment receipt document"
     },
+    "electronicPaymentReceipt": "Electronic Payment Receipt",
+    "@electronicPaymentReceipt": {
+        "description": "Electronic payment receipt document"
+    },
     "pendingStatus": "Pending",
     "@pendingStatus": {
         "description": "Pending status label"
@@ -1103,5 +1107,55 @@
     "confirmAction": "Confirm",
     "@confirmAction": {
         "description": "Confirm button text"
+    },
+    "photoPermissions": "Photo",
+    "@photoPermissions": {
+        "description": "Photo permissions section or screen title"
+    },
+    "photoPermissionsDesc": "Manage photo permissions and view photo reports",
+    "@photoPermissionsDesc": {
+        "description": "Description of photo permissions feature"
+    },
+    "supervisor": "Supervisor",
+    "@supervisor": {
+        "description": "Supervisor role label"
+    },
+    "supervisorUser": "Supervisor: {name}",
+    "@supervisorUser": {
+        "description": "Supervisor greeting label",
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "adminUser": "Admin: {name}",
+    "@adminUser": {
+        "description": "Admin greeting label",
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "paymentReceiptsReport": "Payment Receipts Billing Report",
+    "@paymentReceiptsReport": {
+        "description": "Payment receipts upload report screen title"
+    },
+    "uploadsCount": "Uploads Count",
+    "@uploadsCount": {
+        "description": "Uploaded receipts count label"
+    },
+    "totalUploadedReceipts": "Total Uploaded Receipts",
+    "@totalUploadedReceipts": {
+        "description": "Total uploaded receipts summary label"
+    },
+    "companiesWithUploads": "Billed Companies",
+    "@companiesWithUploads": {
+        "description": "Companies with uploaded receipts summary label"
+    },
+    "receiptsReport": "Receipts Report",
+    "@receiptsReport": {
+        "description": "Receipts report menu item text"
     }
 }

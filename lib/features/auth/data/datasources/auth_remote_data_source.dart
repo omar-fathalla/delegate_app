@@ -137,18 +137,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           if (userRole == 'company-admin' ||
               userRole == 'organization-admin' ||
               userRole == 'Supervisor' ||
-              userRole == 'marketing') {
+              userRole == 'marketing' ||
+              userRole == 'marketing_promotion') {
             // Get admin email from Firestore
             final adminEmail = userData['email'] as String? ?? '';
 
             // Determine the correct UserRole
             final mappedRole = userRole == 'marketing'
                 ? UserRole.marketing
-                : UserRole.admin;
+                : userRole == 'marketing_promotion'
+                    ? UserRole.marketingPromotion
+                    : UserRole.admin;
 
-            // Marketing: use phone-based password check
+            // Marketing and Marketing Promotion: use phone-based password check
             // Admins: use Firebase Auth (email-based)
-            final nationalityMark = userRole == 'marketing'
+            final nationalityMark = (userRole == 'marketing' || userRole == 'marketing_promotion')
                 ? '__phone_auth__:$normalizedPhone'
                 : '__firebase_auth__:$adminEmail';
 
