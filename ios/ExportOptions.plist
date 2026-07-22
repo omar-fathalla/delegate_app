@@ -13,11 +13,6 @@
 	<key>compileBitcode</key>
 	<false/>
 	<key>signingStyle</key>
-	<string>manual</string>
-	<key>provisioningProfiles</key>
-	<dict>
-		<key>io.flutter.delegate_app</key>
-		<string>Tasheel Delegate App Store</string>
-	</dict>
+	<string>automatic</string>
 </dict>
 </plist>

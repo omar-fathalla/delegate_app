@@ -46,6 +46,7 @@ run_xcodebuild() {
   local step_name="$1"
   shift
   local log_file="$LOG_DIR/${step_name}.log"
+  mkdir -p "$LOG_DIR"
 
   if [ "$USE_XCPRETTY" = true ]; then
     # تشغيل مع xcpretty + حفظ اللوق الكامل
@@ -111,7 +112,9 @@ run_xcodebuild "archive" \
   -allowProvisioningUpdates \
   DEVELOPMENT_TEAM="$TEAM_ID" \
   CODE_SIGN_STYLE=Automatic \
-  CODE_SIGN_IDENTITY="Apple Development"
+  CODE_SIGN_IDENTITY="Apple Development" \
+  PROVISIONING_PROFILE_SPECIFIER="" \
+  PROVISIONING_PROFILE=""
 echo -e "  ${GREEN}✅ Archive تم بنجاح${NC}"
 echo ""
 
