@@ -118,12 +118,14 @@ import 'package:delegate_app/features/photo_permission/domain/usecases/upload_ca
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_delegate_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/core/services/review_service.dart';
 
 final sl = GetIt.instance;
 
 Future<void> init({required SharedPreferences sharedPreferences}) async {
   // ! Core
   sl.registerLazySingleton(() => sharedPreferences);
+  sl.registerLazySingleton(() => ReviewService(prefs: sl()));
   sl.registerLazySingleton(() => LocaleProvider(sharedPreferences));
   sl.registerLazySingleton(() => ThemeCubit(sl()));
 

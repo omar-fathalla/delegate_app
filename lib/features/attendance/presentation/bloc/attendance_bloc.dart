@@ -6,6 +6,8 @@ import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart'
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_paginated.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
+import 'package:delegate_app/core/services/review_service.dart';
+import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 
 part 'attendance_event.dart';
@@ -54,7 +56,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     );
     result.fold(
       (failure) => emit(AttendanceError(message: failure.message)),
-      (attendance) => emit(AttendanceCheckedIn(attendance: attendance)),
+      (attendance) {
+        emit(AttendanceCheckedIn(attendance: attendance));
+        sl<ReviewService>().triggerSmartReview();
+      },
     );
   }
 
@@ -74,7 +79,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     );
     result.fold(
       (failure) => emit(AttendanceError(message: failure.message)),
-      (attendance) => emit(AttendanceCheckedOut(attendance: attendance)),
+      (attendance) {
+        emit(AttendanceCheckedOut(attendance: attendance));
+        sl<ReviewService>().triggerSmartReview();
+      },
     );
   }
 

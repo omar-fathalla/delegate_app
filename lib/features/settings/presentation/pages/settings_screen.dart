@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
+import 'package:delegate_app/core/services/review_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -159,6 +160,17 @@ class SettingsScreen extends StatelessWidget {
                               '/submit-feedback',
                               extra: delegate,
                             ),
+                          ),
+                          Divider(
+                            height: 1,
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                            indent: 64,
+                          ),
+                          _buildSettingsTile(
+                            context: context,
+                            icon: Icons.star_rate_rounded,
+                            title: isArabic ? 'تقييم التطبيق على المتجر' : 'Rate Application',
+                            onTap: () => sl<ReviewService>().requestManualReview(),
                           ),
                           Divider(
                             height: 1,

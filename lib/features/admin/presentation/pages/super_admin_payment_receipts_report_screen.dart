@@ -214,9 +214,13 @@ class _SuperAdminPaymentReceiptsReportScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          l10n.paymentReceiptsReport,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: Text(
+            l10n.paymentReceiptsReport,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          ),
         ),
         actions: [
           IconButton(
@@ -324,21 +328,27 @@ class _SuperAdminPaymentReceiptsReportScreenState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'تفاصيل الإيصالات الإلكترونية',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          'تفاصيل الإيصالات الإلكترونية',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       FilledButton.icon(
                         onPressed: _exportToCSV,
-                        icon: const Icon(Icons.file_download_rounded),
-                        label: const Text('تصدير Excel'),
+                        icon: const Icon(Icons.file_download_rounded, size: 18),
+                        label: const Text('تصدير Excel', style: TextStyle(fontSize: 12)),
                         style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
