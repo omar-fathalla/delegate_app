@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// خدمة مركزية لإدارة التقييم داخل التطبيق (In-App Reviews) والتوجيه للمتجر
 class ReviewService {
@@ -18,20 +19,10 @@ class ReviewService {
   })  : _inAppReview = inAppReview ?? InAppReview.instance,
         _prefs = prefs;
 
-  /// طلب التقييم يدويًا أو عبر الزر (مع إمكانية فتح المتجر كبديل)
+  /// طلب التقييم يدويًا عند ضغط المستخدم على زر (توجيه مباشر لصفحة المتجر)
   Future<void> requestManualReview() async {
-    try {
-      final isAvailable = await _inAppReview.isAvailable();
-      if (isAvailable) {
-        await _inAppReview.requestReview();
-        await _updateLastReviewTimestamp();
-      } else {
-        await openStoreListing();
-      }
-    } catch (e) {
-      debugPrint('ReviewService: Error requesting manual review: $e');
-      await openStoreListing();
-    }
+    await openStoreListing();
+    await _updateLastReviewTimestamp();
   }
 
   /// فتح صفحة التطبيق على متجر Google Play أو App Store مباشرة
@@ -41,7 +32,15 @@ class ReviewService {
         appStoreId: 'com.tashil.delegate',
       );
     } catch (e) {
-      debugPrint('ReviewService: Error opening store listing: $e');
+      debugPrint('ReviewService: Error opening store listing via in_app_review: $e');
+      try {
+        final url = Uri.parse('https://play.google.com/store/apps/details?id=com.tashil.delegate');
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        }
+      } catch (urlError) {
+        debugPrint('ReviewService: Error launching store URL: $urlError');
+      }
     }
   }
 

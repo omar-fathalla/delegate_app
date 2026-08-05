@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/main.dart';
 import 'package:delegate_app/features/admin/domain/entities/admin_user.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/manage_admins_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
@@ -18,13 +19,53 @@ class ManageAdminsScreen extends StatelessWidget {
   }
 }
 
-class _ManageAdminsView extends StatelessWidget {
+class _ManageAdminsView extends StatefulWidget {
   const _ManageAdminsView();
+
+  @override
+  State<_ManageAdminsView> createState() => _ManageAdminsViewState();
+}
+
+class _ManageAdminsViewState extends State<_ManageAdminsView> {
+  final TextEditingController _searchController = TextEditingController();
+  String _selectedStatusFilter = 'all'; // 'all', 'active', 'suspended'
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<AdminUser> _filterAdmins(List<AdminUser> admins) {
+    final query = _searchController.text.trim().toLowerCase();
+
+    return admins.where((admin) {
+      final matchesName = admin.displayName.toLowerCase().contains(query);
+      final matchesPhone = admin.phoneNumber.toLowerCase().contains(query);
+      final matchesEmail = admin.email.toLowerCase().contains(query);
+      final matchesRole = admin.role.toLowerCase().contains(query);
+
+      final matchesQuery =
+          query.isEmpty ||
+          matchesName ||
+          matchesPhone ||
+          matchesEmail ||
+          matchesRole;
+
+      final matchesStatus =
+          _selectedStatusFilter == 'all' ||
+          (_selectedStatusFilter == 'active' && admin.isActive) ||
+          (_selectedStatusFilter == 'suspended' && !admin.isActive);
+
+      return matchesQuery && matchesStatus;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
+    final isArabic = localeProvider.isArabic;
 
     return Scaffold(
       appBar: AdminHeader(subtitle: l10n.manageAdmins, showBackButton: true),
@@ -46,38 +87,185 @@ class _ManageAdminsView extends StatelessWidget {
           }
 
           if (state is ManageAdminsLoaded) {
-            if (state.admins.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.admin_panel_settings_outlined,
-                      size: 64,
-                      color: colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      l10n.noAdminsFound,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
+            final allAdmins = state.admins;
+            final filteredAdmins = _filterAdmins(allAdmins);
+            final isSearchingOrFiltering =
+                _searchController.text.isNotEmpty ||
+                _selectedStatusFilter != 'all';
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: state.admins.length,
-              itemBuilder: (context, index) {
-                final admin = state.admins[index];
-                return _AdminCard(admin: admin);
-              },
+            return Column(
+              children: [
+                // ── Search & Filter Section ──
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Search Bar
+                      SearchBar(
+                        controller: _searchController,
+                        hintText: isArabic
+                            ? 'البحث باسم المستخدم، الاسم، أو رقم الموبايل...'
+                            : 'Search by username, name, or phone...',
+                        elevation: WidgetStateProperty.all(0),
+                        backgroundColor: WidgetStateProperty.all(
+                          colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
+                        leading: const Icon(Icons.search_rounded),
+                        trailing: _searchController.text.isNotEmpty
+                            ? [
+                                IconButton(
+                                  icon: const Icon(Icons.clear_rounded),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {});
+                                  },
+                                ),
+                              ]
+                            : null,
+                        padding: WidgetStateProperty.all(
+                          const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Filter Chips
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            FilterChip(
+                              label: Text(l10n.all),
+                              selected: _selectedStatusFilter == 'all',
+                              onSelected: (_) =>
+                                  setState(() => _selectedStatusFilter = 'all'),
+                            ),
+                            const SizedBox(width: 8),
+                            FilterChip(
+                              label: Text(isArabic ? 'نشط' : 'Active'),
+                              selected: _selectedStatusFilter == 'active',
+                              onSelected: (_) => setState(
+                                  () => _selectedStatusFilter = 'active'),
+                              selectedColor:
+                                  Colors.green.withValues(alpha: 0.2),
+                              checkmarkColor: Colors.green,
+                            ),
+                            const SizedBox(width: 8),
+                            FilterChip(
+                              label: Text(l10n.suspended),
+                              selected: _selectedStatusFilter == 'suspended',
+                              onSelected: (_) => setState(
+                                  () => _selectedStatusFilter = 'suspended'),
+                              selectedColor:
+                                  colorScheme.error.withValues(alpha: 0.2),
+                              checkmarkColor: colorScheme.error,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Results Summary Header ──
+                if (allAdmins.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isArabic
+                              ? 'عدد النتائج: ${filteredAdmins.length}'
+                              : 'Results count: ${filteredAdmins.length}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        if (isSearchingOrFiltering)
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _selectedStatusFilter = 'all');
+                            },
+                            icon: const Icon(Icons.refresh_rounded, size: 16),
+                            label: Text(
+                              isArabic ? 'إعادة ضبط' : 'Reset',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                // ── Admins List or Empty View ──
+                Expanded(
+                  child: filteredAdmins.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                isSearchingOrFiltering
+                                    ? Icons.search_off_rounded
+                                    : Icons.admin_panel_settings_outlined,
+                                size: 64,
+                                color: colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                isSearchingOrFiltering
+                                    ? (isArabic
+                                        ? 'لا توجد نتائج تطابق البحث أو الفلتر'
+                                        : 'No matching admins found')
+                                    : l10n.noAdminsFound,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          itemCount: filteredAdmins.length,
+                          itemBuilder: (context, index) {
+                            final admin = filteredAdmins[index];
+                            return _AdminCard(admin: admin);
+                          },
+                        ),
+                ),
+              ],
             );
           }
 

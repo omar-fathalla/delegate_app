@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import '../widgets/company_name_with_code.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import '../bloc/photo_permission_bloc.dart';
@@ -195,12 +197,14 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'supervisor_permissions_fab',
-        onPressed: () => _showCreateRequestSheet(context),
-        label: const Text('طلب إذن تصوير'),
-        icon: const Icon(Icons.add_a_photo_rounded),
-      ),
+      floatingActionButton: widget.supervisorDelegate.role == UserRole.organizationAdmin
+          ? null
+          : FloatingActionButton.extended(
+              heroTag: 'supervisor_permissions_fab',
+              onPressed: () => _showCreateRequestSheet(context),
+              label: const Text('طلب إذن تصوير'),
+              icon: const Icon(Icons.add_a_photo_rounded),
+            ),
     );
   }
 
@@ -268,13 +272,15 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'اضغط على الزر بالأسفل لطلب إذن جديد لشركتك.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+          if (widget.supervisorDelegate.role != UserRole.organizationAdmin) ...[
+            const SizedBox(height: 8),
+            Text(
+              'اضغط على الزر بالأسفل لطلب إذن جديد لشركتك.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -326,38 +332,71 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      permission.companyName,
+                    CompanyNameWithCode(
+                      organizationUID: widget.supervisorDelegate.organizationUID,
+                      companyUID: permission.companyUID,
+                      companyName: permission.companyName,
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    if (permission.companyCode != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'كود الشركة: ${permission.companyCode}',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colorScheme.primary,
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        statusText,
+                        style: TextStyle(
+                          color: statusColor,
                           fontWeight: FontWeight.bold,
+                          fontSize: 13,
                         ),
+                      ),
+                    ),
+                    if (permission.approvedBy != null &&
+                        permission.approvedBy!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            permission.status == 'approved'
+                                ? Icons.verified_user_rounded
+                                : Icons.person_outline_rounded,
+                            size: 13,
+                            color: permission.status == 'approved'
+                                ? Colors.green.shade700
+                                : colorScheme.error,
+                          ),
+                          const SizedBox(width: 4),
+                          ApproverNameText(
+                            approvedBy: permission.approvedBy!,
+                            organizationUID: widget.supervisorDelegate.organizationUID,
+                            companyUID: permission.companyUID,
+                            currentUserUid: widget.supervisorDelegate.uid,
+                            currentUserName: widget.supervisorDelegate.fullName,
+                            prefix: permission.status == 'approved'
+                                ? 'تم الاعتماد بواسطة: '
+                                : 'مرفوض بواسطة: ',
+                            style: TextStyle(
+                              color: permission.status == 'approved'
+                                  ? Colors.green.shade700
+                                  : Colors.red.shade700,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    statusText,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                if (isApproved)
+                if (isApproved && widget.supervisorDelegate.role == UserRole.marketingPromotion)
                   Row(
                     children: [
                       Text(
@@ -454,6 +493,7 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
   }
 
   void _showCreateRequestSheet(BuildContext context) {
+    if (widget.supervisorDelegate.role == UserRole.organizationAdmin) return;
     final state = context.read<PhotoPermissionBloc>().state;
     if (state is PhotoPermissionsLoaded) {
       final now = DateTime.now();
@@ -783,6 +823,255 @@ class _ExpandableBranchTextState extends State<ExpandableBranchText> {
           ],
         ],
       ),
+    );
+  }
+}
+
+class ApproverNameText extends StatefulWidget {
+  final String approvedBy;
+  final TextStyle? style;
+  final String prefix;
+  final String? organizationUID;
+  final String? companyUID;
+  final String? currentUserUid;
+  final String? currentUserName;
+
+  const ApproverNameText({
+    super.key,
+    required this.approvedBy,
+    this.style,
+    this.prefix = '',
+    this.organizationUID,
+    this.companyUID,
+    this.currentUserUid,
+    this.currentUserName,
+  });
+
+  static final Map<String, String> _userNameCache = {};
+
+  @override
+  State<ApproverNameText> createState() => _ApproverNameTextState();
+}
+
+class _ApproverNameTextState extends State<ApproverNameText> {
+  String? _resolvedName;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveName();
+  }
+
+  @override
+  void didUpdateWidget(covariant ApproverNameText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.approvedBy != widget.approvedBy) {
+      _resolveName();
+    }
+  }
+
+  bool _isLikelyUid(String text) {
+    final trimmed = text.trim();
+    return !trimmed.contains(' ') &&
+        RegExp(r'^[a-zA-Z0-9_-]{15,45}$').hasMatch(trimmed);
+  }
+
+  Future<void> _resolveName() async {
+    final text = widget.approvedBy.trim();
+    if (text.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _resolvedName = '';
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (!_isLikelyUid(text)) {
+      if (mounted) {
+        setState(() {
+          _resolvedName = text;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (ApproverNameText._userNameCache.containsKey(text)) {
+      if (mounted) {
+        setState(() {
+          _resolvedName = ApproverNameText._userNameCache[text];
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+
+      if (widget.currentUserUid != null && text == widget.currentUserUid) {
+        if (widget.currentUserName != null && widget.currentUserName!.isNotEmpty) {
+          ApproverNameText._userNameCache[text] = widget.currentUserName!;
+          if (mounted) {
+            setState(() {
+              _resolvedName = widget.currentUserName!;
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+      }
+
+      if (widget.organizationUID != null) {
+        // Try specific company first if provided
+        if (widget.companyUID != null) {
+          final delegateDoc = await firestore
+              .collection('organizations')
+              .doc(widget.organizationUID)
+              .collection('companies')
+              .doc(widget.companyUID)
+              .collection('delegates')
+              .doc(text)
+              .get();
+
+          if (delegateDoc.exists && delegateDoc.data() != null) {
+            final data = delegateDoc.data()!;
+            final nameResult = _extractName(data);
+            if (nameResult.isNotEmpty) {
+              _setResolvedName(text, nameResult);
+              return;
+            }
+          }
+        }
+        
+        // Search all companies in organization
+        final companies = await firestore
+            .collection('organizations')
+            .doc(widget.organizationUID)
+            .collection('companies')
+            .get();
+            
+        for (var company in companies.docs) {
+          if (widget.companyUID != null && company.id == widget.companyUID) continue; // Already checked
+          
+          final delegateDoc = await firestore
+              .collection('organizations')
+              .doc(widget.organizationUID)
+              .collection('companies')
+              .doc(company.id)
+              .collection('delegates')
+              .doc(text)
+              .get();
+              
+          if (delegateDoc.exists && delegateDoc.data() != null) {
+            final data = delegateDoc.data()!;
+            final nameResult = _extractName(data);
+            if (nameResult.isNotEmpty) {
+              _setResolvedName(text, nameResult);
+              return;
+            }
+          }
+        }
+      }      final userDoc = await firestore.collection('users').doc(text).get();
+      if (userDoc.exists && userDoc.data() != null) {
+        final data = userDoc.data()!;
+        final nameResult = _extractName(data);
+
+        if (nameResult.isNotEmpty) {
+          _setResolvedName(text, nameResult);
+          return;
+        }
+      }
+
+      final groupQuery = await firestore
+          .collectionGroup('users')
+          .where('uid', isEqualTo: text)
+          .limit(1)
+          .get();
+
+      if (groupQuery.docs.isNotEmpty) {
+        final data = groupQuery.docs.first.data();
+        final nameResult = _extractName(data);
+        if (nameResult.isNotEmpty) {
+          _setResolvedName(text, nameResult);
+          return;
+        }
+      }
+
+      final delegatesQuery = await firestore
+          .collectionGroup('delegates')
+          .where('uid', isEqualTo: text)
+          .limit(1)
+          .get();
+
+      if (delegatesQuery.docs.isNotEmpty) {
+        final data = delegatesQuery.docs.first.data();
+        final nameResult = _extractName(data);
+        if (nameResult.isNotEmpty) {
+          _setResolvedName(text, nameResult);
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error resolving name: $e');
+    }
+
+    ApproverNameText._userNameCache[text] = text;
+    if (mounted) {
+      setState(() {
+        _resolvedName = text;
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _extractName(Map<String, dynamic> data) {
+    final fullName = data['fullName']?.toString() ?? '';
+    final displayName = data['displayName']?.toString() ?? '';
+    final firstName = data['firstName']?.toString() ?? '';
+    final lastName = data['lastName']?.toString() ?? '';
+    final name = data['name']?.toString() ?? '';
+
+    if (fullName.trim().isNotEmpty) return fullName.trim();
+    if (displayName.trim().isNotEmpty) return displayName.trim();
+    final combined = '$firstName $lastName'.trim();
+    if (combined.isNotEmpty) return combined;
+    if (name.trim().isNotEmpty) return name.trim();
+    return '';
+  }
+
+  void _setResolvedName(String text, String nameResult) {
+    ApproverNameText._userNameCache[text] = nameResult;
+    if (mounted) {
+      setState(() {
+        _resolvedName = nameResult;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Text(
+        '${widget.prefix}...',
+        style: widget.style,
+      );
+    }
+
+    final displayName = _resolvedName ?? widget.approvedBy;
+    return Text(
+      '${widget.prefix}$displayName',
+      style: widget.style,
     );
   }
 }

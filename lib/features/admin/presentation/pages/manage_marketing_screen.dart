@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/main.dart';
 import 'package:delegate_app/features/admin/domain/entities/admin_user.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/manage_marketing_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
@@ -29,6 +30,7 @@ class _ManageMarketingView extends StatefulWidget {
 class _ManageMarketingViewState extends State<_ManageMarketingView> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedOrganizationUID;
+  String _selectedRoleFilter = 'all';
 
   @override
   void dispose() {
@@ -37,12 +39,26 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
   }
 
   List<AdminUser> _filterEmployees(List<AdminUser> employees) {
-    final query = _searchController.text.trim();
+    final query = _searchController.text.trim().toLowerCase();
     return employees.where((e) {
-      final matchesPhone = query.isEmpty || e.phoneNumber.contains(query);
+      final matchesPhone = e.phoneNumber.toLowerCase().contains(query);
+      final matchesName = e.displayName.toLowerCase().contains(query);
+      final matchesEmail = e.email.toLowerCase().contains(query);
+      final matchesRoleQuery = e.role.toLowerCase().contains(query);
+
+      final matchesQuery = query.isEmpty ||
+          matchesPhone ||
+          matchesName ||
+          matchesEmail ||
+          matchesRoleQuery;
+
       final matchesOrg = _selectedOrganizationUID == null ||
           e.organizationUID == _selectedOrganizationUID;
-      return matchesPhone && matchesOrg;
+
+      final matchesRole = _selectedRoleFilter == 'all' ||
+          e.role == _selectedRoleFilter;
+
+      return matchesQuery && matchesOrg && matchesRole;
     }).toList();
   }
 
@@ -63,10 +79,11 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
+    final isArabic = localeProvider.isArabic;
 
     return Scaffold(
       appBar: AdminHeader(
-        subtitle: l10n.manageMarketing,
+        subtitle: isArabic ? 'إدارة المستخدمين والتسويق' : l10n.manageMarketing,
         showBackButton: true,
       ),
       backgroundColor: colorScheme.surface,
@@ -97,6 +114,7 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
                 _SearchFilterBar(
                   searchController: _searchController,
                   selectedOrganizationUID: _selectedOrganizationUID,
+                  selectedRoleFilter: _selectedRoleFilter,
                   organizations: organizations,
                   onSearchChanged: (_) => setState(() {}),
                   onSearchCleared: () {
@@ -105,6 +123,9 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
                   },
                   onOrganizationChanged: (uid) {
                     setState(() => _selectedOrganizationUID = uid);
+                  },
+                  onRoleFilterChanged: (role) {
+                    setState(() => _selectedRoleFilter = role);
                   },
                 ),
 
@@ -136,7 +157,7 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        l10n.marketingEmployee,
+                        isArabic ? 'مستخدم' : 'Users',
                         style: TextStyle(
                           color: colorScheme.onSurfaceVariant,
                           fontSize: 14,
@@ -151,7 +172,8 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
                   child: filteredEmployees.isEmpty
                       ? _EmptyView(
                           isFiltering: _searchController.text.isNotEmpty ||
-                              _selectedOrganizationUID != null,
+                              _selectedOrganizationUID != null ||
+                              _selectedRoleFilter != 'all',
                           allEmpty: allEmployees.isEmpty,
                         )
                       : ListView.separated(
@@ -188,24 +210,37 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
 class _SearchFilterBar extends StatelessWidget {
   final TextEditingController searchController;
   final String? selectedOrganizationUID;
+  final String selectedRoleFilter;
   final List<_OrgOption> organizations;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onSearchCleared;
   final ValueChanged<String?> onOrganizationChanged;
+  final ValueChanged<String> onRoleFilterChanged;
 
   const _SearchFilterBar({
     required this.searchController,
     required this.selectedOrganizationUID,
+    required this.selectedRoleFilter,
     required this.organizations,
     required this.onSearchChanged,
     required this.onSearchCleared,
     required this.onOrganizationChanged,
+    required this.onRoleFilterChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final isArabic = localeProvider.isArabic;
+
+    final roles = [
+      {'key': 'all', 'label': isArabic ? 'الكل' : 'All'},
+      {'key': 'marketing', 'label': isArabic ? 'تسويق الفروع' : 'Branch Marketing'},
+      {'key': 'marketing_promotion', 'label': isArabic ? 'تسويق العروض' : 'Marketing Promotion'},
+      {'key': 'company-admin', 'label': isArabic ? 'مدير قطاع' : 'Company Admin'},
+      {'key': 'organization-admin', 'label': isArabic ? 'مدير عام' : 'Organization Admin'},
+    ];
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -225,13 +260,15 @@ class _SearchFilterBar extends StatelessWidget {
           // Search bar
           SearchBar(
             controller: searchController,
-            hintText: l10n.searchByPhone,
+            hintText: isArabic
+                ? 'البحث باسم المستخدم، الاسم، أو رقم الموبايل...'
+                : 'Search by username, name, or phone...',
             elevation: WidgetStateProperty.all(0),
             backgroundColor: WidgetStateProperty.all(
               theme.colorScheme.surfaceContainerHighest
                   .withValues(alpha: 0.4),
             ),
-            leading: const Icon(Icons.phone_android_rounded),
+            leading: const Icon(Icons.search_rounded),
             trailing: searchController.text.isNotEmpty
                 ? [
                     IconButton(
@@ -245,8 +282,32 @@ class _SearchFilterBar extends StatelessWidget {
             ),
             onChanged: onSearchChanged,
           ),
+          const SizedBox(height: 10),
+
+          // Role Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: roles.map((role) {
+                final key = role['key'] as String;
+                final label = role['label'] as String;
+                final isSelected = selectedRoleFilter == key;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(label),
+                    selected: isSelected,
+                    onSelected: (_) => onRoleFilterChanged(key),
+                    selectedColor: theme.colorScheme.primaryContainer,
+                    checkmarkColor: theme.colorScheme.onPrimaryContainer,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
           if (organizations.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             // Organization Filter Chips
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -404,6 +465,8 @@ class _EmployeeCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        _buildRoleBadge(context, employee.role),
+                        const SizedBox(width: 6),
                         if (isSuspended)
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -521,6 +584,64 @@ class _EmployeeCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRoleBadge(BuildContext context, String role) {
+    final isArabic = localeProvider.isArabic;
+    String label;
+    IconData icon;
+    Color color;
+
+    switch (role) {
+      case 'marketing':
+        label = isArabic ? 'تسويق الفروع' : 'Branch Marketing';
+        icon = Icons.campaign_rounded;
+        color = Colors.orange;
+        break;
+      case 'marketing_promotion':
+        label = isArabic ? 'تسويق العروض' : 'Marketing Promotion';
+        icon = Icons.photo_library_rounded;
+        color = Colors.purple;
+        break;
+      case 'company-admin':
+        label = isArabic ? 'مدير قطاع' : 'Company Admin';
+        icon = Icons.business_rounded;
+        color = Colors.blue;
+        break;
+      case 'organization-admin':
+        label = isArabic ? 'مدير عام' : 'Organization Admin';
+        icon = Icons.corporate_fare_rounded;
+        color = Colors.teal;
+        break;
+      default:
+        label = role;
+        icon = Icons.person_rounded;
+        color = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

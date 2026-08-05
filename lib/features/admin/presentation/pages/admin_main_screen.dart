@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/supervisor_permissions_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/marketing_permissions_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/super_admin_permissions_report_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_payment_receipts_report_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_branch_screen.dart';
@@ -12,6 +14,9 @@ import 'package:delegate_app/features/admin/presentation/pages/create_admin_scre
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_dashboard_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/manage_admins_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/manage_marketing_screen.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/admin_penalties_list_page.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
+import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
@@ -19,7 +24,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:go_router/go_router.dart';
+
 
 class AdminMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -38,33 +43,54 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
   void initState() {
     super.initState();
     final delegate = widget.delegate;
-    _screens = isSuperAdmin
-        ? [
-            SuperAdminDashboardScreen(
-              delegate: delegate,
-              onNavigateToBranches: () => setState(() => _currentIndex = 1),
-              onNavigateToAddBranch: () => setState(() => _currentIndex = 2),
-              onNavigateToCreateAdmin: () => setState(() => _currentIndex = 3),
-            ),
-            const AdminBranchesScreen(),
-            const AddBranchScreen(),
-            CreateAdminScreen(organizationUID: delegate.organizationUID),
-          ]
-        : [
-            AdminHomeScreen(adminDelegate: delegate),
-            AdminDelegatesScreen(adminDelegate: delegate),
-            AdminTasksScreen(adminDelegate: delegate),
-            MultiBlocProvider(
-              providers: [
-                BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
-                BlocProvider(create: (_) => di.sl<BranchBloc>()),
-              ],
-              child: SupervisorPermissionsScreen(
-                supervisorDelegate: delegate,
-                showAppBar: false,
-              ),
-            ),
-          ];
+    if (isSuperAdmin) {
+      _screens = [
+        SuperAdminDashboardScreen(
+          delegate: delegate,
+          onNavigateToBranches: () => setState(() => _currentIndex = 1),
+          onNavigateToAddBranch: () => setState(() => _currentIndex = 2),
+          onNavigateToCreateAdmin: () => setState(() => _currentIndex = 3),
+        ),
+        const AdminBranchesScreen(),
+        const AddBranchScreen(),
+        CreateAdminScreen(organizationUID: delegate.organizationUID),
+      ];
+    } else if (isOrganizationAdmin) {
+      _screens = [
+        AdminHomeScreen(adminDelegate: delegate),
+        AdminTasksScreen(adminDelegate: delegate),
+        // تبويب أذونات التصوير
+        BlocProvider(
+          create: (_) => di.sl<PhotoPermissionBloc>()
+            ..add(const LoadPermissionsRequested(
+              organizationUID: '',
+              companyUID: '',
+            )),
+          child: MarketingPermissionsScreen(marketingDelegate: delegate),
+        ),
+        // تبويب المخالفات والغرامات (قراءة + إضافة لمشرف الشركات)
+        BlocProvider(
+          create: (_) => di.sl<PenaltyBloc>(),
+          child: CompanyPenaltiesSettingsPage(delegate: delegate),
+        ),
+      ];
+    } else {
+      _screens = [
+        AdminHomeScreen(adminDelegate: delegate),
+        AdminDelegatesScreen(adminDelegate: delegate),
+        AdminTasksScreen(adminDelegate: delegate),
+        MultiBlocProvider(
+          providers: [
+            BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
+            BlocProvider(create: (_) => di.sl<BranchBloc>()),
+          ],
+          child: SupervisorPermissionsScreen(
+            supervisorDelegate: delegate,
+            showAppBar: false,
+          ),
+        ),
+      ];
+    }
   }
 
   void _onMenuSelected(String value) {
@@ -99,6 +125,16 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
         );
         break;
+      case 'penalties_management':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BlocProvider(
+              create: (_) => di.sl<PenaltyBloc>(),
+              child: AdminPenaltiesListPage(adminDelegate: widget.delegate),
+            ),
+          ),
+        );
+        break;
       case 'settings':
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -109,10 +145,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
         );
         break;
+      case 'profile':
+        context.push('/user-profile');
+        break;
     }
   }
 
   bool get isSuperAdmin => widget.delegate.role == UserRole.superAdmin;
+  bool get isOrganizationAdmin =>
+      widget.delegate.role == UserRole.organizationAdmin;
 
   @override
   Widget build(BuildContext context) {
@@ -129,6 +170,14 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               : _currentIndex == 2
               ? l10n.addBranch
               : l10n.createAdmin)
+        : isOrganizationAdmin
+        ? (_currentIndex == 0
+              ? delegate.firstName
+              : _currentIndex == 1
+              ? l10n.tasks
+              : _currentIndex == 2
+              ? 'أذونات التصوير'
+              : 'المخالفات والغرامات')
         : (_currentIndex == 0
               ? l10n.supervisorUser(delegate.firstName)
               : _currentIndex == 1
@@ -189,6 +238,28 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ),
             ),
           ],
+
+          // نظام الغرامات في القائمة للـ superAdmin و admin (للـ organizationAdmin موجود كتبويب مباشر)
+          if (!isOrganizationAdmin) ...[
+            const PopupMenuItem(
+              value: 'penalties_management',
+              child: ListTile(
+                leading: Icon(Icons.gavel_rounded),
+                title: Text('نظام الغرامات والمخالفات'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+          PopupMenuItem(
+            value: 'profile',
+            child: ListTile(
+              leading: const Icon(Icons.person_outline_rounded),
+              title: const Text('الملف الشخصي'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
           PopupMenuItem(
             value: 'settings',
             child: ListTile(
@@ -227,6 +298,37 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 NavigationDestination(
                   icon: const Icon(Icons.admin_panel_settings_rounded),
                   label: l10n.createAdmin,
+                ),
+              ],
+            )
+          : isOrganizationAdmin
+          ? NavigationBar(
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              destinations: [
+                NavigationDestination(
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home_rounded),
+                  label: l10n.home,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.task_alt_outlined),
+                  selectedIcon: const Icon(Icons.task_alt_rounded),
+                  label: l10n.tasks,
+                ),
+                const NavigationDestination(
+                  icon: Icon(Icons.photo_library_outlined),
+                  selectedIcon: Icon(Icons.photo_library_rounded),
+                  label: 'أذونات التصوير',
+                ),
+                const NavigationDestination(
+                  icon: Icon(Icons.gavel_outlined),
+                  selectedIcon: Icon(Icons.gavel_rounded),
+                  label: 'الغرامات',
                 ),
               ],
             )

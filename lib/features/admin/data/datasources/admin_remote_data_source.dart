@@ -6,6 +6,7 @@ import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/features/admin/data/models/admin_user_model.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 abstract class AdminRemoteDataSource {
   Future<List<Map<String, dynamic>>> getOrganizations();
@@ -29,6 +30,7 @@ abstract class AdminRemoteDataSource {
     String companyUID,
   );
   Future<int> getTodayCheckedInCount(String organizationId, String companyId);
+  Future<int> getTotalCompaniesCount(String organizationId);
 }
 
 class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
@@ -136,7 +138,14 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
           .collection('users')
           .where(
             'role',
-            whereIn: ['company-admin', 'organization-admin', 'Supervisor'],
+            whereIn: [
+              'company-admin',
+              'organization-admin',
+              'Supervisor',
+              'super-admin',
+              'marketing',
+              'marketing_promotion',
+            ],
           )
           .get();
       return snapshot.docs
@@ -230,18 +239,104 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     String companyUID,
   ) async {
     try {
-      final snapshot = await firestore
-          .collection('organizations')
-          .doc(organizationUID)
-          .collection('companies')
-          .doc(companyUID)
-          .collection('delegates')
-          .get();
-      return snapshot.docs
-          .map((doc) => DelegateModel.fromJson(doc.data(), doc.id))
-          .toList();
+      final List<DelegateModel> delegatesList = [];
+
+      QuerySnapshot<Map<String, dynamic>> snapshot;
+      if (organizationUID.isEmpty) {
+        snapshot = await firestore.collectionGroup('delegates').get();
+      } else if (companyUID.isEmpty) {
+        snapshot = await firestore
+            .collectionGroup('delegates')
+            .where('organizationUID', isEqualTo: organizationUID)
+            .get();
+      } else {
+        snapshot = await firestore
+            .collection('organizations')
+            .doc(organizationUID)
+            .collection('companies')
+            .doc(companyUID)
+            .collection('delegates')
+            .get();
+      }
+
+      delegatesList.addAll(
+        snapshot.docs.map((doc) => DelegateModel.fromJson(doc.data(), doc.id)),
+      );
+
+      // Fetch marketing staff from /users for Organization or General Manager assignment
+      // Only fetch marketing staff if this is an organization-wide query (no specific company)
+      if (companyUID.isEmpty) {
+        try {
+          Query<Map<String, dynamic>> usersQuery = firestore
+              .collection('users')
+              .where('role', whereIn: ['marketing', 'marketing_promotion']);
+
+          if (organizationUID.isNotEmpty) {
+            usersQuery = usersQuery.where(
+              'organizationUID',
+              isEqualTo: organizationUID,
+            );
+          }
+
+          final usersSnap = await usersQuery.get();
+          for (final uDoc in usersSnap.docs) {
+            final uData = uDoc.data();
+            final uRole = uData['role'] as String? ?? '';
+            final roleEnum = uRole == 'marketing'
+                ? UserRole.marketing
+                : uRole == 'marketing_promotion'
+                    ? UserRole.marketingPromotion
+                    : UserRole.delegate;
+
+            final roleBadge = uRole == 'marketing'
+                ? '📢 (تسويق الفروع)'
+                : '🖼️ (تسويق العروض)';
+
+            final dName = uData['displayName'] as String? ?? 'تسويق';
+
+            delegatesList.add(
+              DelegateModel(
+                uid: uDoc.id,
+                firstName: dName,
+                middleName: '',
+                lastName: '',
+                fullName: '$dName $roleBadge',
+                nationalityID: '',
+                motherName: '',
+                city: '',
+                phoneNumber: uData['phoneNumber'] as String? ?? '',
+                gender: DelegateGender.male,
+                position: DelegatePosition.supervisor,
+                birthDate: DateTime.now(),
+                organizationUID: uData['organizationUID'] as String? ?? '',
+                organizationName: uData['organizationName'] as String? ?? '',
+                companyUID: '',
+                companyName: '',
+                status: DelegateStatus.approved,
+                delegatePublicId: '',
+                allReceiptCodes: const [],
+                createdAt: DateTime.now(),
+                createdBy: uData['createdBy'] as String? ?? '',
+                hasPendingUpdate: false,
+                isDeductedFromCompany: false,
+                isPrinted: false,
+                isProfileComplete: true,
+                numberOfDocuments: 0,
+                paymentAmount: 0,
+                version: 1,
+                documents: const [],
+                role: roleEnum,
+              ),
+            );
+          }
+        } catch (_) {}
+      }
+
+      return delegatesList;
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في جلب قائمة المناديب.');
+    } catch (e) {
+      return [];
     }
   }
 
@@ -257,11 +352,15 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
 
       QuerySnapshot<Map<String, dynamic>> snapshot;
       try {
-        // Try optimized query with composite index
-        snapshot = await firestore
-            .collection(kAttendanceCollection)
-            .where('organizationId', isEqualTo: organizationId)
-            .where('companyId', isEqualTo: companyId)
+        Query<Map<String, dynamic>> query =
+            firestore.collection(kAttendanceCollection);
+        if (organizationId.isNotEmpty) {
+          query = query.where('organizationId', isEqualTo: organizationId);
+        }
+        if (companyId.isNotEmpty) {
+          query = query.where('companyId', isEqualTo: companyId);
+        }
+        snapshot = await query
             .where('type', isEqualTo: 'check_in')
             .where(
               'timestamp',
@@ -270,14 +369,15 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
             .where('timestamp', isLessThan: Timestamp.fromDate(endOfDay))
             .get();
       } catch (_) {
-        // Fallback: query without timestamp range (no composite index needed)
-        // Filter by date client-side
-        snapshot = await firestore
-            .collection(kAttendanceCollection)
-            .where('organizationId', isEqualTo: organizationId)
-            .where('companyId', isEqualTo: companyId)
-            .where('type', isEqualTo: 'check_in')
-            .get();
+        Query<Map<String, dynamic>> query =
+            firestore.collection(kAttendanceCollection);
+        if (organizationId.isNotEmpty) {
+          query = query.where('organizationId', isEqualTo: organizationId);
+        }
+        if (companyId.isNotEmpty) {
+          query = query.where('companyId', isEqualTo: companyId);
+        }
+        snapshot = await query.where('type', isEqualTo: 'check_in').get();
       }
 
       // Count unique delegate IDs (only today's records)
@@ -298,7 +398,26 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
       return uniqueDelegateIds.length;
     } on FirebaseException catch (e) {
       if (e.code == 'failed-precondition') return 0;
-      throwFirestoreFailure(e, 'فشل في جلب بيانات الحضور اليوم.');
+      return 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  @override
+  Future<int> getTotalCompaniesCount(String organizationId) async {
+    try {
+      if (organizationId.isNotEmpty) {
+        final snapshot = await firestore
+            .collection('organizations')
+            .doc(organizationId)
+            .collection('companies')
+            .get();
+        return snapshot.docs.length;
+      } else {
+        final snapshot = await firestore.collectionGroup('companies').get();
+        return snapshot.docs.length;
+      }
     } catch (_) {
       return 0;
     }

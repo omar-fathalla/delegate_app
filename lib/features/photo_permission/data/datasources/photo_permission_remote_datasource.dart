@@ -68,6 +68,19 @@ abstract class PhotoPermissionRemoteDataSource {
   Future<List<CapturedPhotoModel>> getDelegateCapturedPhotos({
     required String delegateUID,
   });
+
+  Future<List<CapturedPhotoModel>> getCompanyCapturedPhotos({
+    required String companyUID,
+    String? organizationUID,
+  });
+
+  Future<void> deleteCapturedPhoto({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required String photoId,
+    required String photoUrl,
+  });
 }
 
 class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSource {
@@ -401,6 +414,69 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       throw ServerFailure('فشل في جلب تقرير صور المندوب: [${e.code}] ${e.message}');
     } catch (e) {
       debugPrint('Unexpected Error in getDelegateCapturedPhotos: $e');
+      throw ServerFailure('حدث خطأ غير متوقع: $e');
+    }
+  }
+
+  @override
+  Future<List<CapturedPhotoModel>> getCompanyCapturedPhotos({
+    required String companyUID,
+    String? organizationUID,
+  }) async {
+    try {
+      await _ensureAuth();
+      final snapshot = await firestore
+          .collectionGroup('captured_photos')
+          .where('companyUID', isEqualTo: companyUID)
+          .orderBy('capturedAt', descending: true)
+          .get();
+
+      final docs = snapshot.docs
+          .map((doc) => CapturedPhotoModel.fromFirestore(doc))
+          .toList();
+
+      return docs;
+    } on FirebaseException catch (e) {
+      debugPrint('Firestore Error in getCompanyCapturedPhotos: $e');
+      throw ServerFailure('فشل في جلب صور الشركة: [${e.code}] ${e.message}');
+    } catch (e) {
+      debugPrint('Unexpected Error in getCompanyCapturedPhotos: $e');
+      throw ServerFailure('حدث خطأ غير متوقع: $e');
+    }
+  }
+
+  @override
+  Future<void> deleteCapturedPhoto({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required String photoId,
+    required String photoUrl,
+  }) async {
+    try {
+      await _ensureAuth();
+      final snapshot = await firestore
+          .collectionGroup('captured_photos')
+          .where('photoId', isEqualTo: photoId)
+          .get();
+          
+      for (var doc in snapshot.docs) {
+        try {
+          final imageUrl = doc.data()['imageUrl'] as String?;
+          if (imageUrl != null) {
+            final ref = storage.refFromURL(imageUrl);
+            await ref.delete();
+          }
+        } catch (e) {
+          debugPrint('Error deleting image from storage: $e');
+        }
+        await doc.reference.delete();
+      }
+    } on FirebaseException catch (e) {
+      debugPrint('Firestore Error in deleteCapturedPhoto: $e');
+      throw ServerFailure('فشل في حذف الصورة: [${e.code}] ${e.message}');
+    } catch (e) {
+      debugPrint('Unexpected Error in deleteCapturedPhoto: $e');
       throw ServerFailure('حدث خطأ غير متوقع: $e');
     }
   }

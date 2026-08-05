@@ -46,6 +46,11 @@ service firebase.storage {
         request.resource.contentType.matches('image/.*');
     }
 
+    // ==================== PHOTO PERMISSION IMAGES ====================
+    match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
+      allow read, write: if isAuthenticated();
+    }
+
     // ==================== ORGANIZATION FILES ====================
     // Files under organizations/{orgId}/...
     match /organizations/{orgId}/{allPaths=**} {
@@ -75,11 +80,6 @@ service firebase.storage {
       allow read: if belongsToOrganization(
         firestore.get(/databases/(default)/documents/companies/$(compId)).data.organizationUID
       );
-    }
-
-    // ==================== PHOTO PERMISSION IMAGES ====================
-    match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
-      allow read, write: if isAuthenticated();
     }
 
     // Files directly under /companies/ (without compId)

@@ -17,6 +17,7 @@ class DelegateCameraCaptureScreen extends StatefulWidget {
 }
 
 class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScreen> {
+  List<PhotoPermission>? _cachedPermissions;
   PhotoPermission? _selectedPermission;
   String? _selectedBranchId;
   String? _selectedBranchName;
@@ -59,6 +60,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
         setState(() {
           _imageFile = File(photo.path);
         });
+        // محاولة جلب الموقع كمعلومة إضافية بدون تعطيل العملية
         _getCurrentLocation();
       }
     } catch (e) {
@@ -74,7 +76,6 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showErrorSnackBar('خدمات الموقع الجغرافي معطلة. يرجى تفعيل الـ GPS.');
         setState(() => _gettingLocation = false);
         return;
       }
@@ -83,14 +84,12 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          _showErrorSnackBar('تم رفض صلاحية الوصول للموقع الجغرافي.');
           setState(() => _gettingLocation = false);
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        _showErrorSnackBar('صلاحيات الموقع مرفوضة دائماً. يرجى تفعيلها من إعدادات الهاتف.');
         setState(() => _gettingLocation = false);
         return;
       }
@@ -106,8 +105,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
         _longitude = position.longitude;
         _gettingLocation = false;
       });
-    } catch (e) {
-      _showErrorSnackBar('فشل في جلب الموقع الجغرافي: $e');
+    } catch (_) {
       setState(() => _gettingLocation = false);
     }
   }
@@ -139,7 +137,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
           if (state is PhotoUploadSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('✅ تم رفع التقرير والصورة بنجاح في النظام'),
+                content: Text('✅ تم حفظ التقرير محلياً. سيتم رفعه تلقائياً عند توفر الإنترنت.'),
                 backgroundColor: Colors.green,
                 behavior: SnackBarBehavior.floating,
               ),
@@ -156,13 +154,20 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
           }
         },
         builder: (context, state) {
-          if (state is PhotoPermissionLoading) {
+          if (state is OngoingPermissionsLoaded) {
+            _cachedPermissions = state.permissions;
+          }
+
+          if (state is PhotoPermissionLoading && _cachedPermissions == null) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (state is OngoingPermissionsLoaded) {
+          final permissionsToUse = _cachedPermissions ??
+              (state is OngoingPermissionsLoaded ? state.permissions : null);
+
+          if (permissionsToUse != null) {
             // تصفية الأذونات لتظهر فقط الأذونات الممنوحة لشركة المندوب (بالـ UID، الكود، أو اسم الشركة)
-            final delegatePermissions = state.permissions.where((p) {
+            final delegatePermissions = permissionsToUse.where((p) {
               final matchUID = widget.delegate.companyUID.isNotEmpty && p.companyUID == widget.delegate.companyUID;
               final matchName = p.companyName.trim().toLowerCase() == widget.delegate.companyName.trim().toLowerCase();
               return matchUID || matchName;
@@ -177,75 +182,101 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Step 1: Select permission/campaign
-                  Text(
-                    '1. اختر العرض أو الإذن المصرح لك به:',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<PhotoPermission>(
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    hint: const Text('اختر الإذن المتاح لشركتك'),
-                    initialValue: _selectedPermission,
-                    items: delegatePermissions.map((permission) {
-                      return DropdownMenuItem(
-                        value: permission,
-                        child: Text(
-                          'إذن تصوير العروض - ${permission.companyName}',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() {
-                        _selectedPermission = val;
-                        _selectedBranchId = null;
-                        _selectedBranchName = null;
+                  // Auto-selected permission/campaign info
+                  ...(() {
+                    if (_selectedPermission == null && delegatePermissions.isNotEmpty) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          setState(() {
+                            _selectedPermission = delegatePermissions.first;
+                          });
+                        }
                       });
-                    },
-                  ),
-                  const SizedBox(height: 20),
+                    }
+                    final activePermission = _selectedPermission ?? delegatePermissions.first;
 
-                  // Step 2: Select Branch
-                  if (_selectedPermission != null) ...[
-                    Text(
-                      '2. حدد الفرع الذي تتواجد فيه الآن:',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    return [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.verified_rounded, color: colorScheme.primary),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'العرض المصرح لك به',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'إذن تصوير العروض - ${activePermission.companyName}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      hint: const Text('اختر الفرع المتواجد به'),
-                      initialValue: _selectedBranchId,
-                      items: List.generate(_selectedPermission!.branchIds.length, (index) {
-                        final id = _selectedPermission!.branchIds[index];
-                        final name = _selectedPermission!.branchNames[index];
-                        return DropdownMenuItem(
-                          value: id,
-                          child: Text(name),
-                        );
-                      }),
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedBranchId = val;
-                          _selectedBranchName = _selectedPermission!.branchNames[
-                              _selectedPermission!.branchIds.indexOf(val!)];
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                  ],
+                      const SizedBox(height: 24),
+
+                      // Step 1: Select Branch
+                      Text(
+                        '1. حدد الفرع الذي تتواجد فيه الآن:',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        hint: const Text('اختر الفرع المتواجد به'),
+                        initialValue: _selectedBranchId != null && activePermission.branchIds.contains(_selectedBranchId) 
+                            ? _selectedBranchId 
+                            : null,
+                        items: List.generate(activePermission.branchIds.length, (index) {
+                          final id = activePermission.branchIds[index];
+                          final name = activePermission.branchNames[index];
+                          return DropdownMenuItem(
+                            value: id,
+                            child: Text(name),
+                          );
+                        }),
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedPermission = activePermission;
+                            _selectedBranchId = val;
+                            _selectedBranchName = activePermission.branchNames[
+                                activePermission.branchIds.indexOf(val!)];
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                    ];
+                  })(),
 
                   // Step 3: Capture & comment
                   if (_selectedBranchId != null) ...[
                     Text(
-                      '3. التقاط الصورة الميدانية:',
+                      '2. التقاط الصورة الميدانية:',
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
@@ -287,32 +318,27 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                       ),
                       const SizedBox(height: 20),
 
-                      // Coordinates verification
+                      // Coordinates info (optional)
                       Row(
                         children: [
                           Icon(
-                            _latitude != null ? Icons.location_on_rounded : Icons.location_searching_rounded,
-                            color: _latitude != null ? Colors.green : Colors.orange,
+                            _latitude != null ? Icons.location_on_rounded : Icons.info_outline_rounded,
+                            color: _latitude != null ? Colors.green : Colors.blue,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _gettingLocation
-                                  ? 'جاري تحديد موقعك الجغرافي...'
+                                  ? 'جاري رصد إحداثيات الموقع اختيارياً...'
                                   : (_latitude != null
-                                      ? 'تم تحديد إحداثيات الموقع بدقة بنجاح.'
-                                      : 'لم يتم رصد إحداثيات الموقع بعد.'),
+                                      ? 'تم ربط الموقع الجغرافي بالتقرير بنجاح.'
+                                      : 'التسجيل متاح بناءً على اختيار الفرع (الموقع اختياري).'),
                               style: TextStyle(
                                 fontSize: 12,
-                                color: _latitude != null ? Colors.green : Colors.orange,
+                                color: _latitude != null ? Colors.green : Colors.blue,
                               ),
                             ),
                           ),
-                          if (_latitude == null && !_gettingLocation)
-                            IconButton(
-                              icon: const Icon(Icons.my_location_rounded),
-                              onPressed: _getCurrentLocation,
-                            ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -336,30 +362,36 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 children: [
                                   CircularProgressIndicator(),
                                   SizedBox(height: 8),
-                                  Text('جاري رفع الصورة والتقرير إلى السيرفر...'),
+                                  Text('جاري الحفظ...'),
                                 ],
                               ),
                             )
                           : ElevatedButton(
-                              onPressed: _latitude == null
-                                  ? null
-                                  : () {
-                                      context.read<PhotoPermissionBloc>().add(
-                                            UploadPhotoRequested(
-                                              organizationUID: widget.delegate.organizationUID,
-                                              companyUID: widget.delegate.companyUID,
-                                              permissionId: _selectedPermission!.uid,
-                                              branchId: _selectedBranchId!,
-                                              branchName: _selectedBranchName!,
-                                              delegateUID: widget.delegate.uid,
-                                              delegateName: widget.delegate.fullName,
-                                              imageFile: _imageFile!,
-                                              comment: _commentController.text,
-                                              latitude: _latitude!,
-                                              longitude: _longitude!,
-                                            ),
-                                          );
-                                    },
+                              onPressed: () {
+                                final currentPerm = _selectedPermission ?? delegatePermissions.first;
+                                final orgUID = currentPerm.organizationUID.isNotEmpty
+                                    ? currentPerm.organizationUID
+                                    : widget.delegate.organizationUID;
+                                final compUID = currentPerm.companyUID.isNotEmpty
+                                    ? currentPerm.companyUID
+                                    : widget.delegate.companyUID;
+
+                                context.read<PhotoPermissionBloc>().add(
+                                      UploadPhotoRequested(
+                                        organizationUID: orgUID,
+                                        companyUID: compUID,
+                                        permissionId: currentPerm.uid,
+                                        branchId: _selectedBranchId!,
+                                        branchName: _selectedBranchName!,
+                                        delegateUID: widget.delegate.uid,
+                                        delegateName: widget.delegate.fullName,
+                                        imageFile: _imageFile!,
+                                        comment: _commentController.text,
+                                        latitude: _latitude ?? 0.0,
+                                        longitude: _longitude ?? 0.0,
+                                      ),
+                                    );
+                              },
                               style: ElevatedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(

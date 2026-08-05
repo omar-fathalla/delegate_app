@@ -1,6 +1,10 @@
 import 'dart:io';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:get_it/get_it.dart';
+import 'package:delegate_app/core/services/sync_manager.dart';
+import 'package:delegate_app/features/photo_permission/data/datasources/photo_offline_datasource.dart';
+import 'package:delegate_app/features/photo_permission/data/models/captured_photo_model.dart';
 import 'package:delegate_app/features/photo_permission/domain/entities/photo_permission.dart';
 import 'package:delegate_app/features/photo_permission/domain/entities/captured_photo.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/request_photo_permission.dart';
@@ -11,6 +15,8 @@ import 'package:delegate_app/features/photo_permission/domain/usecases/get_ongoi
 import 'package:delegate_app/features/photo_permission/domain/usecases/upload_captured_photo.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_delegate_captured_photos.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/get_company_captured_photos.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/delete_captured_photo.dart';
 
 part 'photo_permission_event.dart';
 part 'photo_permission_state.dart';
@@ -24,6 +30,8 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
   final UploadCapturedPhoto uploadCapturedPhoto;
   final GetCapturedPhotos getCapturedPhotos;
   final GetDelegateCapturedPhotos getDelegateCapturedPhotos;
+  final GetCompanyCapturedPhotos getCompanyCapturedPhotos;
+  final DeleteCapturedPhoto deleteCapturedPhoto;
 
   PhotoPermissionBloc({
     required this.requestPhotoPermission,
@@ -34,6 +42,8 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     required this.uploadCapturedPhoto,
     required this.getCapturedPhotos,
     required this.getDelegateCapturedPhotos,
+    required this.getCompanyCapturedPhotos,
+    required this.deleteCapturedPhoto,
   }) : super(PhotoPermissionInitial()) {
     on<RequestPermissionRequested>(_onRequestPermission);
     on<LoadPermissionsRequested>(_onLoadPermissions);
@@ -43,6 +53,8 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     on<UploadPhotoRequested>(_onUploadPhoto);
     on<LoadCapturedPhotosRequested>(_onLoadCapturedPhotos);
     on<LoadDelegateCapturedPhotosRequested>(_onLoadDelegateCapturedPhotos);
+    on<LoadCompanyCapturedPhotosRequested>(_onLoadCompanyCapturedPhotos);
+    on<DeleteCapturedPhotoRequested>(_onDeleteCapturedPhoto);
   }
 
   Future<void> _onRequestPermission(
@@ -165,25 +177,51 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     Emitter<PhotoPermissionState> emit,
   ) async {
     emit(PhotoPermissionUploadInProgress());
-    final result = await uploadCapturedPhoto(
-      UploadCapturedPhotoParams(
+    try {
+      final offlineDataSource = GetIt.I<PhotoOfflineDataSource>();
+      final syncManager = GetIt.I<SyncManager>();
+
+      // Save locally
+      await offlineDataSource.savePendingPhoto({
+        'organizationUID': event.organizationUID,
+        'companyUID': event.companyUID,
+        'permissionId': event.permissionId,
+        'branchId': event.branchId,
+        'branchName': event.branchName,
+        'delegateUID': event.delegateUID,
+        'delegateName': event.delegateName,
+        'imagePath': event.imageFile.path,
+        'comment': event.comment,
+        'latitude': event.latitude,
+        'longitude': event.longitude,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      // We emit success so UI can pop, then trigger sync
+      // using a dummy model to fulfill PhotoUploadSuccess expectations.
+      final dummyPhoto = CapturedPhotoModel(
+        uid: 'pending_${DateTime.now().millisecondsSinceEpoch}',
+        permissionId: event.permissionId,
         organizationUID: event.organizationUID,
         companyUID: event.companyUID,
-        permissionId: event.permissionId,
         branchId: event.branchId,
         branchName: event.branchName,
         delegateUID: event.delegateUID,
         delegateName: event.delegateName,
-        imageFile: event.imageFile,
+        photoUrl: 'local', // Placeholder
         comment: event.comment,
         latitude: event.latitude,
         longitude: event.longitude,
-      ),
-    );
-    result.fold(
-      (failure) => emit(PhotoPermissionError(message: failure.message)),
-      (photo) => emit(PhotoUploadSuccess(photo: photo)),
-    );
+        capturedAt: DateTime.now(),
+      );
+
+      emit(PhotoUploadSuccess(photo: dummyPhoto));
+
+      // Attempt to sync immediately if internet is available
+      syncManager.syncPendingPhotos();
+    } catch (e) {
+      emit(PhotoPermissionError(message: 'فشل في حفظ الصورة محلياً: $e'));
+    }
   }
 
   Future<void> _onLoadCapturedPhotos(
@@ -209,14 +247,85 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     Emitter<PhotoPermissionState> emit,
   ) async {
     emit(PhotoPermissionLoading());
+    
+    // 1. Fetch remote photos
     final result = await getDelegateCapturedPhotos(
       GetDelegateCapturedPhotosParams(
         delegateUID: event.delegateUID,
       ),
     );
+    
+    // 2. Fetch local pending photos
+    final offlineDataSource = GetIt.I<PhotoOfflineDataSource>();
+    final pendingMaps = await offlineDataSource.getPendingPhotos();
+    
+    final List<CapturedPhoto> pendingPhotos = pendingMaps
+        .where((map) => map['delegateUID'] == event.delegateUID)
+        .map((map) => CapturedPhotoModel(
+              uid: 'pending_${map['id']}',
+              permissionId: map['permissionId'],
+              organizationUID: map['organizationUID'],
+              companyUID: map['companyUID'],
+              branchId: map['branchId'],
+              branchName: map['branchName'],
+              delegateUID: map['delegateUID'],
+              delegateName: map['delegateName'],
+              photoUrl: map['imagePath'],
+              comment: map['comment'] ?? '',
+              latitude: map['latitude'] ?? 0.0,
+              longitude: map['longitude'] ?? 0.0,
+              capturedAt: DateTime.fromMillisecondsSinceEpoch(map['timestamp']),
+            ))
+        .toList();
+
+    result.fold(
+      (failure) {
+        if (pendingPhotos.isNotEmpty) {
+          emit(CapturedPhotosLoaded(photos: pendingPhotos));
+        } else {
+          emit(PhotoPermissionError(message: failure.message));
+        }
+      },
+      (photos) {
+        final allPhotos = [...pendingPhotos, ...photos];
+        // Sort newest first
+        allPhotos.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+        emit(CapturedPhotosLoaded(photos: allPhotos));
+      },
+    );
+  }
+
+  Future<void> _onLoadCompanyCapturedPhotos(
+    LoadCompanyCapturedPhotosRequested event,
+    Emitter<PhotoPermissionState> emit,
+  ) async {
+    emit(PhotoPermissionLoading());
+    final result = await getCompanyCapturedPhotos(
+      GetCompanyCapturedPhotosParams(companyUID: event.companyUID),
+    );
     result.fold(
       (failure) => emit(PhotoPermissionError(message: failure.message)),
       (photos) => emit(CapturedPhotosLoaded(photos: photos)),
+    );
+  }
+
+  Future<void> _onDeleteCapturedPhoto(
+    DeleteCapturedPhotoRequested event,
+    Emitter<PhotoPermissionState> emit,
+  ) async {
+    emit(PhotoPermissionLoading());
+    final result = await deleteCapturedPhoto(
+      DeleteCapturedPhotoParams(
+        photoId: event.photoId,
+        organizationUID: '',
+        companyUID: '',
+        permissionId: '',
+        photoUrl: '',
+      ),
+    );
+    result.fold(
+      (failure) => emit(PhotoPermissionError(message: failure.message)),
+      (_) => emit(PhotoPermissionActionSuccess(message: 'تم حذف الصورة بنجاح')),
     );
   }
 }

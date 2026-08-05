@@ -147,7 +147,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 ? UserRole.marketing
                 : userRole == 'marketing_promotion'
                     ? UserRole.marketingPromotion
-                    : UserRole.admin;
+                    : userRole == 'organization-admin'
+                        ? UserRole.organizationAdmin
+                        : UserRole.admin;
 
             // Marketing and Marketing Promotion: use phone-based password check
             // Admins: use Firebase Auth (email-based)

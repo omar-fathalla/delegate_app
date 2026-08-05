@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,10 +8,20 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/captured_photo.dart';
 
+enum GroupMode {
+  byDate,
+  byBranch,
+}
+
 class MonthlyPhotoReportScreen extends StatefulWidget {
   final Delegate delegate;
+  final bool showAppBar;
 
-  const MonthlyPhotoReportScreen({super.key, required this.delegate});
+  const MonthlyPhotoReportScreen({
+    super.key,
+    required this.delegate,
+    this.showAppBar = true,
+  });
 
   @override
   State<MonthlyPhotoReportScreen> createState() => _MonthlyPhotoReportScreenState();
@@ -18,6 +29,7 @@ class MonthlyPhotoReportScreen extends StatefulWidget {
 
 class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
   late DateTime _selectedMonth;
+  GroupMode _currentGroupMode = GroupMode.byDate;
 
   @override
   void initState() {
@@ -27,9 +39,15 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
   }
 
   void _loadPhotos() {
-    context.read<PhotoPermissionBloc>().add(
-          LoadDelegateCapturedPhotosRequested(delegateUID: widget.delegate.uid),
-        );
+    if (widget.delegate.role == UserRole.admin) {
+      context.read<PhotoPermissionBloc>().add(
+            LoadCompanyCapturedPhotosRequested(companyUID: widget.delegate.companyUID),
+          );
+    } else {
+      context.read<PhotoPermissionBloc>().add(
+            LoadDelegateCapturedPhotosRequested(delegateUID: widget.delegate.uid),
+          );
+    }
   }
 
   void _previousMonth() {
@@ -57,6 +75,9 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
     final isCurrentMonth = _selectedMonth.year == now.year && _selectedMonth.month == now.month;
 
     return Scaffold(
+      appBar: widget.showAppBar ? AppBar(
+        title: const Text('تقارير الصور الشهرية'),
+      ) : null,
       backgroundColor: colorScheme.surfaceContainerLow,
       body: BlocBuilder<PhotoPermissionBloc, PhotoPermissionState>(
         builder: (context, state) {
@@ -179,6 +200,33 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                     ),
                   ),
 
+                  // شريط اختيار طريقة العرض
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: SegmentedButton<GroupMode>(
+                        segments: const [
+                          ButtonSegment<GroupMode>(
+                            value: GroupMode.byDate,
+                            label: Text('حسب التاريخ'),
+                            icon: Icon(Icons.calendar_month_rounded),
+                          ),
+                          ButtonSegment<GroupMode>(
+                            value: GroupMode.byBranch,
+                            label: Text('حسب الفرع'),
+                            icon: Icon(Icons.store_rounded),
+                          ),
+                        ],
+                        selected: <GroupMode>{_currentGroupMode},
+                        onSelectionChanged: (Set<GroupMode> newSelection) {
+                          setState(() {
+                            _currentGroupMode = newSelection.first;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+
                   // عرض الصور أو حالة خلو البيانات
                   if (filteredPhotos.isEmpty)
                     SliverFillRemaining(
@@ -187,22 +235,8 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                     )
                   else
                     SliverPadding(
-                      padding: const EdgeInsets.all(16),
-                      sliver: SliverGrid(
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.8,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final photo = filteredPhotos[index];
-                            return _buildPhotoCard(context, photo, theme);
-                          },
-                          childCount: filteredPhotos.length,
-                        ),
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      sliver: _buildGroupedPhotosList(filteredPhotos, theme),
                     ),
                 ],
               ),
@@ -295,129 +329,148 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
     );
   }
 
-  Widget _buildPhotoCard(BuildContext context, CapturedPhoto photo, ThemeData theme) {
+  Widget _buildCompactPhotoCard(BuildContext context, CapturedPhoto photo, ThemeData theme) {
     final colorScheme = theme.colorScheme;
-    final timeStr = DateFormat('hh:mm a').format(photo.capturedAt);
-    final dateStr = DateFormat('dd-MM-yyyy').format(photo.capturedAt);
+    final dateStr = DateFormat('dd-MM-yyyy hh:mm a').format(photo.capturedAt);
 
     return Card(
-      elevation: 2,
-      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 8),
+      color: colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      child: ListTile(
+        onTap: () => _showPhotoDetails(context, photo),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(Icons.image_outlined, color: colorScheme.onPrimaryContainer),
+        ),
+        title: Text(
+          photo.branchName,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Text(
+          dateStr,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        trailing: Icon(Icons.chevron_left_rounded, color: colorScheme.onSurfaceVariant),
+      ),
+    );
+  }
+
+  Widget _buildGroupedPhotosList(List<CapturedPhoto> photos, ThemeData theme) {
+    if (_currentGroupMode == GroupMode.byDate) {
+      // Group by date (day)
+      final Map<String, List<CapturedPhoto>> grouped = {};
+      for (var photo in photos) {
+        final dateKey = DateFormat('yyyy-MM-dd').format(photo.capturedAt);
+        grouped.putIfAbsent(dateKey, () => []).add(photo);
+      }
+      
+      // Sort keys descending
+      final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+      return SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final key = sortedKeys[index];
+            final groupPhotos = grouped[key]!;
+            final displayDate = DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.parse(key));
+            
+            return _buildGroupExpansionTile(
+              title: displayDate,
+              icon: Icons.calendar_today_rounded,
+              photos: groupPhotos,
+              theme: theme,
+            );
+          },
+          childCount: sortedKeys.length,
+        ),
+      );
+    } else {
+      // Group by branch
+      final Map<String, List<CapturedPhoto>> grouped = {};
+      for (var photo in photos) {
+        grouped.putIfAbsent(photo.branchName, () => []).add(photo);
+      }
+      
+      final sortedKeys = grouped.keys.toList()..sort();
+
+      return SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final key = sortedKeys[index];
+            final groupPhotos = grouped[key]!;
+            
+            return _buildGroupExpansionTile(
+              title: key,
+              icon: Icons.store_rounded,
+              photos: groupPhotos,
+              theme: theme,
+            );
+          },
+          childCount: sortedKeys.length,
+        ),
+      );
+    }
+  }
+
+  Widget _buildGroupExpansionTile({
+    required String title,
+    required IconData icon,
+    required List<CapturedPhoto> photos,
+    required ThemeData theme,
+  }) {
+    final colorScheme = theme.colorScheme;
+    
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
-      child: InkWell(
-        onTap: () => _showPhotoDetails(context, photo),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // صورة المعاينة مع تظليل علوي وسفلي
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CachedNetworkImage(
-                    imageUrl: photo.photoUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: colorScheme.surfaceContainerHighest,
-                      child: const Center(
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: colorScheme.surfaceContainerHighest,
-                      child: const Icon(Icons.broken_image_rounded, size: 32),
-                    ),
-                  ),
-                  // تظليل داكن ناعم من الأسفل لقراءة النص
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.65),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          stops: const [0.6, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                  // وقت الالتقاط في الأعلى
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        timeStr,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          collapsedBackgroundColor: colorScheme.surface,
+          backgroundColor: colorScheme.surfaceContainerLowest,
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(8),
             ),
-            // بيانات الفرع والتعليق
+            child: Icon(icon, color: colorScheme.onPrimaryContainer),
+          ),
+          title: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          subtitle: Text(
+            '${photos.length} صور',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          children: [
             Padding(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.location_on_rounded, size: 14, color: colorScheme.primary),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          photo.branchName,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    dateStr,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontSize: 10,
-                    ),
-                  ),
-                  if (photo.comment.trim().isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      photo.comment,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontStyle: FontStyle.italic,
-                        fontSize: 11,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
+                children: photos.map((photo) => _buildCompactPhotoCard(context, photo, theme)).toList(),
               ),
             ),
           ],
@@ -537,16 +590,24 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                             panEnabled: true,
                             minScale: 1.0,
                             maxScale: 4.0,
-                            child: CachedNetworkImage(
-                              imageUrl: photo.photoUrl,
-                              fit: BoxFit.contain,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) => const Center(
-                                child: Icon(Icons.broken_image, size: 64),
-                              ),
-                            ),
+                            child: photo.photoUrl.startsWith('http')
+                                ? CachedNetworkImage(
+                                    imageUrl: photo.photoUrl,
+                                    fit: BoxFit.contain,
+                                    placeholder: (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                    errorWidget: (context, url, error) => const Center(
+                                      child: Icon(Icons.broken_image, size: 64),
+                                    ),
+                                  )
+                                : Image.file(
+                                    File(photo.photoUrl),
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) => const Center(
+                                      child: Icon(Icons.broken_image, size: 64),
+                                    ),
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 8),

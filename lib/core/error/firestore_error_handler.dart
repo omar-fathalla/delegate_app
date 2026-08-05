@@ -21,9 +21,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 Never throwFirestoreFailure(FirebaseException e, String message) {
   if (e.code == 'permission-denied') {
     _healAnonymousSession();
-    throw ServerFailure('$message (تم تجديد الجلسة، يرجى المحاولة مرة أخرى)');
+    throw ServerFailure('$message (خطأ الصلاحية: ${e.code})');
   }
-  throw ServerFailure(message);
+  final codeDetails = e.code.isNotEmpty ? ' [رمز الخطأ: ${e.code}]' : '';
+  throw ServerFailure('$message$codeDetails');
 }
 
 Never throwTimeoutFailure([

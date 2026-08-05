@@ -1,0 +1,145 @@
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:delegate_app/core/error/exceptions.dart';
+import 'package:delegate_app/features/penalties/data/models/penalty_model.dart';
+import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
+
+abstract class PenaltyRemoteDataSource {
+  Future<void> createPenalty(PenaltyModel penalty);
+  Future<List<PenaltyModel>> getCompanyPenalties(String companyId);
+  Future<List<PenaltyModel>> getAllPenalties();
+  Future<void> updatePenaltyStatus(String penaltyId, PenaltyStatus status);
+  Future<EvidenceFile> uploadEvidenceFile({
+    required File file,
+    required String penaltyId,
+  });
+}
+
+class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
+  final FirebaseFirestore firestore;
+  final FirebaseStorage storage;
+
+  PenaltyRemoteDataSourceImpl({
+    required this.firestore,
+    required this.storage,
+  });
+
+  CollectionReference<Map<String, dynamic>> get _penaltiesRef =>
+      firestore.collection('penalties');
+
+  @override
+  Future<void> createPenalty(PenaltyModel penalty) async {
+    try {
+      final docRef = _penaltiesRef.doc(
+        penalty.penaltyId.isNotEmpty ? penalty.penaltyId : null,
+      );
+      final finalPenalty = PenaltyModel(
+        penaltyId: docRef.id,
+        companyId: penalty.companyId,
+        companyName: penalty.companyName,
+        createdById: penalty.createdById,
+        createdByName: penalty.createdByName,
+        title: penalty.title,
+        category: penalty.category,
+        incidentDescription: penalty.incidentDescription,
+        fineAmount: penalty.fineAmount,
+        currency: penalty.currency,
+        status: penalty.status,
+        evidenceFiles: penalty.evidenceFiles,
+        createdAt: penalty.createdAt,
+        updatedAt: penalty.updatedAt,
+      );
+
+      await docRef.set(finalPenalty.toJson());
+    } on FirebaseException catch (e) {
+      throw ServerException(e.message ?? 'فشل في تسجيل الغرامة.');
+    } catch (e) {
+      throw ServerException('حدث خطأ غير متوقع أثناء تسجيل الغرامة.');
+    }
+  }
+
+  @override
+  Future<List<PenaltyModel>> getCompanyPenalties(String companyId) async {
+    try {
+      final snapshot = await _penaltiesRef
+          .where('companyId', isEqualTo: companyId)
+          .get();
+
+      final list = snapshot.docs
+          .map((doc) => PenaltyModel.fromFirestore(doc))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    } on FirebaseException catch (e) {
+      throw ServerException(e.message ?? 'فشل في جلب قائمة المخالفات.');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<List<PenaltyModel>> getAllPenalties() async {
+    try {
+      final snapshot = await _penaltiesRef.get();
+      final list = snapshot.docs
+          .map((doc) => PenaltyModel.fromFirestore(doc))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    } on FirebaseException catch (e) {
+      throw ServerException(e.message ?? 'فشل في جلب كافة المخالفات.');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<void> updatePenaltyStatus(
+    String penaltyId,
+    PenaltyStatus status,
+  ) async {
+    try {
+      await _penaltiesRef.doc(penaltyId).update({
+        'status': status.toFirestoreString(),
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      });
+    } on FirebaseException catch (e) {
+      throw ServerException(e.message ?? 'فشل في تحديث حالة المخالفة.');
+    }
+  }
+
+  @override
+  Future<EvidenceFile> uploadEvidenceFile({
+    required File file,
+    required String penaltyId,
+  }) async {
+    try {
+      final fileName = file.path.split('/').last.split('\\').last;
+      final ext = fileName.split('.').last.toLowerCase();
+      final fileType = (ext == 'pdf')
+          ? 'PDF'
+          : (ext == 'doc' || ext == 'docx')
+              ? 'DOC'
+              : 'IMAGE';
+
+      final ref = storage
+          .ref()
+          .child('penalties')
+          .child('evidence')
+          .child(penaltyId.isNotEmpty ? penaltyId : 'temp')
+          .child('${DateTime.now().millisecondsSinceEpoch}_$fileName');
+
+      final uploadTask = await ref.putFile(file);
+      final downloadUrl = await uploadTask.ref.getDownloadURL();
+
+      return EvidenceFile(
+        fileUrl: downloadUrl,
+        fileType: fileType,
+        fileName: fileName,
+      );
+    } catch (e) {
+      throw ServerException('فشل في رفع المستند/الصورة المرفقة.');
+    }
+  }
+}

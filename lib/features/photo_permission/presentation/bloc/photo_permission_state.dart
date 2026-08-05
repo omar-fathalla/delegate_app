@@ -58,6 +58,15 @@ class PhotoUploadSuccess extends PhotoPermissionState {
   List<Object?> get props => [photo];
 }
 
+class PhotoPermissionActionSuccess extends PhotoPermissionState {
+  final String message;
+  
+  const PhotoPermissionActionSuccess({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}
+
 class PhotoPermissionError extends PhotoPermissionState {
   final String message;
   const PhotoPermissionError({required this.message});
@@ -65,3 +74,5 @@ class PhotoPermissionError extends PhotoPermissionState {
   @override
   List<Object?> get props => [message];
 }
+
+class PhotoDeleteSuccess extends PhotoPermissionState {}

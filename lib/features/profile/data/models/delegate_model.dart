@@ -76,7 +76,10 @@ class DelegateModel extends Delegate {
       switch (role) {
         case 'super_admin':
           return UserRole.superAdmin;
+        case 'organization-admin':
+          return UserRole.organizationAdmin;
         case 'admin':
+        case 'company-admin':
           return UserRole.admin;
         case 'marketing':
           return UserRole.marketing;
@@ -138,6 +141,8 @@ class DelegateModel extends Delegate {
     switch (role) {
       case UserRole.superAdmin:
         return 'super_admin';
+      case UserRole.organizationAdmin:
+        return 'organization-admin';
       case UserRole.admin:
         return 'admin';
       case UserRole.marketing:

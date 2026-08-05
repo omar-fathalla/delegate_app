@@ -235,6 +235,9 @@ class AdminRepositoryImpl implements AdminRepository {
         organizationUID,
         companyUID,
       );
+      final totalCompanies = await remoteDataSource.getTotalCompaniesCount(
+        organizationUID,
+      );
 
       final totalDelegates = delegates.length;
       final absentToday = (totalDelegates - checkedInCount).clamp(
@@ -247,6 +250,7 @@ class AdminRepositoryImpl implements AdminRepository {
           totalDelegates: totalDelegates,
           checkedInToday: checkedInCount,
           absentToday: absentToday,
+          totalCompanies: totalCompanies,
         ),
       );
     } on Failure catch (f) {

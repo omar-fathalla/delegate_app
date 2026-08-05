@@ -170,3 +170,25 @@ class LoadDelegateCapturedPhotosRequested extends PhotoPermissionEvent {
   @override
   List<Object?> get props => [delegateUID];
 }
+
+class LoadCompanyCapturedPhotosRequested extends PhotoPermissionEvent {
+  final String companyUID;
+
+  const LoadCompanyCapturedPhotosRequested({
+    required this.companyUID,
+  });
+
+  @override
+  List<Object?> get props => [companyUID];
+}
+
+class DeleteCapturedPhotoRequested extends PhotoPermissionEvent {
+  final String photoId;
+
+  const DeleteCapturedPhotoRequested({
+    required this.photoId,
+  });
+
+  @override
+  List<Object?> get props => [photoId];
+}

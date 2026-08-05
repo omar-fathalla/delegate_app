@@ -8,15 +8,12 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final Delegate delegate;
@@ -47,9 +44,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   final ScrollController _scrollController = ScrollController();
 
-  Map<String, dynamic>? _supervisorData;
-  bool _loadingSupervisor = false;
-  String? _supervisorError;
 
   @override
   bool get wantKeepAlive => true;
@@ -66,117 +60,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     });
 
     _scrollController.addListener(_onScroll);
-    _fetchSupervisor();
   }
 
-  Future<void> _fetchSupervisor() async {
-    final orgId = widget.delegate.organizationUID;
-    final compId = widget.delegate.companyUID;
 
-    if (orgId.isEmpty || compId.isEmpty) return;
-
-    setState(() {
-      _loadingSupervisor = true;
-      _supervisorError = null;
-    });
-
-    try {
-      // 1. First attempt: Get supervisor info directly from the company document
-      final compDoc = await FirebaseFirestore.instance
-          .collection('organizations')
-          .doc(orgId)
-          .collection('companies')
-          .doc(compId)
-          .get();
-
-      if (compDoc.exists) {
-        final compData = compDoc.data();
-        if (compData != null) {
-          final companyPhone = compData['phone'] as String? ?? compData['phoneNumber'] as String? ?? '';
-          final companyEmail = compData['email'] as String? ?? compData['emailAddress'] as String? ?? '';
-          final companySupervisorName = compData['supervisorName'] as String? ?? 
-                                         compData['contactName'] as String? ?? 
-                                         compData['adminName'] as String? ?? 
-                                         compData['managerName'] as String? ?? 
-                                         compData['displayName'] as String? ?? 
-                                         '';
-
-          if (companyPhone.isNotEmpty || companyEmail.isNotEmpty) {
-            if (mounted) {
-              setState(() {
-                _supervisorData = {
-                  'displayName': companySupervisorName.isNotEmpty ? companySupervisorName : 'مشرف الشركة',
-                  'phoneNumber': companyPhone,
-                  'email': companyEmail,
-                };
-                _loadingSupervisor = false;
-              });
-              return;
-            }
-          }
-        }
-      }
-
-      // 2. Fallback: Query the users collection
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('organizationUID', isEqualTo: orgId)
-          .where('companyUID', isEqualTo: compId)
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        QueryDocumentSnapshot<Map<String, dynamic>>? adminDoc;
-        for (final doc in snapshot.docs) {
-          final role = doc.data()['role'] as String? ?? '';
-          if (role == 'company-admin' || role == 'Supervisor') {
-            adminDoc = doc;
-            break;
-          }
-        }
-        adminDoc ??= snapshot.docs.first;
-
-        if (mounted) {
-          setState(() {
-            _supervisorData = adminDoc!.data();
-            _loadingSupervisor = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _supervisorData = null;
-            _loadingSupervisor = false;
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _supervisorError = e.toString();
-          _loadingSupervisor = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _callNumber(String phone) async {
-    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
-    final uri = Uri.parse('tel:$cleanPhone');
-    try {
-      await launchUrl(uri);
-    } catch (_) {}
-  }
-
-  Future<void> _openWhatsApp(String phone) async {
-    var cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
-    if (cleanPhone.startsWith('0')) {
-      cleanPhone = '2$cleanPhone';
-    }
-    final uri = Uri.parse('https://wa.me/$cleanPhone');
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {}
-  }
 
   void _onScroll() {
     if (_isBottom) {
@@ -365,12 +251,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   children: [
                     const SizedBox(height: 16),
                     _buildHeader(context),
-                    if (!_loadingSupervisor) ...[
-                      _buildSupervisorCard(context),
-                    ],
-                    if (!widget.viewOnly && widget.delegate.role == UserRole.delegate) ...[
-                      _buildPhotoCaptureCard(context),
-                    ],
+
                     Expanded(child: _buildBody(context, state)),
                   ],
                 ),
@@ -517,77 +398,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
   }
 
-  Widget _buildPhotoCaptureCard(BuildContext context) {
-    final theme = Theme.of(context);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(top: 12),
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: theme.colorScheme.primary.withValues(alpha: 0.25),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.camera_alt_rounded,
-                color: theme.colorScheme.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isArabic ? 'تصوير العروض الميدانية' : 'Field Offer Photos',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isArabic
-                        ? 'التقاط وإرسال صور العروض والبرندات المعتمدة'
-                        : 'Capture & send approved offer photos',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            FilledButton.icon(
-              onPressed: () {
-                context.push('/photo-permissions/delegate', extra: widget.delegate);
-              },
-              icon: const Icon(Icons.camera_rounded, size: 16),
-              label: Text(isArabic ? 'الكاميرا' : 'Camera'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildBody(BuildContext context, AttendanceState state) {
     final l10n = AppLocalizations.of(context)!;
@@ -1211,121 +1022,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
   }
 
-  Widget _buildSupervisorCard(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final name = _supervisorData?['displayName'] as String? ?? '';
-    final phone = _supervisorData?['phoneNumber'] as String? ?? '';
-    
-    if (phone.isEmpty || name.isEmpty) {
-      return Card(
-        elevation: 0,
-        color: colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: colorScheme.outlineVariant),
-        ),
-        margin: const EdgeInsets.only(top: 12, bottom: 4),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: colorScheme.errorContainer.withValues(alpha: 0.2),
-                foregroundColor: colorScheme.error,
-                child: const Icon(Icons.person_off_rounded),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'مشرف الشركة (${widget.delegate.companyName})',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _supervisorError != null
-                          ? 'خطأ: $_supervisorError'
-                          : 'لا يوجد مشرف مسجل لهذه الشركة حالياً\n(Company ID: ${widget.delegate.companyUID})',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: _supervisorError != null ? colorScheme.error : colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    
-    return Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      margin: const EdgeInsets.only(top: 12, bottom: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: colorScheme.primaryContainer,
-              foregroundColor: colorScheme.onPrimaryContainer,
-              child: const Icon(Icons.person_rounded),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'مشرف الشركة (الشركة المنتدبة)',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton.filledTonal(
-              onPressed: () => _callNumber(phone),
-              icon: const Icon(Icons.phone_rounded),
-            ),
-            const SizedBox(width: 4),
-            IconButton.filledTonal(
-              onPressed: () => _openWhatsApp(phone),
-              icon: const Icon(Icons.chat_rounded),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.green.withValues(alpha: 0.15),
-                foregroundColor: Colors.green,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// Animated shimmer card that mimics attendance history card layout.

@@ -194,4 +194,46 @@ class PhotoPermissionRepositoryImpl implements PhotoPermissionRepository {
       return const Left(ServerFailure('حدث خطأ غير متوقع أثناء جلب تقرير صور المندوب.'));
     }
   }
+
+  @override
+  Future<Either<Failure, List<CapturedPhoto>>> getCompanyCapturedPhotos({
+    required String companyUID,
+    String? organizationUID,
+  }) async {
+    try {
+      final result = await remoteDataSource.getCompanyCapturedPhotos(
+        companyUID: companyUID,
+        organizationUID: organizationUID,
+      );
+      return Right(result);
+    } on Failure catch (f) {
+      return Left(f);
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ غير متوقع أثناء جلب صور الشركة.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteCapturedPhoto({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required String photoId,
+    required String photoUrl,
+  }) async {
+    try {
+      await remoteDataSource.deleteCapturedPhoto(
+        organizationUID: organizationUID,
+        companyUID: companyUID,
+        permissionId: permissionId,
+        photoId: photoId,
+        photoUrl: photoUrl,
+      );
+      return const Right(null);
+    } on Failure catch (f) {
+      return Left(f);
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ أثناء محاولة حذف الصورة.'));
+    }
+  }
 }

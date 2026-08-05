@@ -123,6 +123,8 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
           Filter.or(
             Filter('assignedTo', isEqualTo: delegateId),
             Filter('assignedTo', isEqualTo: 'all'),
+            Filter('assignedTo', isEqualTo: 'all_branch_marketing'),
+            Filter('assignedTo', isEqualTo: 'all_marketing_promotion'),
           ),
         )
         .orderBy('createdAt', descending: true);

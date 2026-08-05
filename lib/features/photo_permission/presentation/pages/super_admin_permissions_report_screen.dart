@@ -246,7 +246,7 @@ class _SuperAdminPermissionsReportScreenState
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  '$totalBilling ج.م',
+                                  '$totalBilling',
                                   style: theme.textTheme.headlineMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.onSecondaryContainer,
@@ -332,7 +332,7 @@ class _SuperAdminPermissionsReportScreenState
                                   ),
                                   DataCell(
                                     Text(
-                                      '500 ج.م',
+                                      '500',
                                       style: TextStyle(
                                         color: colorScheme.primary,
                                         fontWeight: FontWeight.bold,

@@ -60,7 +60,8 @@ class _SplashScreenState extends State<SplashScreen>
             debugPrint('FCM Init Error: $e');
           });
           if (delegate.role == UserRole.superAdmin ||
-              delegate.role == UserRole.admin) {
+              delegate.role == UserRole.admin ||
+              delegate.role == UserRole.organizationAdmin) {
             context.go('/admin/home', extra: delegate);
           } else if (delegate.role == UserRole.marketing ||
               delegate.role == UserRole.marketingPromotion) {

@@ -20,13 +20,21 @@ class ManageMarketingRemoteDataSourceImpl
     try {
       final snapshot = await firestore
           .collection('users')
-          .where('role', isEqualTo: 'marketing')
+          .where(
+            'role',
+            whereIn: [
+              'marketing',
+              'marketing_promotion',
+              'company-admin',
+              'organization-admin',
+            ],
+          )
           .get();
       return snapshot.docs
           .map((doc) => AdminUserModel.fromFirestore(doc))
           .toList();
     } on FirebaseException catch (e) {
-      throwFirestoreFailure(e, 'فشل في جلب بيانات موظفي التسويق.');
+      throwFirestoreFailure(e, 'فشل في جلب بيانات المستخدمين.');
     }
   }
 

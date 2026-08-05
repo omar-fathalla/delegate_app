@@ -64,4 +64,17 @@ abstract class PhotoPermissionRepository {
   Future<Either<Failure, List<CapturedPhoto>>> getDelegateCapturedPhotos({
     required String delegateUID,
   });
+
+  Future<Either<Failure, List<CapturedPhoto>>> getCompanyCapturedPhotos({
+    required String companyUID,
+    String? organizationUID,
+  });
+
+  Future<Either<Failure, void>> deleteCapturedPhoto({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required String photoId,
+    required String photoUrl,
+  });
 }

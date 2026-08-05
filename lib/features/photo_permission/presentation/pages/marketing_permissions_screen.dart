@@ -1,3 +1,5 @@
+import 'supervisor_permissions_screen.dart';
+import '../widgets/company_name_with_code.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -330,52 +332,44 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      permission.companyName,
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'كود الشركة: ${permission.companyCode ?? "N/A"}',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          title: CompanyNameWithCode(
+            organizationUID: widget.marketingDelegate.organizationUID,
+            companyUID: permission.companyUID,
+            companyName: permission.companyName,
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'في انتظار الاعتماد ⏳',
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'في انتظار الاعتماد ⏳',
-                    style: TextStyle(
-                      color: Colors.orange,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-            const Divider(height: 24),
-            Text(
-              'الفترة المطلوبة ($daysCount يوم):',
-              style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+          children: [
+            const Divider(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'الفترة المطلوبة ($daysCount يوم):',
+                style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
             ),
             const SizedBox(height: 4),
             Row(
@@ -389,9 +383,12 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              'الفروع المطلوبة للتصوير (${permission.branchNames.length}):',
-              style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'الفروع المطلوبة للتصوير (${permission.branchNames.length}):',
+                style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
             ),
             const SizedBox(height: 4),
             ExpandableBranchText(branchNames: permission.branchNames),
@@ -401,13 +398,20 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               children: [
                 OutlinedButton.icon(
                   onPressed: () {
+                    final approverName = widget.marketingDelegate.fullName.isNotEmpty
+                        ? widget.marketingDelegate.fullName
+                        : '${widget.marketingDelegate.firstName} ${widget.marketingDelegate.lastName}'.trim();
+                    final approverText = approverName.isNotEmpty
+                        ? approverName
+                        : widget.marketingDelegate.uid;
+
                     context.read<PhotoPermissionBloc>().add(
                           ApprovePermissionRequested(
                             organizationUID: permission.organizationUID,
                             companyUID: permission.companyUID,
                             permissionId: permission.uid,
                             status: 'rejected',
-                            approvedBy: widget.marketingDelegate.uid,
+                            approvedBy: approverText,
                           ),
                         );
                   },
@@ -417,18 +421,25 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   icon: const Icon(Icons.close_rounded, size: 18),
-                  label: const Text('رفض الطلب'),
+                  label: const Text('رفض'),
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton.icon(
                   onPressed: () {
+                    final approverName = widget.marketingDelegate.fullName.isNotEmpty
+                        ? widget.marketingDelegate.fullName
+                        : '${widget.marketingDelegate.firstName} ${widget.marketingDelegate.lastName}'.trim();
+                    final approverText = approverName.isNotEmpty
+                        ? approverName
+                        : widget.marketingDelegate.uid;
+
                     context.read<PhotoPermissionBloc>().add(
                           ApprovePermissionRequested(
                             organizationUID: permission.organizationUID,
                             companyUID: permission.companyUID,
                             permissionId: permission.uid,
                             status: 'approved',
-                            approvedBy: widget.marketingDelegate.uid,
+                            approvedBy: approverText,
                           ),
                         );
                   },
@@ -438,7 +449,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   icon: const Icon(Icons.check_rounded, size: 18),
-                  label: const Text('الموافقة والاعتماد'),
+                  label: const Text('الموافقة'),
                 ),
               ],
             ),
@@ -471,17 +482,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        permission.companyName,
+                      CompanyNameWithCode(
+                        organizationUID: widget.marketingDelegate.organizationUID,
+                        companyUID: permission.companyUID,
+                        companyName: permission.companyName,
                         style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'كود الشركة: ${permission.companyCode ?? "غير محدد"}',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
                       ),
                     ],
                   ),
@@ -538,8 +543,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     final todayStart = DateTime(now.year, now.month, now.day);
     final status = permission.status.toLowerCase();
 
+    Widget badge;
     if (status == 'pending') {
-      return Container(
+      badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.orange.withValues(alpha: 0.15),
@@ -552,7 +558,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         ),
       );
     } else if (status == 'rejected') {
-      return Container(
+      badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.red.withValues(alpha: 0.15),
@@ -565,7 +571,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         ),
       );
     } else if (permission.endDate.isBefore(todayStart)) {
-      return Container(
+      badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.grey.withValues(alpha: 0.15),
@@ -578,7 +584,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         ),
       );
     } else if (permission.isSupervisorEnabled == false) {
-      return Container(
+      badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.amber.withValues(alpha: 0.15),
@@ -591,7 +597,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         ),
       );
     } else {
-      return Container(
+      badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.green.withValues(alpha: 0.15),
@@ -604,6 +610,33 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         ),
       );
     }
+
+    if (permission.approvedBy != null && permission.approvedBy!.trim().isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          badge,
+          const SizedBox(height: 4),
+          ApproverNameText(
+            approvedBy: permission.approvedBy!,
+            organizationUID: widget.marketingDelegate.organizationUID,
+            companyUID: permission.companyUID,
+            currentUserUid: widget.marketingDelegate.uid,
+            currentUserName: widget.marketingDelegate.fullName,
+            prefix: permission.status == 'approved'
+                ? 'بواسطة: '
+                : 'مرفوض بواسطة: ',
+            style: TextStyle(
+              color: permission.status == 'approved' ? Colors.green.shade700 : Colors.red.shade700,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return badge;
   }
 }
 

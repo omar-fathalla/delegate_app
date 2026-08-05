@@ -14,6 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -149,52 +151,98 @@ class _AdminHomeBody extends StatelessWidget {
 
               if (state is AdminDashboardLoaded) {
                 final summary = state.summary;
+                final canSeeCompaniesCount =
+                    adminDelegate.role == UserRole.superAdmin ||
+                    adminDelegate.role == UserRole.marketing;
                 return Column(
                   children: [
-                    _SummaryCard(
-                      icon: Icons.groups_rounded,
-                      title: l10n.totalDelegates,
-                      value: '${summary.totalDelegates}',
-                      color: theme.colorScheme.primary,
-                      backgroundColor: theme.colorScheme.primaryContainer
-                          .withValues(alpha: 0.5),
-                      onTap: () => _showAttendanceDetailsSheet(context, 'all'),
-                    ),
-                    const SizedBox(height: 14),
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                    // بطاقة "عدد الشركات" تظهر فقط للمدير العام والتسويق
+                    if (canSeeCompaniesCount) ...[
+                      Row(
                         children: [
                           Expanded(
                             child: _CompactSummaryCard(
-                              icon: Icons.check_circle_rounded,
-                              title: l10n.checkedInToday,
-                              value: '${summary.checkedInToday}',
-                              color: theme.colorScheme.secondary,
+                              icon: Icons.business_rounded,
+                              title: 'عدد الشركات',
+                              value: '${summary.totalCompanies}',
+                              color: theme.colorScheme.tertiary,
                               backgroundColor: theme
                                   .colorScheme
-                                  .secondaryContainer
+                                  .tertiaryContainer
                                   .withValues(alpha: 0.5),
-                              onTap: () => _showAttendanceDetailsSheet(context, 'checked_in'),
                             ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: _CompactSummaryCard(
-                              icon: Icons.cancel_rounded,
-                              title: l10n.absentToday,
-                              value: '${summary.absentToday}',
-                              color: theme.colorScheme.onSurfaceVariant,
-                              backgroundColor: theme
-                                  .colorScheme
-                                  .surfaceContainerHighest
-                                  .withValues(alpha: 0.7),
-                              onTap: () => _showAttendanceDetailsSheet(context, 'absent'),
+                              icon: Icons.groups_rounded,
+                              title: l10n.totalDelegates,
+                              value: '${summary.totalDelegates}',
+                              color: theme.colorScheme.primary,
+                              backgroundColor: theme.colorScheme.primaryContainer
+                                  .withValues(alpha: 0.5),
+                              onTap: () =>
+                                  _showAttendanceDetailsSheet(context, 'all'),
                             ),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 14),
+                    ] else ...[
+                      // مشرفين: 3 بطاقات في صف واحد بشكل مضغوط
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: _CompactSummaryCard(
+                                icon: Icons.groups_rounded,
+                                title: l10n.totalDelegates,
+                                value: '${summary.totalDelegates}',
+                                color: theme.colorScheme.primary,
+                                backgroundColor: theme.colorScheme.primaryContainer
+                                    .withValues(alpha: 0.5),
+                                onTap: () =>
+                                    _showAttendanceDetailsSheet(context, 'all'),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _CompactSummaryCard(
+                                icon: Icons.check_circle_rounded,
+                                title: l10n.checkedInToday,
+                                value: '${summary.checkedInToday}',
+                                color: theme.colorScheme.secondary,
+                                backgroundColor: theme
+                                    .colorScheme
+                                    .secondaryContainer
+                                    .withValues(alpha: 0.5),
+                                onTap: () => _showAttendanceDetailsSheet(
+                                    context, 'checked_in'),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _CompactSummaryCard(
+                                icon: Icons.cancel_rounded,
+                                title: l10n.absentToday,
+                                value: '${summary.absentToday}',
+                                color: theme.colorScheme.onSurfaceVariant,
+                                backgroundColor: theme
+                                    .colorScheme
+                                    .surfaceContainerHighest
+                                    .withValues(alpha: 0.7),
+                                onTap: () =>
+                                    _showAttendanceDetailsSheet(context, 'absent'),
+                                isDense: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 );
               }
@@ -204,7 +252,7 @@ class _AdminHomeBody extends StatelessWidget {
           ),
 
           // ── Quick Actions for Company Admin / Supervisor ──
-          if (adminDelegate.role == UserRole.admin) ...[
+          if (adminDelegate.role == UserRole.admin || adminDelegate.role == UserRole.organizationAdmin) ...[
             const SizedBox(height: 24),
             Row(
               children: [
@@ -239,10 +287,47 @@ class _AdminHomeBody extends StatelessWidget {
                   'إدارة أذونات التصوير',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                subtitle: const Text('طلب إذن تصوير جديد، تفعيل/تعطيل الأذونات، ومتابعة تقارير المناديب'),
+                subtitle: Text(
+                  adminDelegate.role == UserRole.organizationAdmin
+                      ? 'استعراض أذونات التصوير ومتابعة تقارير المناديب (للعلم فقط)'
+                      : 'طلب إذن تصوير جديد، تفعيل/تعطيل الأذونات، ومتابعة تقارير المناديب',
+                ),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () {
                   context.push('/photo-permissions/supervisor', extra: adminDelegate);
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: Icon(
+                  Icons.photo_library_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 28,
+                ),
+                title: const Text(
+                  'تقارير الصور',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text('استعراض تقارير الصور الشهرية المرفوعة بواسطة مناديب الشركة'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider(
+                        create: (context) => sl<PhotoPermissionBloc>(),
+                        child: MonthlyPhotoReportScreen(
+                          delegate: adminDelegate,
+                          showAppBar: true,
+                        ),
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
@@ -385,82 +470,7 @@ class _AdminHomeBody extends StatelessWidget {
   }
 }
 
-/// Horizontal card for the full-width summary (Total Delegates)
-class _SummaryCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-  final Color color;
-  final Color backgroundColor;
-  final VoidCallback? onTap;
 
-  const _SummaryCard({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.color,
-    required this.backgroundColor,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      elevation: 0,
-      color: backgroundColor,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: color.withValues(alpha: 0.15)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 26),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: color.withValues(alpha: 0.8),
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      value,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// Compact vertical card for the two side-by-side summary cards
 class _CompactSummaryCard extends StatelessWidget {
@@ -470,6 +480,7 @@ class _CompactSummaryCard extends StatelessWidget {
   final Color color;
   final Color backgroundColor;
   final VoidCallback? onTap;
+  final bool isDense;
 
   const _CompactSummaryCard({
     required this.icon,
@@ -478,6 +489,7 @@ class _CompactSummaryCard extends StatelessWidget {
     required this.color,
     required this.backgroundColor,
     this.onTap,
+    this.isDense = false,
   });
 
   @override
@@ -495,36 +507,44 @@ class _CompactSummaryCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: EdgeInsets.all(isDense ? 10 : 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: isDense ? 36 : 44,
+                height: isDense ? 36 : 44,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: Icon(icon, color: color, size: isDense ? 20 : 24),
               ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: color.withValues(alpha: 0.8),
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
+              SizedBox(height: isDense ? 8 : 12),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: color.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                    fontSize: isDense ? 11 : null,
+                  ),
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                value,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.bold,
+              SizedBox(height: isDense ? 4 : 6),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: isDense ? 22 : null,
+                  ),
                 ),
               ),
             ],

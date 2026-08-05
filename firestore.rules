@@ -110,12 +110,9 @@ service cloud.firestore {
       allow read: if isAuthenticated();
     }
 
-    // Companies collectionGroup (Marketing Search)
-    // Allow marketing users to search companies across all organizations
+    // Companies collectionGroup (Marketing Search + Delegate Supervisor Lookup)
     match /{path=**}/companies/{companyId} {
-      // Allow read for all authenticated users (including marketing)
-      // Marketing users need this for company search functionality
-      allow read: if isAuthenticated();
+      allow read: if true;
     }
 
     // Photo Permissions & Captured Photos collectionGroups
@@ -124,6 +121,11 @@ service cloud.firestore {
     }
     match /{path=**}/captured_photos/{photoId} {
       allow read: if isAuthenticated();
+    }
+
+    // ==================== PENALTIES COLLECTION ====================
+    match /penalties/{penaltyId} {
+      allow read, create, update, delete: if isAuthenticated();
     }
 
     // ==================== INVITES COLLECTION ====================
@@ -170,34 +172,23 @@ service cloud.firestore {
 
     // ==================== USERS COLLECTION ====================
     match /users/{userId} {
-      // Read:
-      // - Users can read their own document (needed for initial auth check)
-      // - Super admins can read all users
-      // - Org admins and company admins can read users for email validation queries
-      // - Any authenticated user can read (needed for mobile app admin login + admin management)
-      allow read: if isAuthenticated();
+      // Read: Allow all users (including delegates logged in without Firebase Auth) to read user docs
+      allow read: if true;
 
       // Create:
-      // - Users can create their own user document during invite claim
-      // - Any authenticated user can create (needed for mobile app super admin creating admins via anonymous auth)
       allow create: if isAuthenticated();
 
       // Update:
-      // - Users can update their own document, super admins can update any
-      // - Any authenticated user can update (needed for mobile app admin management via anonymous auth)
       allow update: if isAuthenticated();
 
       // Delete:
-      // - Super admins and org admins can delete users
-      // - Any authenticated user can delete (needed for mobile app admin management via anonymous auth)
       allow delete: if isAuthenticated();
     }
 
     // ==================== ORGANIZATIONS COLLECTION ====================
     match /organizations/{orgId} {
-      // Read: Super admins can read all organizations, org admins can read their own organization
-      // Also allow anonymous users to read (for mobile app)
-      allow read: if isAuthenticated();
+      // Read: Allow read for all clients (needed for mobile app delegates & admins)
+      allow read: if true;
 
       // Write: Only super admins can create/delete organizations.
       // Org admins can update their own organization (e.g. company counts).
@@ -229,17 +220,11 @@ service cloud.firestore {
 
       // Members subcollection
       match /members/{userId} {
-        // Read:
-        // - Users can read their own member document
-        // - Organization admins can read all members in their organization
-        // - Super admins can read all members
         allow read: if isAuthenticated() && (
           request.auth.uid == userId ||
           canReadOrganization(orgId)
         );
 
-        // Write: Only system can create/update member documents (via batch write during claimInvite)
-        // Allow authenticated users to create their own member document during invite claim
         allow create: if isAuthenticated() &&
                          request.auth.uid == userId;
 
@@ -249,10 +234,8 @@ service cloud.firestore {
 
       // Admins subcollection
       match /admins/{adminId} {
-        // Read: Super admins, org admins, and marketing (read-only)
         allow read: if isAuthenticated() && canReadOrganization(orgId);
 
-        // Write: Super admins and org admins can manage admins in their organization
         allow create, update, delete: if isAuthenticated() && (
           isSuperAdmin() ||
           (isOrgAdmin() && belongsToOrganization(orgId))
@@ -261,10 +244,8 @@ service cloud.firestore {
 
       // Companies subcollection
       match /companies/{compId} {
-        // Read: Allow all authenticated users (including anonymous and marketing) to read companies
-        // NOTE: This includes marketing search functionality where users may not have a /users document
-        // Marketing users need read access for company search by code functionality
-        allow read: if isAuthenticated();
+        // Read: Allow all users (including delegates) to read company info & supervisor details
+        allow read: if true;
 
         // Write: Super admins can create/update/delete any company, org admins can create/update companies in their organization
         // Marketing users have read-only access (no write permissions)
@@ -357,7 +338,8 @@ service cloud.firestore {
           // Captured Photos subcollection
           match /captured_photos/{photoId} {
             allow read, create: if isAuthenticated();
-            allow update, delete: if false; // Photos are immutable logs
+            allow update: if false; 
+            allow delete: if isAuthenticated(); // Allow supervisors to delete photos
           }
         }
       }
@@ -448,13 +430,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Branches (Mobile app admin feature)
+    // Branches (Mobile app admin feature + delegate branch geofence lookup)
     match /branches/{branchId} {
-      // Allow all authenticated users to read branches
-      allow read: if isAuthenticated();
-      // Allow all authenticated users to create/update branches
+      // Allow read for all clients (needed for delegate geofence lookup)
+      allow read: if true;
       allow create, update: if isAuthenticated();
-      // Allow all authenticated users to delete branches (super admin check is in app logic)
       allow delete: if isAuthenticated();
     }
 
@@ -517,6 +497,13 @@ service cloud.firestore {
       
       // Delete: Only Super Admin can delete feedbacks
       allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    // ==================== PENALTIES COLLECTION ====================
+    // Penalties & Infractions system
+    // Allows read and write for penalties collection
+    match /penalties/{penaltyId} {
+      allow read, write: if true;
     }
 
     // ==================== DEFAULT DENY ====================

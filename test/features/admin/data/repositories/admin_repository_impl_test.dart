@@ -105,6 +105,11 @@ class MockAdminRemoteDataSource implements AdminRemoteDataSource {
   Future<List<Map<String, dynamic>>> getOrganizations() {
     throw UnimplementedError();
   }
+
+  @override
+  Future<int> getTotalCompaniesCount(String organizationId) async {
+    return 0;
+  }
 }
 
 class MockManageMarketingRemoteDataSource

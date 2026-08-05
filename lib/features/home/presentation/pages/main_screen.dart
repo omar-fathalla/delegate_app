@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:delegate_app/features/home/presentation/pages/delegate_home_screen.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
@@ -114,15 +115,6 @@ class _MainScreenState extends State<MainScreen> {
                     ],
                   ),
                   actions: [
-                    // Profile Button
-                    IconButton(
-                      icon: const Icon(Icons.account_circle_outlined),
-                      tooltip: l10n.profile,
-                      onPressed: () {
-                        context.push('/profile', extra: delegate);
-                      },
-                    ),
-                    const SizedBox(width: 4),
                     // Notification Bell with Badge
                     BlocProvider(
                       create: (_) => di.sl<NotificationBloc>()
@@ -152,15 +144,67 @@ class _MainScreenState extends State<MainScreen> {
                         },
                       ),
                     ),
-                    // Organization Switcher
-                    if (_allDelegates.length > 1)
-                      IconButton(
-                        icon: const Icon(Icons.swap_horiz_rounded),
-                        tooltip: isArabic
-                            ? 'تبديل المنظمة'
-                            : 'Switch Organization',
-                        onPressed: () => _showOrgSwitcher(context, colorScheme),
+                    const SizedBox(width: 4),
+                    // Header Menu (Profile, Settings, Org Switcher)
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.menu_rounded),
+                      tooltip: isArabic ? 'القائمة' : 'Menu',
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
+                      onSelected: (value) {
+                        if (value == 'profile') {
+                          context.push('/profile', extra: delegate);
+                        } else if (value == 'settings') {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => SettingsScreen(
+                                delegate: delegate,
+                                showAppBar: true,
+                              ),
+                            ),
+                          );
+                        } else if (value == 'org_switch') {
+                          _showOrgSwitcher(context, colorScheme);
+                        }
+                      },
+                      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                        PopupMenuItem<String>(
+                          value: 'profile',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.person_outline_rounded),
+                              const SizedBox(width: 12),
+                              Text(l10n.profile),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'settings',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.settings_outlined),
+                              const SizedBox(width: 12),
+                              Text(l10n.settings),
+                            ],
+                          ),
+                        ),
+                        if (_allDelegates.length > 1) ...[
+                          const PopupMenuDivider(),
+                          PopupMenuItem<String>(
+                            value: 'org_switch',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.swap_horiz_rounded),
+                                const SizedBox(width: 12),
+                                Text(isArabic ? 'تبديل المنظمة' : 'Switch Organization'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(width: 8),
                   ],
                 ),
           body: _buildBody(delegate),
@@ -174,6 +218,10 @@ class _MainScreenState extends State<MainScreen> {
             },
             destinations: [
               NavigationDestination(
+                icon: const Icon(Icons.home_rounded),
+                label: isArabic ? 'الرئيسية' : 'Home',
+              ),
+              NavigationDestination(
                 icon: const Icon(Icons.access_time_filled),
                 label: l10n.attendance,
               ),
@@ -184,10 +232,6 @@ class _MainScreenState extends State<MainScreen> {
               NavigationDestination(
                 icon: const Icon(Icons.photo_library_rounded),
                 label: isArabic ? 'تقارير الصور' : 'Photo Report',
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.menu_rounded),
-                label: l10n.settings,
               ),
             ],
           ),
@@ -202,11 +246,17 @@ class _MainScreenState extends State<MainScreen> {
     return IndexedStack(
       index: _currentIndex,
       children: [
-        // Tab 0: Attendance (always initialized)
-        AttendanceScreen(delegate: delegate),
+        // Tab 0: Home (always initialized)
+        DelegateHomeScreen(delegate: delegate),
 
-        // Tab 1: Tasks
+        // Tab 1: Attendance
         if (_initializedTabs.contains(1))
+          AttendanceScreen(delegate: delegate)
+        else
+          const SizedBox.shrink(),
+
+        // Tab 2: Tasks
+        if (_initializedTabs.contains(2))
           BlocProvider(
             create: (context) => di.sl<DelegateTasksBloc>(),
             child: DelegateTasksScreen(delegate: delegate),
@@ -214,18 +264,12 @@ class _MainScreenState extends State<MainScreen> {
         else
           const SizedBox.shrink(),
 
-        // Tab 2: Photo Reports
-        if (_initializedTabs.contains(2))
+        // Tab 3: Photo Reports
+        if (_initializedTabs.contains(3))
           BlocProvider(
             create: (context) => di.sl<PhotoPermissionBloc>(),
             child: MonthlyPhotoReportScreen(delegate: delegate),
           )
-        else
-          const SizedBox.shrink(),
-
-        // Tab 3: Settings
-        if (_initializedTabs.contains(3))
-          SettingsScreen(delegate: delegate)
         else
           const SizedBox.shrink(),
       ],

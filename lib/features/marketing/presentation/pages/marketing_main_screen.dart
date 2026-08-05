@@ -10,6 +10,9 @@ import 'package:go_router/go_router.dart';
 // Photo Permission Imports
 import 'package:delegate_app/features/photo_permission/presentation/pages/marketing_permissions_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
+import 'package:delegate_app/features/tasks/presentation/pages/delegate_tasks_screen.dart';
+import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 class MarketingMainScreen extends StatefulWidget {
@@ -46,6 +49,7 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
               create: (_) => di.sl<PhotoPermissionBloc>(),
               child: MarketingPermissionsScreen(marketingDelegate: delegate),
             ),
+            AdminTasksScreen(adminDelegate: delegate),
             SettingsScreen(delegate: delegate),
           ]
         : [
@@ -55,12 +59,20 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
               create: (_) => di.sl<PhotoPermissionBloc>(),
               child: MarketingPermissionsScreen(marketingDelegate: delegate),
             ),
+            BlocProvider(
+              create: (_) => di.sl<DelegateTasksBloc>(),
+              child: DelegateTasksScreen(delegate: delegate),
+            ),
             SettingsScreen(delegate: delegate),
           ];
 
     final String subtitle;
     if (isPromotionOnly) {
-      subtitle = _currentIndex == 0 ? 'أذونات التصوير' : l10n.settings;
+      subtitle = _currentIndex == 0
+          ? 'أذونات التصوير'
+          : _currentIndex == 1
+              ? l10n.tasks
+              : l10n.settings;
     } else {
       subtitle = _currentIndex == 0
           ? 'الفروع'
@@ -68,6 +80,8 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
           ? l10n.search
           : _currentIndex == 2
           ? 'أذونات التصوير'
+          : _currentIndex == 3
+          ? l10n.tasks
           : l10n.settings;
     }
 
@@ -129,6 +143,11 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                   label: 'أذونات التصوير',
                 ),
                 NavigationDestination(
+                  icon: const Icon(Icons.task_alt_outlined),
+                  selectedIcon: const Icon(Icons.task_alt_rounded),
+                  label: l10n.tasks,
+                ),
+                NavigationDestination(
                   icon: const Icon(Icons.settings_outlined),
                   selectedIcon: const Icon(Icons.settings_rounded),
                   label: l10n.settings,
@@ -149,6 +168,11 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                   icon: Icon(Icons.photo_library_outlined),
                   selectedIcon: Icon(Icons.photo_library_rounded),
                   label: 'أذونات التصوير',
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.task_alt_outlined),
+                  selectedIcon: const Icon(Icons.task_alt_rounded),
+                  label: l10n.tasks,
                 ),
                 NavigationDestination(
                   icon: const Icon(Icons.settings_outlined),

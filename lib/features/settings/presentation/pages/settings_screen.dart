@@ -211,19 +211,7 @@ class SettingsScreen extends StatelessWidget {
                               indent: 64,
                             ),
                           ],
-                          if (delegate.role == UserRole.admin) ...[
-                            _buildSettingsTile(
-                              context: context,
-                              icon: Icons.camera_alt_rounded,
-                              title: isArabic ? 'إدارة أذونات التصوير' : 'Manage Photo Permissions',
-                              onTap: () => context.push('/photo-permissions/supervisor', extra: delegate),
-                            ),
-                            Divider(
-                              height: 1,
-                              color: Theme.of(context).colorScheme.outlineVariant,
-                              indent: 64,
-                            ),
-                          ],
+
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.help_outline_rounded,

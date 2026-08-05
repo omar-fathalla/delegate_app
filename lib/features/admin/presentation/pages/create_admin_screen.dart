@@ -53,7 +53,8 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
 
   void _submitForm() {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedOrgUID == null || _selectedOrgUID!.isEmpty) {
+    if (_selectedRole != 'super-admin' &&
+        (_selectedOrgUID == null || _selectedOrgUID!.isEmpty)) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('يرجى اختيار المنظمة')));
@@ -66,7 +67,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
         email: _emailController.text.trim(),
         displayName: _nameController.text.trim(),
         role: _selectedRole,
-        organizationUID: _selectedOrgUID!,
+        organizationUID: _selectedOrgUID ?? '',
       ),
     );
   }
@@ -355,7 +356,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                             color: colorScheme.outline.withValues(alpha: 0.3),
                           ),
                           _RoleTile(
-                            title: 'مدير قطاع',
+                            title: 'مدير قطاع / مشرف شركة',
                             subtitle: 'Company Admin',
                             icon: Icons.business_rounded,
                             value: 'company-admin',
@@ -378,6 +379,20 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                               setState(
                                 () => _selectedRole = 'organization-admin',
                               );
+                            },
+                          ),
+                          Divider(
+                            height: 1,
+                            color: colorScheme.outline.withValues(alpha: 0.3),
+                          ),
+                          _RoleTile(
+                            title: 'مدير النظام الفائق',
+                            subtitle: 'Super Admin - كامل الصلاحيات',
+                            icon: Icons.verified_user_rounded,
+                            value: 'super-admin',
+                            isSelected: _selectedRole == 'super-admin',
+                            onTap: () {
+                              setState(() => _selectedRole = 'super-admin');
                             },
                           ),
                         ],

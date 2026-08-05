@@ -78,6 +78,13 @@ import 'package:delegate_app/features/changelog/domain/usecases/get_all_updates.
 import 'package:delegate_app/features/changelog/presentation/bloc/changelog_bloc.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/features/penalties/data/datasources/penalty_remote_data_source.dart';
+import 'package:delegate_app/features/penalties/data/repositories/penalty_repository_impl.dart';
+import 'package:delegate_app/features/penalties/domain/repositories/penalty_repository.dart';
+import 'package:delegate_app/features/penalties/domain/usecases/create_penalty_usecase.dart';
+import 'package:delegate_app/features/penalties/domain/usecases/get_all_penalties_usecase.dart';
+import 'package:delegate_app/features/penalties/domain/usecases/get_company_penalties_usecase.dart';
+import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/tasks/data/datasources/task_remote_data_source.dart';
 import 'package:delegate_app/features/tasks/data/repositories/task_repository_impl.dart';
 import 'package:delegate_app/features/tasks/domain/repositories/task_repository.dart';
@@ -106,6 +113,8 @@ import 'package:delegate_app/features/feedback/feedback_injection.dart';
 import 'package:get_it/get_it.dart';
 
 // Photo Permission Feature Imports
+import 'package:delegate_app/core/services/sync_manager.dart';
+import 'package:delegate_app/features/photo_permission/data/datasources/photo_offline_datasource.dart';
 import 'package:delegate_app/features/photo_permission/data/datasources/photo_permission_remote_datasource.dart';
 import 'package:delegate_app/features/photo_permission/data/repositories/photo_permission_repository_impl.dart';
 import 'package:delegate_app/features/photo_permission/domain/repositories/photo_permission_repository.dart';
@@ -116,6 +125,8 @@ import 'package:delegate_app/features/photo_permission/domain/usecases/get_photo
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_ongoing_photo_permissions.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/upload_captured_photo.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_captured_photos.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/get_company_captured_photos.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/delete_captured_photo.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_delegate_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/core/services/review_service.dart';
@@ -448,6 +459,31 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
     () => MarketingSearchRemoteDataSourceImpl(firestore: sl()),
   );
 
+  // ! Features - Penalties
+  sl.registerFactory(
+    () => PenaltyBloc(
+      createPenaltyUseCase: sl(),
+      getCompanyPenaltiesUseCase: sl(),
+      getAllPenaltiesUseCase: sl(),
+      repository: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton(() => CreatePenaltyUseCase(sl()));
+  sl.registerLazySingleton(() => GetCompanyPenaltiesUseCase(sl()));
+  sl.registerLazySingleton(() => GetAllPenaltiesUseCase(sl()));
+
+  sl.registerLazySingleton<PenaltyRepository>(
+    () => PenaltyRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  sl.registerLazySingleton<PenaltyRemoteDataSource>(
+    () => PenaltyRemoteDataSourceImpl(
+      firestore: sl(),
+      storage: sl(),
+    ),
+  );
+
   // ! Features - Photo Permission
   // Bloc
   sl.registerFactory(
@@ -460,6 +496,8 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       uploadCapturedPhoto: sl(),
       getCapturedPhotos: sl(),
       getDelegateCapturedPhotos: sl(),
+      getCompanyCapturedPhotos: sl(),
+      deleteCapturedPhoto: sl(),
     ),
   );
 
@@ -472,6 +510,8 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => UploadCapturedPhoto(sl()));
   sl.registerLazySingleton(() => GetCapturedPhotos(sl()));
   sl.registerLazySingleton(() => GetDelegateCapturedPhotos(sl()));
+  sl.registerLazySingleton(() => GetCompanyCapturedPhotos(sl()));
+  sl.registerLazySingleton(() => DeleteCapturedPhoto(sl()));
 
   // Repository
   sl.registerLazySingleton<PhotoPermissionRepository>(
@@ -483,6 +523,17 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
     () => PhotoPermissionRemoteDataSourceImpl(
       firestore: sl(),
       storage: sl(),
+    ),
+  );
+  sl.registerLazySingleton<PhotoOfflineDataSource>(
+    () => PhotoOfflineDataSource(),
+  );
+  
+  // Sync Manager
+  sl.registerLazySingleton<SyncManager>(
+    () => SyncManager(
+      offlineDataSource: sl(),
+      remoteDataSource: sl(),
     ),
   );
 
