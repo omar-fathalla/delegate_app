@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tashil Dart VM Inspector & Log Viewer</title>
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(20, 28, 48, 0.6);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.15);
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-dark: #6b7280;
+            --console-bg: #030712;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 40%),
+                              radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.03) 0%, transparent 40%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            background: rgba(11, 15, 25, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--card-border);
+            padding: 1.25rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-area h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #a5b4fc, #6366f1, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-badge {
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #818cf8;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 9999px;
+            text-transform: uppercase;
+        }
+
+        .connection-bar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            padding: 0.5rem 1rem;
+            border-radius: 12px;
+            width: 50%;
+            max-width: 600px;
+        }
+
+        .connection-bar input {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            flex-grow: 1;
+            outline: none;
+        }
+
+        .connection-bar button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.4rem 1.2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 12px var(--primary-glow);
+        }
+
+        .connection-bar button:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .connection-bar button.connected {
+            background: var(--error);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--error);
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+        }
+
+        .status-dot.connected {
+            background: var(--success);
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        main {
+            flex-grow: 1;
+            padding: 2rem;
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 2rem;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(16px);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.75rem;
+        }
+
+        .stat-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+        }
+
+        .stat-value {
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            word-break: break-all;
+            text-align: right;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 9999px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 0.6rem 1rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        .console-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 180px);
+            min-height: 500px;
+        }
+
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .console-filters {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            color: var(--text-muted);
+            padding: 0.35rem 0.8rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+        }
+
+        .filter-btn.active {
+            background: var(--primary-glow);
+            color: #a5b4fc;
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        .search-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.35rem 0.75rem;
+            color: var(--text-main);
+            font-size: 0.8rem;
+            outline: none;
+            min-width: 180px;
+            transition: all 0.2s ease;
+        }
+
+        .search-box:focus {
+            border-color: rgba(99, 102, 241, 0.5);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .console-body {
+            flex-grow: 1;
+            background-color: var(--console-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            overflow-y: auto;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .console-line {
+            white-space: pre-wrap;
+            word-break: break-all;
+            padding: 2px 6px;
+            border-radius: 4px;
+            animation: fadeIn 0.15s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(2px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .line-stdout {
+            color: #e5e7eb;
+        }
+
+        .line-stderr {
+            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.08);
+            border-left: 3px solid var(--error);
+        }
+
+        .line-log {
+            color: #fde047;
+            border-left: 3px solid var(--warning);
+        }
+
+        .line-system {
+            color: #60a5fa;
+            font-style: italic;
+        }
+
+        .line-meta {
+            color: var(--text-dark);
+            user-select: none;
+            margin-right: 8px;
+            font-size: 0.75rem;
+        }
+
+        .no-logs-msg {
+            color: var(--text-dark);
+            text-align: center;
+            margin: auto;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .no-logs-msg svg {
+            width: 48px;
+            height: 48px;
+            stroke: var(--text-dark);
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-area">
+            <h1>TASHIL</h1>
+            <span class="logo-badge">VM Service Inspector</span>
+        </div>
+        
+        <div class="connection-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <input type="text" id="wsInput" value="ws://127.0.0.1:51682/gL3-vvQIikc=/ws">
+            <button id="connectBtn" onclick="toggleConnect()">Connect</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="sidebar">
+            <!-- App Details -->
+            <div class="glass-card">
+                <div class="card-title">VM Summary</div>
+                <div class="stat-grid">
+                    <div class="stat-row">
+                        <span class="stat-label">Dart Version</span>
+                        <span class="stat-value" id="vmVersion">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Platform</span>
+                        <span class="stat-value" id="vmPlatform">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">PID</span>
+                        <span class="stat-value" id="vmPid">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Active Isolates</span>
+                        <span class="stat-value" id="vmIsolates">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Memory Monitor -->
+            <div class="glass-card">
+                <div class="card-title">Memory Usage</div>
+                <div class="stat-grid">
+                    <div class="stat-row">
+                        <span class="stat-label">Heap Usage</span>
+                        <span class="stat-value" id="memUsage">- MB</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Heap Capacity</span>
+                        <span class="stat-value" id="memCapacity">- MB</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">External</span>
+                        <span class="stat-value" id="memExternal">- MB</span>
+                    </div>
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+                            <span>Usage Percent</span>
+                            <span id="memPct">0%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="memProgressBar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions Panel -->
+            <div class="glass-card">
+                <div class="card-title">Quick Actions</div>
+                <div class="stat-grid">
+                    <button class="control-btn" onclick="triggerGC()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
+                        Run Garbage Collection (GC)
+                    </button>
+                    <button class="control-btn" onclick="clearConsole()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                        Clear Console Screen
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="console-container">
+            <div class="console-header">
+                <h2>Real-Time Logs Stream</h2>
+                <div class="console-filters">
+                    <button class="filter-btn active" id="filter-all" onclick="setFilter('all')">All Logs</button>
+                    <button class="filter-btn" id="filter-stdout" onclick="setFilter('stdout')">Stdout</button>
+                    <button class="filter-btn" id="filter-stderr" onclick="setFilter('stderr')">Stderr</button>
+                    <button class="filter-btn" id="filter-log" onclick="setFilter('log')">App Logs</button>
+                    <input type="text" class="search-box" id="searchBox" placeholder="Filter by text..." oninput="filterLogsText()">
+                </div>
+            </div>
+            
+            <div class="console-body" id="consoleBody">
+                <div class="no-logs-msg" id="noLogsMsg">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>Log stream disconnected. Enter Dart VM Service WebSocket URI above and click Connect.</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let socket = null;
+        let isolates = [];
+        let currentIsolateId = null;
+        let memoryInterval = null;
+        let activeFilter = 'all';
+        let logsCache = [];
+
+        function toggleConnect() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                disconnect();
+            } else {
+                connect();
+            }
+        }
+
+        function connect() {
+            const uri = document.getElementById('wsInput').value;
+            logSystem(`Attempting to connect to ${uri}...`);
+            
+            try {
+                socket = new WebSocket(uri);
+            } catch (e) {
+                logSystem(`Connection Error: ${e.message}`, true);
+                return;
+            }
+
+            socket.onopen = function() {
+                document.getElementById('statusDot').className = 'status-dot connected';
+                document.getElementById('statusText').innerText = 'Connected';
+                document.getElementById('connectBtn').innerText = 'Disconnect';
+                document.getElementById('connectBtn').className = 'connected';
+                document.getElementById('noLogsMsg').style.display = 'none';
+                
+                logSystem('Successfully connected to VM Service!');
+                
+                // Fetch VM details
+                sendRPC('getVM', {}, 'vm_info');
+                
+                // Subscribe to Streams
+                sendRPC('streamListen', { streamId: 'Stdout' }, 'sub_stdout');
+                sendRPC('streamListen', { streamId: 'Stderr' }, 'sub_stderr');
+                sendRPC('streamListen', { streamId: 'Logging' }, 'sub_logging');
+            };
+
+            socket.onclose = function(e) {
+                disconnect();
+                logSystem(`Disconnected from VM Service (Code: ${e.code}).`);
+            };
+
+            socket.onerror = function(e) {
+                logSystem('WebSocket Error encountered.', true);
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                // Handle RPC responses
+                if (data.id) {
+                    handleRPCResponse(data);
+                } 
+                // Handle stream notifications
+                else if (data.method === 'streamNotify') {
+                    handleStreamNotification(data.params);
+                }
+            };
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+            if (memoryInterval) {
+                clearInterval(memoryInterval);
+                memoryInterval = null;
+            }
+            document.getElementById('statusDot').className = 'status-dot';
+            document.getElementById('statusText').innerText = 'Disconnected';
+            document.getElementById('connectBtn').innerText = 'Connect';
+            document.getElementById('connectBtn').className = '';
+            
+            // Clear stats
+            document.getElementById('vmVersion').innerText = '-';
+            document.getElementById('vmPlatform').innerText = '-';
+            document.getElementById('vmPid').innerText = '-';
+            document.getElementById('vmIsolates').innerText = '-';
+            document.getElementById('memUsage').innerText = '- MB';
+            document.getElementById('memCapacity').innerText = '- MB';
+            document.getElementById('memExternal').innerText = '- MB';
+            document.getElementById('memPct').innerText = '0%';
+            document.getElementById('memProgressBar').style.width = '0%';
+        }
+
+        function sendRPC(method, params = {}, id = null) {
+            if (!socket || socket.readyState !== WebSocket.OPEN) return;
+            
+            const payload = {
+                jsonrpc: '2.0',
+                method: method,
+                params: params,
+                id: id || Math.random().toString(36).substring(2, 9)
+            };
+            socket.send(JSON.stringify(payload));
+        }
+
+        function handleRPCResponse(data) {
+            if (data.error) {
+                console.error('RPC Error:', data.error);
+                return;
+            }
+
+            const result = data.result;
+            
+            if (data.id === 'vm_info') {
+                document.getElementById('vmVersion').innerText = result.version.split(' ')[0];
+                document.getElementById('vmPlatform').innerText = `${result.targetCPU} (${result.architecture || 'x64'})`;
+                document.getElementById('vmPid').innerText = result.pid;
+                
+                isolates = result.isolates || [];
+                document.getElementById('vmIsolates').innerText = isolates.length;
+                
+                if (isolates.length > 0) {
+                    currentIsolateId = isolates[0].id;
+                    logSystem(`Monitoring Isolate: ${isolates[0].name} (${currentIsolateId})`);
+                    
+                    // Start memory polling interval (every 2 seconds)
+                    if (memoryInterval) clearInterval(memoryInterval);
+                    pollMemory();
+                    memoryInterval = setInterval(pollMemory, 2000);
+                }
+            } else if (data.id === 'memory_info') {
+                updateMemoryUI(result);
+            }
+        }
+
+        function handleStreamNotification(params) {
+            const streamId = params.streamId;
+            const event = params.event;
+            const timeStr = new Date(event.timestamp).toLocaleTimeString();
+            
+            if (streamId === 'Stdout' || streamId === 'Stderr') {
+                if (event.bytes) {
+                    const text = atob(event.bytes);
+                    if (text.trim()) {
+                        appendConsoleLine(streamId.toLowerCase(), text, timeStr);
+                    }
+                }
+            } else if (streamId === 'Logging') {
+                const logRecord = event.logRecord;
+                if (logRecord) {
+                    const message = logRecord.message.valueAsString;
+                    const logger = logRecord.loggerName.valueAsString || 'App';
+                    appendConsoleLine('log', `[${logger}] ${message}`, timeStr);
+                }
+            }
+        }
+
+        function pollMemory() {
+            if (currentIsolateId) {
+                sendRPC('getMemoryUsage', { isolateId: currentIsolateId }, 'memory_info');
+            }
+        }
+
+        function updateMemoryUI(mem) {
+            const usageMB = (mem.heapUsage / (1024 * 1024)).toFixed(1);
+            const capacityMB = (mem.heapCapacity / (1024 * 1024)).toFixed(1);
+            const externalMB = (mem.externalUsage / (1024 * 1024)).toFixed(1);
+            const pct = Math.min(100, Math.round((mem.heapUsage / mem.heapCapacity) * 100));
+
+            document.getElementById('memUsage').innerText = `${usageMB} MB`;
+            document.getElementById('memCapacity').innerText = `${capacityMB} MB`;
+            document.getElementById('memExternal').innerText = `${externalMB} MB`;
+            document.getElementById('memPct').innerText = `${pct}%`;
+            document.getElementById('memProgressBar').style.width = `${pct}%`;
+        }
+
+        function triggerGC() {
+            if (!currentIsolateId) {
+                logSystem('No active isolate to run GC on.', true);
+                return;
+            }
+            logSystem('Triggering garbage collection...');
+            sendRPC('_collectAllGarbage', { isolateId: currentIsolateId });
+        }
+
+        function appendConsoleLine(type, text, timestamp = null) {
+            if (!timestamp) {
+                timestamp = new Date().toLocaleTimeString();
+            }
+            
+            const logEntry = { type, text, timestamp };
+            logsCache.push(logEntry);
+            
+            // Limit cache to 1000 items
+            if (logsCache.length > 1000) {
+                logsCache.shift();
+            }
+
+            renderLogEntry(logEntry);
+        }
+
+        function renderLogEntry(logEntry) {
+            const { type, text, timestamp } = logEntry;
+            
+            // Apply quick filter
+            if (activeFilter !== 'all' && activeFilter !== type) return;
+            
+            // Apply text search filter
+            const searchText = document.getElementById('searchBox').value.toLowerCase();
+            if (searchText && !text.toLowerCase().includes(searchText)) return;
+
+            const consoleBody = document.getElementById('consoleBody');
+            
+            const line = document.createElement('div');
+            line.className = `console-line line-${type}`;
+            
+            const meta = document.createElement('span');
+            meta.className = 'line-meta';
+            meta.innerText = `[${timestamp}]`;
+            
+            line.appendChild(meta);
+            line.appendChild(document.createTextNode(text));
+            
+            consoleBody.appendChild(line);
+            
+            // Auto scroll to bottom
+            consoleBody.scrollTop = consoleBody.scrollHeight;
+        }
+
+        function logSystem(message, isError = false) {
+            appendConsoleLine('system', message);
+        }
+
+        function clearConsole() {
+            const consoleBody = document.getElementById('consoleBody');
+            // Keep the initial hidden message if disconnected
+            const noLogsMsg = document.getElementById('noLogsMsg');
+            consoleBody.innerHTML = '';
+            consoleBody.appendChild(noLogsMsg);
+            logsCache = [];
+            logSystem('Console cleared.');
+        }
+
+        function setFilter(filter) {
+            activeFilter = filter;
+            
+            // Toggle active class on buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`filter-${filter}`).classList.add('active');
+            
+            // Re-render logs
+            reRenderLogs();
+        }
+
+        function filterLogsText() {
+            reRenderLogs();
+        }
+
+        function reRenderLogs() {
+            const consoleBody = document.getElementById('consoleBody');
+            const noLogsMsg = document.getElementById('noLogsMsg');
+            
+            // Remove all logs but keep noLogsMsg
+            consoleBody.innerHTML = '';
+            consoleBody.appendChild(noLogsMsg);
+            
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                noLogsMsg.style.display = 'none';
+            } else {
+                noLogsMsg.style.display = 'flex';
+            }
+
+            logsCache.forEach(log => {
+                renderLogEntry(log);
+            });
+        }
+    </script>
+</body>
+</html>

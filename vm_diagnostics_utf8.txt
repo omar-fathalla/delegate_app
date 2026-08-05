@@ -1,0 +1,18 @@
+﻿=== Tashil VM Diagnostics Log ===
+Started at: 07/12/2026 13:38:44
+Connected successfully!
+Dart VM Version: 3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on "android_x64"
+Platform: x64 (Android virtual processor)
+PID: 4567
+--- Live Stream Log Started ---
+[11:38:44][Stdout] flutter: 🔄 AuthBloc: AuthInitial → AuthLoading
+[11:38:44][Stdout] flutter: 🔄 AuthBloc: AuthLoading → AuthUnauthenticated
+[11:38:44][Stdout] flutter: 🔄 AuthBloc: AuthUnauthenticated → AuthLoading
+[11:38:44][Stdout] flutter: 🔄 AuthBloc: AuthLoading → AuthAuthenticated
+[11:38:44][Stdout] flutter: 🔄 BranchBloc: BranchInitial → BranchLoading
+[11:38:44][Stdout] flutter: 🔄 BranchBloc: BranchLoading → BranchLoaded
+[11:38:44][Stdout] flutter: 🔄 CreateAdminBloc: CreateAdminInitial → CreateAdminOrgsLoaded
+[11:38:44][Stdout] flutter: FCM: Token saved for super-admin-login
+[11:38:44][Stdout] flutter: FCM: Initialized for delegate super-admin-login
+--- Connection closed by host ---
+--- Connection Closed ---
