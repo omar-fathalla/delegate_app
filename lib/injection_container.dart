@@ -207,6 +207,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       getHistory: sl(),
       getHistoryPaginated: sl(),
       syncAttendance: sl(),
+      reviewService: sl<ReviewService>(),
     ),
   );
 

@@ -1,4 +1,5 @@
 import 'package:delegate_app/features/admin/data/datasources/admin_remote_data_source.dart';
+import 'package:delegate_app/features/admin/data/models/admin_user_model.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -102,6 +103,43 @@ void main() {
 
       final doc = await fakeFirestore.collection('branches').doc('b1').get();
       expect(doc.exists, false);
+    });
+  });
+
+  group('createAdmin', () {
+    test('should add user to Firestore and return model', () async {
+      final admin = AdminUserModel(
+        uid: '',
+        phoneNumber: '123456789',
+        email: 'test@test.com',
+        displayName: 'Test',
+        role: 'company-admin',
+        createdAt: DateTime.now(),
+        createdBy: 'admin',
+        temporaryPassword: 'temp',
+      );
+
+      final result = await dataSource.createAdmin(admin);
+      expect(result.uid, isNotEmpty);
+      expect(result.email, 'test@test.com');
+    });
+  });
+
+  group('getAdmins', () {
+    test('should return list of admins', () async {
+      await fakeFirestore.collection('users').add({
+        'role': 'company-admin',
+        'email': 'admin@test.com',
+        'displayName': 'Admin 1',
+      });
+      await fakeFirestore.collection('users').add({
+        'role': 'user',
+        'email': 'user@test.com',
+      });
+
+      final result = await dataSource.getAdmins();
+      expect(result.length, 1);
+      expect(result.first.email, 'admin@test.com');
     });
   });
 }

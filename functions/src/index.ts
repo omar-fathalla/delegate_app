@@ -213,3 +213,163 @@ export const onTaskUpdated = functions.firestore
       return null;
     }
   });
+
+/**
+ * Cloud Function triggered when a new photo permission is created.
+ */
+export const onPhotoPermissionCreated = functions.firestore
+  .document("organizations/{organizationId}/companies/{companyId}/photo_permissions/{permissionId}")
+  .onCreate(async (snap, context) => {
+    const permission = snap.data();
+    const permissionId = context.params.permissionId;
+    const organizationId = context.params.organizationId;
+    const companyId = context.params.companyId;
+
+    try {
+      if (permission.status !== 'pending') {
+        return null;
+      }
+
+      const usersQuery = await admin.firestore().collection("users")
+        .where("organizationUID", "==", organizationId)
+        .where("role", "in", ["supervisor", "admin", "organizationAdmin"])
+        .get();
+
+      const targetUserIds: string[] = [];
+      usersQuery.forEach((doc) => {
+        const userData = doc.data();
+        if (userData.role === 'supervisor') {
+          if (userData.companyUID === companyId) {
+            targetUserIds.push(doc.id);
+          }
+        } else {
+          targetUserIds.push(doc.id);
+        }
+      });
+
+      if (targetUserIds.length === 0) {
+        console.log("No users found to notify for permission:", permissionId);
+        return null;
+      }
+
+      const notificationTitle = "طلب إذن تصوير جديد";
+      const notificationBody = `قام مندوب بطلب إذن تصوير في ${permission.companyName || "الشركة"}`;
+
+      const batch = admin.firestore().batch();
+      const fcmTokens: string[] = [];
+
+      for (const userId of targetUserIds) {
+        const notificationRef = admin.firestore().collection("notifications").doc();
+        batch.set(notificationRef, {
+          delegateUid: userId,
+          organizationId,
+          companyId,
+          title: notificationTitle,
+          body: notificationBody,
+          type: "photo_permission",
+          permissionId,
+          isRead: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const tokenDoc = await admin.firestore().collection("fcm_tokens").doc(userId).get();
+        if (tokenDoc.exists && tokenDoc.data()?.token) {
+          fcmTokens.push(tokenDoc.data()!.token);
+        }
+      }
+
+      await batch.commit();
+
+      if (fcmTokens.length > 0) {
+        await admin.messaging().sendEachForMulticast({
+          notification: {
+            title: notificationTitle,
+            body: notificationBody,
+          },
+          data: {
+            type: "photo_permission",
+            permissionId,
+            organizationId,
+            companyId,
+          },
+          tokens: fcmTokens,
+        });
+      }
+      return null;
+    } catch (error) {
+      console.error("Error in onPhotoPermissionCreated:", error);
+      return null;
+    }
+  });
+
+/**
+ * Cloud Function triggered when a photo permission is updated.
+ */
+export const onPhotoPermissionUpdated = functions.firestore
+  .document("organizations/{organizationId}/companies/{companyId}/photo_permissions/{permissionId}")
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    const permissionId = context.params.permissionId;
+    const organizationId = context.params.organizationId;
+    const companyId = context.params.companyId;
+
+    try {
+      if (before.status === after.status) {
+        return null;
+      }
+
+      const requestedBy = after.requestedBy;
+      if (!requestedBy) return null;
+
+      let notificationTitle = "تحديث إذن التصوير";
+      let notificationBody = `تم تحديث حالة إذن التصوير لشركة ${after.companyName || ""}`;
+
+      if (after.status === "approved") {
+        notificationTitle = "تمت الموافقة على إذن التصوير";
+        notificationBody = `تمت الموافقة على إذن التصوير لشركة ${after.companyName || ""}`;
+      } else if (after.status === "rejected") {
+        notificationTitle = "تم رفض إذن التصوير";
+        notificationBody = `تم رفض طلب إذن التصوير لشركة ${after.companyName || ""}`;
+      }
+
+      const batch = admin.firestore().batch();
+      
+      const notificationRef = admin.firestore().collection("notifications").doc();
+      batch.set(notificationRef, {
+        delegateUid: requestedBy,
+        organizationId,
+        companyId,
+        title: notificationTitle,
+        body: notificationBody,
+        type: "photo_permission",
+        permissionId,
+        isRead: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      const tokenDoc = await admin.firestore().collection("fcm_tokens").doc(requestedBy).get();
+      if (tokenDoc.exists && tokenDoc.data()?.token) {
+        await admin.messaging().send({
+          notification: {
+            title: notificationTitle,
+            body: notificationBody,
+          },
+          data: {
+            type: "photo_permission",
+            permissionId,
+            organizationId,
+            companyId,
+          },
+          token: tokenDoc.data()!.token,
+        });
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error in onPhotoPermissionUpdated:", error);
+      return null;
+    }
+  });

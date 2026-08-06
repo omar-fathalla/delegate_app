@@ -53,7 +53,9 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
       // إجبار المندوب على الكاميرا فقط لمنع التلاعب
       final XFile? photo = await picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 70, // ضغط الصورة لتقليل الاستهلاك
+        imageQuality: 50, // ضغط الصورة بشكل أكبر
+        maxWidth: 1080, // تحديد أقصى عرض
+        maxHeight: 1080, // تحديد أقصى طول
       );
 
       if (photo != null) {

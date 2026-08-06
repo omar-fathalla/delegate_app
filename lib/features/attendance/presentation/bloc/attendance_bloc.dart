@@ -7,7 +7,6 @@ import 'package:delegate_app/features/attendance/domain/usecases/get_history.dar
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_paginated.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
 import 'package:delegate_app/core/services/review_service.dart';
-import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 
 part 'attendance_event.dart';
@@ -19,6 +18,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   final GetHistory getHistory;
   final GetHistoryPaginated getHistoryPaginated;
   final SyncAttendance syncAttendance;
+  final ReviewService? _reviewService;
 
   AttendanceBloc({
     required this.checkIn,
@@ -26,7 +26,9 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     required this.getHistory,
     required this.getHistoryPaginated,
     required this.syncAttendance,
-  }) : super(AttendanceInitial()) {
+    ReviewService? reviewService,
+  })  : _reviewService = reviewService,
+        super(AttendanceInitial()) {
     on<CheckInRequested>(_onCheckIn);
     on<CheckOutRequested>(_onCheckOut);
     on<HistoryRequested>(_onGetHistory);
@@ -58,7 +60,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       (failure) => emit(AttendanceError(message: failure.message)),
       (attendance) {
         emit(AttendanceCheckedIn(attendance: attendance));
-        sl<ReviewService>().triggerSmartReview();
+        _reviewService?.triggerSmartReview();
       },
     );
   }
@@ -81,7 +83,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       (failure) => emit(AttendanceError(message: failure.message)),
       (attendance) {
         emit(AttendanceCheckedOut(attendance: attendance));
-        sl<ReviewService>().triggerSmartReview();
+        _reviewService?.triggerSmartReview();
       },
     );
   }

@@ -393,88 +393,25 @@ class _DelegateCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                PopupMenuButton<DelegateStatus>(
-                  tooltip: 'تغيير حالة المندوب',
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: statusColor.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _getStatusText(context, delegate.status),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: statusColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_drop_down_rounded,
-                          size: 18,
-                          color: statusColor,
-                        ),
-                      ],
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.3),
                     ),
                   ),
-                  onSelected: (newStatus) =>
-                      _updateDelegateStatus(context, delegate, newStatus),
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: DelegateStatus.active,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle_rounded,
-                            color: Colors.green,
-                            size: 20,
-                          ),
-                          SizedBox(width: 8),
-                          Text('تفعيل المندوب (نشط)'),
-                        ],
-                      ),
+                  child: Text(
+                    _getStatusText(context, delegate.status),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const PopupMenuItem(
-                      value: DelegateStatus.suspended,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.pause_circle_filled_rounded,
-                            color: Colors.orange,
-                            size: 20,
-                          ),
-                          SizedBox(width: 8),
-                          Text('إيقاف المندوب (موقوف)'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: DelegateStatus.rejected,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.cancel_rounded,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                          SizedBox(width: 8),
-                          Text('إلغاء المندوب (ملغى)'),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -539,60 +476,5 @@ class _DelegateCard extends StatelessWidget {
     );
   }
 
-  Future<void> _updateDelegateStatus(
-    BuildContext context,
-    Delegate delegate,
-    DelegateStatus newStatus,
-  ) async {
-    final colorScheme = Theme.of(context).colorScheme;
-    final statusString =
-        newStatus.name[0].toUpperCase() + newStatus.name.substring(1);
 
-    try {
-      final firestore = FirebaseFirestore.instance;
-      if (delegate.organizationUID.isNotEmpty &&
-          delegate.companyUID.isNotEmpty) {
-        await firestore
-            .collection('organizations')
-            .doc(delegate.organizationUID)
-            .collection('companies')
-            .doc(delegate.companyUID)
-            .collection('delegates')
-            .doc(delegate.uid)
-            .update({'status': statusString});
-      } else {
-        final query = await firestore
-            .collectionGroup('delegates')
-            .where(FieldPath.documentId, isEqualTo: delegate.uid)
-            .get();
-        for (var doc in query.docs) {
-          await doc.reference.update({'status': statusString});
-        }
-      }
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم تحديث حالة المندوب بنجاح'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        context.read<AdminDelegatesBloc>().add(
-          LoadCompanyDelegates(
-            organizationUID: delegate.organizationUID,
-            companyUID: delegate.companyUID,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('فشل في تحديث حالة المندوب: $e'),
-            backgroundColor: colorScheme.error,
-          ),
-        );
-      }
-    }
-  }
 }

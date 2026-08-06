@@ -8,6 +8,7 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onBackPressed;
   final List<PopupMenuEntry<String>>? menuItems;
   final ValueChanged<String>? onMenuSelected;
+  final List<Widget>? actions;
 
   const AdminHeader({
     super.key,
@@ -17,6 +18,7 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
     this.onBackPressed,
     this.menuItems,
     this.onMenuSelected,
+    this.actions,
   });
 
   @override
@@ -59,6 +61,7 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
+        ...?actions,
         if (menuItems != null && menuItems!.isNotEmpty)
           PopupMenuButton<String>(
             icon: const Icon(Icons.menu_rounded),

@@ -260,13 +260,26 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen> with AutomaticK
         Row(
           children: [
             Expanded(
-              child: _buildStatCard(
-                context,
-                title: 'مهام قيد الانتظار',
-                value: '$_pendingTasks',
-                icon: Icons.task_rounded,
-                color: colorScheme.error,
-                containerColor: colorScheme.errorContainer,
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('organizations')
+                    .doc(widget.delegate.organizationUID)
+                    .collection('tasks')
+                    .where('assignedTo', isEqualTo: widget.delegate.uid)
+                    .where('status', isNotEqualTo: 'completed')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  // Fallback to the initially loaded `_pendingTasks` if still loading
+                  final pendingCount = snapshot.hasData ? snapshot.data!.docs.length : _pendingTasks;
+                  return _buildStatCard(
+                    context,
+                    title: 'مهام قيد الانتظار',
+                    value: '$pendingCount',
+                    icon: Icons.task_rounded,
+                    color: colorScheme.error,
+                    containerColor: colorScheme.errorContainer,
+                  );
+                },
               ),
             ),
             const SizedBox(width: 12),

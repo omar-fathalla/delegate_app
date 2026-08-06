@@ -124,6 +124,7 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                       // Branch Filter
                       Expanded(
                         child: DropdownButtonFormField<String>(
+                          isExpanded: true,
                           initialValue: _selectedBranchId,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.bold,
@@ -157,6 +158,7 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                       // Delegate Filter
                       Expanded(
                         child: DropdownButtonFormField<String>(
+                          isExpanded: true,
                           initialValue: _selectedDelegateUID,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.bold,

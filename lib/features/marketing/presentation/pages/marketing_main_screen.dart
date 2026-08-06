@@ -13,6 +13,7 @@ import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_p
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/delegate_tasks_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_bloc.dart';
+import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 class MarketingMainScreen extends StatefulWidget {
@@ -111,6 +112,35 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
           ],
         ),
         actions: [
+          BlocProvider(
+            create: (_) => di.sl<NotificationBloc>()
+              ..add(
+                SubscribeToUnreadCount(
+                  delegateUid: delegate.uid,
+                  organizationId: delegate.organizationUID,
+                ),
+              ),
+            child: BlocBuilder<NotificationBloc, NotificationState>(
+              builder: (context, state) {
+                final unreadCount = state is NotificationLoaded
+                    ? state.unreadCount
+                    : 0;
+
+                return Badge(
+                  label: Text('$unreadCount'),
+                  isLabelVisible: unreadCount > 0,
+                  child: IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    tooltip: l10n.notifications,
+                    onPressed: () {
+                      context.push('/notifications', extra: delegate);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 4),
           PopupMenuButton<String>(
             icon: const Icon(Icons.menu_rounded),
             shape: RoundedRectangleBorder(

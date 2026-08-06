@@ -16,6 +16,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
+import 'package:delegate_app/features/tasks/data/models/task_model.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -986,43 +987,36 @@ class _DelegateAttendanceData {
   });
 }
 
-/// Fetches admin tasks and displays them in a [TaskSummaryCard].
-class _AdminTaskSummary extends StatefulWidget {
+/// Fetches admin tasks in real-time and displays them in a [TaskSummaryCard].
+class _AdminTaskSummary extends StatelessWidget {
   final Delegate adminDelegate;
 
   const _AdminTaskSummary({required this.adminDelegate});
 
   @override
-  State<_AdminTaskSummary> createState() => _AdminTaskSummaryState();
-}
-
-class _AdminTaskSummaryState extends State<_AdminTaskSummary> {
-  late Future<List<TaskEntity>> _tasksFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _tasksFuture = _fetchTasks();
-  }
-
-  Future<List<TaskEntity>> _fetchTasks() async {
-    final getAdminTasks = sl<GetAdminTasks>();
-    final result = await getAdminTasks(
-      widget.adminDelegate.organizationUID,
-      widget.adminDelegate.companyUID,
-    );
-    return result.fold((_) => [], (tasks) => tasks);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<TaskEntity>>(
-      future: _tasksFuture,
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('organizations')
+          .doc(adminDelegate.organizationUID)
+          .collection('tasks')
+          .where('companyId', isEqualTo: adminDelegate.companyUID)
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const TaskSummaryCard(tasks: [], isLoading: true);
         }
-        return TaskSummaryCard(tasks: snapshot.data ?? []);
+        if (snapshot.hasError) {
+          return const TaskSummaryCard(tasks: []);
+        }
+        
+        final tasks = snapshot.data?.docs.map((doc) {
+          return TaskModel.fromFirestore(doc);
+        }).toList() ?? [];
+
+        return TaskSummaryCard(tasks: tasks);
       },
     );
   }

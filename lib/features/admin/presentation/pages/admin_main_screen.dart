@@ -24,6 +24,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
 
 
 class AdminMainScreen extends StatefulWidget {
@@ -190,6 +191,37 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       appBar: AdminHeader(
         title: headerTitle,
         subtitle: subtitle,
+        actions: [
+          BlocProvider(
+            create: (_) => di.sl<NotificationBloc>()
+              ..add(
+                SubscribeToUnreadCount(
+                  delegateUid: delegate.uid,
+                  organizationId: delegate.organizationUID,
+                ),
+              ),
+            child: BlocBuilder<NotificationBloc, NotificationState>(
+              builder: (context, state) {
+                final unreadCount = state is NotificationLoaded
+                    ? state.unreadCount
+                    : 0;
+
+                return Badge(
+                  label: Text('$unreadCount'),
+                  isLabelVisible: unreadCount > 0,
+                  child: IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    tooltip: l10n.notifications,
+                    onPressed: () {
+                      context.push('/notifications', extra: delegate);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 4),
+        ],
         menuItems: [
           if (isSuperAdmin) ...[
             PopupMenuItem(

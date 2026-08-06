@@ -146,6 +146,8 @@ void main() {
         organizationId: 'org1',
         deviceInfo: 'device1',
       );
+      // Small delay to ensure check-out timestamp is strictly after check-in
+      await Future.delayed(const Duration(milliseconds: 10));
       await dataSource.checkOut(checkIn.id, 'org1', 11.0, 21.0);
 
       // Act

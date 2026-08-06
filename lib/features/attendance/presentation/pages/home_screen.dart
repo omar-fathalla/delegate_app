@@ -16,6 +16,8 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/features/tasks/data/models/task_model.dart';
 
 class HomeScreen extends StatefulWidget {
   final Delegate delegate;
@@ -197,44 +199,44 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// Fetches delegate tasks and displays them in a [TaskSummaryCard].
-class _DelegateTaskSummary extends StatefulWidget {
+/// Fetches delegate tasks in real-time and displays them in a [TaskSummaryCard].
+class _DelegateTaskSummary extends StatelessWidget {
   final Delegate delegate;
 
   const _DelegateTaskSummary({required this.delegate});
 
   @override
-  State<_DelegateTaskSummary> createState() => _DelegateTaskSummaryState();
-}
-
-class _DelegateTaskSummaryState extends State<_DelegateTaskSummary> {
-  late Future<List<TaskEntity>> _tasksFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _tasksFuture = _fetchTasks();
-  }
-
-  Future<List<TaskEntity>> _fetchTasks() async {
-    final getDelegateTasks = sl<GetDelegateTasks>();
-    final result = await getDelegateTasks(
-      widget.delegate.organizationUID,
-      widget.delegate.uid,
-      widget.delegate.companyUID,
-    );
-    return result.fold((_) => [], (tasks) => tasks);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<TaskEntity>>(
-      future: _tasksFuture,
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('organizations')
+          .doc(delegate.organizationUID)
+          .collection('tasks')
+          .where('companyId', isEqualTo: delegate.companyUID)
+          .where(
+            Filter.or(
+              Filter('assignedTo', isEqualTo: delegate.uid),
+              Filter('assignedTo', isEqualTo: 'all'),
+              Filter('assignedTo', isEqualTo: 'all_branch_marketing'),
+              Filter('assignedTo', isEqualTo: 'all_marketing_promotion'),
+            ),
+          )
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const TaskSummaryCard(tasks: [], isLoading: true);
         }
-        return TaskSummaryCard(tasks: snapshot.data ?? []);
+        if (snapshot.hasError) {
+          return const TaskSummaryCard(tasks: []);
+        }
+
+        final tasks = snapshot.data?.docs.map((doc) {
+          return TaskModel.fromFirestore(doc);
+        }).toList() ?? [];
+
+        return TaskSummaryCard(tasks: tasks);
       },
     );
   }

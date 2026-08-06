@@ -17,7 +17,7 @@ void main() {
           isA<ServerFailure>().having(
             (f) => f.message,
             'message',
-            'فشل في تسجيل الحضور.',
+            'فشل في تسجيل الحضور. [رمز الخطأ: not-found]',
           ),
         ),
       );
