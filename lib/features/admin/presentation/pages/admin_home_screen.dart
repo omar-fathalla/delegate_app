@@ -5,8 +5,6 @@ import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_ev
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_state.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
-import 'package:delegate_app/features/tasks/domain/usecases/get_admin_tasks.dart';
 import 'package:delegate_app/features/tasks/presentation/widgets/task_summary_card.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';

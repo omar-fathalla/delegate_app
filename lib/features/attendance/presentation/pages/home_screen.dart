@@ -6,8 +6,6 @@ import 'package:delegate_app/features/attendance/presentation/widgets/attendance
 import 'package:delegate_app/features/attendance/presentation/widgets/attendance_history_list.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/current_status_card.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/home_app_bar.dart';
-import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
-import 'package:delegate_app/features/tasks/domain/usecases/get_delegate_tasks.dart';
 import 'package:delegate_app/features/tasks/presentation/widgets/task_summary_card.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'dart:io';
