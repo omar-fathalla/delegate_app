@@ -41,8 +41,13 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     return false;
   }
 
+  Future<bool> Function(String, String)? verifyPhonePasswordStub;
+
   @override
   Future<bool> verifyPhonePassword(String phone, String password) async {
+    if (verifyPhonePasswordStub != null) {
+      return verifyPhonePasswordStub!(phone, password);
+    }
     return false;
   }
 }
@@ -164,6 +169,90 @@ void main() {
       expect(failure, isA<AuthFailure>());
     });
 
+    test('should return AuthFailure when delegate is suspended', () async {
+      // arrange
+      final suspendedDelegate = DelegateModel(
+        uid: tDelegateModel.uid,
+        firstName: tDelegateModel.firstName,
+        middleName: tDelegateModel.middleName,
+        lastName: tDelegateModel.lastName,
+        fullName: tDelegateModel.fullName,
+        nationalityID: tDelegateModel.nationalityID,
+        motherName: tDelegateModel.motherName,
+        city: tDelegateModel.city,
+        phoneNumber: tDelegateModel.phoneNumber,
+        gender: tDelegateModel.gender,
+        position: tDelegateModel.position,
+        birthDate: tDelegateModel.birthDate,
+        organizationUID: tDelegateModel.organizationUID,
+        organizationName: tDelegateModel.organizationName,
+        companyUID: tDelegateModel.companyUID,
+        companyName: tDelegateModel.companyName,
+        status: DelegateStatus.suspended,
+        delegatePublicId: tDelegateModel.delegatePublicId,
+        allReceiptCodes: tDelegateModel.allReceiptCodes,
+        createdAt: tDelegateModel.createdAt,
+        createdBy: tDelegateModel.createdBy,
+        hasPendingUpdate: tDelegateModel.hasPendingUpdate,
+        isDeductedFromCompany: tDelegateModel.isDeductedFromCompany,
+        isPrinted: tDelegateModel.isPrinted,
+        isProfileComplete: tDelegateModel.isProfileComplete,
+        numberOfDocuments: tDelegateModel.numberOfDocuments,
+        paymentAmount: tDelegateModel.paymentAmount,
+        version: tDelegateModel.version,
+        documents: tDelegateModel.documents,
+      );
+      mockRemoteDataSource.getDelegatesByPhoneStub = (_) async => [
+        suspendedDelegate,
+      ];
+      // act
+      final result = await repository.getDelegatesByPhone(tPhoneNumber);
+      // assert
+      expect(result, equals(const Left(AuthFailure('تم تعليق حسابك. تواصل مع الإدارة.'))));
+    });
+
+    test('should return AuthFailure when delegate is rejected', () async {
+      // arrange
+      final rejectedDelegate = DelegateModel(
+        uid: tDelegateModel.uid,
+        firstName: tDelegateModel.firstName,
+        middleName: tDelegateModel.middleName,
+        lastName: tDelegateModel.lastName,
+        fullName: tDelegateModel.fullName,
+        nationalityID: tDelegateModel.nationalityID,
+        motherName: tDelegateModel.motherName,
+        city: tDelegateModel.city,
+        phoneNumber: tDelegateModel.phoneNumber,
+        gender: tDelegateModel.gender,
+        position: tDelegateModel.position,
+        birthDate: tDelegateModel.birthDate,
+        organizationUID: tDelegateModel.organizationUID,
+        organizationName: tDelegateModel.organizationName,
+        companyUID: tDelegateModel.companyUID,
+        companyName: tDelegateModel.companyName,
+        status: DelegateStatus.rejected,
+        delegatePublicId: tDelegateModel.delegatePublicId,
+        allReceiptCodes: tDelegateModel.allReceiptCodes,
+        createdAt: tDelegateModel.createdAt,
+        createdBy: tDelegateModel.createdBy,
+        hasPendingUpdate: tDelegateModel.hasPendingUpdate,
+        isDeductedFromCompany: tDelegateModel.isDeductedFromCompany,
+        isPrinted: tDelegateModel.isPrinted,
+        isProfileComplete: tDelegateModel.isProfileComplete,
+        numberOfDocuments: tDelegateModel.numberOfDocuments,
+        paymentAmount: tDelegateModel.paymentAmount,
+        version: tDelegateModel.version,
+        documents: tDelegateModel.documents,
+      );
+      mockRemoteDataSource.getDelegatesByPhoneStub = (_) async => [
+        rejectedDelegate,
+      ];
+      // act
+      final result = await repository.getDelegatesByPhone(tPhoneNumber);
+      // assert
+      expect(result, equals(const Left(AuthFailure('تم رفض حسابك. تواصل مع الإدارة.'))));
+    });
+
     test(
       'should return ServerFailure when data source throws ServerFailure',
       () async {
@@ -186,6 +275,94 @@ void main() {
             throw Exception('Unexpected error');
         // act
         final result = await repository.getDelegatesByPhone(tPhoneNumber);
+        // assert
+        expect(result, isA<Left<Failure, dynamic>>());
+        final failure = (result as Left).value;
+        expect(failure, isA<ServerFailure>());
+      },
+    );
+  });
+
+  group('verifyAdminPassword', () {
+    const tEmail = 'test@test.com';
+    const tPassword = 'password';
+
+    test('should return Right(true) when verification succeeds', () async {
+      // arrange
+      mockRemoteDataSource.verifyAdminPasswordStub =
+          (email, password) async => true;
+      // act
+      final result = await repository.verifyAdminPassword(tEmail, tPassword);
+      // assert
+      expect(result, equals(const Right(true)));
+    });
+
+    test(
+      'should return Left(ServerFailure) when data source throws Failure',
+      () async {
+        // arrange
+        const tFailure = ServerFailure('Server Error');
+        mockRemoteDataSource.verifyAdminPasswordStub =
+            (email, password) => throw tFailure;
+        // act
+        final result = await repository.verifyAdminPassword(tEmail, tPassword);
+        // assert
+        expect(result, equals(const Left(tFailure)));
+      },
+    );
+
+    test(
+      'should return Left(ServerFailure) when an unexpected exception is thrown',
+      () async {
+        // arrange
+        mockRemoteDataSource.verifyAdminPasswordStub =
+            (email, password) => throw Exception('Unexpected error');
+        // act
+        final result = await repository.verifyAdminPassword(tEmail, tPassword);
+        // assert
+        expect(result, isA<Left<Failure, dynamic>>());
+        final failure = (result as Left).value;
+        expect(failure, isA<ServerFailure>());
+      },
+    );
+  });
+
+  group('verifyPhonePassword', () {
+    const tPhone = '01234567890';
+    const tPassword = 'password';
+
+    test('should return Right(true) when verification succeeds', () async {
+      // arrange
+      mockRemoteDataSource.verifyPhonePasswordStub =
+          (phone, password) async => true;
+      // act
+      final result = await repository.verifyPhonePassword(tPhone, tPassword);
+      // assert
+      expect(result, equals(const Right(true)));
+    });
+
+    test(
+      'should return Left(ServerFailure) when data source throws Failure',
+      () async {
+        // arrange
+        const tFailure = ServerFailure('Server Error');
+        mockRemoteDataSource.verifyPhonePasswordStub =
+            (phone, password) => throw tFailure;
+        // act
+        final result = await repository.verifyPhonePassword(tPhone, tPassword);
+        // assert
+        expect(result, equals(const Left(tFailure)));
+      },
+    );
+
+    test(
+      'should return Left(ServerFailure) when an unexpected exception is thrown',
+      () async {
+        // arrange
+        mockRemoteDataSource.verifyPhonePasswordStub =
+            (phone, password) => throw Exception('Unexpected error');
+        // act
+        final result = await repository.verifyPhonePassword(tPhone, tPassword);
         // assert
         expect(result, isA<Left<Failure, dynamic>>());
         final failure = (result as Left).value;
