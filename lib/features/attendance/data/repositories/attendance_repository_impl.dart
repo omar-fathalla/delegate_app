@@ -1,4 +1,6 @@
 import 'package:dartz/dartz.dart';
+import 'dart:developer' as developer;
+
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
@@ -40,7 +42,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required String branchName,
     required bool isCheckIn,
   }) async {
-    final branchData = await remoteDataSource.getBranchByName(branchName.trim());
+    final branchData = await remoteDataSource.getBranchByName(
+      branchName.trim(),
+    );
     if (branchData == null) {
       throw const ServerFailure(
         'لم يتم العثور على بيانات الفرع. يرجى التأكد من الرمز.',
@@ -197,7 +201,14 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
       try {
         await localDataSource.overwriteHistory(remoteHistory);
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        developer.log(
+          'Failed to cache history',
+          error: e,
+          stackTrace: stackTrace,
+          name: 'AttendanceRepositoryImpl',
+        );
+      }
 
       return Right(remoteHistory);
     } on Failure catch (e) {
@@ -207,7 +218,14 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         if (filtered.isNotEmpty) {
           return Right(filtered);
         }
-      } catch (_) {}
+      } catch (error, stackTrace) {
+        developer.log(
+          'Failed to read local history',
+          error: error,
+          stackTrace: stackTrace,
+          name: 'AttendanceRepositoryImpl',
+        );
+      }
       return Left(e);
     }
   }
@@ -253,7 +271,14 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       if (lastDoc == null && response.items.isNotEmpty) {
         try {
           await localDataSource.overwriteHistory(response.items);
-        } catch (_) {}
+        } catch (e, stackTrace) {
+          developer.log(
+            'Failed to cache history',
+            error: e,
+            stackTrace: stackTrace,
+            name: 'AttendanceRepositoryImpl',
+          );
+        }
       }
 
       return Right(
