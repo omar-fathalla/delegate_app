@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
@@ -27,7 +29,13 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     try {
       final result = await Connectivity().checkConnectivity();
       return !result.contains(ConnectivityResult.none);
-    } catch (_) {
+    } catch (e, stackTrace) {
+      developer.log(
+        'Connectivity check failed',
+        error: e,
+        stackTrace: stackTrace,
+        name: 'AttendanceRepositoryImpl',
+      );
       return true; // Default to true if check fails
     }
   }
@@ -40,7 +48,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required String branchName,
     required bool isCheckIn,
   }) async {
-    final branchData = await remoteDataSource.getBranchByName(branchName.trim());
+    final branchData = await remoteDataSource.getBranchByName(
+      branchName.trim(),
+    );
     if (branchData == null) {
       throw const ServerFailure(
         'لم يتم العثور على بيانات الفرع. يرجى التأكد من الرمز.',
@@ -197,7 +207,14 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
       try {
         await localDataSource.overwriteHistory(remoteHistory);
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        developer.log(
+          'Failed to cache attendance history',
+          error: e,
+          stackTrace: stackTrace,
+          name: 'AttendanceRepositoryImpl',
+        );
+      }
 
       return Right(remoteHistory);
     } on Failure catch (e) {
@@ -207,7 +224,14 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         if (filtered.isNotEmpty) {
           return Right(filtered);
         }
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        developer.log(
+          'Failed to fetch local attendance history',
+          error: e,
+          stackTrace: stackTrace,
+          name: 'AttendanceRepositoryImpl',
+        );
+      }
       return Left(e);
     }
   }
@@ -253,7 +277,14 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       if (lastDoc == null && response.items.isNotEmpty) {
         try {
           await localDataSource.overwriteHistory(response.items);
-        } catch (_) {}
+        } catch (e, stackTrace) {
+          developer.log(
+            'Failed to cache first page of attendance history locally',
+            error: e,
+            stackTrace: stackTrace,
+            name: 'AttendanceRepositoryImpl',
+          );
+        }
       }
 
       return Right(
@@ -327,7 +358,13 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       return const Right(null);
     } on Failure catch (e) {
       return Left(e);
-    } catch (_) {
+    } catch (e, stackTrace) {
+      developer.log(
+        'Unexpected error saving branch data',
+        error: e,
+        stackTrace: stackTrace,
+        name: 'AttendanceRepositoryImpl',
+      );
       return const Left(
         ServerFailure('حدث خطأ غير متوقع أثناء حفظ بيانات الفرع.'),
       );
