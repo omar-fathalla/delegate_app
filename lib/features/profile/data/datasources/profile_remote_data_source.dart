@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/exceptions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -100,6 +102,13 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       } else if (auth.currentUser == null) {
         await auth.signInAnonymously();
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to heal anonymous session',
+        name: 'ProfileRemoteDataSourceImpl',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 }
