@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:bloc/bloc.dart';
 import 'package:delegate_app/core/services/crashlytics_service.dart';
 import 'package:flutter/foundation.dart';
@@ -16,7 +18,7 @@ class AppBlocObserver extends BlocObserver {
     );
 
     if (kDebugMode) {
-      print('🔴 BLoC Error [${bloc.runtimeType}]: $error');
+      developer.log('🔴 BLoC Error [${bloc.runtimeType}]: $error');
     }
   }
 
@@ -25,7 +27,7 @@ class AppBlocObserver extends BlocObserver {
     super.onTransition(bloc, transition);
 
     if (kDebugMode) {
-      print(
+      developer.log(
         '🔄 ${bloc.runtimeType}: '
         '${transition.currentState.runtimeType} → '
         '${transition.nextState.runtimeType}',
