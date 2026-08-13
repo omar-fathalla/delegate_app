@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,7 +46,14 @@ class SecureStorageService {
   }) async {
     try {
       await write(key: key, value: jsonEncode(value));
-    } catch (_) {}
+    } catch (e, st) {
+      developer.log(
+        'Failed to write secure JSON',
+        name: 'SecureStorageService',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
 
   /// Reads a JSON-serializable [Map] for the given [key].
@@ -54,7 +62,13 @@ class SecureStorageService {
       final raw = await read(key: key);
       if (raw == null) return null;
       return jsonDecode(raw) as Map<String, dynamic>;
-    } catch (_) {
+    } catch (e, st) {
+      developer.log(
+        'Failed to read secure JSON',
+        name: 'SecureStorageService',
+        error: e,
+        stackTrace: st,
+      );
       return null;
     }
   }
