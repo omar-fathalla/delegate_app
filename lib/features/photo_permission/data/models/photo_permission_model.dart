@@ -37,7 +37,11 @@ class PhotoPermissionModel extends PhotoPermission {
       organizationUID: data['organizationUID']?.toString() ?? '',
       companyUID: data['companyUID']?.toString() ?? '',
       companyName: data['companyName']?.toString() ?? '',
-      companyCode: data['companyCode'] != null ? int.tryParse(data['companyCode'].toString()) : null,
+      companyCode: data['companyCode'] != null
+          ? int.tryParse(data['companyCode'].toString())
+          : (data['companyCodeInOrg'] != null
+              ? int.tryParse(data['companyCodeInOrg'].toString())
+              : (data['code'] != null ? int.tryParse(data['code'].toString()) : null)),
       branchIds: List<String>.from(data['branchIds'] as List? ?? []),
       branchNames: List<String>.from(data['branchNames'] as List? ?? []),
       startDate: parseDateTime(data['startDate']),

@@ -178,8 +178,12 @@ void main() {
     blocTest<PenaltyBloc, PenaltyState>(
       'should emit [PenaltyActionSuccessState] when status update is successful',
       build: () {
-        when(() => mockPenaltyRepository.updatePenaltyStatus(any(), any()))
-            .thenAnswer((_) async => const Right(unit));
+        when(() => mockPenaltyRepository.updatePenaltyStatus(
+              penaltyId: any(named: 'penaltyId'),
+              status: any(named: 'status'),
+              rejectionReason: any(named: 'rejectionReason'),
+              reviewerName: any(named: 'reviewerName'),
+            )).thenAnswer((_) async => const Right(unit));
         return bloc;
       },
       act: (bloc) => bloc.add(const UpdatePenaltyStatusEvent(
@@ -194,8 +198,12 @@ void main() {
     blocTest<PenaltyBloc, PenaltyState>(
       'should emit [PenaltyErrorState] when status update fails',
       build: () {
-        when(() => mockPenaltyRepository.updatePenaltyStatus(any(), any()))
-            .thenAnswer((_) async => const Left(ServerFailure('Error')));
+        when(() => mockPenaltyRepository.updatePenaltyStatus(
+              penaltyId: any(named: 'penaltyId'),
+              status: any(named: 'status'),
+              rejectionReason: any(named: 'rejectionReason'),
+              reviewerName: any(named: 'reviewerName'),
+            )).thenAnswer((_) async => const Left(ServerFailure('Error')));
         return bloc;
       },
       act: (bloc) => bloc.add(const UpdatePenaltyStatusEvent(

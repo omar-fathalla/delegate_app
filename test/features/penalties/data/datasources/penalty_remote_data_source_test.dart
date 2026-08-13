@@ -234,7 +234,7 @@ void main() {
     test('should update status successfully', () async {
       when(() => mockDocumentReference.update(any())).thenAnswer((_) async {});
 
-      await dataSource.updatePenaltyStatus('test_id', PenaltyStatus.acknowledged);
+      await dataSource.updatePenaltyStatus(penaltyId: 'test_id', status: PenaltyStatus.acknowledged);
 
       verify(() => mockFirestore.collection('penalties')).called(1);
       verify(() => mockCollectionReference.doc('test_id')).called(1);
@@ -245,9 +245,7 @@ void main() {
       when(() => mockDocumentReference.update(any()))
           .thenThrow(FirebaseException(plugin: 'firestore'));
 
-      final call = dataSource.updatePenaltyStatus;
-
-      expect(() => call('test_id', PenaltyStatus.acknowledged), throwsA(isA<ServerException>()));
+      expect(() => dataSource.updatePenaltyStatus(penaltyId: 'test_id', status: PenaltyStatus.acknowledged), throwsA(isA<ServerException>()));
     });
   });
 

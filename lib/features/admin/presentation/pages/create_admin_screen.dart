@@ -4,26 +4,29 @@ import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../bloc/create_admin_bloc.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 class CreateAdminScreen extends StatelessWidget {
   final String organizationUID;
+  final Delegate? currentDelegate;
 
-  const CreateAdminScreen({super.key, required this.organizationUID});
+  const CreateAdminScreen({super.key, required this.organizationUID, this.currentDelegate});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) =>
           di.sl<CreateAdminBloc>()..add(LoadOrganizationsRequested()),
-      child: _CreateAdminView(organizationUID: organizationUID),
+      child: _CreateAdminView(organizationUID: organizationUID, currentDelegate: currentDelegate),
     );
   }
 }
 
 class _CreateAdminView extends StatefulWidget {
   final String organizationUID;
+  final Delegate? currentDelegate;
 
-  const _CreateAdminView({required this.organizationUID});
+  const _CreateAdminView({required this.organizationUID, this.currentDelegate});
 
   @override
   State<_CreateAdminView> createState() => _CreateAdminViewState();
@@ -34,7 +37,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _nameController = TextEditingController();
-  String _selectedRole = 'company-admin';
+  String _selectedRole = 'organization-admin';
   String? _selectedOrgUID;
   List<Map<String, dynamic>> _organizations = [];
 
@@ -342,6 +345,20 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                             color: colorScheme.outline.withValues(alpha: 0.3),
                           ),
                           _RoleTile(
+                            title: 'مدير تسويق الفروع',
+                            subtitle: 'Branches Marketing Manager',
+                            icon: Icons.storefront_rounded,
+                            value: 'branches_marketing',
+                            isSelected: _selectedRole == 'branches_marketing',
+                            onTap: () {
+                              setState(() => _selectedRole = 'branches_marketing');
+                            },
+                          ),
+                          Divider(
+                            height: 1,
+                            color: colorScheme.outline.withValues(alpha: 0.3),
+                          ),
+                          _RoleTile(
                             title: 'تسويق العروض',
                             subtitle: 'Marketing Promotion',
                             icon: Icons.photo_library_rounded,
@@ -355,20 +372,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                             height: 1,
                             color: colorScheme.outline.withValues(alpha: 0.3),
                           ),
-                          _RoleTile(
-                            title: 'مدير قطاع / مشرف شركة',
-                            subtitle: 'Company Admin',
-                            icon: Icons.business_rounded,
-                            value: 'company-admin',
-                            isSelected: _selectedRole == 'company-admin',
-                            onTap: () {
-                              setState(() => _selectedRole = 'company-admin');
-                            },
-                          ),
-                          Divider(
-                            height: 1,
-                            color: colorScheme.outline.withValues(alpha: 0.3),
-                          ),
+
                           _RoleTile(
                             title: 'مدير عام',
                             subtitle: 'Organization Admin',
@@ -381,20 +385,36 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                               );
                             },
                           ),
-                          Divider(
-                            height: 1,
-                            color: colorScheme.outline.withValues(alpha: 0.3),
-                          ),
-                          _RoleTile(
-                            title: 'مدير النظام الفائق',
-                            subtitle: 'Super Admin - كامل الصلاحيات',
-                            icon: Icons.verified_user_rounded,
-                            value: 'super-admin',
-                            isSelected: _selectedRole == 'super-admin',
-                            onTap: () {
-                              setState(() => _selectedRole = 'super-admin');
-                            },
-                          ),
+                          if (widget.currentDelegate?.role != UserRole.technicalSupport) ...[
+                            Divider(
+                              height: 1,
+                              color: colorScheme.outline.withValues(alpha: 0.3),
+                            ),
+                            _RoleTile(
+                              title: 'مدير النظام الفائق',
+                              subtitle: 'Super Admin - كامل الصلاحيات',
+                              icon: Icons.verified_user_rounded,
+                              value: 'super-admin',
+                              isSelected: _selectedRole == 'super-admin',
+                              onTap: () {
+                                setState(() => _selectedRole = 'super-admin');
+                              },
+                            ),
+                            Divider(
+                              height: 1,
+                              color: colorScheme.outline.withValues(alpha: 0.3),
+                            ),
+                            _RoleTile(
+                              title: 'دعم فني',
+                              subtitle: 'Technical Support',
+                              icon: Icons.support_agent_rounded,
+                              value: 'technical_support',
+                              isSelected: _selectedRole == 'technical_support',
+                              onTap: () {
+                                setState(() => _selectedRole = 'technical_support');
+                              },
+                            ),
+                          ],
                         ],
                       ),
                     ),

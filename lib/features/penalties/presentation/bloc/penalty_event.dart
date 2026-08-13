@@ -38,12 +38,16 @@ class CreatePenaltyRequestedEvent extends PenaltyEvent {
 class UpdatePenaltyStatusEvent extends PenaltyEvent {
   final String penaltyId;
   final PenaltyStatus status;
+  final String? rejectionReason;
+  final String? reviewerName;
 
   const UpdatePenaltyStatusEvent({
     required this.penaltyId,
     required this.status,
+    this.rejectionReason,
+    this.reviewerName,
   });
 
   @override
-  List<Object?> get props => [penaltyId, status];
+  List<Object?> get props => [penaltyId, status, rejectionReason, reviewerName];
 }

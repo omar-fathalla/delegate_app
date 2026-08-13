@@ -36,9 +36,12 @@ class _CompanyPenaltiesSettingsPageState
   }
 
   void _loadData() {
-    final isOrgAdmin = widget.delegate.role == UserRole.organizationAdmin ||
-        widget.delegate.role == UserRole.superAdmin;
-    if (isOrgAdmin) {
+    if (widget.delegate.role == UserRole.marketingPromotion) return;
+    final canViewAll = widget.delegate.role == UserRole.organizationAdmin ||
+        widget.delegate.role == UserRole.superAdmin ||
+        widget.delegate.role == UserRole.branchesMarketingManager ||
+        widget.delegate.role == UserRole.marketing;
+    if (canViewAll) {
       context.read<PenaltyBloc>().add(const LoadAllPenaltiesEvent());
     } else {
       final companyId = widget.delegate.companyUID.isNotEmpty
@@ -50,8 +53,29 @@ class _CompanyPenaltiesSettingsPageState
 
   @override
   Widget build(BuildContext context) {
+    if (widget.delegate.role == UserRole.marketingPromotion) {
+      return Scaffold(
+        appBar: widget.showAppBar
+            ? AppBar(title: const Text('قسم الغرامات والمخالفات'))
+            : null,
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'غير مسموح لحسابات تسويق العروض الوصول لنظام الغرامات والمخالفات',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      );
+    }
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final canCreatePenalty = widget.delegate.role == UserRole.organizationAdmin ||
+        widget.delegate.role == UserRole.superAdmin ||
+        widget.delegate.role == UserRole.marketing;
     final isOrgAdmin = widget.delegate.role == UserRole.organizationAdmin ||
         widget.delegate.role == UserRole.superAdmin;
 
@@ -70,8 +94,7 @@ class _CompanyPenaltiesSettingsPageState
               ],
             )
           : null,
-      // زر إضافة غرامة لمشرف الشركات
-      floatingActionButton: isOrgAdmin
+      floatingActionButton: canCreatePenalty
           ? FloatingActionButton.extended(
               onPressed: () async {
                 final res = await Navigator.of(context).push(
@@ -121,7 +144,18 @@ class _CompanyPenaltiesSettingsPageState
           }
 
           if (state is PenaltyLoadedState) {
-            final penalties = state.penalties;
+            var penalties = state.penalties;
+
+            // Filter for Delegates: show ONLY penalties approved & issued by General Manager
+            final isDelegateRole = widget.delegate.role == UserRole.marketing ||
+                widget.delegate.role == UserRole.marketingPromotion;
+            if (isDelegateRole) {
+              penalties = penalties.where((p) =>
+                p.status == PenaltyStatus.issued ||
+                p.status == PenaltyStatus.acknowledged ||
+                p.status == PenaltyStatus.deducted
+              ).toList();
+            }
 
             // Group penalties by company name
             final Map<String, List<PenaltyEntity>> groupedByCompany = {};
@@ -300,14 +334,17 @@ class _CompanyPenaltiesSettingsPageState
                                   label: Text(
                                     'جميع الشركات (${penalties.length})',
                                     style: TextStyle(
-                                      fontWeight:
-                                          _selectedCompanyFilter == 'all'
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
+                                      color: _selectedCompanyFilter == 'all'
+                                          ? colorScheme.onPrimary
+                                          : colorScheme.onSurface,
+                                      fontWeight: _selectedCompanyFilter == 'all'
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
                                     ),
                                   ),
                                   selected: _selectedCompanyFilter == 'all',
                                   selectedColor: colorScheme.primary,
+                                  checkmarkColor: colorScheme.onPrimary,
                                   onSelected: (val) {
                                     if (val) {
                                       setState(
@@ -323,9 +360,20 @@ class _CompanyPenaltiesSettingsPageState
                                   return Padding(
                                     padding: const EdgeInsets.only(right: 8.0),
                                     child: ChoiceChip(
-                                      label: Text('$compName ($count)'),
+                                      label: Text(
+                                        '$compName ($count)',
+                                        style: TextStyle(
+                                          color: isSelected
+                                              ? colorScheme.onPrimary
+                                              : colorScheme.onSurface,
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
                                       selected: isSelected,
                                       selectedColor: colorScheme.primary,
+                                      checkmarkColor: colorScheme.onPrimary,
                                       onSelected: (val) {
                                         if (val) {
                                           setState(() =>
@@ -380,6 +428,7 @@ class _CompanyPenaltiesSettingsPageState
                           return _CompanyPenaltiesGroupCard(
                             companyName: entry.key,
                             penalties: entry.value,
+                            currentDelegate: widget.delegate,
                           );
                         },
                         childCount: entriesToDisplay.length,
@@ -399,8 +448,12 @@ class _CompanyPenaltiesSettingsPageState
 
 class _PenaltyCard extends StatefulWidget {
   final PenaltyEntity penalty;
+  final Delegate? currentDelegate;
 
-  const _PenaltyCard({required this.penalty});
+  const _PenaltyCard({
+    required this.penalty,
+    this.currentDelegate,
+  });
 
   @override
   State<_PenaltyCard> createState() => _PenaltyCardState();
@@ -409,19 +462,80 @@ class _PenaltyCard extends StatefulWidget {
 class _PenaltyCardState extends State<_PenaltyCard> {
   bool _isExpanded = false;
 
+  @override
+  void initState() {
+    super.initState();
+    final requiresAction = (widget.currentDelegate?.role == UserRole.branchesMarketingManager &&
+            widget.penalty.status == PenaltyStatus.pendingBranchesMarketing) ||
+        ((widget.currentDelegate?.role == UserRole.organizationAdmin ||
+                widget.currentDelegate?.role == UserRole.superAdmin) &&
+            widget.penalty.status == PenaltyStatus.pendingGeneralManager);
+    _isExpanded = requiresAction;
+  }
+
   Color _getStatusColor(PenaltyStatus status) {
     switch (status) {
+      case PenaltyStatus.pendingBranchesMarketing:
+        return Colors.orange.shade800;
+      case PenaltyStatus.rejectedByBranchesMarketing:
+        return Colors.red.shade800;
+      case PenaltyStatus.pendingGeneralManager:
+        return Colors.amber.shade900;
+      case PenaltyStatus.rejectedByGeneralManager:
+        return Colors.red.shade900;
       case PenaltyStatus.issued:
-        return Colors.orange.shade700;
+        return Colors.green.shade700;
       case PenaltyStatus.acknowledged:
         return Colors.blue.shade700;
       case PenaltyStatus.deducted:
-        return Colors.red.shade700;
+        return Colors.teal.shade700;
       case PenaltyStatus.disputed:
         return Colors.purple.shade700;
       case PenaltyStatus.cancelled:
         return Colors.grey.shade600;
     }
+  }
+
+  void _showRejectionDialog(BuildContext context, PenaltyStatus nextStatus) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('سبب الرفض'),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'يرجى كتابة سبب رفض المخالفة...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<PenaltyBloc>().add(
+                    UpdatePenaltyStatusEvent(
+                      penaltyId: widget.penalty.penaltyId,
+                      status: nextStatus,
+                      rejectionReason: controller.text.trim(),
+                      reviewerName: widget.currentDelegate?.fullName,
+                    ),
+                  );
+            },
+            child: const Text('تأكيد الرفض'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -470,6 +584,25 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                       ),
                     ),
                   ),
+                  if (widget.penalty.isRepeated) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: colorScheme.error.withValues(alpha: 0.5)),
+                      ),
+                      child: Text(
+                        'مخالفة مكررة',
+                        style: TextStyle(
+                          color: colorScheme.onErrorContainer,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   Text(
                     widget.penalty.fineAmount.toStringAsFixed(2),
@@ -492,29 +625,45 @@ class _PenaltyCardState extends State<_PenaltyCard> {
               ),
               const SizedBox(height: 6),
 
-              // Title and Category row
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.penalty.title,
-                      maxLines: _isExpanded ? null : 1,
-                      overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
+              // Title on its own dedicated full line (M3 layout)
+              Text(
+                widget.penalty.title,
+                maxLines: _isExpanded ? null : 2,
+                overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+
+              // Category tag line
+              Text(
+                widget.penalty.category.displayName,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (widget.penalty.targetDelegateName != null &&
+                  widget.penalty.targetDelegateName!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.person_pin_rounded,
+                        size: 14, color: colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'المندوب المستهدف: ${widget.penalty.targetDelegateName}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.penalty.category.displayName,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
 
               // Expanded Section (Shows on Tap)
               if (_isExpanded) ...[
@@ -538,6 +687,51 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                   ),
                   const SizedBox(height: 10),
                 ],
+
+                // Rejection Reason Notice
+                if (widget.penalty.rejectionReason != null &&
+                    widget.penalty.rejectionReason!.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Text(
+                      'سبب الرفض: ${widget.penalty.rejectionReason}',
+                      style: TextStyle(
+                        color: Colors.red.shade800,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Audit Trail Info
+                if (widget.penalty.branchesMarketingApprovedBy != null) ...[
+                  Text(
+                    'موافقة مدير تسويق الفروع: ${widget.penalty.branchesMarketingApprovedBy}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.green.shade800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                if (widget.penalty.generalManagerApprovedBy != null) ...[
+                  Text(
+                    'اعتماد المدير العام: ${widget.penalty.generalManagerApprovedBy}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.green.shade900,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+
                 Row(
                   children: [
                     Icon(Icons.calendar_today_rounded,
@@ -569,6 +763,155 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                       ),
                   ],
                 ),
+
+                // Approval Action Buttons per Role
+                if (widget.currentDelegate != null) ...[
+                  // Phase 1: Branch Marketing Manager Approval
+                  if (widget.currentDelegate!.role == UserRole.branchesMarketingManager &&
+                      widget.penalty.status == PenaltyStatus.pendingBranchesMarketing) ...[
+                    Container(
+                      margin: const EdgeInsets.only(top: 14),
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: colorScheme.onPrimary,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: () {
+                                context.read<PenaltyBloc>().add(
+                                      UpdatePenaltyStatusEvent(
+                                        penaltyId: widget.penalty.penaltyId,
+                                        status: PenaltyStatus.pendingGeneralManager,
+                                        reviewerName: widget.currentDelegate!.fullName,
+                                      ),
+                                    );
+                              },
+                              icon: const Icon(Icons.check_circle_rounded, size: 18),
+                              label: const Text(
+                                'موافقة وتمرير',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: colorScheme.errorContainer,
+                                foregroundColor: colorScheme.onErrorContainer,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: () => _showRejectionDialog(
+                                context,
+                                PenaltyStatus.rejectedByBranchesMarketing,
+                              ),
+                              icon: const Icon(Icons.cancel_rounded, size: 18),
+                              label: const Text(
+                                'رفض المخالفة',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Phase 2: General Manager / Super Admin Approval
+                  if ((widget.currentDelegate!.role == UserRole.organizationAdmin ||
+                          widget.currentDelegate!.role == UserRole.superAdmin) &&
+                      (widget.penalty.status == PenaltyStatus.pendingGeneralManager ||
+                          widget.penalty.status == PenaltyStatus.pendingBranchesMarketing)) ...[
+                    Container(
+                      margin: const EdgeInsets.only(top: 14),
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: colorScheme.onPrimary,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: () {
+                                context.read<PenaltyBloc>().add(
+                                      UpdatePenaltyStatusEvent(
+                                        penaltyId: widget.penalty.penaltyId,
+                                        status: PenaltyStatus.issued,
+                                        reviewerName: widget.currentDelegate!.fullName,
+                                      ),
+                                    );
+                              },
+                              icon: const Icon(Icons.verified_rounded, size: 18),
+                              label: const Text(
+                                'اعتماد وإصدار',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: colorScheme.errorContainer,
+                                foregroundColor: colorScheme.onErrorContainer,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: () => _showRejectionDialog(
+                                context,
+                                PenaltyStatus.rejectedByGeneralManager,
+                              ),
+                              icon: const Icon(Icons.cancel_rounded, size: 18),
+                              label: const Text(
+                                'رفض المخالفة',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ],
             ],
           ),
@@ -626,10 +969,12 @@ class _PenaltyCardState extends State<_PenaltyCard> {
 class _CompanyPenaltiesGroupCard extends StatefulWidget {
   final String companyName;
   final List<PenaltyEntity> penalties;
+  final Delegate? currentDelegate;
 
   const _CompanyPenaltiesGroupCard({
     required this.companyName,
     required this.penalties,
+    this.currentDelegate,
   });
 
   @override
@@ -639,6 +984,25 @@ class _CompanyPenaltiesGroupCard extends StatefulWidget {
 
 class _CompanyPenaltiesGroupCardState
     extends State<_CompanyPenaltiesGroupCard> {
+  bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final hasPendingAction = widget.penalties.any((p) {
+      if (widget.currentDelegate?.role == UserRole.branchesMarketingManager) {
+        return p.status == PenaltyStatus.pendingBranchesMarketing;
+      }
+      if (widget.currentDelegate?.role == UserRole.organizationAdmin ||
+          widget.currentDelegate?.role == UserRole.superAdmin) {
+        return p.status == PenaltyStatus.pendingGeneralManager ||
+            p.status == PenaltyStatus.pendingBranchesMarketing;
+      }
+      return false;
+    });
+    _isExpanded = hasPendingAction;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -668,7 +1032,7 @@ class _CompanyPenaltiesGroupCardState
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          initiallyExpanded: false,
+          initiallyExpanded: _isExpanded,
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -749,7 +1113,10 @@ class _CompanyPenaltiesGroupCardState
                     horizontal: 16.0,
                     vertical: 4.0,
                   ),
-                  child: _PenaltyCard(penalty: p),
+                  child: _PenaltyCard(
+                    penalty: p,
+                    currentDelegate: widget.currentDelegate,
+                  ),
                 ),
               )
               .toList(),

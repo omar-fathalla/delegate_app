@@ -9,7 +9,12 @@ abstract class PenaltyRemoteDataSource {
   Future<void> createPenalty(PenaltyModel penalty);
   Future<List<PenaltyModel>> getCompanyPenalties(String companyId);
   Future<List<PenaltyModel>> getAllPenalties();
-  Future<void> updatePenaltyStatus(String penaltyId, PenaltyStatus status);
+  Future<void> updatePenaltyStatus({
+    required String penaltyId,
+    required PenaltyStatus status,
+    String? rejectionReason,
+    String? reviewerName,
+  });
   Future<EvidenceFile> uploadEvidenceFile({
     required File file,
     required String penaltyId,
@@ -47,6 +52,9 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
         currency: penalty.currency,
         status: penalty.status,
         evidenceFiles: penalty.evidenceFiles,
+        targetDelegateId: penalty.targetDelegateId,
+        targetDelegateName: penalty.targetDelegateName,
+        isRepeated: penalty.isRepeated,
         createdAt: penalty.createdAt,
         updatedAt: penalty.updatedAt,
       );
@@ -95,15 +103,31 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
   }
 
   @override
-  Future<void> updatePenaltyStatus(
-    String penaltyId,
-    PenaltyStatus status,
-  ) async {
+  Future<void> updatePenaltyStatus({
+    required String penaltyId,
+    required PenaltyStatus status,
+    String? rejectionReason,
+    String? reviewerName,
+  }) async {
     try {
-      await _penaltiesRef.doc(penaltyId).update({
+      final updateData = <String, dynamic>{
         'status': status.toFirestoreString(),
         'updatedAt': Timestamp.fromDate(DateTime.now()),
-      });
+      };
+
+      if (rejectionReason != null && rejectionReason.isNotEmpty) {
+        updateData['rejectionReason'] = rejectionReason;
+      }
+
+      if (status == PenaltyStatus.pendingGeneralManager && reviewerName != null) {
+        updateData['branchesMarketingApprovedBy'] = reviewerName;
+        updateData['branchesMarketingApprovedAt'] = Timestamp.fromDate(DateTime.now());
+      } else if (status == PenaltyStatus.issued && reviewerName != null) {
+        updateData['generalManagerApprovedBy'] = reviewerName;
+        updateData['generalManagerApprovedAt'] = Timestamp.fromDate(DateTime.now());
+      }
+
+      await _penaltiesRef.doc(penaltyId).update(updateData);
     } on FirebaseException catch (e) {
       throw ServerException(e.message ?? 'فشل في تحديث حالة المخالفة.');
     }

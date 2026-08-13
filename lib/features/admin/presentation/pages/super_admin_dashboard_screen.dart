@@ -74,38 +74,57 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
         companiesCount = companiesQuery.count ?? 0;
       }
 
-      // 3. Fetch delegates and electronic receipts count using collectionGroup
-      final delegatesSnapshot = await firestore.collectionGroup('delegates').get();
-      final filteredDelegates = delegatesSnapshot.docs.where((doc) {
-        final pathParts = doc.reference.path.split('/');
-        final docOrgUid = pathParts.length > 1 ? pathParts[1] : '';
-        if (orgUID.isNotEmpty && docOrgUid != orgUID) {
-          return false;
-        }
-        return true;
-      }).toList();
+      // 3. Fetch delegates count using fast count()
+      int delegatesCount = 0;
+      Query delegatesBaseQuery = firestore.collectionGroup('delegates');
+      
+      if (orgUID.isNotEmpty) {
+        delegatesBaseQuery = delegatesBaseQuery.where('organizationUID', isEqualTo: orgUID);
+      }
+      
+      final delegatesCountQuery = await delegatesBaseQuery.count().get();
+      delegatesCount = delegatesCountQuery.count ?? 0;
 
-      final delegatesCount = filteredDelegates.length;
+      // 4. Calculate receiptsCount using batched queries to prevent OOM / Codec crashes
       int receiptsCount = 0;
+      Query receiptsQuery = delegatesBaseQuery.orderBy(FieldPath.documentId).limit(500);
+      bool hasMore = true;
+      DocumentSnapshot? lastDoc;
 
-      for (var doc in filteredDelegates) {
-        final data = doc.data();
-        final documentsList = data['documents'] as List? ?? [];
+      while (hasMore) {
+        if (lastDoc != null) {
+          receiptsQuery = delegatesBaseQuery.orderBy(FieldPath.documentId).startAfterDocument(lastDoc).limit(500);
+        }
 
-        for (var docItem in documentsList) {
-          if (docItem is Map<String, dynamic>) {
-            final key = docItem['documentKey']?.toString().toLowerCase() ?? '';
-            final url = docItem['documentURL']?.toString() ?? '';
+        final snapshot = await receiptsQuery.get();
+        if (snapshot.docs.isEmpty) {
+          hasMore = false;
+          break;
+        }
 
-            if ((key == 'electronicpaymentreceipt' ||
-                 key == 'electronic_payment_receipt' ||
-                 key == 'electronic_receipt' ||
-                 key == 'electronicreceipt') &&
-                url.isNotEmpty) {
-              receiptsCount++;
+        for (var doc in snapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>? ?? {};
+          final documentsList = data['documents'] as List? ?? [];
+
+          for (var docItem in documentsList) {
+            if (docItem is Map<String, dynamic>) {
+              final key = docItem['documentKey']?.toString().toLowerCase() ?? '';
+              final url = docItem['documentURL']?.toString() ?? '';
+
+              if ((key == 'electronicpaymentreceipt' ||
+                   key == 'electronic_payment_receipt' ||
+                   key == 'electronic_receipt' ||
+                   key == 'electronicreceipt' ||
+                   key == 'paymentreceipt') &&
+                  url.isNotEmpty) {
+                receiptsCount++;
+                break; // Found one for this delegate, no need to check other docs
+              }
             }
           }
         }
+        
+        lastDoc = snapshot.docs.last;
       }
 
       if (mounted) {

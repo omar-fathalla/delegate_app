@@ -103,7 +103,9 @@ class _LoginScreenState extends State<LoginScreen>
               final delegate = state.delegate;
               if (delegate.role == UserRole.superAdmin ||
                   delegate.role == UserRole.admin ||
-                  delegate.role == UserRole.organizationAdmin) {
+                  delegate.role == UserRole.organizationAdmin ||
+                  delegate.role == UserRole.technicalSupport ||
+                  delegate.role == UserRole.branchesMarketingManager) {
                 context.go('/admin/home', extra: delegate);
               } else if (delegate.role == UserRole.marketing ||
                   delegate.role == UserRole.marketingPromotion) {

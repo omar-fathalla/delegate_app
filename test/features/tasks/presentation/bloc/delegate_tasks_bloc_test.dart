@@ -62,11 +62,11 @@ void main() {
   blocTest<DelegateTasksBloc, DelegateTasksState>(
     'should emit [DelegateTasksLoading, DelegateTasksLoaded] when LoadDelegateTasksRequested is added and successful',
     build: () {
-      when(() => mockGetDelegateTasks(any(), any(), any(), status: any(named: 'status'), limit: any(named: 'limit'), lastDoc: any(named: 'lastDoc')))
+      when(() => mockGetDelegateTasks(any(), any(), any(), any(), status: any(named: 'status'), limit: any(named: 'limit'), lastDoc: any(named: 'lastDoc')))
           .thenAnswer((_) async => Right(tTasks));
       return bloc;
     },
-    act: (bloc) => bloc.add(const LoadDelegateTasksRequested(organizationId: 'org1', delegateId: 'del1', companyId: 'comp1')),
+    act: (bloc) => bloc.add(const LoadDelegateTasksRequested(organizationId: 'org1', delegateId: 'del1', companyId: 'comp1', delegateRoleName: 'marketing')),
     expect: () => [
       const DelegateTasksLoading(statusFilter: null),
       DelegateTasksLoaded(tasks: tTasks, statusFilter: null, lastDoc: tTasks.last.uid, hasReachedMax: true),

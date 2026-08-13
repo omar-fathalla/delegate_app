@@ -12,49 +12,55 @@ class LoadDelegateTasksRequested extends DelegateTasksEvent {
   final String organizationId;
   final String delegateId;
   final String companyId;
+  final String delegateRoleName;
   final TaskStatus? status;
 
   const LoadDelegateTasksRequested({
     required this.organizationId,
     required this.delegateId,
     required this.companyId,
+    required this.delegateRoleName,
     this.status,
   });
 
   @override
-  List<Object?> get props => [organizationId, delegateId, companyId, status];
+  List<Object?> get props => [organizationId, delegateId, companyId, delegateRoleName, status];
 }
 
 class LoadMoreDelegateTasksRequested extends DelegateTasksEvent {
   final String organizationId;
   final String delegateId;
   final String companyId;
+  final String delegateRoleName;
 
   const LoadMoreDelegateTasksRequested({
     required this.organizationId,
     required this.delegateId,
     required this.companyId,
+    required this.delegateRoleName,
   });
 
   @override
-  List<Object?> get props => [organizationId, delegateId, companyId];
+  List<Object?> get props => [organizationId, delegateId, companyId, delegateRoleName];
 }
 
 class StatusFilterChangedDelegate extends DelegateTasksEvent {
   final String organizationId;
   final String delegateId;
   final String companyId;
+  final String delegateRoleName;
   final TaskStatus? status;
 
   const StatusFilterChangedDelegate({
     required this.organizationId,
     required this.delegateId,
     required this.companyId,
+    required this.delegateRoleName,
     this.status,
   });
 
   @override
-  List<Object?> get props => [organizationId, delegateId, companyId, status];
+  List<Object?> get props => [organizationId, delegateId, companyId, delegateRoleName, status];
 }
 
 class UpdateTaskStatusRequested extends DelegateTasksEvent {

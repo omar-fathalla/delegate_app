@@ -11,6 +11,8 @@ import 'package:delegate_app/features/photo_permission/domain/usecases/get_captu
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_delegate_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_company_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/delete_captured_photo.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/delete_photo_permission.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/update_photo_permission_branches.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/features/photo_permission/domain/entities/photo_permission.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +28,8 @@ class MockGetCapturedPhotos extends Mock implements GetCapturedPhotos {}
 class MockGetDelegateCapturedPhotos extends Mock implements GetDelegateCapturedPhotos {}
 class MockGetCompanyCapturedPhotos extends Mock implements GetCompanyCapturedPhotos {}
 class MockDeleteCapturedPhoto extends Mock implements DeleteCapturedPhoto {}
+class MockDeletePhotoPermission extends Mock implements DeletePhotoPermission {}
+class MockUpdatePhotoPermissionBranches extends Mock implements UpdatePhotoPermissionBranches {}
 
 class FakeRequestPhotoPermissionParams extends Fake implements RequestPhotoPermissionParams {}
 class FakeApprovePhotoPermissionParams extends Fake implements ApprovePhotoPermissionParams {}
@@ -37,6 +41,8 @@ class FakeGetCapturedPhotosParams extends Fake implements GetCapturedPhotosParam
 class FakeGetDelegateCapturedPhotosParams extends Fake implements GetDelegateCapturedPhotosParams {}
 class FakeGetCompanyCapturedPhotosParams extends Fake implements GetCompanyCapturedPhotosParams {}
 class FakeDeleteCapturedPhotoParams extends Fake implements DeleteCapturedPhotoParams {}
+class FakeDeletePhotoPermissionParams extends Fake implements DeletePhotoPermissionParams {}
+class FakeUpdatePhotoPermissionBranchesParams extends Fake implements UpdatePhotoPermissionBranchesParams {}
 
 void main() {
   late PhotoPermissionBloc bloc;
@@ -50,6 +56,8 @@ void main() {
   late MockGetDelegateCapturedPhotos mockGetDelegateCapturedPhotos;
   late MockGetCompanyCapturedPhotos mockGetCompanyCapturedPhotos;
   late MockDeleteCapturedPhoto mockDeleteCapturedPhoto;
+  late MockDeletePhotoPermission mockDeletePhotoPermission;
+  late MockUpdatePhotoPermissionBranches mockUpdatePhotoPermissionBranches;
 
   setUpAll(() {
     registerFallbackValue(FakeRequestPhotoPermissionParams());
@@ -62,6 +70,8 @@ void main() {
     registerFallbackValue(FakeGetDelegateCapturedPhotosParams());
     registerFallbackValue(FakeGetCompanyCapturedPhotosParams());
     registerFallbackValue(FakeDeleteCapturedPhotoParams());
+    registerFallbackValue(FakeDeletePhotoPermissionParams());
+    registerFallbackValue(FakeUpdatePhotoPermissionBranchesParams());
   });
 
   setUp(() {
@@ -75,6 +85,8 @@ void main() {
     mockGetDelegateCapturedPhotos = MockGetDelegateCapturedPhotos();
     mockGetCompanyCapturedPhotos = MockGetCompanyCapturedPhotos();
     mockDeleteCapturedPhoto = MockDeleteCapturedPhoto();
+    mockDeletePhotoPermission = MockDeletePhotoPermission();
+    mockUpdatePhotoPermissionBranches = MockUpdatePhotoPermissionBranches();
 
     bloc = PhotoPermissionBloc(
       requestPhotoPermission: mockRequestPhotoPermission,
@@ -87,6 +99,8 @@ void main() {
       getDelegateCapturedPhotos: mockGetDelegateCapturedPhotos,
       getCompanyCapturedPhotos: mockGetCompanyCapturedPhotos,
       deleteCapturedPhoto: mockDeleteCapturedPhoto,
+      deletePhotoPermission: mockDeletePhotoPermission,
+      updatePhotoPermissionBranches: mockUpdatePhotoPermissionBranches,
     );
   });
 

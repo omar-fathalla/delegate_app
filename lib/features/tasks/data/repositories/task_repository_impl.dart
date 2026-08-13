@@ -61,16 +61,20 @@ class TaskRepositoryImpl implements TaskRepository {
     TaskStatus? status,
     int? limit,
     dynamic lastDoc,
+    String? adminId,
+    String? adminRoleName,
   }) async {
     try {
-      final result = await remoteDataSource.getAdminTasks(
+      final tasks = await remoteDataSource.getAdminTasks(
         organizationId,
         companyId,
         status: status,
         limit: limit,
         lastDoc: lastDoc,
+        adminId: adminId,
+        adminRoleName: adminRoleName,
       );
-      return Right(result);
+      return Right(tasks);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -82,21 +86,23 @@ class TaskRepositoryImpl implements TaskRepository {
   Future<Either<Failure, List<TaskEntity>>> getDelegateTasks(
     String organizationId,
     String delegateId,
-    String companyId, {
+    String companyId,
+    String delegateRoleName, {
     TaskStatus? status,
     int? limit,
     dynamic lastDoc,
   }) async {
     try {
-      final result = await remoteDataSource.getDelegateTasks(
+      final tasks = await remoteDataSource.getDelegateTasks(
         organizationId,
         delegateId,
         companyId,
+        delegateRoleName,
         status: status,
         limit: limit,
         lastDoc: lastDoc,
       );
-      return Right(result);
+      return Right(tasks);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

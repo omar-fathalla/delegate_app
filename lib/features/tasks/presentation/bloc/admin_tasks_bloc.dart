@@ -35,6 +35,8 @@ class AdminTasksBloc extends Bloc<AdminTasksEvent, AdminTasksState> {
       event.companyId,
       status: event.status,
       limit: _pageSize,
+      adminId: event.adminId,
+      adminRoleName: event.adminRoleName,
     );
     result.fold(
       (failure) => emit(
@@ -70,6 +72,8 @@ class AdminTasksBloc extends Bloc<AdminTasksEvent, AdminTasksState> {
       status: currentState.statusFilter,
       limit: _pageSize,
       lastDoc: currentState.lastDoc,
+      adminId: event.adminId,
+      adminRoleName: event.adminRoleName,
     );
 
     result.fold(
@@ -105,6 +109,8 @@ class AdminTasksBloc extends Bloc<AdminTasksEvent, AdminTasksState> {
         organizationId: event.organizationId,
         companyId: event.companyId,
         status: event.status,
+        adminId: event.adminId,
+        adminRoleName: event.adminRoleName,
       ),
     );
   }

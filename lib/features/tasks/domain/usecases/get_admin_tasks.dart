@@ -14,6 +14,8 @@ class GetAdminTasks {
     TaskStatus? status,
     int? limit,
     dynamic lastDoc,
+    String? adminId,
+    String? adminRoleName,
   }) {
     return repository.getAdminTasks(
       organizationId,
@@ -21,6 +23,8 @@ class GetAdminTasks {
       status: status,
       limit: limit,
       lastDoc: lastDoc,
+      adminId: adminId,
+      adminRoleName: adminRoleName,
     );
   }
 }

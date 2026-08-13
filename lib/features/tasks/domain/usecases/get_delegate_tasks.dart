@@ -11,7 +11,8 @@ class GetDelegateTasks {
   Future<Either<Failure, List<TaskEntity>>> call(
     String organizationId,
     String delegateId,
-    String companyId, {
+    String companyId,
+    String delegateRoleName, {
     TaskStatus? status,
     int? limit,
     dynamic lastDoc,
@@ -20,6 +21,7 @@ class GetDelegateTasks {
       organizationId,
       delegateId,
       companyId,
+      delegateRoleName,
       status: status,
       limit: limit,
       lastDoc: lastDoc,

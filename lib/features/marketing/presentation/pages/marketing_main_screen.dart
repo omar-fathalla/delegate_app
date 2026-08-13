@@ -14,6 +14,9 @@ import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_scree
 import 'package:delegate_app/features/tasks/presentation/pages/delegate_tasks_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_bloc.dart';
 import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
+import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
+import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 class MarketingMainScreen extends StatefulWidget {
@@ -29,7 +32,55 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
   int _currentIndex = 0;
 
   void _onMenuSelected(String value) {
+    final delegate = widget.delegate;
+    final isPromotionOnly = delegate.role == UserRole.marketingPromotion;
+
     switch (value) {
+      case 'search':
+        if (isPromotionOnly) break;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MarketingSearchScreen(
+              organizationUID: delegate.organizationUID,
+            ),
+          ),
+        );
+        break;
+      case 'tasks':
+        if (isPromotionOnly) break;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => isPromotionOnly
+                ? AdminTasksScreen(adminDelegate: delegate)
+                : BlocProvider(
+                    create: (_) => di.sl<DelegateTasksBloc>(),
+                    child: DelegateTasksScreen(delegate: delegate),
+                  ),
+          ),
+        );
+        break;
+      case 'penalties':
+        if (isPromotionOnly) break;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BlocProvider(
+              create: (_) => di.sl<PenaltyBloc>()
+                ..add(LoadCompanyPenaltiesEvent(widget.delegate.companyUID)),
+              child: CompanyPenaltiesSettingsPage(
+                delegate: widget.delegate,
+                showAppBar: true,
+              ),
+            ),
+          ),
+        );
+        break;
+      case 'settings':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SettingsScreen(delegate: widget.delegate),
+          ),
+        );
+        break;
       case 'profile':
         context.push('/user-profile');
         break;
@@ -51,39 +102,31 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
               child: MarketingPermissionsScreen(marketingDelegate: delegate),
             ),
             AdminTasksScreen(adminDelegate: delegate),
-            SettingsScreen(delegate: delegate),
           ]
         : [
             BranchHomeScreen(marketingUser: delegate),
-            MarketingSearchScreen(organizationUID: delegate.organizationUID),
             BlocProvider(
               create: (_) => di.sl<PhotoPermissionBloc>(),
               child: MarketingPermissionsScreen(marketingDelegate: delegate),
             ),
             BlocProvider(
-              create: (_) => di.sl<DelegateTasksBloc>(),
-              child: DelegateTasksScreen(delegate: delegate),
+              create: (_) => di.sl<PenaltyBloc>(),
+              child: CompanyPenaltiesSettingsPage(
+                delegate: delegate,
+                showAppBar: false,
+              ),
             ),
-            SettingsScreen(delegate: delegate),
           ];
 
     final String subtitle;
     if (isPromotionOnly) {
-      subtitle = _currentIndex == 0
-          ? 'أذونات التصوير'
-          : _currentIndex == 1
-              ? l10n.tasks
-              : l10n.settings;
+      subtitle = _currentIndex == 0 ? 'أذونات التصوير' : 'المهام';
     } else {
       subtitle = _currentIndex == 0
           ? 'الفروع'
           : _currentIndex == 1
-          ? l10n.search
-          : _currentIndex == 2
-          ? 'أذونات التصوير'
-          : _currentIndex == 3
-          ? l10n.tasks
-          : l10n.settings;
+              ? 'أذونات التصوير'
+              : 'قسم الغرامات والمخالفات';
     }
 
     return Scaffold(
@@ -112,6 +155,7 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
           ],
         ),
         actions: [
+          // 1. زر الإشعارات
           BlocProvider(
             create: (_) => di.sl<NotificationBloc>()
               ..add(
@@ -141,13 +185,54 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
             ),
           ),
           const SizedBox(width: 4),
+
+          // 2. المنيو العلوي (البحث، المهام، الإعدادات، الملف الشخصي)
           PopupMenuButton<String>(
             icon: const Icon(Icons.menu_rounded),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
             ),
             onSelected: _onMenuSelected,
             itemBuilder: (_) => [
+              if (!isPromotionOnly)
+                PopupMenuItem(
+                  value: 'search',
+                  child: ListTile(
+                    leading: const Icon(Icons.search_rounded),
+                    title: Text(l10n.search),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              if (!isPromotionOnly)
+                PopupMenuItem(
+                  value: 'tasks',
+                  child: ListTile(
+                    leading: const Icon(Icons.task_alt_rounded),
+                    title: Text(l10n.tasks),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              if (!isPromotionOnly)
+                PopupMenuItem(
+                  value: 'penalties',
+                  child: ListTile(
+                    leading: Icon(Icons.gavel_rounded, color: colorScheme.error),
+                    title: const Text('المخالفات والغرامات'),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              PopupMenuItem(
+                value: 'settings',
+                child: ListTile(
+                  leading: const Icon(Icons.settings_outlined),
+                  title: Text(l10n.settings),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
               const PopupMenuItem(
                 value: 'profile',
                 child: ListTile(
@@ -166,48 +251,33 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
         destinations: isPromotionOnly
-            ? [
-                const NavigationDestination(
+            ? const [
+                NavigationDestination(
                   icon: Icon(Icons.photo_library_outlined),
                   selectedIcon: Icon(Icons.photo_library_rounded),
                   label: 'أذونات التصوير',
                 ),
                 NavigationDestination(
-                  icon: const Icon(Icons.task_alt_outlined),
-                  selectedIcon: const Icon(Icons.task_alt_rounded),
-                  label: l10n.tasks,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.settings_outlined),
-                  selectedIcon: const Icon(Icons.settings_rounded),
-                  label: l10n.settings,
+                  icon: Icon(Icons.task_alt_outlined),
+                  selectedIcon: Icon(Icons.task_alt_rounded),
+                  label: 'المهام',
                 ),
               ]
-            : [
-                const NavigationDestination(
+            : const [
+                NavigationDestination(
                   icon: Icon(Icons.store_outlined),
                   selectedIcon: Icon(Icons.store_rounded),
                   label: 'الفروع',
                 ),
                 NavigationDestination(
-                  icon: const Icon(Icons.search_outlined),
-                  selectedIcon: const Icon(Icons.search_rounded),
-                  label: l10n.search,
-                ),
-                const NavigationDestination(
                   icon: Icon(Icons.photo_library_outlined),
                   selectedIcon: Icon(Icons.photo_library_rounded),
                   label: 'أذونات التصوير',
                 ),
                 NavigationDestination(
-                  icon: const Icon(Icons.task_alt_outlined),
-                  selectedIcon: const Icon(Icons.task_alt_rounded),
-                  label: l10n.tasks,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.settings_outlined),
-                  selectedIcon: const Icon(Icons.settings_rounded),
-                  label: l10n.settings,
+                  icon: Icon(Icons.gavel_outlined),
+                  selectedIcon: Icon(Icons.gavel_rounded),
+                  label: 'الغرامات',
                 ),
               ],
       ),
