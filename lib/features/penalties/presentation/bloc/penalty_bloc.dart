@@ -23,6 +23,7 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
     on<LoadAllPenaltiesEvent>(_onLoadAllPenalties);
     on<CreatePenaltyRequestedEvent>(_onCreatePenaltyRequested);
     on<UpdatePenaltyStatusEvent>(_onUpdatePenaltyStatus);
+    on<DeletePenaltyEvent>(_onDeletePenalty);
   }
 
   Future<void> _onLoadCompanyPenalties(
@@ -147,6 +148,18 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
     result.fold(
       (failure) => emit(PenaltyErrorState(failure.message)),
       (_) => emit(const PenaltyActionSuccessState('تم تحديث حالة المخالفة بنجاح.')),
+    );
+  }
+
+  Future<void> _onDeletePenalty(
+    DeletePenaltyEvent event,
+    Emitter<PenaltyState> emit,
+  ) async {
+    final result = await repository.deletePenalty(event.penaltyId);
+
+    result.fold(
+      (failure) => emit(PenaltyErrorState(failure.message)),
+      (_) => emit(const PenaltyActionSuccessState('تم حذف المخالفة بنجاح.')),
     );
   }
 }

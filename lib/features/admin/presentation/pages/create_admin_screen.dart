@@ -3,27 +3,40 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import '../bloc/create_admin_bloc.dart';
 
 class CreateAdminScreen extends StatelessWidget {
   final String organizationUID;
+  final UserRole? currentUserRole;
 
-  const CreateAdminScreen({super.key, required this.organizationUID});
+  const CreateAdminScreen({
+    super.key,
+    required this.organizationUID,
+    this.currentUserRole,
+  });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) =>
           di.sl<CreateAdminBloc>()..add(LoadOrganizationsRequested()),
-      child: _CreateAdminView(organizationUID: organizationUID),
+      child: _CreateAdminView(
+        organizationUID: organizationUID,
+        currentUserRole: currentUserRole,
+      ),
     );
   }
 }
 
 class _CreateAdminView extends StatefulWidget {
   final String organizationUID;
+  final UserRole? currentUserRole;
 
-  const _CreateAdminView({required this.organizationUID});
+  const _CreateAdminView({
+    required this.organizationUID,
+    this.currentUserRole,
+  });
 
   @override
   State<_CreateAdminView> createState() => _CreateAdminViewState();
@@ -82,8 +95,20 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
         if (state is CreateAdminOrgsLoaded) {
           setState(() {
             _organizations = state.organizations;
-            if (widget.organizationUID.isNotEmpty) {
-              _selectedOrgUID = widget.organizationUID;
+            if (_organizations.isNotEmpty) {
+              if (widget.organizationUID.isNotEmpty &&
+                  _organizations.any((org) => org['uid'] == widget.organizationUID)) {
+                _selectedOrgUID = widget.organizationUID;
+              } else {
+                final fathallaOrg = _organizations.firstWhere(
+                  (org) {
+                    final name = (org['name'] as String? ?? '').toLowerCase();
+                    return name.contains('fathalla') || name.contains('فتح الله');
+                  },
+                  orElse: () => _organizations.first,
+                );
+                _selectedOrgUID = fathallaOrg['uid'] as String;
+              }
             }
           });
         }
@@ -92,7 +117,18 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
           _emailController.clear();
           _nameController.clear();
           setState(() {
-            _selectedOrgUID = null;
+            if (_organizations.isNotEmpty) {
+              final fathallaOrg = _organizations.firstWhere(
+                (org) {
+                  final name = (org['name'] as String? ?? '').toLowerCase();
+                  return name.contains('fathalla') || name.contains('فتح الله');
+                },
+                orElse: () => _organizations.first,
+              );
+              _selectedOrgUID = fathallaOrg['uid'] as String;
+            } else {
+              _selectedOrgUID = null;
+            }
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -381,20 +417,22 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                               );
                             },
                           ),
-                          Divider(
-                            height: 1,
-                            color: colorScheme.outline.withValues(alpha: 0.3),
-                          ),
-                          _RoleTile(
-                            title: 'مدير النظام الفائق',
-                            subtitle: 'Super Admin - كامل الصلاحيات',
-                            icon: Icons.verified_user_rounded,
-                            value: 'super-admin',
-                            isSelected: _selectedRole == 'super-admin',
-                            onTap: () {
-                              setState(() => _selectedRole = 'super-admin');
-                            },
-                          ),
+                          if (widget.currentUserRole != UserRole.technicalSupport) ...[
+                            Divider(
+                              height: 1,
+                              color: colorScheme.outline.withValues(alpha: 0.3),
+                            ),
+                            _RoleTile(
+                              title: 'مدير النظام الفائق',
+                              subtitle: 'Super Admin - كامل الصلاحيات',
+                              icon: Icons.verified_user_rounded,
+                              value: 'super-admin',
+                              isSelected: _selectedRole == 'super-admin',
+                              onTap: () {
+                                setState(() => _selectedRole = 'super-admin');
+                              },
+                            ),
+                          ],
                         ],
                       ),
                     ),

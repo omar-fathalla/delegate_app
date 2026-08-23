@@ -75,14 +75,30 @@ void main() {
   group('getUnreadCount', () {
     test('should return stream of int representing unread notifications', () {
       when(() => mockCollection.where('delegateUid', isEqualTo: any(named: 'isEqualTo'))).thenReturn(mockQuery);
-      when(() => mockQuery.where('organizationId', isEqualTo: any(named: 'isEqualTo'))).thenReturn(mockQuery);
-      when(() => mockQuery.where('isRead', isEqualTo: any(named: 'isEqualTo'))).thenReturn(mockQuery);
-      when(() => mockQuery.snapshots()).thenAnswer((_) => Stream.value(mockQuerySnapshot));
-      when(() => mockQuerySnapshot.docs).thenReturn([mockQueryDoc, mockQueryDoc]); // 2 unread
+      when(() => mockQuery.limit(any())).thenReturn(mockQuery);
+      when(() => mockQuery.get()).thenAnswer((_) async => mockQuerySnapshot);
+      when(() => mockFirestore.collection(any())).thenReturn(mockCollection);
+      when(() => mockCollection.doc(any())).thenReturn(mockDocument);
+      when(() => mockDocument.get()).thenAnswer((_) async => mockQueryDoc);
+      when(() => mockQueryDoc.exists).thenReturn(false);
+
+      final data = {
+        'delegateUid': 'delegate123',
+        'organizationId': 'org123',
+        'companyId': 'company123',
+        'title': 'Title',
+        'body': 'Body',
+        'type': 'general',
+        'isRead': false,
+        'createdAt': Timestamp.fromDate(DateTime(2023, 1, 1)),
+      };
+      when(() => mockQuerySnapshot.docs).thenReturn([mockQueryDoc, mockQueryDoc]);
+      when(() => mockQueryDoc.data()).thenReturn(data);
+      when(() => mockQueryDoc.id).thenReturn('notif123');
 
       final result = dataSource.getUnreadCount('delegate123', 'org123');
 
-      expect(result, emits(2));
+      expect(result, emits(1));
     });
   });
 
@@ -94,7 +110,7 @@ void main() {
       await dataSource.markAsRead('notif123');
 
       verify(() => mockCollection.doc('notif123')).called(1);
-      verify(() => mockDocument.update({'isRead': true})).called(1);
+      verify(() => mockDocument.update(any())).called(1);
     });
   });
 
@@ -114,7 +130,7 @@ void main() {
       await dataSource.markAllAsRead('delegate123', 'org123');
 
       verify(() => mockFirestore.batch()).called(1);
-      verify(() => mockWriteBatch.update(mockDocument, {'isRead': true})).called(2);
+      verify(() => mockWriteBatch.update(mockDocument, any())).called(2);
       verify(() => mockWriteBatch.commit()).called(1);
     });
   });

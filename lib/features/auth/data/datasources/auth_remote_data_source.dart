@@ -138,7 +138,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               userRole == 'organization-admin' ||
               userRole == 'Supervisor' ||
               userRole == 'marketing' ||
-              userRole == 'marketing_promotion') {
+              userRole == 'marketing_promotion' ||
+              userRole == 'technical_support' ||
+              userRole == 'technical-support' ||
+              userRole == 'tech_support' ||
+              userRole == 'super_admin' ||
+              userRole == 'super-admin') {
             // Get admin email from Firestore
             final adminEmail = userData['email'] as String? ?? '';
 
@@ -149,11 +154,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                     ? UserRole.marketingPromotion
                     : userRole == 'organization-admin'
                         ? UserRole.organizationAdmin
-                        : UserRole.admin;
+                        : (userRole == 'technical_support' ||
+                                userRole == 'technical-support' ||
+                                userRole == 'tech_support')
+                            ? UserRole.technicalSupport
+                            : (userRole == 'super_admin' ||
+                                    userRole == 'super-admin')
+                                ? UserRole.superAdmin
+                                : UserRole.admin;
 
-            // Marketing and Marketing Promotion: use phone-based password check
-            // Admins: use Firebase Auth (email-based)
-            final nationalityMark = (userRole == 'marketing' || userRole == 'marketing_promotion')
+            // Use phone-based password check if user has a stored password or is marketing/technical_support
+            final hasStoredPassword = userData['password'] != null ||
+                userData['temporaryPassword'] != null ||
+                userData['tempPassword'] != null;
+
+            final nationalityMark = (hasStoredPassword ||
+                    userRole == 'marketing' ||
+                    userRole == 'marketing_promotion' ||
+                    userRole == 'technical_support' ||
+                    userRole == 'technical-support' ||
+                    userRole == 'tech_support')
                 ? '__phone_auth__:$normalizedPhone'
                 : '__firebase_auth__:$adminEmail';
 

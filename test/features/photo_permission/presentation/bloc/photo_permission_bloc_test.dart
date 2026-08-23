@@ -11,6 +11,7 @@ import 'package:delegate_app/features/photo_permission/domain/usecases/get_captu
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_delegate_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_company_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/delete_captured_photo.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/delete_photo_permission.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/features/photo_permission/domain/entities/photo_permission.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +27,7 @@ class MockGetCapturedPhotos extends Mock implements GetCapturedPhotos {}
 class MockGetDelegateCapturedPhotos extends Mock implements GetDelegateCapturedPhotos {}
 class MockGetCompanyCapturedPhotos extends Mock implements GetCompanyCapturedPhotos {}
 class MockDeleteCapturedPhoto extends Mock implements DeleteCapturedPhoto {}
+class MockDeletePhotoPermission extends Mock implements DeletePhotoPermission {}
 
 class FakeRequestPhotoPermissionParams extends Fake implements RequestPhotoPermissionParams {}
 class FakeApprovePhotoPermissionParams extends Fake implements ApprovePhotoPermissionParams {}
@@ -37,6 +39,7 @@ class FakeGetCapturedPhotosParams extends Fake implements GetCapturedPhotosParam
 class FakeGetDelegateCapturedPhotosParams extends Fake implements GetDelegateCapturedPhotosParams {}
 class FakeGetCompanyCapturedPhotosParams extends Fake implements GetCompanyCapturedPhotosParams {}
 class FakeDeleteCapturedPhotoParams extends Fake implements DeleteCapturedPhotoParams {}
+class FakeDeletePhotoPermissionParams extends Fake implements DeletePhotoPermissionParams {}
 
 void main() {
   late PhotoPermissionBloc bloc;
@@ -50,6 +53,7 @@ void main() {
   late MockGetDelegateCapturedPhotos mockGetDelegateCapturedPhotos;
   late MockGetCompanyCapturedPhotos mockGetCompanyCapturedPhotos;
   late MockDeleteCapturedPhoto mockDeleteCapturedPhoto;
+  late MockDeletePhotoPermission mockDeletePhotoPermission;
 
   setUpAll(() {
     registerFallbackValue(FakeRequestPhotoPermissionParams());
@@ -62,6 +66,7 @@ void main() {
     registerFallbackValue(FakeGetDelegateCapturedPhotosParams());
     registerFallbackValue(FakeGetCompanyCapturedPhotosParams());
     registerFallbackValue(FakeDeleteCapturedPhotoParams());
+    registerFallbackValue(FakeDeletePhotoPermissionParams());
   });
 
   setUp(() {
@@ -75,6 +80,7 @@ void main() {
     mockGetDelegateCapturedPhotos = MockGetDelegateCapturedPhotos();
     mockGetCompanyCapturedPhotos = MockGetCompanyCapturedPhotos();
     mockDeleteCapturedPhoto = MockDeleteCapturedPhoto();
+    mockDeletePhotoPermission = MockDeletePhotoPermission();
 
     bloc = PhotoPermissionBloc(
       requestPhotoPermission: mockRequestPhotoPermission,
@@ -87,6 +93,7 @@ void main() {
       getDelegateCapturedPhotos: mockGetDelegateCapturedPhotos,
       getCompanyCapturedPhotos: mockGetCompanyCapturedPhotos,
       deleteCapturedPhoto: mockDeleteCapturedPhoto,
+      deletePhotoPermission: mockDeletePhotoPermission,
     );
   });
 
@@ -164,6 +171,46 @@ void main() {
       expect: () => [
         PhotoPermissionLoading(),
         const PhotoPermissionError(message: 'Server Error'),
+      ],
+    );
+
+    blocTest<PhotoPermissionBloc, PhotoPermissionState>(
+      'should emit [PhotoPermissionLoading, PhotoPermissionActionSuccess] when deleting photo permission succeeds',
+      build: () {
+        when(() => mockDeletePhotoPermission(any()))
+            .thenAnswer((_) async => const Right(null));
+        return bloc;
+      },
+      act: (bloc) => bloc.add(
+        const DeletePhotoPermissionRequested(
+          organizationUID: 'org123',
+          companyUID: 'comp123',
+          permissionId: 'perm123',
+        ),
+      ),
+      expect: () => [
+        PhotoPermissionLoading(),
+        const PhotoPermissionActionSuccess(message: 'تم حذف إذن التصوير بنجاح.'),
+      ],
+    );
+
+    blocTest<PhotoPermissionBloc, PhotoPermissionState>(
+      'should emit [PhotoPermissionLoading, PhotoPermissionError] when deleting photo permission fails',
+      build: () {
+        when(() => mockDeletePhotoPermission(any()))
+            .thenAnswer((_) async => const Left(ServerFailure('Failed to delete')));
+        return bloc;
+      },
+      act: (bloc) => bloc.add(
+        const DeletePhotoPermissionRequested(
+          organizationUID: 'org123',
+          companyUID: 'comp123',
+          permissionId: 'perm123',
+        ),
+      ),
+      expect: () => [
+        PhotoPermissionLoading(),
+        const PhotoPermissionError(message: 'Failed to delete'),
       ],
     );
   });

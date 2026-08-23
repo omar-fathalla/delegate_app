@@ -104,6 +104,7 @@ import 'package:delegate_app/features/notifications/domain/usecases/get_notifica
 import 'package:delegate_app/features/notifications/domain/usecases/get_unread_count.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/mark_all_notifications_read.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/mark_notification_read.dart';
+import 'package:delegate_app/features/notifications/domain/usecases/delete_notification_for_user.dart';
 import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -127,6 +128,7 @@ import 'package:delegate_app/features/photo_permission/domain/usecases/upload_ca
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_company_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/delete_captured_photo.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/delete_photo_permission.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_delegate_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/core/services/review_service.dart';
@@ -394,6 +396,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       getUnreadCount: sl(),
       markNotificationRead: sl(),
       markAllNotificationsRead: sl(),
+      deleteNotificationForUser: sl(),
     ),
   );
 
@@ -402,6 +405,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => GetUnreadCount(sl()));
   sl.registerLazySingleton(() => MarkNotificationRead(sl()));
   sl.registerLazySingleton(() => MarkAllNotificationsRead(sl()));
+  sl.registerLazySingleton(() => DeleteNotificationForUser(sl()));
 
   // Repository
   sl.registerLazySingleton<NotificationRepository>(
@@ -499,6 +503,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       getDelegateCapturedPhotos: sl(),
       getCompanyCapturedPhotos: sl(),
       deleteCapturedPhoto: sl(),
+      deletePhotoPermission: sl(),
     ),
   );
 
@@ -513,6 +518,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => GetDelegateCapturedPhotos(sl()));
   sl.registerLazySingleton(() => GetCompanyCapturedPhotos(sl()));
   sl.registerLazySingleton(() => DeleteCapturedPhoto(sl()));
+  sl.registerLazySingleton(() => DeletePhotoPermission(sl()));
 
   // Repository
   sl.registerLazySingleton<PhotoPermissionRepository>(

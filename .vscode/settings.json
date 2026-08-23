@@ -1,7 +1,7 @@
 {
     "java.configuration.updateBuildConfiguration": "automatic",
-    "java.jdt.ls.java.home": "/Applications/Android Studio.app/Contents/jbr/Contents/Home",
-    "java.import.gradle.java.home": "/Applications/Android Studio.app/Contents/jbr/Contents/Home",
+    "java.jdt.ls.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr",
+    "java.import.gradle.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr",
     "java.import.gradle.enabled": false,
     "java.import.maven.enabled": false,
     "java.import.exclusions": [

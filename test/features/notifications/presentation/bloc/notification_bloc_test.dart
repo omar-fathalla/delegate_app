@@ -2,6 +2,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/notifications/domain/entities/notification_entity.dart';
+import 'package:delegate_app/features/notifications/domain/usecases/delete_notification_for_user.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/get_notifications.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/get_unread_count.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/mark_all_notifications_read.dart';
@@ -14,11 +15,13 @@ class MockGetNotifications extends Mock implements GetNotifications {}
 class MockGetUnreadCount extends Mock implements GetUnreadCount {}
 class MockMarkNotificationRead extends Mock implements MarkNotificationRead {}
 class MockMarkAllNotificationsRead extends Mock implements MarkAllNotificationsRead {}
+class MockDeleteNotificationForUser extends Mock implements DeleteNotificationForUser {}
 
 class FakeGetNotificationsParams extends Fake implements GetNotificationsParams {}
 class FakeGetUnreadCountParams extends Fake implements GetUnreadCountParams {}
 class FakeMarkNotificationReadParams extends Fake implements MarkNotificationReadParams {}
 class FakeMarkAllNotificationsReadParams extends Fake implements MarkAllNotificationsReadParams {}
+class FakeDeleteNotificationForUserParams extends Fake implements DeleteNotificationForUserParams {}
 
 void main() {
   late NotificationBloc bloc;
@@ -26,12 +29,14 @@ void main() {
   late MockGetUnreadCount mockGetUnreadCount;
   late MockMarkNotificationRead mockMarkNotificationRead;
   late MockMarkAllNotificationsRead mockMarkAllNotificationsRead;
+  late MockDeleteNotificationForUser mockDeleteNotificationForUser;
 
   setUpAll(() {
     registerFallbackValue(FakeGetNotificationsParams());
     registerFallbackValue(FakeGetUnreadCountParams());
     registerFallbackValue(FakeMarkNotificationReadParams());
     registerFallbackValue(FakeMarkAllNotificationsReadParams());
+    registerFallbackValue(FakeDeleteNotificationForUserParams());
   });
 
   setUp(() {
@@ -39,12 +44,14 @@ void main() {
     mockGetUnreadCount = MockGetUnreadCount();
     mockMarkNotificationRead = MockMarkNotificationRead();
     mockMarkAllNotificationsRead = MockMarkAllNotificationsRead();
+    mockDeleteNotificationForUser = MockDeleteNotificationForUser();
 
     bloc = NotificationBloc(
       getNotifications: mockGetNotifications,
       getUnreadCount: mockGetUnreadCount,
       markNotificationRead: mockMarkNotificationRead,
       markAllNotificationsRead: mockMarkAllNotificationsRead,
+      deleteNotificationForUser: mockDeleteNotificationForUser,
     );
   });
 
@@ -76,7 +83,7 @@ void main() {
     act: (bloc) => bloc.add(const LoadNotifications(delegateUid: 'del1', organizationId: 'org1')),
     expect: () => [
       NotificationLoading(),
-      NotificationLoaded(notifications: tNotificationList, unreadCount: 0),
+      NotificationLoaded(notifications: tNotificationList, unreadCount: 1),
     ],
   );
 
@@ -115,7 +122,7 @@ void main() {
     act: (bloc) => bloc.add(const MarkAsRead(notificationId: 'notif1', delegateUid: 'del1', organizationId: 'org1')),
     expect: () => [
       NotificationLoading(),
-      NotificationLoaded(notifications: tNotificationList, unreadCount: 0),
+      NotificationLoaded(notifications: tNotificationList, unreadCount: 1),
     ],
     verify: (_) {
       verify(() => mockMarkNotificationRead(any())).called(1);
@@ -135,7 +142,7 @@ void main() {
     act: (bloc) => bloc.add(const MarkAllAsRead(delegateUid: 'del1', organizationId: 'org1')),
     expect: () => [
       NotificationLoading(),
-      NotificationLoaded(notifications: tNotificationList, unreadCount: 0),
+      NotificationLoaded(notifications: tNotificationList, unreadCount: 1),
     ],
     verify: (_) {
       verify(() => mockMarkAllNotificationsRead(any())).called(1);

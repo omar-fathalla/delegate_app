@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bloc/bloc.dart';
 import 'package:delegate_app/features/notifications/domain/entities/notification_entity.dart';
+import 'package:delegate_app/features/notifications/domain/usecases/delete_notification_for_user.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/get_notifications.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/get_unread_count.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/mark_all_notifications_read.dart';
@@ -16,20 +17,24 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final GetUnreadCount getUnreadCount;
   final MarkNotificationRead markNotificationRead;
   final MarkAllNotificationsRead markAllNotificationsRead;
+  final DeleteNotificationForUser deleteNotificationForUser;
 
   StreamSubscription<int>? _unreadCountSubscription;
+  int _currentUnreadCount = 0;
 
   NotificationBloc({
     required this.getNotifications,
     required this.getUnreadCount,
     required this.markNotificationRead,
     required this.markAllNotificationsRead,
+    required this.deleteNotificationForUser,
   }) : super(NotificationInitial()) {
     on<LoadNotifications>(_onLoadNotifications);
     on<SubscribeToUnreadCount>(_onSubscribeToUnreadCount);
     on<UnreadCountUpdated>(_onUnreadCountUpdated);
     on<MarkAsRead>(_onMarkAsRead);
     on<MarkAllAsRead>(_onMarkAllAsRead);
+    on<DeleteNotificationRequested>(_onDeleteNotification);
   }
 
   Future<void> _onLoadNotifications(
@@ -42,6 +47,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       GetNotificationsParams(
         delegateUid: event.delegateUid,
         organizationId: event.organizationId,
+        phoneNumber: event.phoneNumber,
       ),
     );
 
@@ -50,9 +56,9 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       (notifications) => emit(
         NotificationLoaded(
           notifications: notifications,
-          unreadCount: state is NotificationLoaded
-              ? (state as NotificationLoaded).unreadCount
-              : 0,
+          unreadCount: _currentUnreadCount > 0
+              ? _currentUnreadCount
+              : notifications.where((n) => !n.isRead).length,
         ),
       ),
     );
@@ -69,6 +75,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
           GetUnreadCountParams(
             delegateUid: event.delegateUid,
             organizationId: event.organizationId,
+            phoneNumber: event.phoneNumber,
           ),
         ).listen((count) {
           add(UnreadCountUpdated(count));
@@ -79,12 +86,11 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     UnreadCountUpdated event,
     Emitter<NotificationState> emit,
   ) {
+    _currentUnreadCount = event.count;
     if (state is NotificationLoaded) {
       emit((state as NotificationLoaded).copyWith(unreadCount: event.count));
     } else {
-      emit(
-        NotificationLoaded(notifications: const [], unreadCount: event.count),
-      );
+      emit(NotificationLoaded(notifications: const [], unreadCount: event.count));
     }
   }
 
@@ -101,6 +107,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       LoadNotifications(
         delegateUid: event.delegateUid,
         organizationId: event.organizationId,
+        phoneNumber: event.phoneNumber,
       ),
     );
   }
@@ -121,6 +128,31 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       LoadNotifications(
         delegateUid: event.delegateUid,
         organizationId: event.organizationId,
+        phoneNumber: event.phoneNumber,
+      ),
+    );
+  }
+
+  Future<void> _onDeleteNotification(
+    DeleteNotificationRequested event,
+    Emitter<NotificationState> emit,
+  ) async {
+    if (state is NotificationLoaded) {
+      final currentList = (state as NotificationLoaded).notifications;
+      final updatedList =
+          currentList.where((n) => n.id != event.notificationId).toList();
+      emit(
+        (state as NotificationLoaded).copyWith(
+          notifications: updatedList,
+          unreadCount: updatedList.where((n) => !n.isRead).length,
+        ),
+      );
+    }
+
+    await deleteNotificationForUser(
+      DeleteNotificationForUserParams(
+        notificationId: event.notificationId,
+        userUid: event.delegateUid,
       ),
     );
   }

@@ -71,6 +71,7 @@ void main() {
         'taskId': 'task123',
         'isRead': false,
         'createdAt': tTimestamp,
+        'deletedBy': const [],
       };
       expect(result, equals(expectedMap));
     });

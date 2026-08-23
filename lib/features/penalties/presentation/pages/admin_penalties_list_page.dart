@@ -33,6 +33,56 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
     }
   }
 
+  Future<void> _confirmAndDeletePenalty(
+    BuildContext context,
+    PenaltyEntity penalty,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'تأكيد حذف المخالفة',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'هل أنت متأكد من رغبتك في حذف المخالفة "${penalty.title}" نهائياً؟',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_forever_rounded, size: 18),
+            label: const Text('حذف نهائي'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      context.read<PenaltyBloc>().add(DeletePenaltyEvent(penalty.penaltyId));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -72,7 +122,27 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
               icon: const Icon(Icons.add_rounded),
               label: const Text('تسجيل غرامة جديدة'),
             ),
-      body: BlocBuilder<PenaltyBloc, PenaltyState>(
+      body: BlocConsumer<PenaltyBloc, PenaltyState>(
+        listener: (context, state) {
+          if (state is PenaltyActionSuccessState) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            _loadData();
+          } else if (state is PenaltyErrorState) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
         builder: (context, state) {
           if (state is PenaltyLoadingState) {
             return const Center(child: CircularProgressIndicator());
@@ -137,14 +207,14 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                             status: newStatus,
                           ),
                         );
-                    _loadData();
                   },
+                  onDelete: () => _confirmAndDeletePenalty(context, p),
                 );
               },
             );
           }
 
-          return const SizedBox.shrink();
+          return const Center(child: CircularProgressIndicator());
         },
       ),
     );
@@ -155,11 +225,13 @@ class _AdminPenaltyCard extends StatefulWidget {
   final PenaltyEntity penalty;
   final bool isReadOnly;
   final ValueChanged<PenaltyStatus> onStatusChanged;
+  final VoidCallback? onDelete;
 
   const _AdminPenaltyCard({
     required this.penalty,
     required this.isReadOnly,
     required this.onStatusChanged,
+    this.onDelete,
   });
 
   @override
@@ -382,6 +454,19 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                           ),
                         ),
                       ),
+                    if (!widget.isReadOnly && widget.onDelete != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.red.withValues(alpha: 0.1),
+                          foregroundColor: Colors.red.shade700,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                        tooltip: 'حذف المخالفة',
+                        onPressed: widget.onDelete,
+                      ),
+                    ],
                     const Spacer(),
                     if (widget.penalty.evidenceFiles.isNotEmpty)
                       OutlinedButton.icon(

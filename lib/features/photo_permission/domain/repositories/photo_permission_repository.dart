@@ -77,4 +77,10 @@ abstract class PhotoPermissionRepository {
     required String photoId,
     required String photoUrl,
   });
+
+  Future<Either<Failure, void>> deletePermission({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+  });
 }

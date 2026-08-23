@@ -10,6 +10,7 @@ class GetUnreadCount {
     return repository.getUnreadCount(
       params.delegateUid,
       params.organizationId,
+      phoneNumber: params.phoneNumber,
     );
   }
 }
@@ -17,12 +18,14 @@ class GetUnreadCount {
 class GetUnreadCountParams extends Equatable {
   final String delegateUid;
   final String organizationId;
+  final String? phoneNumber;
 
   const GetUnreadCountParams({
     required this.delegateUid,
     required this.organizationId,
+    this.phoneNumber,
   });
 
   @override
-  List<Object?> get props => [delegateUid, organizationId];
+  List<Object?> get props => [delegateUid, organizationId, phoneNumber];
 }

@@ -236,4 +236,24 @@ class PhotoPermissionRepositoryImpl implements PhotoPermissionRepository {
       return const Left(ServerFailure('حدث خطأ أثناء محاولة حذف الصورة.'));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> deletePermission({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+  }) async {
+    try {
+      await remoteDataSource.deletePermission(
+        organizationUID: organizationUID,
+        companyUID: companyUID,
+        permissionId: permissionId,
+      );
+      return const Right(null);
+    } on Failure catch (f) {
+      return Left(f);
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ غير متوقع أثناء حذف إذن التصوير.'));
+    }
+  }
 }

@@ -18,6 +18,7 @@ class GetNotifications
     return repository.getNotifications(
       params.delegateUid,
       params.organizationId,
+      phoneNumber: params.phoneNumber,
     );
   }
 }
@@ -25,12 +26,14 @@ class GetNotifications
 class GetNotificationsParams extends Equatable {
   final String delegateUid;
   final String organizationId;
+  final String? phoneNumber;
 
   const GetNotificationsParams({
     required this.delegateUid,
     required this.organizationId,
+    this.phoneNumber,
   });
 
   @override
-  List<Object?> get props => [delegateUid, organizationId];
+  List<Object?> get props => [delegateUid, organizationId, phoneNumber];
 }

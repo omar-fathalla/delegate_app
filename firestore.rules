@@ -117,10 +117,10 @@ service cloud.firestore {
 
     // Photo Permissions & Captured Photos collectionGroups
     match /{path=**}/photo_permissions/{permissionId} {
-      allow read: if isAuthenticated();
+      allow read, delete: if isAuthenticated();
     }
     match /{path=**}/captured_photos/{photoId} {
-      allow read: if isAuthenticated();
+      allow read, delete: if isAuthenticated();
     }
 
     // ==================== PENALTIES COLLECTION ====================
@@ -334,12 +334,13 @@ service cloud.firestore {
         // Photo Permissions subcollection
         match /photo_permissions/{permissionId} {
           allow read, create, update: if isAuthenticated();
+          allow delete: if isAuthenticated();
 
           // Captured Photos subcollection
           match /captured_photos/{photoId} {
             allow read, create: if isAuthenticated();
             allow update: if false; 
-            allow delete: if isAuthenticated(); // Allow supervisors to delete photos
+            allow delete: if isAuthenticated(); // Allow supervisors and super admin to delete photos
           }
         }
       }
@@ -503,6 +504,17 @@ service cloud.firestore {
     // Penalties & Infractions system
     // Allows read and write for penalties collection
     match /penalties/{penaltyId} {
+      allow read, write: if true;
+    }
+
+    // ==================== NOTIFICATIONS COLLECTIONS ====================
+    // In-app notifications for delegates, admins, and technical support
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    // Sent notifications history and outbox for Technical Support & Admins
+    match /sent_notifications/{docId} {
       allow read, write: if true;
     }
 

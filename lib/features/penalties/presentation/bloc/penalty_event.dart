@@ -47,3 +47,12 @@ class UpdatePenaltyStatusEvent extends PenaltyEvent {
   @override
   List<Object?> get props => [penaltyId, status];
 }
+
+class DeletePenaltyEvent extends PenaltyEvent {
+  final String penaltyId;
+
+  const DeletePenaltyEvent(this.penaltyId);
+
+  @override
+  List<Object?> get props => [penaltyId];
+}

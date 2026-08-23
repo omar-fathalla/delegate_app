@@ -26,6 +26,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       widget.marketingDelegate.role == UserRole.marketingPromotion ||
       widget.marketingDelegate.role == UserRole.superAdmin;
 
+  bool get _isSuperAdmin => widget.marketingDelegate.role == UserRole.superAdmin;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +43,84 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             companyUID: '',      // فارغة لعدم التقييد بأي شركة
           ),
         );
+  }
+
+  Future<void> _confirmDeletePermission(BuildContext context, PhotoPermission permission) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'تأكيد حذف إذن التصوير',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'هل أنت متأكد من رغبتك في حذف إذن التصوير لشركة "${permission.companyName}" نهائياً؟',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'سيتم حذف هذا الإذن وجميع الصور الميدانية المرفوعة داخله بشكل نهائي لا يمكن التراجع عنه.',
+                      style: TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_forever_rounded, size: 18),
+            label: const Text('حذف نهائي'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      context.read<PhotoPermissionBloc>().add(
+            DeletePhotoPermissionRequested(
+              organizationUID: permission.organizationUID,
+              companyUID: permission.companyUID,
+              permissionId: permission.uid,
+            ),
+          );
+    }
   }
 
   @override
@@ -79,6 +159,15 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       body: BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
         listener: (context, state) {
           if (state is PermissionActionSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            _loadData();
+          } else if (state is PhotoPermissionActionSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
@@ -396,6 +485,17 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (_isSuperAdmin) ...[
+                  IconButton(
+                    onPressed: () => _confirmDeletePermission(context, permission),
+                    tooltip: 'حذف الإذن نهائياً',
+                    icon: Icon(Icons.delete_forever_rounded, color: Colors.red.shade700),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.red.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  const Spacer(),
+                ],
                 OutlinedButton.icon(
                   onPressed: () {
                     final approverName = widget.marketingDelegate.fullName.isNotEmpty
@@ -512,25 +612,38 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             const SizedBox(height: 4),
             ExpandableBranchText(branchNames: permission.branchNames),
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (routeContext) => BlocProvider(
-                        create: (_) => di.sl<PhotoPermissionBloc>(),
-                        child: CapturedPhotosViewScreen(
-                          photoPermission: permission,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (_isSuperAdmin)
+                  IconButton(
+                    onPressed: () => _confirmDeletePermission(context, permission),
+                    tooltip: 'حذف الإذن نهائياً',
+                    icon: Icon(Icons.delete_forever_rounded, color: Colors.red.shade700, size: 20),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.red.withValues(alpha: 0.1),
+                    ),
+                  )
+                else
+                  const SizedBox.shrink(),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (routeContext) => BlocProvider(
+                          create: (_) => di.sl<PhotoPermissionBloc>(),
+                          child: CapturedPhotosViewScreen(
+                            photoPermission: permission,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.collections_rounded, size: 18),
-                label: const Text('عرض الصور الميدانية المرفوعة'),
-              ),
+                    );
+                  },
+                  icon: const Icon(Icons.collections_rounded, size: 18),
+                  label: const Text('عرض الصور الميدانية المرفوعة'),
+                ),
+              ],
             ),
           ],
         ),

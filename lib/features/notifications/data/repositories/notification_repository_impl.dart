@@ -12,12 +12,14 @@ class NotificationRepositoryImpl implements NotificationRepository {
   @override
   Future<Either<Failure, List<NotificationEntity>>> getNotifications(
     String delegateUid,
-    String organizationId,
-  ) async {
+    String organizationId, {
+    String? phoneNumber,
+  }) async {
     try {
       final notifications = await remoteDataSource.getNotifications(
         delegateUid,
         organizationId,
+        phoneNumber: phoneNumber,
       );
       return Right(notifications);
     } catch (e) {
@@ -28,9 +30,14 @@ class NotificationRepositoryImpl implements NotificationRepository {
   @override
   Stream<int> getUnreadCount(
     String delegateUid,
-    String organizationId,
-  ) {
-    return remoteDataSource.getUnreadCount(delegateUid, organizationId);
+    String organizationId, {
+    String? phoneNumber,
+  }) {
+    return remoteDataSource.getUnreadCount(
+      delegateUid,
+      organizationId,
+      phoneNumber: phoneNumber,
+    );
   }
 
   @override
@@ -50,6 +57,19 @@ class NotificationRepositoryImpl implements NotificationRepository {
   ) async {
     try {
       await remoteDataSource.markAllAsRead(delegateUid, organizationId);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteNotificationForUser(
+    String notificationId,
+    String userUid,
+  ) async {
+    try {
+      await remoteDataSource.deleteNotificationForUser(notificationId, userUid);
       return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));

@@ -67,6 +67,18 @@ class PenaltyRepositoryImpl implements PenaltyRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> deletePenalty(String penaltyId) async {
+    try {
+      await remoteDataSource.deletePenalty(penaltyId);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ أثناء حذف المخالفة.'));
+    }
+  }
+
+  @override
   Future<Either<Failure, EvidenceFile>> uploadEvidenceFile({
     required File file,
     required String penaltyId,

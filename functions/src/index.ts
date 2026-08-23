@@ -373,3 +373,59 @@ export const onPhotoPermissionUpdated = functions.firestore
       return null;
     }
   });
+
+/**
+ * Cloud Function triggered when any new notification is created in Firestore.
+ * Automatically dispatches FCM push notifications to target device(s) or FCM topic.
+ */
+export const onNotificationCreated = functions.firestore
+  .document("notifications/{notificationId}")
+  .onCreate(async (snap, context) => {
+    const notification = snap.data();
+    const { delegateUid, title, body, organizationId, companyId, type } = notification;
+
+    if (!title || !body) return null;
+
+    try {
+      if (delegateUid === "all") {
+        // Broadcast push notification to topic 'app_updates'
+        await admin.messaging().send({
+          topic: "app_updates",
+          notification: { title, body },
+          data: {
+            type: type || "support_broadcast",
+            organizationId: organizationId || "",
+            companyId: companyId || "",
+          },
+        });
+        console.log("Successfully sent broadcast push notification to FCM topic 'app_updates'");
+      } else if (delegateUid) {
+        // Fetch recipient's FCM token from fcm_tokens collection
+        const tokenDoc = await admin.firestore()
+          .collection("fcm_tokens")
+          .doc(delegateUid)
+          .get();
+
+        if (tokenDoc.exists && tokenDoc.data()?.token) {
+          const fcmToken = tokenDoc.data()!.token;
+          await admin.messaging().send({
+            notification: { title, body },
+            data: {
+              type: type || "support_alert",
+              organizationId: organizationId || "",
+              companyId: companyId || "",
+            },
+            token: fcmToken,
+          });
+          console.log(`Successfully sent FCM push notification to delegate ${delegateUid}`);
+        } else {
+          console.log(`No active FCM token found for delegate ${delegateUid}`);
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Error in onNotificationCreated FCM push function:", error);
+      return null;
+    }
+  });
+

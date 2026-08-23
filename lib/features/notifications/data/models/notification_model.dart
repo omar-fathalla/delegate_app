@@ -13,10 +13,16 @@ class NotificationModel extends NotificationEntity {
     super.taskId,
     required super.isRead,
     required super.createdAt,
+    super.deletedBy,
   });
 
   factory NotificationModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final rawDeletedBy = data['deletedBy'];
+    final List<String> deletedBy = rawDeletedBy is List
+        ? rawDeletedBy.map((e) => e.toString()).toList()
+        : const [];
+
     return NotificationModel(
       id: doc.id,
       delegateUid: data['delegateUid'] ?? '',
@@ -28,6 +34,7 @@ class NotificationModel extends NotificationEntity {
       taskId: data['taskId'],
       isRead: data['isRead'] ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      deletedBy: deletedBy,
     );
   }
 
@@ -42,6 +49,7 @@ class NotificationModel extends NotificationEntity {
       'taskId': taskId,
       'isRead': isRead,
       'createdAt': Timestamp.fromDate(createdAt),
+      'deletedBy': deletedBy,
     };
   }
 }

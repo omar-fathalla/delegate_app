@@ -25,6 +25,9 @@ import 'package:delegate_app/features/settings/presentation/pages/settings_scree
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
+import 'package:delegate_app/features/feedback/presentation/bloc/admin_feedback_bloc.dart';
+import 'package:delegate_app/features/feedback/presentation/pages/admin_feedbacks_screen.dart';
+import 'package:delegate_app/features/notifications/presentation/pages/send_notification_screen.dart';
 
 
 class AdminMainScreen extends StatefulWidget {
@@ -54,7 +57,10 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         ),
         const AdminBranchesScreen(),
         const AddBranchScreen(),
-        CreateAdminScreen(organizationUID: delegate.organizationUID),
+        CreateAdminScreen(
+          organizationUID: delegate.organizationUID,
+          currentUserRole: delegate.role,
+        ),
       ];
     } else if (isOrganizationAdmin) {
       _screens = [
@@ -107,7 +113,21 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         ).push(MaterialPageRoute(builder: (_) => const ManageMarketingScreen()));
         break;
       case 'manage_feedbacks':
-        context.push('/admin/feedbacks');
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BlocProvider(
+              create: (_) => di.sl<AdminFeedbackBloc>(),
+              child: const AdminFeedbacksScreen(),
+            ),
+          ),
+        );
+        break;
+      case 'send_notification':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SendNotificationScreen(senderDelegate: widget.delegate),
+          ),
+        );
         break;
       case 'permissions_report':
         Navigator.of(context).push(
@@ -152,7 +172,9 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     }
   }
 
-  bool get isSuperAdmin => widget.delegate.role == UserRole.superAdmin;
+  bool get isSuperAdmin =>
+      widget.delegate.role == UserRole.superAdmin ||
+      widget.delegate.role == UserRole.technicalSupport;
   bool get isOrganizationAdmin =>
       widget.delegate.role == UserRole.organizationAdmin;
 
@@ -161,7 +183,10 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
 
-    final headerTitle = isSuperAdmin ? null : delegate.companyName;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final headerTitle = delegate.role == UserRole.technicalSupport
+        ? (isArabic ? 'الدعم الفني' : 'Technical Support')
+        : (isSuperAdmin ? null : delegate.companyName);
 
     final subtitle = isSuperAdmin
         ? (_currentIndex == 0
@@ -198,6 +223,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 SubscribeToUnreadCount(
                   delegateUid: delegate.uid,
                   organizationId: delegate.organizationUID,
+                  phoneNumber: delegate.phoneNumber,
                 ),
               ),
             child: BlocBuilder<NotificationBloc, NotificationState>(
@@ -252,23 +278,34 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ),
             ),
             PopupMenuItem(
-              value: 'permissions_report',
+              value: 'send_notification',
               child: ListTile(
-                leading: const Icon(Icons.analytics_outlined),
-                title: const Text('تقرير أذونات التصوير'),
+                leading: const Icon(Icons.send_rounded),
+                title: const Text('إرسال إشعار جديد'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
               ),
             ),
-            PopupMenuItem(
-              value: 'receipts_report',
-              child: ListTile(
-                leading: const Icon(Icons.receipt_long_rounded),
-                title: Text(l10n.receiptsReport),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
+            if (delegate.role != UserRole.technicalSupport) ...[
+              PopupMenuItem(
+                value: 'permissions_report',
+                child: ListTile(
+                  leading: const Icon(Icons.analytics_outlined),
+                  title: const Text('تقرير أذونات التصوير'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
-            ),
+              PopupMenuItem(
+                value: 'receipts_report',
+                child: ListTile(
+                  leading: const Icon(Icons.receipt_long_rounded),
+                  title: Text(l10n.receiptsReport),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ],
 
           // نظام الغرامات في القائمة للـ superAdmin و admin (للـ organizationAdmin موجود كتبويب مباشر)

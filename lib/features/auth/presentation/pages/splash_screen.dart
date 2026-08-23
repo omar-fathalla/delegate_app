@@ -61,7 +61,8 @@ class _SplashScreenState extends State<SplashScreen>
           });
           if (delegate.role == UserRole.superAdmin ||
               delegate.role == UserRole.admin ||
-              delegate.role == UserRole.organizationAdmin) {
+              delegate.role == UserRole.organizationAdmin ||
+              delegate.role == UserRole.technicalSupport) {
             context.go('/admin/home', extra: delegate);
           } else if (delegate.role == UserRole.marketing ||
               delegate.role == UserRole.marketingPromotion) {

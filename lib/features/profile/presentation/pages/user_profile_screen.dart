@@ -245,6 +245,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               value: delegate?.email ?? _currentUser?.email ?? 'غير محدد',
               colorScheme: colorScheme,
               theme: theme,
+              onEdit: () => _showEditInfoSheet(
+                context,
+                fieldType: 'email',
+                initialValue: delegate?.email ?? _currentUser?.email ?? '',
+                delegate: delegate,
+              ),
             ),
 
             // Phone Number
@@ -254,6 +260,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               value: delegate?.phoneNumber ?? _currentUser?.phoneNumber ?? 'غير محدد',
               colorScheme: colorScheme,
               theme: theme,
+              onEdit: () => _showEditInfoSheet(
+                context,
+                fieldType: 'phone',
+                initialValue: delegate?.phoneNumber ?? _currentUser?.phoneNumber ?? '',
+                delegate: delegate,
+              ),
               showDivider: false,
             ),
           ],
@@ -346,6 +358,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     required String value,
     required ColorScheme colorScheme,
     required ThemeData theme,
+    VoidCallback? onEdit,
     bool showDivider = true,
   }) {
     return Column(
@@ -386,11 +399,41 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ],
                 ),
               ),
+              if (onEdit != null)
+                IconButton(
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    color: colorScheme.primary,
+                    size: 20,
+                  ),
+                  tooltip: 'تعديل $label',
+                  onPressed: onEdit,
+                ),
             ],
           ),
         ),
         if (showDivider) Divider(height: 1, color: colorScheme.outlineVariant),
       ],
+    );
+  }
+
+  // ─── Edit Info Sheet (Email / Phone) ───────────────────────────
+  void _showEditInfoSheet(
+    BuildContext context, {
+    required String fieldType,
+    required String initialValue,
+    Delegate? delegate,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _EditInfoBottomSheet(
+        fieldType: fieldType,
+        initialValue: initialValue,
+        delegate: delegate,
+      ),
     );
   }
 
@@ -405,6 +448,269 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Edit Email / Phone Bottom Sheet
+// ═══════════════════════════════════════════════════════════════════
+
+class _EditInfoBottomSheet extends StatefulWidget {
+  final String fieldType; // 'email' or 'phone'
+  final String initialValue;
+  final Delegate? delegate;
+
+  const _EditInfoBottomSheet({
+    required this.fieldType,
+    required this.initialValue,
+    this.delegate,
+  });
+
+  @override
+  State<_EditInfoBottomSheet> createState() => _EditInfoBottomSheetState();
+}
+
+class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _controller;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _updateInfo() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final newValue = _controller.text.trim();
+      final isEmail = widget.fieldType == 'email';
+
+      // 1. Update Firestore 'users' collection
+      final db = FirebaseFirestore.instance;
+      final fbUser = FirebaseAuth.instance.currentUser;
+
+      Query query = db.collection('users');
+      if (widget.delegate != null && widget.delegate!.uid.isNotEmpty) {
+        query = query.where('uid', isEqualTo: widget.delegate!.uid);
+      } else if (fbUser != null) {
+        query = query.where('uid', isEqualTo: fbUser.uid);
+      }
+
+      var snapshot = await query.limit(1).get();
+      if (snapshot.docs.isEmpty && widget.delegate != null) {
+        if (isEmail && widget.delegate!.phoneNumber.isNotEmpty) {
+          snapshot = await db
+              .collection('users')
+              .where('phoneNumber', isEqualTo: widget.delegate!.phoneNumber)
+              .limit(1)
+              .get();
+        } else if (!isEmail &&
+            widget.delegate!.email != null &&
+            widget.delegate!.email!.isNotEmpty) {
+          snapshot = await db
+              .collection('users')
+              .where('email', isEqualTo: widget.delegate!.email)
+              .limit(1)
+              .get();
+        }
+      }
+
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        final fieldName = isEmail ? 'email' : 'phoneNumber';
+        await doc.reference.update({fieldName: newValue});
+      }
+
+      // Also update delegates collection if applicable
+      if (widget.delegate != null && widget.delegate!.phoneNumber.isNotEmpty) {
+        final delegateQuery = await db
+            .collectionGroup('delegates')
+            .where('phoneNumber', isEqualTo: widget.delegate!.phoneNumber)
+            .get();
+        for (final dDoc in delegateQuery.docs) {
+          final fieldName = isEmail ? 'email' : 'phoneNumber';
+          await dDoc.reference.update({fieldName: newValue});
+        }
+      }
+
+      // Update Firebase Auth email if applicable
+      if (fbUser != null && isEmail) {
+        try {
+          await fbUser.verifyBeforeUpdateEmail(newValue);
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isEmail
+                  ? '✅ تم تحديث البريد الإلكتروني بنجاح'
+                  : '✅ تم تحديث رقم الموبايل بنجاح',
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        // Trigger auth reload
+        context.read<AuthBloc>().add(CheckAutoLoginRequested());
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ حدث خطأ أثناء التحديث: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isEmail = widget.fieldType == 'email';
+    final title = isEmail ? 'تعديل البريد الإلكتروني' : 'تعديل رقم الموبايل';
+    final label = isEmail ? 'البريد الإلكتروني الجديد' : 'رقم الموبايل الجديد';
+    final icon = isEmail ? Icons.email_outlined : Icons.phone_outlined;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottomInset),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 28, color: colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Text(
+                    title,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              TextFormField(
+                controller: _controller,
+                keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: label,
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colorScheme.outlineVariant, width: 1),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return isEmail ? 'يرجى إدخال البريد الإلكتروني' : 'يرجى إدخال رقم الموبايل';
+                  }
+                  if (isEmail && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                    return 'يرجى إدخال بريد إلكتروني صحيح';
+                  }
+                  if (!isEmail && value.trim().length < 10) {
+                    return 'يرجى إدخال رقم موبايل صحيح';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text('إلغاء', style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _isLoading ? null : _updateInfo,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('حفظ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════

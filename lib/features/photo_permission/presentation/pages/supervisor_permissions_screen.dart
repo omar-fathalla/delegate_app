@@ -44,6 +44,86 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
     context.read<BranchBloc>().add(BranchLoadRequested());
   }
 
+  bool get _isSuperAdmin => widget.supervisorDelegate.role == UserRole.superAdmin;
+
+  Future<void> _confirmDeletePermission(BuildContext context, PhotoPermission permission) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'تأكيد حذف إذن التصوير',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'هل أنت متأكد من رغبتك في حذف إذن التصوير لشركة "${permission.companyName}" نهائياً؟',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'سيتم حذف هذا الإذن وجميع الصور الميدانية المرفوعة داخله بشكل نهائي لا يمكن التراجع عنه.',
+                      style: TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_forever_rounded, size: 18),
+            label: const Text('حذف نهائي'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      context.read<PhotoPermissionBloc>().add(
+            DeletePhotoPermissionRequested(
+              organizationUID: permission.organizationUID,
+              companyUID: permission.companyUID,
+              permissionId: permission.uid,
+            ),
+          );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -67,6 +147,15 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
       body: BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
         listener: (context, state) {
           if (state is PermissionActionSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            _loadData();
+          } else if (state is PhotoPermissionActionSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
@@ -455,34 +544,45 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
             ),
             const SizedBox(height: 4),
             ExpandableBranchText(branchNames: permission.branchNames),
-            if (isApproved) ...[
+            if (isApproved || _isSuperAdmin) ...[
               const Divider(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'متابعة المناديب وتقارير الصور:',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                  if (_isSuperAdmin)
+                    IconButton(
+                      onPressed: () => _confirmDeletePermission(context, permission),
+                      tooltip: 'حذف الإذن نهائياً',
+                      icon: Icon(Icons.delete_forever_rounded, color: Colors.red.shade700, size: 20),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.red.withValues(alpha: 0.1),
+                      ),
+                    )
+                  else
+                    Text(
+                      'متابعة المناديب وتقارير الصور:',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (routeContext) => BlocProvider(
-                            create: (_) => di.sl<PhotoPermissionBloc>(),
-                            child: CapturedPhotosViewScreen(
-                              photoPermission: permission,
+                  if (isApproved)
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (routeContext) => BlocProvider(
+                              create: (_) => di.sl<PhotoPermissionBloc>(),
+                              child: CapturedPhotosViewScreen(
+                                photoPermission: permission,
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.collections_rounded, size: 18),
-                    label: const Text('عرض الصور الميدانية'),
-                  ),
+                        );
+                      },
+                      icon: const Icon(Icons.collections_rounded, size: 18),
+                      label: const Text('عرض الصور الميدانية'),
+                    ),
                 ],
               ),
             ],

@@ -17,6 +17,7 @@ import 'package:delegate_app/features/photo_permission/domain/usecases/get_captu
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_delegate_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_company_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/delete_captured_photo.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/delete_photo_permission.dart';
 
 part 'photo_permission_event.dart';
 part 'photo_permission_state.dart';
@@ -32,6 +33,7 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
   final GetDelegateCapturedPhotos getDelegateCapturedPhotos;
   final GetCompanyCapturedPhotos getCompanyCapturedPhotos;
   final DeleteCapturedPhoto deleteCapturedPhoto;
+  final DeletePhotoPermission deletePhotoPermission;
 
   PhotoPermissionBloc({
     required this.requestPhotoPermission,
@@ -44,6 +46,7 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     required this.getDelegateCapturedPhotos,
     required this.getCompanyCapturedPhotos,
     required this.deleteCapturedPhoto,
+    required this.deletePhotoPermission,
   }) : super(PhotoPermissionInitial()) {
     on<RequestPermissionRequested>(_onRequestPermission);
     on<LoadPermissionsRequested>(_onLoadPermissions);
@@ -55,6 +58,7 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     on<LoadDelegateCapturedPhotosRequested>(_onLoadDelegateCapturedPhotos);
     on<LoadCompanyCapturedPhotosRequested>(_onLoadCompanyCapturedPhotos);
     on<DeleteCapturedPhotoRequested>(_onDeleteCapturedPhoto);
+    on<DeletePhotoPermissionRequested>(_onDeletePhotoPermission);
   }
 
   Future<void> _onRequestPermission(
@@ -325,7 +329,25 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     );
     result.fold(
       (failure) => emit(PhotoPermissionError(message: failure.message)),
-      (_) => emit(PhotoPermissionActionSuccess(message: 'تم حذف الصورة بنجاح')),
+      (_) => emit(const PhotoPermissionActionSuccess(message: 'تم حذف الصورة بنجاح')),
+    );
+  }
+
+  Future<void> _onDeletePhotoPermission(
+    DeletePhotoPermissionRequested event,
+    Emitter<PhotoPermissionState> emit,
+  ) async {
+    emit(PhotoPermissionLoading());
+    final result = await deletePhotoPermission(
+      DeletePhotoPermissionParams(
+        organizationUID: event.organizationUID,
+        companyUID: event.companyUID,
+        permissionId: event.permissionId,
+      ),
+    );
+    result.fold(
+      (failure) => emit(PhotoPermissionError(message: failure.message)),
+      (_) => emit(const PhotoPermissionActionSuccess(message: 'تم حذف إذن التصوير بنجاح.')),
     );
   }
 }

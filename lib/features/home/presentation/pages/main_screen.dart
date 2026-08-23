@@ -122,6 +122,7 @@ class _MainScreenState extends State<MainScreen> {
                           SubscribeToUnreadCount(
                             delegateUid: delegate.uid,
                             organizationId: delegate.organizationUID,
+                            phoneNumber: delegate.phoneNumber,
                           ),
                         ),
                       child: BlocBuilder<NotificationBloc, NotificationState>(

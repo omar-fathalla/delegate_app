@@ -1,6 +1,7 @@
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:delegate_app/features/notifications/presentation/widgets/notification_list_item.dart';
+import 'package:delegate_app/features/notifications/presentation/pages/send_notification_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,21 +14,39 @@ class NotificationsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canSendNotification = delegate.role == UserRole.technicalSupport ||
+        delegate.role == UserRole.superAdmin;
+
     return BlocProvider(
       create: (_) => di.sl<NotificationBloc>()
         ..add(
           LoadNotifications(
             delegateUid: delegate.uid,
             organizationId: delegate.organizationUID,
+            phoneNumber: delegate.phoneNumber,
           ),
         )
         ..add(
           SubscribeToUnreadCount(
             delegateUid: delegate.uid,
             organizationId: delegate.organizationUID,
+            phoneNumber: delegate.phoneNumber,
           ),
         ),
       child: Scaffold(
+        floatingActionButton: canSendNotification
+            ? FloatingActionButton.extended(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SendNotificationScreen(senderDelegate: delegate),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.send_rounded),
+                label: const Text('إرسال إشعار جديد'),
+              )
+            : null,
         appBar: AppBar(
           title: Text(AppLocalizations.of(context)!.notifications),
           actions: [
@@ -40,6 +59,7 @@ class NotificationsPage extends StatelessWidget {
                         MarkAllAsRead(
                           delegateUid: delegate.uid,
                           organizationId: delegate.organizationUID,
+                          phoneNumber: delegate.phoneNumber,
                         ),
                       );
                     },
@@ -106,6 +126,7 @@ class NotificationsPage extends StatelessWidget {
                     LoadNotifications(
                       delegateUid: delegate.uid,
                       organizationId: delegate.organizationUID,
+                      phoneNumber: delegate.phoneNumber,
                     ),
                   );
                 },

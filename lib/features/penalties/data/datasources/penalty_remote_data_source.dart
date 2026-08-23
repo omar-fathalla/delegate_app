@@ -10,6 +10,7 @@ abstract class PenaltyRemoteDataSource {
   Future<List<PenaltyModel>> getCompanyPenalties(String companyId);
   Future<List<PenaltyModel>> getAllPenalties();
   Future<void> updatePenaltyStatus(String penaltyId, PenaltyStatus status);
+  Future<void> deletePenalty(String penaltyId);
   Future<EvidenceFile> uploadEvidenceFile({
     required File file,
     required String penaltyId,
@@ -106,6 +107,17 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
       });
     } on FirebaseException catch (e) {
       throw ServerException(e.message ?? 'فشل في تحديث حالة المخالفة.');
+    }
+  }
+
+  @override
+  Future<void> deletePenalty(String penaltyId) async {
+    try {
+      await _penaltiesRef.doc(penaltyId).delete();
+    } on FirebaseException catch (e) {
+      throw ServerException(e.message ?? 'فشل في حذف المخالفة.');
+    } catch (_) {
+      throw ServerException('حدث خطأ غير متوقع أثناء حذف المخالفة.');
     }
   }
 

@@ -118,6 +118,7 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                 SubscribeToUnreadCount(
                   delegateUid: delegate.uid,
                   organizationId: delegate.organizationUID,
+                  phoneNumber: delegate.phoneNumber,
                 ),
               ),
             child: BlocBuilder<NotificationBloc, NotificationState>(

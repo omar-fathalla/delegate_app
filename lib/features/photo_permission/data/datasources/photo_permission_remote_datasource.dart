@@ -81,6 +81,12 @@ abstract class PhotoPermissionRemoteDataSource {
     required String photoId,
     required String photoUrl,
   });
+
+  Future<void> deletePermission({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+  });
 }
 
 class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSource {
@@ -478,6 +484,75 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     } catch (e) {
       debugPrint('Unexpected Error in deleteCapturedPhoto: $e');
       throw ServerFailure('حدث خطأ غير متوقع: $e');
+    }
+  }
+
+  @override
+  Future<void> deletePermission({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+  }) async {
+    try {
+      await _ensureAuth();
+
+      // 1. Delete all captured photos under this permission from Storage and Firestore
+      QuerySnapshot<Map<String, dynamic>> photosSnapshot;
+      if (organizationUID.isNotEmpty && companyUID.isNotEmpty) {
+        photosSnapshot = await firestore
+            .collection('organizations')
+            .doc(organizationUID)
+            .collection('companies')
+            .doc(companyUID)
+            .collection('photo_permissions')
+            .doc(permissionId)
+            .collection('captured_photos')
+            .get();
+      } else {
+        photosSnapshot = await firestore
+            .collectionGroup('captured_photos')
+            .where('permissionId', isEqualTo: permissionId)
+            .get();
+      }
+
+      for (var doc in photosSnapshot.docs) {
+        try {
+          final imageUrl = doc.data()['imageUrl'] as String?;
+          if (imageUrl != null && imageUrl.isNotEmpty) {
+            final ref = storage.refFromURL(imageUrl);
+            await ref.delete();
+          }
+        } catch (e) {
+          debugPrint('Error deleting photo image from storage during permission deletion: $e');
+        }
+        await doc.reference.delete();
+      }
+
+      // 2. Delete the permission document
+      if (organizationUID.isNotEmpty && companyUID.isNotEmpty) {
+        await firestore
+            .collection('organizations')
+            .doc(organizationUID)
+            .collection('companies')
+            .doc(companyUID)
+            .collection('photo_permissions')
+            .doc(permissionId)
+            .delete();
+      } else {
+        final permSnapshot = await firestore
+            .collectionGroup('photo_permissions')
+            .where(FieldPath.documentId, isEqualTo: permissionId)
+            .get();
+        for (var doc in permSnapshot.docs) {
+          await doc.reference.delete();
+        }
+      }
+    } on FirebaseException catch (e) {
+      debugPrint('Firestore Error in deletePermission: $e');
+      throwFirestoreFailure(e, 'فشل في حذف إذن التصوير.');
+    } catch (e) {
+      debugPrint('Unexpected Error in deletePermission: $e');
+      throw ServerFailure('حدث خطأ غير متوقع أثناء حذف إذن التصوير: $e');
     }
   }
 }
