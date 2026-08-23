@@ -22,12 +22,15 @@ abstract class TaskRepository {
     TaskStatus? status,
     int? limit,
     dynamic lastDoc,
+    String? adminId,
+    String? adminRoleName,
   });
 
   Future<Either<Failure, List<TaskEntity>>> getDelegateTasks(
     String organizationId,
     String delegateId,
-    String companyId, {
+    String companyId,
+    String delegateRoleName, {
     TaskStatus? status,
     int? limit,
     dynamic lastDoc,

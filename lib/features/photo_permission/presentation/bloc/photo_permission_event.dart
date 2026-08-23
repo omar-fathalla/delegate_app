@@ -212,3 +212,21 @@ class DeletePhotoPermissionRequested extends PhotoPermissionEvent {
       ];
 }
 
+class UpdatePhotoPermissionBranchesRequested extends PhotoPermissionEvent {
+  final String organizationUID;
+  final String companyUID;
+  final String permissionId;
+  final List<String> branchIds;
+  final List<String> branchNames;
+
+  const UpdatePhotoPermissionBranchesRequested({
+    required this.organizationUID,
+    required this.companyUID,
+    required this.permissionId,
+    required this.branchIds,
+    required this.branchNames,
+  });
+
+  @override
+  List<Object?> get props => [organizationUID, companyUID, permissionId, branchIds, branchNames];
+}

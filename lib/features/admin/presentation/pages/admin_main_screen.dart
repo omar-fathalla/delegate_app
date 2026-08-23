@@ -28,6 +28,7 @@ import 'package:delegate_app/features/notifications/presentation/bloc/notificati
 import 'package:delegate_app/features/feedback/presentation/bloc/admin_feedback_bloc.dart';
 import 'package:delegate_app/features/feedback/presentation/pages/admin_feedbacks_screen.dart';
 import 'package:delegate_app/features/notifications/presentation/pages/send_notification_screen.dart';
+import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
 
 
 class AdminMainScreen extends StatefulWidget {
@@ -59,7 +60,38 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         const AddBranchScreen(),
         CreateAdminScreen(
           organizationUID: delegate.organizationUID,
+          currentDelegate: delegate,
           currentUserRole: delegate.role,
+        ),
+      ];
+    } else if (isTechnicalSupport) {
+      _screens = [
+        BlocProvider(
+          create: (_) => di.sl<PhotoPermissionBloc>()
+            ..add(const LoadPermissionsRequested(
+              organizationUID: '',
+              companyUID: '',
+            )),
+          child: MarketingPermissionsScreen(marketingDelegate: delegate),
+        ),
+        const AdminBranchesScreen(),
+        const AddBranchScreen(),
+        CreateAdminScreen(organizationUID: delegate.organizationUID, currentDelegate: delegate),
+      ];
+    } else if (isBranchesMarketingManager) {
+      _screens = [
+        MarketingSearchScreen(organizationUID: delegate.organizationUID),
+        BlocProvider(
+          create: (_) => di.sl<PhotoPermissionBloc>()
+            ..add(const LoadPermissionsRequested(
+              organizationUID: '',
+              companyUID: '',
+            )),
+          child: MarketingPermissionsScreen(marketingDelegate: delegate),
+        ),
+        BlocProvider(
+          create: (_) => di.sl<PenaltyBloc>(),
+          child: CompanyPenaltiesSettingsPage(delegate: delegate),
         ),
       ];
     } else if (isOrganizationAdmin) {
@@ -172,11 +204,12 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     }
   }
 
-  bool get isSuperAdmin =>
-      widget.delegate.role == UserRole.superAdmin ||
-      widget.delegate.role == UserRole.technicalSupport;
+  bool get isSuperAdmin => widget.delegate.role == UserRole.superAdmin;
+  bool get isTechnicalSupport => widget.delegate.role == UserRole.technicalSupport;
   bool get isOrganizationAdmin =>
       widget.delegate.role == UserRole.organizationAdmin;
+  bool get isBranchesMarketingManager =>
+      widget.delegate.role == UserRole.branchesMarketingManager;
 
   @override
   Widget build(BuildContext context) {
@@ -196,12 +229,26 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               : _currentIndex == 2
               ? l10n.addBranch
               : l10n.createAdmin)
+        : isTechnicalSupport
+        ? (_currentIndex == 0
+              ? l10n.photoPermissions
+              : _currentIndex == 1
+              ? l10n.branches
+              : _currentIndex == 2
+              ? l10n.addBranch
+              : l10n.createAdmin)
         : isOrganizationAdmin
         ? (_currentIndex == 0
               ? delegate.firstName
               : _currentIndex == 1
               ? l10n.tasks
               : _currentIndex == 2
+              ? 'أذونات التصوير'
+              : 'المخالفات والغرامات')
+        : isBranchesMarketingManager
+        ? (_currentIndex == 0
+              ? 'الاستعلامات'
+              : _currentIndex == 1
               ? 'أذونات التصوير'
               : 'المخالفات والغرامات')
         : (_currentIndex == 0
@@ -249,7 +296,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           const SizedBox(width: 4),
         ],
         menuItems: [
-          if (isSuperAdmin) ...[
+          if (isSuperAdmin || isTechnicalSupport) ...[
             PopupMenuItem(
               value: 'manage_admins',
               child: ListTile(
@@ -370,6 +417,34 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 ),
               ],
             )
+          : isTechnicalSupport
+          ? NavigationBar(
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              destinations: [
+                NavigationDestination(
+                  icon: const Icon(Icons.photo_library_outlined),
+                  selectedIcon: const Icon(Icons.photo_library_rounded),
+                  label: l10n.photoPermissions,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.storefront_rounded),
+                  label: l10n.branches,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.add_location_alt_rounded),
+                  label: l10n.addBranch,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.admin_panel_settings_rounded),
+                  label: l10n.createAdmin,
+                ),
+              ],
+            )
           : isOrganizationAdmin
           ? NavigationBar(
               selectedIndex: _currentIndex,
@@ -395,6 +470,32 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   label: 'أذونات التصوير',
                 ),
                 const NavigationDestination(
+                  icon: Icon(Icons.gavel_outlined),
+                  selectedIcon: Icon(Icons.gavel_rounded),
+                  label: 'الغرامات',
+                ),
+              ],
+            )
+          : isBranchesMarketingManager
+          ? NavigationBar(
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.search_rounded),
+                  selectedIcon: Icon(Icons.search_rounded),
+                  label: 'الاستعلامات',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.photo_library_outlined),
+                  selectedIcon: Icon(Icons.photo_library_rounded),
+                  label: 'أذونات التصوير',
+                ),
+                NavigationDestination(
                   icon: Icon(Icons.gavel_outlined),
                   selectedIcon: Icon(Icons.gavel_rounded),
                   label: 'الغرامات',

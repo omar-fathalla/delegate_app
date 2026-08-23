@@ -89,6 +89,10 @@ class DelegateModel extends Delegate {
         case 'technical-support':
         case 'tech_support':
           return UserRole.technicalSupport;
+        case 'branches_marketing':
+        case 'branches-marketing':
+        case 'branches_marketing_manager':
+          return UserRole.branchesMarketingManager;
         default:
           return UserRole.delegate;
       }
@@ -155,6 +159,8 @@ class DelegateModel extends Delegate {
         return 'marketing_promotion';
       case UserRole.technicalSupport:
         return 'technical_support';
+      case UserRole.branchesMarketingManager:
+        return 'branches_marketing';
       case UserRole.delegate:
         return 'delegate';
     }

@@ -35,11 +35,28 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
   void initState() {
     super.initState();
     _selectedMonth = DateTime.now();
+
+    final isGeneralManagerOrAdmin =
+        widget.delegate.role == UserRole.organizationAdmin ||
+        widget.delegate.role == UserRole.superAdmin ||
+        widget.delegate.role == UserRole.admin ||
+        widget.delegate.role == UserRole.branchesMarketingManager;
+
+    if (isGeneralManagerOrAdmin) {
+      _currentGroupMode = GroupMode.byBranch;
+    }
+
     _loadPhotos();
   }
 
   void _loadPhotos() {
-    if (widget.delegate.role == UserRole.admin) {
+    final isGeneralManagerOrAdmin =
+        widget.delegate.role == UserRole.organizationAdmin ||
+        widget.delegate.role == UserRole.superAdmin ||
+        widget.delegate.role == UserRole.admin ||
+        widget.delegate.role == UserRole.branchesMarketingManager;
+
+    if (isGeneralManagerOrAdmin) {
       context.read<PhotoPermissionBloc>().add(
             LoadCompanyCapturedPhotosRequested(companyUID: widget.delegate.companyUID),
           );

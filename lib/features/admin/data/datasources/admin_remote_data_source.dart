@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/features/admin/data/models/admin_user_model.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
@@ -113,6 +114,28 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   @override
   Future<AdminUserModel> createAdmin(AdminUserModel admin) async {
     try {
+      // Check if phone number already exists
+      final phoneQuery = await firestore
+          .collection('users')
+          .where('phoneNumber', isEqualTo: admin.phoneNumber)
+          .get();
+          
+      if (phoneQuery.docs.isNotEmpty) {
+        throw const ServerFailure('هذا الرقم مسجل من قبل');
+      }
+
+      // Check if email already exists (only if email is provided)
+      if (admin.email.isNotEmpty) {
+        final emailQuery = await firestore
+            .collection('users')
+            .where('email', isEqualTo: admin.email)
+            .get();
+            
+        if (emailQuery.docs.isNotEmpty) {
+          throw const ServerFailure('هذا الإيميل مسجل من قبل');
+        }
+      }
+
       final ref = await firestore.collection('users').add(admin.toMap());
       return AdminUserModel(
         uid: ref.id,
@@ -243,11 +266,12 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
 
       QuerySnapshot<Map<String, dynamic>> snapshot;
       if (organizationUID.isEmpty) {
-        snapshot = await firestore.collectionGroup('delegates').get();
+        snapshot = await firestore.collectionGroup('delegates').limit(1000).get();
       } else if (companyUID.isEmpty) {
         snapshot = await firestore
             .collectionGroup('delegates')
             .where('organizationUID', isEqualTo: organizationUID)
+            .limit(1000)
             .get();
       } else {
         snapshot = await firestore
@@ -256,6 +280,7 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
             .collection('companies')
             .doc(companyUID)
             .collection('delegates')
+            .limit(1000)
             .get();
       }
 

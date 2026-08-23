@@ -124,6 +124,30 @@ class PhotoPermissionRepositoryImpl implements PhotoPermissionRepository {
   }
 
   @override
+  Future<Either<Failure, void>> updatePermissionBranches({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required List<String> branchIds,
+    required List<String> branchNames,
+  }) async {
+    try {
+      await remoteDataSource.updatePermissionBranches(
+        organizationUID: organizationUID,
+        companyUID: companyUID,
+        permissionId: permissionId,
+        branchIds: branchIds,
+        branchNames: branchNames,
+      );
+      return const Right(null);
+    } on Failure catch (f) {
+      return Left(f);
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ غير متوقع أثناء تعديل فروع الإذن.'));
+    }
+  }
+
+  @override
   Future<Either<Failure, CapturedPhoto>> uploadPhoto({
     required String organizationUID,
     required String companyUID,

@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "practice-firebase-72df1"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

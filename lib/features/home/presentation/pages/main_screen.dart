@@ -16,6 +16,9 @@ import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/delegate_tasks_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_bloc.dart';
 import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
+import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
+import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
@@ -165,6 +168,19 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                             ),
                           );
+                        } else if (value == 'penalties') {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => BlocProvider(
+                                create: (_) => di.sl<PenaltyBloc>()
+                                  ..add(LoadCompanyPenaltiesEvent(delegate.companyUID)),
+                                child: CompanyPenaltiesSettingsPage(
+                                  delegate: delegate,
+                                  showAppBar: true,
+                                ),
+                              ),
+                            ),
+                          );
                         } else if (value == 'org_switch') {
                           _showOrgSwitcher(context, colorScheme);
                         }
@@ -187,6 +203,16 @@ class _MainScreenState extends State<MainScreen> {
                               const Icon(Icons.settings_outlined),
                               const SizedBox(width: 12),
                               Text(l10n.settings),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'penalties',
+                          child: Row(
+                            children: [
+                              Icon(Icons.gavel_rounded, color: colorScheme.error),
+                              const SizedBox(width: 12),
+                              const Text('المخالفات والغرامات'),
                             ],
                           ),
                         ),

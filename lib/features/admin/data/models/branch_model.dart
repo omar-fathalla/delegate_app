@@ -12,13 +12,27 @@ class BranchModel extends Branch {
 
   factory BranchModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
-    final location = data['location'] as Map<String, dynamic>? ?? {};
+    final dynamic rawLocation = data['location'];
+    
+    double lat = 0.0;
+    double lng = 0.0;
+
+    if (rawLocation is GeoPoint) {
+      lat = rawLocation.latitude;
+      lng = rawLocation.longitude;
+    } else if (rawLocation is Map) {
+      lat = (rawLocation['latitude'] as num?)?.toDouble() ?? 0.0;
+      lng = (rawLocation['longitude'] as num?)?.toDouble() ?? 0.0;
+    } else {
+      lat = (data['latitude'] as num?)?.toDouble() ?? 0.0;
+      lng = (data['longitude'] as num?)?.toDouble() ?? 0.0;
+    }
 
     return BranchModel(
       id: doc.id,
       branchName: data['branchName'] as String? ?? '',
-      latitude: (location['latitude'] as num?)?.toDouble() ?? 0.0,
-      longitude: (location['longitude'] as num?)?.toDouble() ?? 0.0,
+      latitude: lat,
+      longitude: lng,
       geofenceRadius: (data['geofenceRadius'] as num?)?.toDouble() ?? 100.0,
     );
   }
@@ -27,17 +41,27 @@ class BranchModel extends Branch {
   /// Supports both nested (`location.latitude`) and top-level (`latitude`) formats
   /// for backwards compatibility with older branch documents.
   factory BranchModel.fromMap(Map<String, dynamic> map, {String id = ''}) {
-    final location = map['location'] as Map<String, dynamic>?;
+    final dynamic rawLocation = map['location'];
+    
+    double lat = 0.0;
+    double lng = 0.0;
+
+    if (rawLocation is GeoPoint) {
+      lat = rawLocation.latitude;
+      lng = rawLocation.longitude;
+    } else if (rawLocation is Map) {
+      lat = (rawLocation['latitude'] as num?)?.toDouble() ?? 0.0;
+      lng = (rawLocation['longitude'] as num?)?.toDouble() ?? 0.0;
+    } else {
+      lat = (map['latitude'] as num?)?.toDouble() ?? 0.0;
+      lng = (map['longitude'] as num?)?.toDouble() ?? 0.0;
+    }
 
     return BranchModel(
       id: id,
       branchName: map['branchName'] as String? ?? '',
-      latitude:
-          ((location?['latitude'] ?? map['latitude']) as num?)?.toDouble() ??
-          0.0,
-      longitude:
-          ((location?['longitude'] ?? map['longitude']) as num?)?.toDouble() ??
-          0.0,
+      latitude: lat,
+      longitude: lng,
       geofenceRadius: (map['geofenceRadius'] as num?)?.toDouble() ?? 100.0,
     );
   }

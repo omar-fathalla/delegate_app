@@ -84,6 +84,7 @@ import 'package:delegate_app/features/penalties/domain/repositories/penalty_repo
 import 'package:delegate_app/features/penalties/domain/usecases/create_penalty_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/get_all_penalties_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/get_company_penalties_usecase.dart';
+import 'package:delegate_app/features/penalties/domain/usecases/update_penalty_status_usecase.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/tasks/data/datasources/task_remote_data_source.dart';
 import 'package:delegate_app/features/tasks/data/repositories/task_repository_impl.dart';
@@ -129,6 +130,7 @@ import 'package:delegate_app/features/photo_permission/domain/usecases/get_captu
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_company_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/delete_captured_photo.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/delete_photo_permission.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/update_photo_permission_branches.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_delegate_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/core/services/review_service.dart';
@@ -477,6 +479,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => CreatePenaltyUseCase(sl()));
   sl.registerLazySingleton(() => GetCompanyPenaltiesUseCase(sl()));
   sl.registerLazySingleton(() => GetAllPenaltiesUseCase(sl()));
+  sl.registerLazySingleton(() => UpdatePenaltyStatusUseCase(sl()));
 
   sl.registerLazySingleton<PenaltyRepository>(
     () => PenaltyRepositoryImpl(remoteDataSource: sl()),
@@ -504,6 +507,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       getCompanyCapturedPhotos: sl(),
       deleteCapturedPhoto: sl(),
       deletePhotoPermission: sl(),
+      updatePhotoPermissionBranches: sl(),
     ),
   );
 
@@ -519,6 +523,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => GetCompanyCapturedPhotos(sl()));
   sl.registerLazySingleton(() => DeleteCapturedPhoto(sl()));
   sl.registerLazySingleton(() => DeletePhotoPermission(sl()));
+  sl.registerLazySingleton(() => UpdatePhotoPermissionBranches(sl()));
 
   // Repository
   sl.registerLazySingleton<PhotoPermissionRepository>(

@@ -52,12 +52,19 @@ class PenaltyRepositoryImpl implements PenaltyRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> updatePenaltyStatus(
-    String penaltyId,
-    PenaltyStatus status,
-  ) async {
+  Future<Either<Failure, Unit>> updatePenaltyStatus({
+    required String penaltyId,
+    required PenaltyStatus status,
+    String? rejectionReason,
+    String? reviewerName,
+  }) async {
     try {
-      await remoteDataSource.updatePenaltyStatus(penaltyId, status);
+      await remoteDataSource.updatePenaltyStatus(
+        penaltyId: penaltyId,
+        status: status,
+        rejectionReason: rejectionReason,
+        reviewerName: reviewerName,
+      );
       return const Right(unit);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));

@@ -7,7 +7,12 @@ abstract class PenaltyRepository {
   Future<Either<Failure, Unit>> createPenalty(PenaltyEntity penalty);
   Future<Either<Failure, List<PenaltyEntity>>> getCompanyPenalties(String companyId);
   Future<Either<Failure, List<PenaltyEntity>>> getAllPenalties();
-  Future<Either<Failure, Unit>> updatePenaltyStatus(String penaltyId, PenaltyStatus status);
+  Future<Either<Failure, Unit>> updatePenaltyStatus({
+    required String penaltyId,
+    required PenaltyStatus status,
+    String? rejectionReason,
+    String? reviewerName,
+  });
   Future<Either<Failure, Unit>> deletePenalty(String penaltyId);
   Future<Either<Failure, EvidenceFile>> uploadEvidenceFile({
     required File file,

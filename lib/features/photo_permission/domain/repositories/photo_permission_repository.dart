@@ -41,6 +41,20 @@ abstract class PhotoPermissionRepository {
     required String organizationUID,
   });
 
+  Future<Either<Failure, void>> updatePermissionBranches({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required List<String> branchIds,
+    required List<String> branchNames,
+  });
+
+  Future<Either<Failure, void>> deletePermission({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+  });
+
   Future<Either<Failure, CapturedPhoto>> uploadPhoto({
     required String organizationUID,
     required String companyUID,
@@ -76,11 +90,5 @@ abstract class PhotoPermissionRepository {
     required String permissionId,
     required String photoId,
     required String photoUrl,
-  });
-
-  Future<Either<Failure, void>> deletePermission({
-    required String organizationUID,
-    required String companyUID,
-    required String permissionId,
   });
 }

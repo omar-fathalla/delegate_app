@@ -40,6 +40,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
           organizationId: widget.delegate.organizationUID,
           delegateId: widget.delegate.uid,
           companyId: widget.delegate.companyUID,
+          delegateRoleName: widget.delegate.role.name,
         ),
       );
     }
@@ -58,6 +59,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
         organizationId: widget.delegate.organizationUID,
         delegateId: widget.delegate.uid,
         companyId: widget.delegate.companyUID,
+        delegateRoleName: widget.delegate.role.name,
       ),
     );
   }
@@ -269,6 +271,7 @@ class _FilterBarDelegate extends StatelessWidget {
         organizationId: delegate.organizationUID,
         delegateId: delegate.uid,
         companyId: delegate.companyUID,
+        delegateRoleName: delegate.role.name,
         status: status,
       ),
     );
@@ -353,6 +356,7 @@ class _TaskCard extends StatelessWidget {
                 organizationId: organizationId,
                 delegateId: delegate.uid,
                 companyId: delegate.companyUID,
+                delegateRoleName: delegate.role.name,
               ),
             );
           }

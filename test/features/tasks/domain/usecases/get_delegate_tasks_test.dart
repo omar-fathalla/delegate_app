@@ -39,15 +39,15 @@ void main() {
 
   test('should get delegate tasks from the repository', () async {
     // Arrange
-    when(() => mockTaskRepository.getDelegateTasks(any(), any(), any(), status: any(named: 'status'), limit: any(named: 'limit'), lastDoc: any(named: 'lastDoc')))
+    when(() => mockTaskRepository.getDelegateTasks(any(), any(), any(), any(), status: any(named: 'status'), limit: any(named: 'limit'), lastDoc: any(named: 'lastDoc')))
         .thenAnswer((_) async => Right(tTasks));
 
     // Act
-    final result = await usecase('org1', 'delegate1', 'comp1');
+    final result = await usecase('org1', 'delegate1', 'comp1', 'marketing');
 
     // Assert
     expect(result, Right(tTasks));
-    verify(() => mockTaskRepository.getDelegateTasks('org1', 'delegate1', 'comp1')).called(1);
+    verify(() => mockTaskRepository.getDelegateTasks('org1', 'delegate1', 'comp1', 'marketing')).called(1);
     verifyNoMoreInteractions(mockTaskRepository);
   });
 }

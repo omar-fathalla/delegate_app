@@ -13,8 +13,16 @@ class PenaltyModel extends PenaltyEntity {
     required super.incidentDescription,
     required super.fineAmount,
     super.currency = 'EGP',
-    super.status = PenaltyStatus.issued,
+    super.status = PenaltyStatus.pendingBranchesMarketing,
     super.evidenceFiles = const [],
+    super.branchesMarketingApprovedBy,
+    super.branchesMarketingApprovedAt,
+    super.generalManagerApprovedBy,
+    super.generalManagerApprovedAt,
+    super.rejectionReason,
+    super.targetDelegateId,
+    super.targetDelegateName,
+    super.isRepeated = false,
     required super.createdAt,
     required super.updatedAt,
   });
@@ -26,6 +34,13 @@ class PenaltyModel extends PenaltyEntity {
       if (val is Timestamp) return val.toDate();
       if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
       return DateTime.now();
+    }
+
+    DateTime? parseNullableTimestamp(dynamic val) {
+      if (val == null) return null;
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.tryParse(val);
+      return null;
     }
 
     final rawFiles = data['evidenceFiles'] as List<dynamic>? ?? [];
@@ -46,6 +61,14 @@ class PenaltyModel extends PenaltyEntity {
       currency: data['currency'] ?? 'EGP',
       status: PenaltyStatus.fromString(data['status'] ?? ''),
       evidenceFiles: evidenceFilesList,
+      branchesMarketingApprovedBy: data['branchesMarketingApprovedBy'],
+      branchesMarketingApprovedAt: parseNullableTimestamp(data['branchesMarketingApprovedAt']),
+      generalManagerApprovedBy: data['generalManagerApprovedBy'],
+      generalManagerApprovedAt: parseNullableTimestamp(data['generalManagerApprovedAt']),
+      rejectionReason: data['rejectionReason'],
+      targetDelegateId: data['targetDelegateId'],
+      targetDelegateName: data['targetDelegateName'],
+      isRepeated: data['isRepeated'] ?? false,
       createdAt: parseTimestamp(data['createdAt']),
       updatedAt: parseTimestamp(data['updatedAt']),
     );
@@ -65,6 +88,18 @@ class PenaltyModel extends PenaltyEntity {
       'currency': currency,
       'status': status.toFirestoreString(),
       'evidenceFiles': evidenceFiles.map((e) => e.toJson()).toList(),
+      if (branchesMarketingApprovedBy != null)
+        'branchesMarketingApprovedBy': branchesMarketingApprovedBy,
+      if (branchesMarketingApprovedAt != null)
+        'branchesMarketingApprovedAt': Timestamp.fromDate(branchesMarketingApprovedAt!),
+      if (generalManagerApprovedBy != null)
+        'generalManagerApprovedBy': generalManagerApprovedBy,
+      if (generalManagerApprovedAt != null)
+        'generalManagerApprovedAt': Timestamp.fromDate(generalManagerApprovedAt!),
+      if (rejectionReason != null) 'rejectionReason': rejectionReason,
+      if (targetDelegateId != null) 'targetDelegateId': targetDelegateId,
+      if (targetDelegateName != null) 'targetDelegateName': targetDelegateName,
+      'isRepeated': isRepeated,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -84,6 +119,14 @@ class PenaltyModel extends PenaltyEntity {
       currency: entity.currency,
       status: entity.status,
       evidenceFiles: entity.evidenceFiles,
+      branchesMarketingApprovedBy: entity.branchesMarketingApprovedBy,
+      branchesMarketingApprovedAt: entity.branchesMarketingApprovedAt,
+      generalManagerApprovedBy: entity.generalManagerApprovedBy,
+      generalManagerApprovedAt: entity.generalManagerApprovedAt,
+      rejectionReason: entity.rejectionReason,
+      targetDelegateId: entity.targetDelegateId,
+      targetDelegateName: entity.targetDelegateName,
+      isRepeated: entity.isRepeated,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     );

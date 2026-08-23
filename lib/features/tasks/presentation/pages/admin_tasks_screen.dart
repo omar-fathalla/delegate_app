@@ -41,6 +41,8 @@ class _AdminTasksScreenState extends State<AdminTasksScreen> {
         LoadMoreAdminTasksRequested(
           organizationId: widget.adminDelegate.organizationUID,
           companyId: widget.adminDelegate.companyUID,
+          adminId: widget.adminDelegate.uid,
+          adminRoleName: widget.adminDelegate.role.name,
         ),
       );
     }
@@ -76,6 +78,8 @@ class _AdminTasksScreenState extends State<AdminTasksScreen> {
                     LoadAdminTasksRequested(
                       organizationId: widget.adminDelegate.organizationUID,
                       companyId: widget.adminDelegate.companyUID,
+                      adminId: widget.adminDelegate.uid,
+                      adminRoleName: widget.adminDelegate.role.name,
                     ),
                   );
                   return const Center(child: CircularProgressIndicator());
@@ -256,6 +260,8 @@ class _FilterBar extends StatelessWidget {
         organizationId: adminDelegate.organizationUID,
         companyId: adminDelegate.companyUID,
         status: status,
+        adminId: adminDelegate.uid,
+        adminRoleName: adminDelegate.role.name,
       ),
     );
   }
@@ -366,6 +372,8 @@ class _TaskCard extends StatelessWidget {
               LoadAdminTasksRequested(
                 organizationId: adminDelegate.organizationUID,
                 companyId: adminDelegate.companyUID,
+                adminId: adminDelegate.uid,
+                adminRoleName: adminDelegate.role.name,
               ),
             );
           }

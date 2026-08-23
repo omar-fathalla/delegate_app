@@ -31,6 +31,7 @@ class DelegateTasksBloc extends Bloc<DelegateTasksEvent, DelegateTasksState> {
       event.organizationId,
       event.delegateId,
       event.companyId,
+      event.delegateRoleName,
       status: event.status,
       limit: 20,
     );
@@ -71,6 +72,7 @@ class DelegateTasksBloc extends Bloc<DelegateTasksEvent, DelegateTasksState> {
       event.organizationId,
       event.delegateId,
       event.companyId,
+      event.delegateRoleName,
       status: currentState.statusFilter,
       lastDoc: currentState.lastDoc,
       limit: 20,
@@ -105,6 +107,7 @@ class DelegateTasksBloc extends Bloc<DelegateTasksEvent, DelegateTasksState> {
         organizationId: event.organizationId,
         delegateId: event.delegateId,
         companyId: event.companyId,
+        delegateRoleName: event.delegateRoleName,
         status: event.status,
       ),
     );

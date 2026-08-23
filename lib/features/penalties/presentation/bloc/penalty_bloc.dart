@@ -141,8 +141,10 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
     Emitter<PenaltyState> emit,
   ) async {
     final result = await repository.updatePenaltyStatus(
-      event.penaltyId,
-      event.status,
+      penaltyId: event.penaltyId,
+      status: event.status,
+      rejectionReason: event.rejectionReason,
+      reviewerName: event.reviewerName,
     );
 
     result.fold(

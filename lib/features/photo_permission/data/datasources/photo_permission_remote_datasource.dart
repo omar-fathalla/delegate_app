@@ -45,6 +45,20 @@ abstract class PhotoPermissionRemoteDataSource {
     required String organizationUID,
   });
 
+  Future<void> updatePermissionBranches({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required List<String> branchIds,
+    required List<String> branchNames,
+  });
+
+  Future<void> deletePermission({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+  });
+
   Future<CapturedPhotoModel> uploadPhoto({
     required String organizationUID,
     required String companyUID,
@@ -80,12 +94,6 @@ abstract class PhotoPermissionRemoteDataSource {
     required String permissionId,
     required String photoId,
     required String photoUrl,
-  });
-
-  Future<void> deletePermission({
-    required String organizationUID,
-    required String companyUID,
-    required String permissionId,
   });
 }
 
@@ -254,8 +262,11 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       await _ensureAuth();
       if (companyUID.isEmpty) {
         // Marketing user fetching for all companies across organizations
+        // We limit to the latest 100 to prevent Out Of Memory crashes on Android
         final snapshot = await firestore
             .collectionGroup('photo_permissions')
+            .orderBy('createdAt', descending: true)
+            .limit(100)
             .get();
 
         final docs = snapshot.docs
@@ -293,9 +304,13 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
   }) async {
     try {
       await _ensureAuth();
-      final snapshot = await firestore
-          .collectionGroup('photo_permissions')
-          .get();
+      Query query = firestore.collectionGroup('photo_permissions');
+          
+      if (organizationUID.isNotEmpty) {
+        query = query.where('organizationUID', isEqualTo: organizationUID);
+      }
+
+      final snapshot = await query.get();
 
       final now = DateTime.now();
       final todayStart = DateTime(now.year, now.month, now.day);
@@ -431,11 +446,12 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
   }) async {
     try {
       await _ensureAuth();
-      final snapshot = await firestore
-          .collectionGroup('captured_photos')
-          .where('companyUID', isEqualTo: companyUID)
-          .orderBy('capturedAt', descending: true)
-          .get();
+      Query query = firestore.collectionGroup('captured_photos');
+      if (companyUID.isNotEmpty) {
+        query = query.where('companyUID', isEqualTo: companyUID);
+      }
+      query = query.orderBy('capturedAt', descending: true);
+      final snapshot = await query.get();
 
       final docs = snapshot.docs
           .map((doc) => CapturedPhotoModel.fromFirestore(doc))
@@ -517,7 +533,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
 
       for (var doc in photosSnapshot.docs) {
         try {
-          final imageUrl = doc.data()['imageUrl'] as String?;
+          final imageUrl = doc.data()['photoUrl'] as String?;
           if (imageUrl != null && imageUrl.isNotEmpty) {
             final ref = storage.refFromURL(imageUrl);
             await ref.delete();
@@ -553,6 +569,37 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     } catch (e) {
       debugPrint('Unexpected Error in deletePermission: $e');
       throw ServerFailure('حدث خطأ غير متوقع أثناء حذف إذن التصوير: $e');
+    }
+  }
+
+  @override
+  Future<void> updatePermissionBranches({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required List<String> branchIds,
+    required List<String> branchNames,
+  }) async {
+    try {
+      await _ensureAuth();
+      final docRef = firestore
+          .collection('organizations')
+          .doc(organizationUID)
+          .collection('companies')
+          .doc(companyUID)
+          .collection('photo_permissions')
+          .doc(permissionId);
+
+      await docRef.update({
+        'branchIds': branchIds,
+        'branchNames': branchNames,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (e) {
+      throwFirestoreFailure(e, 'فشل في تعديل فروع إذن التصوير.');
+    } catch (e) {
+      debugPrint('Unexpected Error in updatePermissionBranches: $e');
+      throw ServerFailure('حدث خطأ غير متوقع أثناء التعديل: $e');
     }
   }
 }

@@ -95,6 +95,7 @@ void main() {
             'fileName': 'file.jpg',
           }
         ],
+        'isRepeated': false,
         'createdAt': Timestamp.fromDate(tDate),
         'updatedAt': Timestamp.fromDate(tDate),
       };
@@ -116,6 +117,8 @@ void main() {
         category: ViolationCategory.dataMissing,
         incidentDescription: 'Missing data in form',
         fineAmount: 50.0,
+        currency: 'EGP',
+        status: PenaltyStatus.issued,
         createdAt: tDate,
         updatedAt: tDate,
         evidenceFiles: const [

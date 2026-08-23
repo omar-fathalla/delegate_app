@@ -155,27 +155,41 @@ void main() {
   group('updatePenaltyStatus', () {
     test('should return Right(unit) when call is successful', () async {
       // Arrange
-      when(() => mockRemoteDataSource.updatePenaltyStatus(any(), any()))
-          .thenAnswer((_) async {});
+      when(() => mockRemoteDataSource.updatePenaltyStatus(
+            penaltyId: any(named: 'penaltyId'),
+            status: any(named: 'status'),
+            rejectionReason: any(named: 'rejectionReason'),
+            reviewerName: any(named: 'reviewerName'),
+          )).thenAnswer((_) async {});
 
       // Act
       final result = await repository.updatePenaltyStatus(
-          'test_id', PenaltyStatus.acknowledged);
+        penaltyId: 'test_id',
+        status: PenaltyStatus.acknowledged,
+      );
 
       // Assert
       expect(result, const Right(unit));
       verify(() => mockRemoteDataSource.updatePenaltyStatus(
-          'test_id', PenaltyStatus.acknowledged)).called(1);
+            penaltyId: 'test_id',
+            status: PenaltyStatus.acknowledged,
+          )).called(1);
     });
 
     test('should return Left(ServerFailure) when call fails', () async {
       // Arrange
-      when(() => mockRemoteDataSource.updatePenaltyStatus(any(), any()))
-          .thenThrow(ServerException('Error'));
+      when(() => mockRemoteDataSource.updatePenaltyStatus(
+            penaltyId: any(named: 'penaltyId'),
+            status: any(named: 'status'),
+            rejectionReason: any(named: 'rejectionReason'),
+            reviewerName: any(named: 'reviewerName'),
+          )).thenThrow(ServerException('Error'));
 
       // Act
       final result = await repository.updatePenaltyStatus(
-          'test_id', PenaltyStatus.acknowledged);
+        penaltyId: 'test_id',
+        status: PenaltyStatus.acknowledged,
+      );
 
       // Assert
       expect(result, const Left(ServerFailure('Error')));

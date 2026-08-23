@@ -12,43 +12,55 @@ class LoadAdminTasksRequested extends AdminTasksEvent {
   final String organizationId;
   final String companyId;
   final TaskStatus? status;
+  final String? adminId;
+  final String? adminRoleName;
 
   const LoadAdminTasksRequested({
     required this.organizationId,
     required this.companyId,
     this.status,
+    this.adminId,
+    this.adminRoleName,
   });
 
   @override
-  List<Object?> get props => [organizationId, companyId, status];
+  List<Object?> get props => [organizationId, companyId, status, adminId, adminRoleName];
 }
 
 class LoadMoreAdminTasksRequested extends AdminTasksEvent {
   final String organizationId;
   final String companyId;
+  final String? adminId;
+  final String? adminRoleName;
 
   const LoadMoreAdminTasksRequested({
     required this.organizationId,
     required this.companyId,
+    this.adminId,
+    this.adminRoleName,
   });
 
   @override
-  List<Object?> get props => [organizationId, companyId];
+  List<Object?> get props => [organizationId, companyId, adminId, adminRoleName];
 }
 
 class StatusFilterChanged extends AdminTasksEvent {
   final String organizationId;
   final String companyId;
   final TaskStatus? status;
+  final String? adminId;
+  final String? adminRoleName;
 
   const StatusFilterChanged({
     required this.organizationId,
     required this.companyId,
     this.status,
+    this.adminId,
+    this.adminRoleName,
   });
 
   @override
-  List<Object?> get props => [organizationId, companyId, status];
+  List<Object?> get props => [organizationId, companyId, status, adminId, adminRoleName];
 }
 
 class AdminTaskStatusUpdateRequested extends AdminTasksEvent {

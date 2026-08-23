@@ -128,11 +128,11 @@ void main() {
   group('getDelegateTasks', () {
     test('should return list of TaskEntity on success', () async {
       // Arrange
-      when(() => mockRemoteDataSource.getDelegateTasks(any(), any(), any(), status: any(named: 'status'), limit: any(named: 'limit'), lastDoc: any(named: 'lastDoc')))
+      when(() => mockRemoteDataSource.getDelegateTasks(any(), any(), any(), any(), status: any(named: 'status'), limit: any(named: 'limit'), lastDoc: any(named: 'lastDoc')))
           .thenAnswer((_) async => [tTaskModel]);
 
       // Act
-      final result = await repository.getDelegateTasks('org123', 'delegate123', 'company123');
+      final result = await repository.getDelegateTasks('org123', 'delegate123', 'company123', 'marketing');
 
       // Assert
       result.fold(

@@ -8,11 +8,13 @@ import '../bloc/create_admin_bloc.dart';
 
 class CreateAdminScreen extends StatelessWidget {
   final String organizationUID;
+  final Delegate? currentDelegate;
   final UserRole? currentUserRole;
 
   const CreateAdminScreen({
     super.key,
     required this.organizationUID,
+    this.currentDelegate,
     this.currentUserRole,
   });
 
@@ -23,6 +25,7 @@ class CreateAdminScreen extends StatelessWidget {
           di.sl<CreateAdminBloc>()..add(LoadOrganizationsRequested()),
       child: _CreateAdminView(
         organizationUID: organizationUID,
+        currentDelegate: currentDelegate,
         currentUserRole: currentUserRole,
       ),
     );
@@ -31,10 +34,12 @@ class CreateAdminScreen extends StatelessWidget {
 
 class _CreateAdminView extends StatefulWidget {
   final String organizationUID;
+  final Delegate? currentDelegate;
   final UserRole? currentUserRole;
 
   const _CreateAdminView({
     required this.organizationUID,
+    this.currentDelegate,
     this.currentUserRole,
   });
 
@@ -47,7 +52,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _nameController = TextEditingController();
-  String _selectedRole = 'company-admin';
+  String _selectedRole = 'organization-admin';
   String? _selectedOrgUID;
   List<Map<String, dynamic>> _organizations = [];
 
@@ -378,6 +383,20 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                             color: colorScheme.outline.withValues(alpha: 0.3),
                           ),
                           _RoleTile(
+                            title: 'مدير تسويق الفروع',
+                            subtitle: 'Branches Marketing Manager',
+                            icon: Icons.storefront_rounded,
+                            value: 'branches_marketing',
+                            isSelected: _selectedRole == 'branches_marketing',
+                            onTap: () {
+                              setState(() => _selectedRole = 'branches_marketing');
+                            },
+                          ),
+                          Divider(
+                            height: 1,
+                            color: colorScheme.outline.withValues(alpha: 0.3),
+                          ),
+                          _RoleTile(
                             title: 'تسويق العروض',
                             subtitle: 'Marketing Promotion',
                             icon: Icons.photo_library_rounded,
@@ -391,20 +410,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                             height: 1,
                             color: colorScheme.outline.withValues(alpha: 0.3),
                           ),
-                          _RoleTile(
-                            title: 'مدير قطاع / مشرف شركة',
-                            subtitle: 'Company Admin',
-                            icon: Icons.business_rounded,
-                            value: 'company-admin',
-                            isSelected: _selectedRole == 'company-admin',
-                            onTap: () {
-                              setState(() => _selectedRole = 'company-admin');
-                            },
-                          ),
-                          Divider(
-                            height: 1,
-                            color: colorScheme.outline.withValues(alpha: 0.3),
-                          ),
+
                           _RoleTile(
                             title: 'مدير عام',
                             subtitle: 'Organization Admin',
@@ -417,7 +423,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                               );
                             },
                           ),
-                          if (widget.currentUserRole != UserRole.technicalSupport) ...[
+                          if ((widget.currentDelegate?.role ?? widget.currentUserRole) != UserRole.technicalSupport) ...[
                             Divider(
                               height: 1,
                               color: colorScheme.outline.withValues(alpha: 0.3),
@@ -430,6 +436,20 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                               isSelected: _selectedRole == 'super-admin',
                               onTap: () {
                                 setState(() => _selectedRole = 'super-admin');
+                              },
+                            ),
+                            Divider(
+                              height: 1,
+                              color: colorScheme.outline.withValues(alpha: 0.3),
+                            ),
+                            _RoleTile(
+                              title: 'دعم فني',
+                              subtitle: 'Technical Support',
+                              icon: Icons.support_agent_rounded,
+                              value: 'technical_support',
+                              isSelected: _selectedRole == 'technical_support',
+                              onTap: () {
+                                setState(() => _selectedRole = 'technical_support');
                               },
                             ),
                           ],

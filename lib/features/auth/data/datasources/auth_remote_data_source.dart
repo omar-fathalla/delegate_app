@@ -124,26 +124,54 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // Also check if the user is an admin in the 'users' collection
       // (a phone number can exist in both delegates and users collections)
       try {
-        final userQuery = await firestore
+        var userQuery = await firestore
             .collection('users')
             .where('phoneNumber', isEqualTo: normalizedPhone)
-            .limit(1)
             .get();
+        var docs = userQuery.docs.toList();
+        if (docs.isEmpty) {
+          userQuery = await firestore
+              .collection('users')
+              .where('phoneNumber', isEqualTo: phoneNumber.trim())
+              .get();
+          docs = userQuery.docs.toList();
+        }
+        
+        // Prioritize higher roles in case a phone number has multiple accounts
+        docs.sort((a, b) {
+          final roleA = a.data()['role'] as String? ?? '';
+          final roleB = b.data()['role'] as String? ?? '';
+          
+          int getRoleWeight(String role) {
+            if (role == 'super-admin' || role == 'super_admin') return 100;
+            if (role == 'technical_support') return 90;
+            if (role == 'organization-admin' || role == 'organization_admin') return 80;
+            if (role == 'company-admin' || role == 'admin') return 70;
+            if (role == 'branches_marketing' || role == 'branches-marketing' || role == 'branches_marketing_manager') return 65;
+            if (role == 'Supervisor') return 60;
+            if (role == 'marketing' || role == 'marketing_promotion') return 50;
+            return 0;
+          }
+          
+          return getRoleWeight(roleB).compareTo(getRoleWeight(roleA));
+        });
 
-        if (userQuery.docs.isNotEmpty) {
-          final userDoc = userQuery.docs.first;
+        for (final userDoc in docs) {
           final userData = userDoc.data();
           final userRole = userData['role'] as String? ?? '';
           if (userRole == 'company-admin' ||
               userRole == 'organization-admin' ||
               userRole == 'Supervisor' ||
+              userRole == 'super-admin' ||
+              userRole == 'super_admin' ||
               userRole == 'marketing' ||
               userRole == 'marketing_promotion' ||
               userRole == 'technical_support' ||
               userRole == 'technical-support' ||
               userRole == 'tech_support' ||
-              userRole == 'super_admin' ||
-              userRole == 'super-admin') {
+              userRole == 'branches_marketing' ||
+              userRole == 'branches-marketing' ||
+              userRole == 'branches_marketing_manager') {
             // Get admin email from Firestore
             final adminEmail = userData['email'] as String? ?? '';
 
@@ -161,9 +189,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                             : (userRole == 'super_admin' ||
                                     userRole == 'super-admin')
                                 ? UserRole.superAdmin
-                                : UserRole.admin;
+                                : (userRole == 'branches_marketing' || userRole == 'branches-marketing' || userRole == 'branches_marketing_manager')
+                                    ? UserRole.branchesMarketingManager
+                                    : UserRole.admin;
 
-            // Use phone-based password check if user has a stored password or is marketing/technical_support
+            // Use phone-based password check if user has a stored password or is marketing/technical_support/branches_marketing
             final hasStoredPassword = userData['password'] != null ||
                 userData['temporaryPassword'] != null ||
                 userData['tempPassword'] != null;
@@ -173,9 +203,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                     userRole == 'marketing_promotion' ||
                     userRole == 'technical_support' ||
                     userRole == 'technical-support' ||
-                    userRole == 'tech_support')
+                    userRole == 'tech_support' ||
+                    userRole == 'branches_marketing' ||
+                    userRole == 'branches-marketing' ||
+                    userRole == 'branches_marketing_manager')
                 ? '__phone_auth__:$normalizedPhone'
-                : '__firebase_auth__:$adminEmail';
+                : (adminEmail.isNotEmpty)
+                    ? '__firebase_auth__:$adminEmail'
+                    : '__phone_auth__:$normalizedPhone';
 
             delegates.add(
               DelegateModel(
@@ -212,6 +247,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 email: adminEmail,
               ),
             );
+            
+            // Break after finding the first valid admin role to prevent duplicate delegates
+            break;
           }
         }
       } on FirebaseException catch (_) {
@@ -303,13 +341,24 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         await signInAnonymously();
       }
 
-      final query = await firestore
+      final normalizedPhone = _normalizePhone(phoneNumber);
+      var query = await firestore
           .collection('users')
-          .where('phoneNumber', isEqualTo: phoneNumber)
+          .where('phoneNumber', isEqualTo: normalizedPhone)
           .limit(1)
           .get();
 
-      if (query.docs.isEmpty) return false;
+      var docs = query.docs;
+      if (docs.isEmpty) {
+        query = await firestore
+            .collection('users')
+            .where('phoneNumber', isEqualTo: phoneNumber.trim())
+            .limit(1)
+            .get();
+        docs = query.docs;
+      }
+
+      if (docs.isEmpty) return false;
 
       final userData = query.docs.first.data();
       final storedPassword =

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
+import 'package:delegate_app/features/penalties/domain/entities/standard_violation.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
@@ -27,12 +28,20 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
 
   String? _selectedCompanyId;
   String? _selectedCompanyName;
-  ViolationCategory _selectedCategory = ViolationCategory.unauthorizedPhotography;
+  ViolationCategory _selectedCategory = ViolationCategory.protocolBreach;
+
+  StandardViolation? _selectedOfficialViolation;
+  String? _selectedDelegateId;
+  String? _selectedDelegateName;
+  List<Map<String, String>> _companyDelegates = [];
+  bool _isLoadingDelegates = false;
 
   List<Map<String, String>> _companies = [];
   bool _isLoadingCompanies = true;
 
   final List<File> _attachedFiles = [];
+
+  bool _isRepeated = false;
 
   @override
   void initState() {
@@ -71,6 +80,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
         if (list.isNotEmpty) {
           _selectedCompanyId = list.first['id'];
           _selectedCompanyName = list.first['name'];
+          _fetchCompanyDelegates(list.first['id']!);
         }
         _isLoadingCompanies = false;
       });
@@ -79,6 +89,121 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       setState(() {
         _isLoadingCompanies = false;
       });
+    }
+  }
+
+  Future<void> _fetchCompanyDelegates(String companyId) async {
+    setState(() {
+      _isLoadingDelegates = true;
+      _companyDelegates = [];
+      _selectedDelegateId = null;
+      _selectedDelegateName = null;
+    });
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final Map<String, Map<String, String>> delegatesMap = {};
+
+      // Strategy 1: Fetch from subcollection /organizations/{org}/companies/{comp}/delegates
+      if (widget.adminDelegate.organizationUID.isNotEmpty) {
+        try {
+          final subSnapshot = await firestore
+              .collection('organizations')
+              .doc(widget.adminDelegate.organizationUID)
+              .collection('companies')
+              .doc(companyId)
+              .collection('delegates')
+              .get();
+
+          for (var doc in subSnapshot.docs) {
+            final data = doc.data();
+            final name = data['displayName']?.toString() ??
+                data['fullName']?.toString() ??
+                data['name']?.toString() ??
+                doc.id;
+            final phone = data['phoneNumber']?.toString() ?? data['phone']?.toString() ?? '';
+            delegatesMap[doc.id] = {
+              'id': doc.id,
+              'name': name,
+              'phone': phone,
+            };
+          }
+        } catch (_) {}
+      }
+
+      // Strategy 2: Fetch from users collection filtering out supervisors/admins
+      final userSnapshot = await firestore
+          .collection('users')
+          .where('companyUID', isEqualTo: companyId)
+          .get();
+
+      for (var doc in userSnapshot.docs) {
+        final data = doc.data();
+        final role = data['role']?.toString().toLowerCase() ?? '';
+        // Skip supervisors, admins, company_admins
+        if (role.contains('admin') || role.contains('supervisor') || role.contains('manager')) {
+          continue;
+        }
+
+        final name = data['displayName']?.toString() ??
+            data['fullName']?.toString() ??
+            data['name']?.toString() ??
+            doc.id;
+        final phone = data['phoneNumber']?.toString() ?? data['phone']?.toString() ?? '';
+
+        delegatesMap[doc.id] = {
+          'id': doc.id,
+          'name': name,
+          'phone': phone,
+        };
+      }
+
+      final list = delegatesMap.values.toList();
+      list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+
+      if (!mounted) return;
+      setState(() {
+        _companyDelegates = list;
+        _isLoadingDelegates = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingDelegates = false;
+      });
+    }
+  }
+
+  void _applyViolationSelection(StandardViolation violation, bool repeated) {
+    _selectedOfficialViolation = violation;
+    _selectedCategory = violation.category;
+    _titleController.text = violation.title;
+
+    if (repeated) {
+      if (violation.action2 != null && violation.action2!.isNotEmpty) {
+        _descriptionController.text = violation.action2!;
+        if (violation.id == 8) {
+          _fineAmountController.text = '5000';
+        } else if (violation.id == 9) {
+          _fineAmountController.text = '3000';
+        } else if (violation.id == 23 || violation.id == 24) {
+          _fineAmountController.text = '100';
+        } else {
+          _fineAmountController.text = violation.defaultFine > 0
+              ? violation.defaultFine.toStringAsFixed(0)
+              : '0';
+        }
+      } else {
+        _descriptionController.text = '${violation.action1} (مخالفة مكررة)';
+        _fineAmountController.text = violation.defaultFine > 0
+            ? violation.defaultFine.toStringAsFixed(0)
+            : '0';
+      }
+    } else {
+      _fineAmountController.text = violation.defaultFine > 0
+          ? violation.defaultFine.toStringAsFixed(0)
+          : '0';
+      _descriptionController.text = violation.action1;
     }
   }
 
@@ -112,6 +237,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
               _selectedCompanyId = id;
               _selectedCompanyName = name;
             });
+            _fetchCompanyDelegates(id);
           },
         );
       },
@@ -127,6 +253,18 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       return;
     }
 
+    final rawTitle = _selectedOfficialViolation != null
+        ? _selectedOfficialViolation!.title
+        : _titleController.text.trim();
+
+    if (rawTitle.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('الرجاء اختيار المخالفة من اللائحة الرسمية')),
+      );
+      return;
+    }
+
+    final finalTitle = _isRepeated ? '$rawTitle (مخالفة مكررة)' : rawTitle;
     final fineAmount = double.tryParse(_fineAmountController.text) ?? 0.0;
 
     final penalty = PenaltyEntity(
@@ -135,13 +273,16 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       companyName: _selectedCompanyName ?? _selectedCompanyId!,
       createdById: widget.adminDelegate.uid,
       createdByName: widget.adminDelegate.fullName,
-      title: _titleController.text.trim(),
+      title: finalTitle,
       category: _selectedCategory,
       incidentDescription: _descriptionController.text.trim(),
       fineAmount: fineAmount,
       currency: 'EGP',
-      status: PenaltyStatus.issued,
+      status: PenaltyStatus.pendingBranchesMarketing,
       evidenceFiles: const [],
+      targetDelegateId: _selectedDelegateId,
+      targetDelegateName: _selectedDelegateName,
+      isRepeated: _isRepeated,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -286,73 +427,203 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                             ),
                           ),
                         ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
-                  // 2. Violation Category
-                  Text(
-                    'نوع المخالفة',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<ViolationCategory>(
-                    initialValue: _selectedCategory,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.category_rounded),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 14,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
+                  // 1.b Target Delegate Selector (Optional)
+                  if (_selectedCompanyId != null) ...[
+                    Text(
+                      'المندوب المستهدف بالشركة (اختياري)',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    items: ViolationCategory.values.map((cat) {
-                      return DropdownMenuItem<ViolationCategory>(
-                        value: cat,
-                        child: Text(
-                          cat.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 8),
+                    _isLoadingDelegates
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        : DropdownButtonFormField<String?>(
+                            initialValue: _selectedDelegateId,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              hintText: 'بدون تحديد مندوب (على الشركة فقط)',
+                              prefixIcon: const Icon(Icons.person_pin_rounded),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 14,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text(
+                                  'بدون تحديد مندوب (تطبيق المخالفة على الشركة بالكامل)',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              ..._companyDelegates.map((d) {
+                                return DropdownMenuItem<String?>(
+                                  value: d['id'],
+                                  child: Text(d['name'] ?? ''),
+                                );
+                              }),
+                            ],
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedDelegateId = val;
+                                if (val != null) {
+                                  final selected = _companyDelegates.firstWhere(
+                                    (d) => d['id'] == val,
+                                    orElse: () => {'name': ''},
+                                  );
+                                  _selectedDelegateName = selected['name'];
+                                } else {
+                                  _selectedDelegateName = null;
+                                }
+                              });
+                            },
+                          ),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // 2. Official Violations Schedule Dropdown (لائحة المخالفات الرسمية)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: colorScheme.primary.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.gavel_rounded,
+                                color: colorScheme.primary, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'اختيار المخالفة من اللائحة الرسمية',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _selectedCategory = val;
-                        });
-                      }
-                    },
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<StandardViolation>(
+                          initialValue: _selectedOfficialViolation,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            hintText: 'اختر المخالفة حسب اللائحة (1 - 24)...',
+                            fillColor: colorScheme.surface,
+                            filled: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          items: officialViolationsSchedule.map((v) {
+                            final fineLabel = v.defaultFine > 0
+                                ? '${v.defaultFine.toStringAsFixed(0)} ج.م'
+                                : 'لفت نظر';
+                            return DropdownMenuItem<StandardViolation>(
+                              value: v,
+                              child: Text(
+                                '${v.id}. ${v.title} ($fineLabel)',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _applyViolationSelection(val, _isRepeated);
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 20),
 
-                  // 3. Title
+                  // 3. Repeated Violation Selector (طبيعة المخالفة)
                   Text(
-                    'عنوان المخالفة',
+                    'طبيعة وقوع المخالفة',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _titleController,
-                    decoration: InputDecoration(
-                      hintText: 'مثال: مخالفة تصوير بدون إذن رسمي',
-                      prefixIcon: const Icon(Icons.title_rounded),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 14,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 4),
+                              child: Text(
+                                'المرة الأولى (أول واقعة)',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                          selected: !_isRepeated,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _isRepeated = false;
+                                if (_selectedOfficialViolation != null) {
+                                  _applyViolationSelection(
+                                      _selectedOfficialViolation!, false);
+                                }
+                              });
+                            }
+                          },
+                        ),
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 4),
+                              child: Text(
+                                'مخالفة مكررة (المرة الثانية)',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                          selected: _isRepeated,
+                          selectedColor: colorScheme.errorContainer,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _isRepeated = true;
+                                if (_selectedOfficialViolation != null) {
+                                  _applyViolationSelection(
+                                      _selectedOfficialViolation!, true);
+                                }
+                              });
+                            }
+                          },
+                        ),
                       ),
-                    ),
-                    validator: (val) => val == null || val.trim().isEmpty
-                        ? 'الرجاء أدخل عنوان المخالفة'
-                        : null,
+                    ],
                   ),
                   const SizedBox(height: 20),
 

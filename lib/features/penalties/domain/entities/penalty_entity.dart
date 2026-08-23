@@ -54,6 +54,10 @@ enum ViolationCategory {
 }
 
 enum PenaltyStatus {
+  pendingBranchesMarketing,
+  rejectedByBranchesMarketing,
+  pendingGeneralManager,
+  rejectedByGeneralManager,
   issued,
   acknowledged,
   deducted,
@@ -62,8 +66,16 @@ enum PenaltyStatus {
 
   String get displayName {
     switch (this) {
+      case PenaltyStatus.pendingBranchesMarketing:
+        return 'بانتظار موافقة مدير تسويق الفروع';
+      case PenaltyStatus.rejectedByBranchesMarketing:
+        return 'مرفوضة من مدير تسويق الفروع';
+      case PenaltyStatus.pendingGeneralManager:
+        return 'بانتظار موافقة المدير العام';
+      case PenaltyStatus.rejectedByGeneralManager:
+        return 'مرفوضة من المدير العام';
       case PenaltyStatus.issued:
-        return 'محررة';
+        return 'محررة وموافق عليها';
       case PenaltyStatus.acknowledged:
         return 'تم الإشعار';
       case PenaltyStatus.deducted:
@@ -77,6 +89,14 @@ enum PenaltyStatus {
 
   static PenaltyStatus fromString(String status) {
     switch (status.toUpperCase()) {
+      case 'PENDING_BRANCHES_MARKETING':
+        return PenaltyStatus.pendingBranchesMarketing;
+      case 'REJECTED_BRANCHES_MARKETING':
+        return PenaltyStatus.rejectedByBranchesMarketing;
+      case 'PENDING_GENERAL_MANAGER':
+        return PenaltyStatus.pendingGeneralManager;
+      case 'REJECTED_GENERAL_MANAGER':
+        return PenaltyStatus.rejectedByGeneralManager;
       case 'ISSUED':
         return PenaltyStatus.issued;
       case 'ACKNOWLEDGED':
@@ -88,12 +108,20 @@ enum PenaltyStatus {
       case 'CANCELLED':
         return PenaltyStatus.cancelled;
       default:
-        return PenaltyStatus.issued;
+        return PenaltyStatus.pendingBranchesMarketing;
     }
   }
 
   String toFirestoreString() {
     switch (this) {
+      case PenaltyStatus.pendingBranchesMarketing:
+        return 'PENDING_BRANCHES_MARKETING';
+      case PenaltyStatus.rejectedByBranchesMarketing:
+        return 'REJECTED_BRANCHES_MARKETING';
+      case PenaltyStatus.pendingGeneralManager:
+        return 'PENDING_GENERAL_MANAGER';
+      case PenaltyStatus.rejectedByGeneralManager:
+        return 'REJECTED_GENERAL_MANAGER';
       case PenaltyStatus.issued:
         return 'ISSUED';
       case PenaltyStatus.acknowledged:
@@ -150,6 +178,14 @@ class PenaltyEntity extends Equatable {
   final String currency;
   final PenaltyStatus status;
   final List<EvidenceFile> evidenceFiles;
+  final String? branchesMarketingApprovedBy;
+  final DateTime? branchesMarketingApprovedAt;
+  final String? generalManagerApprovedBy;
+  final DateTime? generalManagerApprovedAt;
+  final String? rejectionReason;
+  final String? targetDelegateId;
+  final String? targetDelegateName;
+  final bool isRepeated;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -164,8 +200,16 @@ class PenaltyEntity extends Equatable {
     required this.incidentDescription,
     required this.fineAmount,
     this.currency = 'EGP',
-    this.status = PenaltyStatus.issued,
+    this.status = PenaltyStatus.pendingBranchesMarketing,
     this.evidenceFiles = const [],
+    this.branchesMarketingApprovedBy,
+    this.branchesMarketingApprovedAt,
+    this.generalManagerApprovedBy,
+    this.generalManagerApprovedAt,
+    this.rejectionReason,
+    this.targetDelegateId,
+    this.targetDelegateName,
+    this.isRepeated = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -184,6 +228,14 @@ class PenaltyEntity extends Equatable {
         currency,
         status,
         evidenceFiles,
+        branchesMarketingApprovedBy,
+        branchesMarketingApprovedAt,
+        generalManagerApprovedBy,
+        generalManagerApprovedAt,
+        rejectionReason,
+        targetDelegateId,
+        targetDelegateName,
+        isRepeated,
         createdAt,
         updatedAt,
       ];

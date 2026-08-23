@@ -114,7 +114,7 @@ void main() {
       await colRef.add({...tTaskModel.toFirestore(), 'assignedTo': 'other_delegate'}); // Shouldn't be returned
 
       // Act
-      final result = await dataSource.getDelegateTasks('org123', 'delegate123', 'company123');
+      final result = await dataSource.getDelegateTasks('org123', 'delegate123', 'company123', 'marketing');
 
       // Assert
       expect(result.length, equals(2));

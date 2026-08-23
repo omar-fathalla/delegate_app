@@ -17,11 +17,14 @@ abstract class TaskRemoteDataSource {
     TaskStatus? status,
     int? limit,
     dynamic lastDoc,
+    String? adminId,
+    String? adminRoleName,
   });
   Future<List<TaskModel>> getDelegateTasks(
     String organizationId,
     String delegateId,
-    String companyId, {
+    String companyId,
+    String delegateRoleName, {
     TaskStatus? status,
     int? limit,
     dynamic lastDoc,
@@ -87,10 +90,24 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     TaskStatus? status,
     int? limit,
     dynamic lastDoc,
+    String? adminId,
+    String? adminRoleName,
   }) async {
     Query query = _taskCollection(organizationId)
-        .where('companyId', isEqualTo: companyId)
-        .orderBy('createdAt', descending: true);
+        .where('companyId', isEqualTo: companyId);
+
+    if (adminId != null && adminRoleName != null && adminRoleName == 'marketingPromotion') {
+      query = query.where(
+        Filter.or(
+          Filter('createdBy', isEqualTo: adminId),
+          Filter('assignedTo', isEqualTo: adminId),
+          Filter('assignedTo', isEqualTo: 'all'),
+          Filter('assignedTo', isEqualTo: 'all_marketing_promotion'),
+        ),
+      );
+    }
+    
+    query = query.orderBy('createdAt', descending: true);
 
     if (status != null) {
       query = query.where('status', isEqualTo: status.name);
@@ -112,22 +129,41 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   Future<List<TaskModel>> getDelegateTasks(
     String organizationId,
     String delegateId,
-    String companyId, {
+    String companyId,
+    String delegateRoleName, {
     TaskStatus? status,
     int? limit,
     dynamic lastDoc,
   }) async {
     Query query = _taskCollection(organizationId)
-        .where('companyId', isEqualTo: companyId)
-        .where(
-          Filter.or(
-            Filter('assignedTo', isEqualTo: delegateId),
-            Filter('assignedTo', isEqualTo: 'all'),
-            Filter('assignedTo', isEqualTo: 'all_branch_marketing'),
-            Filter('assignedTo', isEqualTo: 'all_marketing_promotion'),
-          ),
-        )
-        .orderBy('createdAt', descending: true);
+        .where('companyId', isEqualTo: companyId);
+
+    if (delegateRoleName == 'marketing') {
+      query = query.where(
+        Filter.or(
+          Filter('assignedTo', isEqualTo: delegateId),
+          Filter('assignedTo', isEqualTo: 'all'),
+          Filter('assignedTo', isEqualTo: 'all_branch_marketing'),
+        ),
+      );
+    } else if (delegateRoleName == 'marketingPromotion') {
+      query = query.where(
+        Filter.or(
+          Filter('assignedTo', isEqualTo: delegateId),
+          Filter('assignedTo', isEqualTo: 'all'),
+          Filter('assignedTo', isEqualTo: 'all_marketing_promotion'),
+        ),
+      );
+    } else {
+      query = query.where(
+        Filter.or(
+          Filter('assignedTo', isEqualTo: delegateId),
+          Filter('assignedTo', isEqualTo: 'all'),
+        ),
+      );
+    }
+
+    query = query.orderBy('createdAt', descending: true);
 
     if (status != null) {
       query = query.where('status', isEqualTo: status.name);
