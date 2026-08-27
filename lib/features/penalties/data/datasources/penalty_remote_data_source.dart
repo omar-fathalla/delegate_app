@@ -44,6 +44,8 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
         penaltyId: docRef.id,
         companyId: penalty.companyId,
         companyName: penalty.companyName,
+        branchId: penalty.branchId,
+        branchName: penalty.branchName,
         createdById: penalty.createdById,
         createdByName: penalty.createdByName,
         title: penalty.title,
@@ -61,6 +63,57 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
       );
 
       await docRef.set(finalPenalty.toJson());
+
+      // Send notifications to Area Marketing Manager & General Manager
+      try {
+        final notifBody =
+            'تم تسجيل مخالفة (${finalPenalty.title}) بمبلغ ${finalPenalty.fineAmount.toStringAsFixed(0)} ج.م على شركة (${finalPenalty.companyName}) بفرع (${finalPenalty.branchName ?? "الفرع"}).';
+
+        // 1. Role-based notifications
+        for (final roleKey in ['branchesMarketingManager', 'organizationAdmin', 'super-admin']) {
+          await firestore.collection('notifications').add({
+            'title': '🚨 تسجيل مخالفة جديدة قيد المراجعة',
+            'body': notifBody,
+            'type': 'penalty',
+            'penaltyId': docRef.id,
+            'companyId': finalPenalty.companyId,
+            'branchId': finalPenalty.branchId,
+            'delegateUid': roleKey,
+            'read': false,
+            'createdAt': Timestamp.now(),
+          });
+        }
+
+        // 2. Specific manager accounts in Firestore
+        final usersSnap = await firestore
+            .collection('users')
+            .where('role', whereIn: [
+              'branchesMarketingManager',
+              'organizationAdmin',
+              'superAdmin',
+              'branches_marketing'
+            ])
+            .get();
+
+        for (final userDoc in usersSnap.docs) {
+          final uid = userDoc.id;
+          final phone = userDoc.data()['phoneNumber']?.toString();
+          await firestore.collection('notifications').add({
+            'title': '🚨 تسجيل مخالفة جديدة قيد المراجعة',
+            'body': notifBody,
+            'type': 'penalty',
+            'penaltyId': docRef.id,
+            'companyId': finalPenalty.companyId,
+            'branchId': finalPenalty.branchId,
+            'delegateUid': uid,
+            if (phone != null && phone.isNotEmpty) 'phoneNumber': phone,
+            'read': false,
+            'createdAt': Timestamp.now(),
+          });
+        }
+      } catch (_) {
+        // Notification failure should not block penalty creation
+      }
     } on FirebaseException catch (e) {
       throw ServerException(e.message ?? 'فشل في تسجيل الغرامة.');
     } catch (e) {

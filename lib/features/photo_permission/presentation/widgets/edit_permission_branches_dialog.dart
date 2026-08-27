@@ -33,15 +33,19 @@ class _EditPermissionBranchesDialogState extends State<EditPermissionBranchesDia
   Future<void> _fetchBranches() async {
     try {
       final snapshot = await FirebaseFirestore.instance
-          .collection('organizations')
-          .doc(widget.permission.organizationUID)
-          .collection('companies')
-          .doc(widget.permission.companyUID)
           .collection('branches')
           .get();
       if (mounted) {
+        final docs = snapshot.docs.toList();
+        docs.sort((a, b) {
+          final dataA = a.data();
+          final dataB = b.data();
+          final nameA = (dataA['branchName'] as String?) ?? (dataA['name'] as String?) ?? '';
+          final nameB = (dataB['branchName'] as String?) ?? (dataB['name'] as String?) ?? '';
+          return nameA.compareTo(nameB);
+        });
         setState(() {
-          _allBranches = snapshot.docs;
+          _allBranches = docs;
           _isLoading = false;
         });
       }
@@ -63,15 +67,18 @@ class _EditPermissionBranchesDialogState extends State<EditPermissionBranchesDia
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _allBranches.isEmpty
-                ? const Text('لا توجد فروع مسجلة لهذه الشركة.')
+                ? const Text('لا توجد فروع مسجلة.')
                 : ListView.builder(
                     shrinkWrap: true,
                     itemCount: _allBranches.length,
                     itemBuilder: (context, index) {
                       final doc = _allBranches[index];
-                      final data = doc.data() as Map<String, dynamic>;
+                      final data = (doc.data() as Map<String, dynamic>?) ?? {};
                       final branchId = doc.id;
-                      final branchName = data['branchName'] as String? ?? 'بدون اسم';
+                      final branchName = (data['branchName'] as String?) ??
+                          (data['name'] as String?) ??
+                          (data['title'] as String?) ??
+                          'بدون اسم';
 
                       final isSelected = _selectedBranchIds.contains(branchId);
 

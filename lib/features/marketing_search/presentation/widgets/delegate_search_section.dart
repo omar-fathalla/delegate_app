@@ -59,7 +59,7 @@ class DelegateSearchSection extends StatelessWidget {
           ],
           decoration: InputDecoration(
             labelText: 'رقم الموبايل',
-            hintText: 'أدخل رقم الموبايل (مثال: 01012345678)',
+            hintText: 'أدخل رقم الموبايل',
             hintStyle: TextStyle(color: colorScheme.outline),
             prefixIcon: Icon(
               Icons.phone_android_rounded,

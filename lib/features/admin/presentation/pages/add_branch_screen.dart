@@ -11,19 +11,21 @@ import '../../data/models/branch_model.dart';
 import '../bloc/branch_bloc.dart';
 
 class AddBranchScreen extends StatelessWidget {
-  const AddBranchScreen({super.key});
+  final bool showAppBar;
+  const AddBranchScreen({super.key, this.showAppBar = false});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => di.sl<BranchBloc>(),
-      child: const _AddBranchView(),
+      child: _AddBranchView(showAppBar: showAppBar),
     );
   }
 }
 
 class _AddBranchView extends StatefulWidget {
-  const _AddBranchView();
+  final bool showAppBar;
+  const _AddBranchView({this.showAppBar = false});
 
   @override
   State<_AddBranchView> createState() => _AddBranchViewState();
@@ -259,6 +261,12 @@ class _AddBranchViewState extends State<_AddBranchView> {
         final isSaving = state is BranchLoading;
 
         return Scaffold(
+          appBar: widget.showAppBar
+              ? AppBar(
+                  title: Text(l10n.addBranch),
+                  centerTitle: true,
+                )
+              : null,
           backgroundColor: colorScheme.surface,
           body: SafeArea(
             child: SingleChildScrollView(

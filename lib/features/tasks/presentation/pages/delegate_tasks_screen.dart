@@ -86,7 +86,28 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
       body: BlocConsumer<DelegateTasksBloc, DelegateTasksState>(
         listener: (context, state) {
           if (state is TaskStatusUpdateSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  state.newStatus == TaskStatus.completed
+                      ? 'تم تأكيد إنجاز المهمة بنجاح ✅'
+                      : 'تم بدء العمل على المهمة بنجاح ⏱️',
+                ),
+                backgroundColor: state.newStatus == TaskStatus.completed
+                    ? Colors.green.shade700
+                    : Colors.blue.shade700,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
             _loadTasks();
+          } else if (state is DelegateTasksError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red.shade700,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
           }
         },
         builder: (context, state) {
@@ -118,17 +139,34 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
           if (state is DelegateTasksLoaded) {
             if (state.tasks.isEmpty) {
               return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.task_alt_rounded,
-                      size: 64,
-                      color: theme.colorScheme.outlineVariant,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(l10n.noTasksYet, style: theme.textTheme.titleMedium),
-                  ],
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.task_alt_rounded,
+                        size: 72,
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'لا توجد مهام مسندة إليك حالياً',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'ستظهر هنا أي مهام يوجهها المشرف أو الإدارة فور إسنادها.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               );
             }

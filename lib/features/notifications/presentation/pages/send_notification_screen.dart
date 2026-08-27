@@ -6,8 +6,13 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 class SendNotificationScreen extends StatefulWidget {
   final Delegate senderDelegate;
+  final bool showAppBar;
 
-  const SendNotificationScreen({super.key, required this.senderDelegate});
+  const SendNotificationScreen({
+    super.key,
+    required this.senderDelegate,
+    this.showAppBar = true,
+  });
 
   @override
   State<SendNotificationScreen> createState() => _SendNotificationScreenState();
@@ -288,10 +293,10 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
         if (matchedUser != null) {
           targetUid = matchedUser['uid'];
-          final uName = matchedUser['name'];
-          final uPhone = matchedUser['phone'];
-          targetName = '$uName ($uPhone)';
-          targetDetails = 'مستخدم محدد: $uName • رقم الهاتف: $uPhone';
+          final uName = matchedUser['name'] ?? 'مستخدم';
+          final uPhone = matchedUser['phone'] ?? phoneInput;
+          targetName = uName;
+          targetDetails = 'مستخدم محدد: $uName';
 
           await firestore.collection('notifications').add({
             'delegateUid': targetUid,
@@ -407,6 +412,40 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final tabBar = TabBar(
+      controller: _tabController,
+      indicatorColor: colorScheme.primary,
+      indicatorWeight: 3,
+      labelColor: colorScheme.primary,
+      unselectedLabelColor: colorScheme.onSurfaceVariant,
+      labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+      tabs: const [
+        Tab(icon: Icon(Icons.edit_note_rounded), text: 'إرسال إشعار جديد'),
+        Tab(
+          icon: Icon(Icons.outbox_rounded),
+          text: 'صندوق الصادر والمقروء',
+        ),
+      ],
+    );
+
+    if (!widget.showAppBar) {
+      return Column(
+        children: [
+          Material(
+            color: colorScheme.surface,
+            elevation: 1,
+            child: tabBar,
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [_buildComposeTab(theme, colorScheme), _buildSentHistoryTab()],
+            ),
+          ),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -414,21 +453,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: colorScheme.primary,
-          indicatorWeight: 3,
-          labelColor: colorScheme.primary,
-          unselectedLabelColor: colorScheme.onSurfaceVariant,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          tabs: const [
-            Tab(icon: Icon(Icons.edit_note_rounded), text: 'إرسال إشعار جديد'),
-            Tab(
-              icon: Icon(Icons.outbox_rounded),
-              text: 'صندوق الصادر والمقروء',
-            ),
-          ],
-        ),
+        bottom: tabBar,
       ),
       body: TabBarView(
         controller: _tabController,
@@ -890,7 +915,8 @@ class _SentNotificationCard extends StatelessWidget {
 
     final title = data['title'] as String? ?? 'بدون عنوان';
     final body = data['body'] as String? ?? '';
-    final targetName = data['targetName'] as String? ?? 'الجميع';
+    final rawTargetName = data['targetName'] as String? ?? 'الجميع';
+    final targetName = rawTargetName.replaceAll(RegExp(r'\s*\(\+?\d+\)\s*'), '').trim();
     final targetAudience = data['targetAudience'] as String? ?? 'all';
     final senderName = data['senderName'] as String? ?? 'الدعم الفني';
     final totalSent = (data['sentCount'] as num?)?.toInt() ?? 1;
@@ -1206,7 +1232,10 @@ class _SentNotificationCard extends StatelessWidget {
                 const Divider(),
                 _buildDetailRow(
                   'المستهدف',
-                  data['targetDetails'] ?? data['targetName'] ?? '',
+                  (data['targetDetails'] as String? ?? data['targetName'] as String? ?? '')
+                      .replaceAll(RegExp(r'\s*•?\s*رقم الهاتف:?\s*\+?\d+'), '')
+                      .replaceAll(RegExp(r'\s*\(\+?\d+\)\s*'), '')
+                      .trim(),
                 ),
                 const Divider(),
                 _buildDetailRow('المرسل', data['senderName'] ?? ''),

@@ -610,14 +610,24 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   void _openAttendanceHistory(BuildContext context, Map<String, dynamic> record) {
     final delegateData = record['delegateData'] as Map<String, dynamic>?;
     final delegateId = record['delegateId'] as String? ?? '';
-    if (delegateData == null || delegateId.isEmpty) {
+    if (delegateId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لا توجد بيانات كاملة للمندوب')),
+        const SnackBar(content: Text('لا توجد بيانات للمندوب')),
       );
       return;
     }
     try {
-      final delegate = DelegateModel.fromJson(delegateData, delegateId);
+      final safeData = Map<String, dynamic>.from(delegateData ?? {});
+      safeData.putIfAbsent('uid', () => delegateId);
+      safeData.putIfAbsent('fullName', () => record['fullName'] ?? 'مندوب');
+      safeData.putIfAbsent('phoneNumber', () => record['phoneNumber'] ?? '');
+      safeData.putIfAbsent('companyName', () => record['companyName'] ?? '');
+      safeData.putIfAbsent('companyUID', () => record['companyUID'] ?? '');
+      safeData.putIfAbsent('organizationUID', () => widget.marketingUser.organizationUID);
+      safeData.putIfAbsent('status', () => 'Active');
+      safeData.putIfAbsent('role', () => 'delegate');
+
+      final delegate = DelegateModel.fromJson(safeData, delegateId);
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -806,12 +816,24 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     try {
       final snapshot = await di.sl<FirebaseFirestore>()
           .collection('branches')
-          .orderBy('branchName')
           .get();
       if (mounted) {
+        final docs = snapshot.docs.map((d) {
+          final data = d.data();
+          final name = (data['branchName'] as String?) ??
+              (data['name'] as String?) ??
+              (data['title'] as String?) ??
+              '';
+          return {
+            'id': d.id,
+            ...data,
+            'branchName': name,
+          };
+        }).toList();
+        docs.sort((a, b) =>
+            (a['branchName'] as String? ?? '').compareTo(b['branchName'] as String? ?? ''));
         setState(() {
-          _allBranches =
-              snapshot.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+          _allBranches = docs;
           _filtered = _allBranches;
           _loading = false;
         });

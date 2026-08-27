@@ -7,10 +7,6 @@ import 'package:delegate_app/features/settings/presentation/pages/settings_scree
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:delegate_app/features/changelog/presentation/bloc/changelog_bloc.dart';
-import 'package:delegate_app/features/changelog/presentation/bloc/changelog_event.dart';
-import 'package:delegate_app/features/changelog/presentation/bloc/changelog_state.dart';
-import 'package:delegate_app/features/changelog/presentation/widgets/whats_new_dialog.dart';
 import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/delegate_tasks_screen.dart';
@@ -60,33 +56,7 @@ class _MainScreenState extends State<MainScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final isArabic = localeProvider.isArabic;
 
-    return BlocProvider(
-      create: (_) {
-        final bloc = di.sl<ChangelogBloc>();
-        Future.delayed(const Duration(seconds: 4), () {
-          if (!bloc.isClosed) {
-            bloc.add(CheckForNewUpdates());
-          }
-        });
-        return bloc;
-      },
-      child: BlocListener<ChangelogBloc, ChangelogState>(
-        listener: (context, state) {
-          if (state is ChangelogHasNewUpdates) {
-            // Show the dialog after the frame is built
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!context.mounted) return;
-              WhatsNewDialog.show(
-                context,
-                updates: state.updates,
-                onDismiss: () {
-                  context.read<ChangelogBloc>().add(DismissNewUpdates());
-                },
-              );
-            });
-          }
-        },
-        child: Scaffold(
+    return Scaffold(
           appBar: AppBar(
                   backgroundColor: colorScheme.surface,
                   foregroundColor: colorScheme.onSurface,
@@ -262,9 +232,7 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ],
           ),
-        ),
-      ),
-    );
+        );
   }
 
   /// Lazy-builds tabs: only creates a tab widget when it's first visited,
@@ -307,6 +275,15 @@ class _MainScreenState extends State<MainScreen> {
     final cacheDelegate = di.sl<CacheDelegate>();
     await cacheDelegate(delegate);
     if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'تم التبديل بنجاح إلى: ${delegate.organizationName} - ${delegate.companyName}',
+          ),
+          backgroundColor: Colors.green.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       context.go('/home', extra: delegate);
     }
   }
@@ -378,12 +355,19 @@ class _MainScreenState extends State<MainScreen> {
                   trailing: isCurrentOrg
                       ? Icon(Icons.check_circle, color: colorScheme.primary)
                       : null,
-                  onTap: isCurrentOrg
-                      ? null
-                      : () {
-                          Navigator.pop(dialogContext);
-                          _switchToOrganization(delegate);
-                        },
+                  onTap: () {
+                    Navigator.pop(dialogContext);
+                    if (isCurrentOrg) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('أنت تعمل بالفعل ضمن هذه المنظمة حالياً.'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else {
+                      _switchToOrganization(delegate);
+                    }
+                  },
                 ),
               ),
             );

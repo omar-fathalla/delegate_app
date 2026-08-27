@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
@@ -28,11 +30,96 @@ class CompanyPenaltiesSettingsPage extends StatefulWidget {
 class _CompanyPenaltiesSettingsPageState
     extends State<CompanyPenaltiesSettingsPage> {
   String _selectedCompanyFilter = 'all';
+  String _selectedBranchFilter = 'all';
+  String? _pinnedBranchId;
+  List<Map<String, String>> _availableBranches = [];
+  bool _isLoadingBranches = true;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _loadBranchesAndPinned();
+  }
+
+  Future<void> _loadBranchesAndPinned() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pinnedId = prefs.getString('pinned_penalty_branch_id_${widget.delegate.uid}');
+
+      final snapshot = await FirebaseFirestore.instance.collection('branches').get();
+      if (!mounted) return;
+
+      final list = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final name = (data['branchName'] as String?) ??
+            (data['name'] as String?) ??
+            (data['title'] as String?) ??
+            doc.id;
+        return {
+          'id': doc.id,
+          'name': name,
+        };
+      }).toList();
+      list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+
+      setState(() {
+        _availableBranches = list;
+        _pinnedBranchId = pinnedId;
+        if (pinnedId != null && list.any((b) => b['id'] == pinnedId)) {
+          _selectedBranchFilter = pinnedId;
+        }
+        _isLoadingBranches = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingBranches = false;
+      });
+    }
+  }
+
+  Future<void> _togglePinCurrentBranch() async {
+    if (_selectedBranchFilter == 'all') return;
+    final prefs = await SharedPreferences.getInstance();
+    final keyId = 'pinned_penalty_branch_id_${widget.delegate.uid}';
+    final keyName = 'pinned_penalty_branch_name_${widget.delegate.uid}';
+
+    if (_pinnedBranchId == _selectedBranchFilter) {
+      // Unpin
+      await prefs.remove(keyId);
+      await prefs.remove(keyName);
+      if (!mounted) return;
+      setState(() {
+        _pinnedBranchId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إلغاء تثبيت الفرع الافتراضي'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      // Pin
+      final branchObj = _availableBranches.firstWhere(
+        (b) => b['id'] == _selectedBranchFilter,
+        orElse: () => {'name': _selectedBranchFilter},
+      );
+      final branchName = branchObj['name'] ?? _selectedBranchFilter;
+      await prefs.setString(keyId, _selectedBranchFilter);
+      await prefs.setString(keyName, branchName);
+      if (!mounted) return;
+      setState(() {
+        _pinnedBranchId = _selectedBranchFilter;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('📌 تم تثبيت "$branchName" كفرع افتراضي لقسم الغرامات'),
+          backgroundColor: Colors.teal.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _loadData() {
@@ -89,7 +176,10 @@ class _CompanyPenaltiesSettingsPageState
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
-                  onPressed: _loadData,
+                  onPressed: () {
+                    _loadData();
+                    _loadBranchesAndPinned();
+                  },
                 ),
               ],
             )
@@ -107,7 +197,10 @@ class _CompanyPenaltiesSettingsPageState
                     ),
                   ),
                 );
-                if (res == true) _loadData();
+                if (res == true) {
+                  _loadData();
+                  _loadBranchesAndPinned();
+                }
               },
               icon: const Icon(Icons.add_rounded),
               label: const Text('تسجيل مخالفة'),
@@ -146,14 +239,15 @@ class _CompanyPenaltiesSettingsPageState
           if (state is PenaltyLoadedState) {
             var penalties = state.penalties;
 
-            // Filter for Delegates: show ONLY penalties approved & issued by General Manager
-            final isDelegateRole = widget.delegate.role == UserRole.marketing ||
-                widget.delegate.role == UserRole.marketingPromotion;
-            if (isDelegateRole) {
+            // Filter by selected Branch
+            if (_selectedBranchFilter != 'all') {
               penalties = penalties.where((p) =>
-                p.status == PenaltyStatus.issued ||
-                p.status == PenaltyStatus.acknowledged ||
-                p.status == PenaltyStatus.deducted
+                p.branchId == _selectedBranchFilter ||
+                p.branchName == _selectedBranchFilter ||
+                (p.branchName != null &&
+                    _availableBranches.any((b) =>
+                        b['id'] == _selectedBranchFilter &&
+                        b['name'] == p.branchName))
               ).toList();
             }
 
@@ -165,6 +259,13 @@ class _CompanyPenaltiesSettingsPageState
               groupedByCompany.putIfAbsent(compName, () => []).add(p);
             }
 
+            // Recalculate totals for the filtered subset
+            final filteredTotalFines =
+                penalties.fold<double>(0.0, (total, p) => total + p.fineAmount);
+            final filteredDeducted = penalties
+                .where((p) => p.status == PenaltyStatus.deducted)
+                .fold<double>(0.0, (total, p) => total + p.fineAmount);
+
             // Filtered entries according to selection chip
             final entriesToDisplay = _selectedCompanyFilter == 'all'
                 ? groupedByCompany.entries.toList()
@@ -172,8 +273,183 @@ class _CompanyPenaltiesSettingsPageState
                     .where((e) => e.key == _selectedCompanyFilter)
                     .toList();
 
+            final selectedBranchObj = _availableBranches.firstWhere(
+              (b) => b['id'] == _selectedBranchFilter,
+              orElse: () => {'name': ''},
+            );
+            final activeBranchName = selectedBranchObj['name'];
+            final isCurrentBranchPinned = _selectedBranchFilter != 'all' &&
+                _pinnedBranchId == _selectedBranchFilter;
+
             return CustomScrollView(
               slivers: [
+                // 0. Branch Selector & Pin Bar
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isCurrentBranchPinned
+                              ? colorScheme.primary.withValues(alpha: 0.5)
+                              : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.storefront_rounded,
+                                color: colorScheme.primary,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'عرض مخالفات الفرع:',
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (_selectedBranchFilter != 'all')
+                                InkWell(
+                                  onTap: _togglePinCurrentBranch,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isCurrentBranchPinned
+                                          ? colorScheme.primaryContainer
+                                          : colorScheme.surface,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isCurrentBranchPinned
+                                            ? colorScheme.primary
+                                            : colorScheme.outlineVariant,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          isCurrentBranchPinned
+                                              ? Icons.push_pin_rounded
+                                              : Icons.push_pin_outlined,
+                                          size: 14,
+                                          color: isCurrentBranchPinned
+                                              ? colorScheme.onPrimaryContainer
+                                              : colorScheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          isCurrentBranchPinned
+                                              ? 'فرعي المثبت 📌'
+                                              : 'تثبيت كافتراضي',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: isCurrentBranchPinned
+                                                ? colorScheme.onPrimaryContainer
+                                                : colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _isLoadingBranches
+                              ? const LinearProgressIndicator()
+                              : DropdownButtonFormField<String>(
+                                  key: ValueKey(_selectedBranchFilter),
+                                  initialValue: _availableBranches.any((b) => b['id'] == _selectedBranchFilter)
+                                      ? _selectedBranchFilter
+                                      : 'all',
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    filled: true,
+                                    fillColor: colorScheme.surface,
+                                  ),
+                                  items: [
+                                    const DropdownMenuItem(
+                                      value: 'all',
+                                      child: Text(
+                                        'جميع الفروع (عرض شامل)',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    ..._availableBranches.map((b) {
+                                      final isPinned = b['id'] == _pinnedBranchId;
+                                      return DropdownMenuItem(
+                                        value: b['id'],
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                b['name'] ?? '',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (isPinned) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: colorScheme.primaryContainer,
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  'المثبت 📌',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: colorScheme.onPrimaryContainer,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _selectedBranchFilter = val;
+                                        _selectedCompanyFilter = 'all';
+                                      });
+                                    }
+                                  },
+                                ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
                 // 1. Overall Summary Card
                 SliverToBoxAdapter(
                   child: Padding(
@@ -205,13 +481,19 @@ class _CompanyPenaltiesSettingsPageState
                                 size: 28,
                               ),
                               const SizedBox(width: 10),
-                              Text(
-                                isOrgAdmin
-                                    ? 'ملخص غرامات ومخالفات الشركات'
-                                    : 'ملخص الغرامات والمخالفات',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onErrorContainer,
+                              Expanded(
+                                child: Text(
+                                  activeBranchName != null && activeBranchName.isNotEmpty
+                                      ? 'ملخص الغرامات ($activeBranchName)'
+                                      : (isOrgAdmin
+                                          ? 'ملخص غرامات ومخالفات الشركات'
+                                          : 'ملخص الغرامات والمخالفات'),
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onErrorContainer,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -231,7 +513,7 @@ class _CompanyPenaltiesSettingsPageState
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      state.totalFineAmount.toStringAsFixed(2),
+                                      filteredTotalFines.toStringAsFixed(2),
                                       style: theme.textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: colorScheme.error,
@@ -258,7 +540,7 @@ class _CompanyPenaltiesSettingsPageState
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      state.deductedAmount.toStringAsFixed(2),
+                                      filteredDeducted.toStringAsFixed(2),
                                       style: theme.textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: Colors.green.shade700,
@@ -638,13 +920,50 @@ class _PenaltyCardState extends State<_PenaltyCard> {
               ),
               const SizedBox(height: 4),
 
-              // Category tag line
-              Text(
-                widget.penalty.category.displayName,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
+              // Category tag line & Branch badge
+              Row(
+                children: [
+                  Text(
+                    widget.penalty.category.displayName,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (widget.penalty.branchName != null &&
+                      widget.penalty.branchName!.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.storefront_rounded,
+                            size: 12,
+                            color: colorScheme.onSecondaryContainer,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            widget.penalty.branchName!,
+                            style: TextStyle(
+                              color: colorScheme.onSecondaryContainer,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
               if (widget.penalty.targetDelegateName != null &&
                   widget.penalty.targetDelegateName!.isNotEmpty) ...[
@@ -793,18 +1112,29 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                 elevation: 0,
                               ),
                               onPressed: () {
+                                final isDirectApproval = widget.penalty.fineAmount <= 1000.0;
+                                final nextStatus = isDirectApproval
+                                    ? PenaltyStatus.issued
+                                    : PenaltyStatus.pendingGeneralManager;
                                 context.read<PenaltyBloc>().add(
                                       UpdatePenaltyStatusEvent(
                                         penaltyId: widget.penalty.penaltyId,
-                                        status: PenaltyStatus.pendingGeneralManager,
+                                        status: nextStatus,
                                         reviewerName: widget.currentDelegate!.fullName,
                                       ),
                                     );
                               },
-                              icon: const Icon(Icons.check_circle_rounded, size: 18),
-                              label: const Text(
-                                'موافقة وتمرير',
-                                style: TextStyle(
+                              icon: Icon(
+                                widget.penalty.fineAmount <= 1000.0
+                                    ? Icons.verified_rounded
+                                    : Icons.arrow_forward_rounded,
+                                size: 18,
+                              ),
+                              label: Text(
+                                widget.penalty.fineAmount <= 1000.0
+                                    ? 'اعتماد وإصدار فوري (≤ 1000 ج.م)'
+                                    : 'موافقة وتمرير للمدير العام (> 1000 ج.م)',
+                                style: const TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 13),
                               ),
                             ),

@@ -65,6 +65,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(File('test.jpg'));
+    registerFallbackValue(SettableMetadata());
   });
 
   setUp(() {
@@ -118,14 +119,14 @@ void main() {
       when(() => mockStorage.ref()).thenReturn(mockRootReference);
       when(() => mockRootReference.child(any())).thenReturn(mockChildReference);
       
-      when(() => mockChildReference.putFile(any())).thenAnswer((_) => FakeUploadTask(mockTaskSnapshot));
+      when(() => mockChildReference.putFile(any(), any())).thenAnswer((_) => FakeUploadTask(mockTaskSnapshot));
       when(() => mockChildReference.getDownloadURL()).thenAnswer((_) async => 'http://test.com/my_image.jpg');
       when(() => mockCollectionReference.add(any())).thenAnswer((_) async => mockDocumentReference);
 
       await dataSource.submitFeedback(tFeedbackModel, mockFile);
 
       verify(() => mockStorage.ref()).called(1);
-      verify(() => mockChildReference.putFile(any())).called(1);
+      verify(() => mockChildReference.putFile(any(), any())).called(1);
       verify(() => mockFirestore.collection('feedbacks')).called(1);
       verify(() => mockCollectionReference.add(any())).called(1);
     });

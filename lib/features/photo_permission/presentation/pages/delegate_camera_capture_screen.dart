@@ -137,11 +137,29 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
       body: BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
         listener: (context, state) {
           if (state is PhotoUploadSuccess) {
+            final isOffline = state.isOffline;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✅ تم حفظ التقرير محلياً. سيتم رفعه تلقائياً عند توفر الإنترنت.'),
-                backgroundColor: Colors.green,
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(
+                      isOffline ? Icons.cloud_off_rounded : Icons.cloud_done_rounded,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isOffline
+                            ? '⏳ تم حفظ الصورة محلياً بأمان، وسيتم رفعها تلقائياً للسيرفر فور توفر الإنترنت.'
+                            : '✅ تم رفع الصورة وحفظ التقرير بنجاح على السيرفر.',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: isOffline ? Colors.orange.shade800 : Colors.green.shade700,
                 behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
               ),
             );
             setState(() {
@@ -359,12 +377,33 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
 
                       // Submit button
                       state is PhotoPermissionUploadInProgress
-                          ? const Center(
-                              child: Column(
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  CircularProgressIndicator(),
-                                  SizedBox(height: 8),
-                                  Text('جاري الحفظ...'),
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'جاري رفع الصورة إلى السيرفر وحفظ التقرير...',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.primary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
                                 ],
                               ),
                             )

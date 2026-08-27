@@ -21,19 +21,38 @@ class BranchModel extends Branch {
       lat = rawLocation.latitude;
       lng = rawLocation.longitude;
     } else if (rawLocation is Map) {
-      lat = (rawLocation['latitude'] as num?)?.toDouble() ?? 0.0;
-      lng = (rawLocation['longitude'] as num?)?.toDouble() ?? 0.0;
+      lat = (rawLocation['latitude'] as num?)?.toDouble() ??
+          (rawLocation['lat'] as num?)?.toDouble() ??
+          0.0;
+      lng = (rawLocation['longitude'] as num?)?.toDouble() ??
+          (rawLocation['lng'] as num?)?.toDouble() ??
+          0.0;
     } else {
-      lat = (data['latitude'] as num?)?.toDouble() ?? 0.0;
-      lng = (data['longitude'] as num?)?.toDouble() ?? 0.0;
+      lat = (data['latitude'] as num?)?.toDouble() ??
+          (data['lat'] as num?)?.toDouble() ??
+          0.0;
+      lng = (data['longitude'] as num?)?.toDouble() ??
+          (data['lng'] as num?)?.toDouble() ??
+          0.0;
     }
+
+    final name = data['branchName'] as String? ??
+        data['name'] as String? ??
+        data['title'] as String? ??
+        data['branch_name'] as String? ??
+        '';
+
+    final radius = (data['geofenceRadius'] as num?)?.toDouble() ??
+        (data['radius'] as num?)?.toDouble() ??
+        (data['geofence_radius'] as num?)?.toDouble() ??
+        100.0;
 
     return BranchModel(
       id: doc.id,
-      branchName: data['branchName'] as String? ?? '',
+      branchName: name,
       latitude: lat,
       longitude: lng,
-      geofenceRadius: (data['geofenceRadius'] as num?)?.toDouble() ?? 100.0,
+      geofenceRadius: radius,
     );
   }
 
@@ -50,19 +69,38 @@ class BranchModel extends Branch {
       lat = rawLocation.latitude;
       lng = rawLocation.longitude;
     } else if (rawLocation is Map) {
-      lat = (rawLocation['latitude'] as num?)?.toDouble() ?? 0.0;
-      lng = (rawLocation['longitude'] as num?)?.toDouble() ?? 0.0;
+      lat = (rawLocation['latitude'] as num?)?.toDouble() ??
+          (rawLocation['lat'] as num?)?.toDouble() ??
+          0.0;
+      lng = (rawLocation['longitude'] as num?)?.toDouble() ??
+          (rawLocation['lng'] as num?)?.toDouble() ??
+          0.0;
     } else {
-      lat = (map['latitude'] as num?)?.toDouble() ?? 0.0;
-      lng = (map['longitude'] as num?)?.toDouble() ?? 0.0;
+      lat = (map['latitude'] as num?)?.toDouble() ??
+          (map['lat'] as num?)?.toDouble() ??
+          0.0;
+      lng = (map['longitude'] as num?)?.toDouble() ??
+          (map['lng'] as num?)?.toDouble() ??
+          0.0;
     }
+
+    final name = map['branchName'] as String? ??
+        map['name'] as String? ??
+        map['title'] as String? ??
+        map['branch_name'] as String? ??
+        '';
+
+    final radius = (map['geofenceRadius'] as num?)?.toDouble() ??
+        (map['radius'] as num?)?.toDouble() ??
+        (map['geofence_radius'] as num?)?.toDouble() ??
+        100.0;
 
     return BranchModel(
       id: id,
-      branchName: map['branchName'] as String? ?? '',
+      branchName: name,
       latitude: lat,
       longitude: lng,
-      geofenceRadius: (map['geofenceRadius'] as num?)?.toDouble() ?? 100.0,
+      geofenceRadius: radius,
     );
   }
 

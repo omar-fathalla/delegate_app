@@ -576,18 +576,29 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                               elevation: 0,
                             ),
                             onPressed: () {
+                              final isDirectApproval = widget.penalty.fineAmount <= 1000.0;
+                              final nextStatus = isDirectApproval
+                                  ? PenaltyStatus.issued
+                                  : PenaltyStatus.pendingGeneralManager;
                               context.read<PenaltyBloc>().add(
                                     UpdatePenaltyStatusEvent(
                                       penaltyId: widget.penalty.penaltyId,
-                                      status: PenaltyStatus.pendingGeneralManager,
+                                      status: nextStatus,
                                       reviewerName: widget.currentDelegate.fullName,
                                     ),
                                   );
                             },
-                            icon: const Icon(Icons.check_circle_rounded, size: 18),
-                            label: const Text(
-                              'موافقة وتمرير',
-                              style: TextStyle(
+                            icon: Icon(
+                              widget.penalty.fineAmount <= 1000.0
+                                  ? Icons.verified_rounded
+                                  : Icons.arrow_forward_rounded,
+                              size: 18,
+                            ),
+                            label: Text(
+                              widget.penalty.fineAmount <= 1000.0
+                                  ? 'اعتماد وإصدار فوري (≤ 1000 ج.م)'
+                                  : 'موافقة وتمرير للمدير العام (> 1000 ج.م)',
+                              style: const TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 13),
                             ),
                           ),

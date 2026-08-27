@@ -6,19 +6,21 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import '../bloc/branch_bloc.dart';
 
 class AdminBranchesScreen extends StatelessWidget {
-  const AdminBranchesScreen({super.key});
+  final bool showAppBar;
+  const AdminBranchesScreen({super.key, this.showAppBar = false});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => di.sl<BranchBloc>()..add(BranchLoadRequested()),
-      child: const _AdminBranchesView(),
+      child: _AdminBranchesView(showAppBar: showAppBar),
     );
   }
 }
 
 class _AdminBranchesView extends StatelessWidget {
-  const _AdminBranchesView();
+  final bool showAppBar;
+  const _AdminBranchesView({this.showAppBar = false});
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +28,12 @@ class _AdminBranchesView extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      appBar: showAppBar
+          ? AppBar(
+              title: Text(l10n.branches),
+              centerTitle: true,
+            )
+          : null,
       body: BlocBuilder<BranchBloc, BranchState>(
         builder: (context, state) {
           if (state is BranchLoading || state is BranchInitial) {

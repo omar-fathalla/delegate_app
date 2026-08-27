@@ -33,6 +33,9 @@ class FeedbackRepositoryImpl implements FeedbackRepository {
       await remoteDataSource.submitFeedback(feedback, screenshot);
       return const Right(null);
     } catch (e) {
+      if (e.toString().contains('unauthorized') || e.toString().contains('permission-denied')) {
+        return const Left(ServerFailure('حدث خطأ في صلاحيات رفع الصورة. يرجى إعادة المحاولة.'));
+      }
       return Left(ServerFailure('فشل إرسال المقترح: ${e.toString()}'));
     }
   }

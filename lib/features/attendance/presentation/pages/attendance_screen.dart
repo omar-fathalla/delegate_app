@@ -12,6 +12,8 @@ import 'package:intl/intl.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -31,7 +33,7 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen>
     with AutomaticKeepAliveClientMixin {
-  DateTime _selectedMonth = DateTime.now();
+  late DateTime _selectedMonth;
 
   // --- Performance: Cache connectivity state instead of StreamBuilder ---
   bool _isOffline = false;
@@ -44,13 +46,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   final ScrollController _scrollController = ScrollController();
 
-
   @override
   bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
+    try {
+      _selectedMonth = sl.isRegistered<TrustedTimeService>()
+          ? sl<TrustedTimeService>().now
+          : DateTime.now();
+    } catch (_) {
+      _selectedMonth = DateTime.now();
+    }
+
     // Subscribe to connectivity changes once
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
       final offline = results.contains(ConnectivityResult.none);
@@ -242,7 +251,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
           return Scaffold(
             appBar: widget.viewOnly
-                ? AppBar(title: Text(widget.delegate.fullName))
+                ? AppBar(
+                    title: Text(
+                      widget.delegate.fullName.isNotEmpty
+                          ? widget.delegate.fullName
+                          : (widget.delegate.companyName.isNotEmpty
+                              ? 'مندوب - ${widget.delegate.companyName}'
+                              : 'سجل الحضور'),
+                    ),
+                  )
                 : null,
             body: SafeArea(
               child: Padding(
@@ -293,10 +310,22 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
   }
 
+  DateTime _getTrustedNow() {
+    try {
+      if (sl.isRegistered<TrustedTimeService>()) {
+        return sl<TrustedTimeService>().now;
+      }
+    } catch (_) {}
+    return DateTime.now();
+  }
+
   Widget _buildHeader(BuildContext context) {
     final locale = Localizations.localeOf(context).languageCode;
     final l10n = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
+    final trustedNow = _getTrustedNow();
+    final isCurrentMonth = _selectedMonth.year == trustedNow.year &&
+        _selectedMonth.month == trustedNow.month;
 
     return Card(
       elevation: 0,
@@ -304,7 +333,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         child: Column(
           children: [
             Row(
@@ -313,7 +342,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 FilledButton.tonal(
                   style: FilledButton.styleFrom(
                     shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(12),
                     backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
                     foregroundColor: colorScheme.onPrimaryContainer,
                   ),
@@ -326,20 +355,54 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       _recomputeFilteredHistory();
                     });
                   },
-                  child: const Icon(Icons.chevron_left_rounded, size: 28),
+                  child: const Icon(Icons.chevron_left_rounded, size: 26),
                 ),
-                Text(
-                  DateFormat('MMMM yyyy', locale).format(_selectedMonth),
-                  style: TextStyle(
-                    color: colorScheme.onPrimaryContainer,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
+                Column(
+                  children: [
+                    Text(
+                      DateFormat('MMMM yyyy', locale).format(_selectedMonth),
+                      style: TextStyle(
+                        color: colorScheme.onPrimaryContainer,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (!isCurrentMonth) ...[
+                      const SizedBox(height: 4),
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedMonth = trustedNow;
+                            _recomputeFilteredHistory();
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'العودة للشهر الحالي ↩',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 FilledButton.tonal(
                   style: FilledButton.styleFrom(
                     shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(12),
                     backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
                     foregroundColor: colorScheme.onPrimaryContainer,
                   ),
@@ -352,16 +415,124 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       _recomputeFilteredHistory();
                     });
                   },
-                  child: const Icon(Icons.chevron_right_rounded, size: 28),
+                  child: const Icon(Icons.chevron_right_rounded, size: 26),
                 ),
               ],
             ),
             if (_isOffline) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
               _buildConnectivityBadge(context, l10n),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMonthlyStatsBanner(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final totalDays = _dayKeys.length;
+
+    int totalMinutes = 0;
+    for (final item in _filteredHistory) {
+      if (item.checkOutTime != null) {
+        totalMinutes +=
+            item.checkOutTime!.difference(item.checkInTime).inMinutes;
+      }
+    }
+    final hours = totalMinutes ~/ 60;
+    final mins = totalMinutes % 60;
+    final totalHoursStr = '$hours س ${mins > 0 ? '$mins د' : ''}';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12, bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.calendar_month_rounded,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'أيام الحضور',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    '$totalDays يوم',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Container(width: 1, height: 28, color: colorScheme.outlineVariant),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colorScheme.tertiaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.access_time_filled_rounded,
+                  size: 18,
+                  color: colorScheme.onTertiaryContainer,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'إجمالي الساعات',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    totalHoursStr,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -519,9 +690,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         },
         child: ListView.builder(
           controller: _scrollController,
-          padding: const EdgeInsetsDirectional.only(top: 16, bottom: 80),
-          itemCount: _dayKeys.length + (state.hasReachedMax ? 0 : 1),
-          itemBuilder: (context, dayIndex) {
+          padding: const EdgeInsetsDirectional.only(top: 12, bottom: 80),
+          itemCount: _dayKeys.length + (state.hasReachedMax ? 1 : 2),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return _buildMonthlyStatsBanner(context);
+            }
+            final dayIndex = index - 1;
             if (dayIndex >= _dayKeys.length) {
               return state.isLoadingMore
                   ? const Padding(
@@ -770,7 +945,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         final position = await _getCurrentLocation(parentContext);
         if (position != null && parentContext.mounted) {
           if (isCheckedIn && activeAttendance != null) {
-            final now = DateTime.now();
+            final now = _getTrustedNow();
             final isPreviousDay =
                 activeAttendance.checkInTime.year != now.year ||
                 activeAttendance.checkInTime.month != now.month ||
@@ -871,15 +1046,37 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
 
     try {
-      return await Geolocator.getCurrentPosition(
+      final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 10),
         ),
       );
+
+      // --- Anti-Fraud: Fake GPS / Mock Location Detection ---
+      if (position.isMocked) {
+        if (context.mounted) {
+          AppSnackBar.showError(
+            context,
+            'تم اكتشاف استخدام برنامج لتزييف الموقع الجغرافي (Fake GPS). يرجى إيقاف التطبيق لتسجيل الحضور والانصراف.',
+          );
+        }
+        return null;
+      }
+
+      return position;
     } on TimeoutException catch (_) {
       final lastPosition = await Geolocator.getLastKnownPosition();
       if (lastPosition != null) {
+        if (lastPosition.isMocked) {
+          if (context.mounted) {
+            AppSnackBar.showError(
+              context,
+              'تم اكتشاف استخدام برنامج لتزييف الموقع الجغرافي (Fake GPS). يرجى إيقاف التطبيق لتسجيل الحضور والانصراف.',
+            );
+          }
+          return null;
+        }
         return lastPosition;
       }
       if (context.mounted) {
@@ -1115,22 +1312,39 @@ class _ScannerModal extends StatefulWidget {
   State<_ScannerModal> createState() => _ScannerModalState();
 }
 
-class _ScannerModalState extends State<_ScannerModal> {
+class _ScannerModalState extends State<_ScannerModal>
+    with SingleTickerProviderStateMixin {
   late final MobileScannerController _scannerController;
+  late final AnimationController _laserController;
   bool _isProcessing = false;
+  late final TrustedTimeService _timeService;
 
   @override
   void initState() {
     super.initState();
+    try {
+      _timeService = sl.isRegistered<TrustedTimeService>()
+          ? sl<TrustedTimeService>()
+          : TrustedTimeService();
+    } catch (_) {
+      _timeService = TrustedTimeService();
+    }
+
     _scannerController = MobileScannerController(
       detectionSpeed: DetectionSpeed.noDuplicates,
       returnImage: false,
       facing: CameraFacing.back,
     );
+
+    _laserController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
+    _laserController.dispose();
     _scannerController.dispose();
     super.dispose();
   }
@@ -1141,8 +1355,10 @@ class _ScannerModalState extends State<_ScannerModal> {
     final l10n = AppLocalizations.of(context)!;
     final isCheckedIn = widget.action == l10n.checkOut;
     final color = isCheckedIn ? colorScheme.secondary : colorScheme.primary;
+    final locale = Localizations.localeOf(context).languageCode;
 
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
           MobileScanner(
@@ -1153,6 +1369,7 @@ class _ScannerModalState extends State<_ScannerModal> {
 
               final List<Barcode> barcodes = capture.barcodes;
               if (barcodes.isNotEmpty) {
+                HapticFeedback.mediumImpact();
                 final String rawValue = barcodes.first.rawValue ?? '';
                 String? scannedBranch;
                 try {
@@ -1165,10 +1382,13 @@ class _ScannerModalState extends State<_ScannerModal> {
                       scannedBranch = decoded['branch'] as String;
                     }
                   }
-                } catch (_) {}
+                } catch (_) {
+                  if (rawValue.isNotEmpty && !rawValue.startsWith('{')) {
+                    scannedBranch = rawValue.trim();
+                  }
+                }
 
                 if (mounted) {
-                  // Wait for stop to finish, or just call it.
                   _scannerController.stop();
                   Navigator.pop(context, scannedBranch ?? "");
                 }
@@ -1177,17 +1397,70 @@ class _ScannerModalState extends State<_ScannerModal> {
               }
             },
           ),
+
+          // Central Scan Target Overlay with glowing corners and laser line
+          Center(
+            child: SizedBox(
+              width: 260,
+              height: 260,
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        width: 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  // Animated Scanner Laser Line
+                  AnimatedBuilder(
+                    animation: _laserController,
+                    builder: (context, child) {
+                      return Positioned(
+                        top: 20 + (_laserController.value * 220),
+                        left: 15,
+                        right: 15,
+                        child: Container(
+                          height: 3,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                color.withValues(alpha: 0.1),
+                                color,
+                                color.withValues(alpha: 0.1),
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withValues(alpha: 0.8),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Top Header Gradient
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+              padding: const EdgeInsets.fromLTRB(20, 50, 20, 24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    colorScheme.scrim.withValues(alpha: 0.7),
-                    colorScheme.scrim.withValues(alpha: 0.0),
+                    Colors.black87,
+                    Colors.transparent,
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -1197,92 +1470,139 @@ class _ScannerModalState extends State<_ScannerModal> {
                 children: [
                   Text(
                     l10n.scanForAction(widget.action),
-                    style: TextStyle(
-                      color: colorScheme.surface,
-                      fontSize: 24,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.pointCameraToQR(widget.action),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 13,
                     ),
                   ),
                 ],
               ),
             ),
           ),
+
+          // Bottom Bar with Live Ticking Time & Date
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.all(30),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
               decoration: BoxDecoration(
                 color: colorScheme.surface,
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
+                  topLeft: Radius.circular(32),
+                  topRight: Radius.circular(32),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+              child: StreamBuilder<DateTime>(
+                stream: _timeService.liveClockStream,
+                initialData: _timeService.now,
+                builder: (context, snapshot) {
+                  final currentTime = snapshot.data ?? _timeService.now;
+                  return Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             DateFormat(
-                              'EEEE, d MMMM',
-                              Localizations.localeOf(context).languageCode,
-                            ).format(DateTime.now()),
+                              'EEEE، d MMMM yyyy',
+                              locale,
+                            ).format(currentTime),
                             style: TextStyle(
                               color: colorScheme.onSurfaceVariant,
-                              fontSize: 14,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          Text(
-                            DateFormat(
-                              'hh:mm a',
-                              Localizations.localeOf(context).languageCode,
-                            ).format(DateTime.now()),
-                            style: TextStyle(
-                              color: colorScheme.onSurface,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Text(
+                                DateFormat(
+                                  'hh:mm:ss a',
+                                  locale,
+                                ).format(currentTime),
+                                style: TextStyle(
+                                  color: colorScheme.onSurface,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              if (_timeService.isSynced) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'وقت موثوق 🔒',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.1),
+                          color: color.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          isCheckedIn ? Icons.logout : Icons.login,
+                          isCheckedIn
+                              ? Icons.logout_rounded
+                              : Icons.login_rounded,
                           color: color,
                           size: 30,
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    l10n.pointCameraToQR(widget.action),
-                    style: TextStyle(color: colorScheme.onSurfaceVariant),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ),
+
+          // Close Button
           Positioned(
-            top: 40,
+            top: 45,
             left: 20,
             child: CircleAvatar(
-              backgroundColor: colorScheme.surface.withValues(alpha: 0.3),
+              backgroundColor: Colors.black45,
               child: IconButton(
                 tooltip: 'Close Scanner',
-                icon: Icon(Icons.close, color: colorScheme.surface),
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
                 onPressed: () {
                   Navigator.pop(context);
                 },

@@ -112,6 +112,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/features/feedback/feedback_injection.dart';
+import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:get_it/get_it.dart';
 
 // Photo Permission Feature Imports
@@ -547,6 +548,11 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       offlineDataSource: sl(),
       remoteDataSource: sl(),
     ),
+  );
+
+  // Trusted Time Service
+  sl.registerLazySingleton<TrustedTimeService>(
+    () => TrustedTimeService(firestore: sl()),
   );
 
   // ! Core

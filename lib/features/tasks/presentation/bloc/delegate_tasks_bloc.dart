@@ -139,7 +139,7 @@ class DelegateTasksBloc extends Bloc<DelegateTasksEvent, DelegateTasksState> {
       ),
       (_) {
         // Emit success and potentially reload
-        emit(TaskStatusUpdateSuccess());
+        emit(TaskStatusUpdateSuccess(newStatus: event.newStatus));
         // Auto-reload to show the updated status
         if (state is DelegateTasksLoaded || state is TaskStatusUpdateSuccess) {
           // We might need to store the last event params or keep them in the state

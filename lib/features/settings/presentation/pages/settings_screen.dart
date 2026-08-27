@@ -19,7 +19,7 @@ class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
     super.key,
     required this.delegate,
-    this.showAppBar = false,
+    this.showAppBar = true,
   });
 
   @override
@@ -31,9 +31,25 @@ class SettingsScreen extends StatelessWidget {
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: showAppBar
           ? AppBar(
-              title: Text(l10n.settings),
+              title: Text(
+                l10n.settings,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               backgroundColor: Theme.of(context).colorScheme.surface,
+              surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
               elevation: 0,
+              centerTitle: false,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: isArabic ? 'رجوع' : 'Back',
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    context.pop();
+                  }
+                },
+              ),
             )
           : null,
       body: SafeArea(

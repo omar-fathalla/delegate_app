@@ -134,9 +134,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         );
       }
 
-      // --- Anti-Fraud Geofencing for Check-Out (Non-Blocking) ---
-      // Geofencing errors should NOT prevent check-out, only warn.
-      // Only actual "out of range" violations should block.
+      // --- Geofencing for Check-Out ---
+      // Check-out records location and closes session without trapping employees if they forgot to check out on-site
       if (userId.isNotEmpty) {
         try {
           final activeAttendance = await remoteDataSource.findActiveAttendance(
@@ -151,12 +150,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
               isCheckIn: false,
             );
           }
-        } catch (e) {
-          // Only rethrow actual geofencing violations (out of range)
-          if (e is ServerFailure && e.message.contains('خارج نطاق')) {
-            rethrow;
-          }
-          // All other errors (missing index, network, etc.) → continue
+        } catch (_) {
+          // Allow check-out to proceed to avoid permanently locking active shifts
         }
       }
 

@@ -23,7 +23,7 @@ class AuthRepositoryImpl implements AuthRepository {
       // Fetch the delegate data (will handle authentication internally)
       final delegates = await remoteDataSource.getDelegatesByPhone(phoneNumber);
       if (delegates.isEmpty) {
-        return const Left(AuthFailure('رقم الهاتف غير مسجل'));
+        return const Left(AuthFailure('رقم الهاتف غير مسجل في النظام. يرجى مراجعة مشرف شركتك أو الدعم الفني.'));
       }
 
       // Filter out suspended/rejected delegates
@@ -36,12 +36,7 @@ class AuthRepositoryImpl implements AuthRepository {
           .toList();
 
       if (validDelegates.isEmpty) {
-        // Determine which message to show from the first delegate's status
-        final first = delegates.first;
-        if (first.status == DelegateStatus.suspended) {
-          return const Left(AuthFailure('تم تعليق حسابك. تواصل مع الإدارة.'));
-        }
-        return const Left(AuthFailure('تم رفض حسابك. تواصل مع الإدارة.'));
+        return const Left(AuthFailure('تم تجميد هذا الحساب من قبل الإدارة. يرجى التواصل مع مسؤول المنظمة.'));
       }
 
       return Right(validDelegates);

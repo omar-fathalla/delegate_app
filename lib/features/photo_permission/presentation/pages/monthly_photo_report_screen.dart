@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:delegate_app/core/services/trusted_time_service.dart';
+import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/captured_photo.dart';
@@ -31,10 +33,18 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
   late DateTime _selectedMonth;
   GroupMode _currentGroupMode = GroupMode.byDate;
 
+  DateTime get _now {
+    try {
+      return di.sl<TrustedTimeService>().now;
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _selectedMonth = DateTime.now();
+    _selectedMonth = _now;
 
     final isGeneralManagerOrAdmin =
         widget.delegate.role == UserRole.organizationAdmin ||
@@ -75,7 +85,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
 
   void _nextMonth() {
     // عدم السماح بتخطي الشهر الحالي
-    final now = DateTime.now();
+    final now = _now;
     if (_selectedMonth.year >= now.year && _selectedMonth.month >= now.month) {
       return;
     }
@@ -84,11 +94,17 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
     });
   }
 
+  void _resetToCurrentMonth() {
+    setState(() {
+      _selectedMonth = _now;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final now = DateTime.now();
+    final now = _now;
     final isCurrentMonth = _selectedMonth.year == now.year && _selectedMonth.month == now.month;
 
     return Scaffold(
@@ -125,7 +141,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             final totalPhotos = filteredPhotos.length;
             final uniqueBranches = filteredPhotos.map((p) => p.branchId).toSet().length;
             
-            final today = DateTime.now();
+            final today = now;
             final photosToday = filteredPhotos.where((p) =>
                 p.capturedAt.year == today.year &&
                 p.capturedAt.month == today.month &&
@@ -150,26 +166,57 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.arrow_back_ios_rounded),
-                                onPressed: _previousMonth,
-                                tooltip: 'الشهر السابق',
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_back_ios_rounded),
+                                    onPressed: _previousMonth,
+                                    tooltip: 'الشهر السابق',
+                                  ),
+                                  Text(
+                                    _getMonthNameArabic(_selectedMonth),
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_forward_ios_rounded),
+                                    onPressed: isCurrentMonth ? null : _nextMonth,
+                                    tooltip: 'الشهر التالي',
+                                  ),
+                                ],
                               ),
-                              Text(
-                                _getMonthNameArabic(_selectedMonth),
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.primary,
+                              if (!isCurrentMonth)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: InkWell(
+                                    onTap: _resetToCurrentMonth,
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.history_rounded, size: 14, color: colorScheme.primary),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'العودة للشهر الحالي ↩',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: colorScheme.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.arrow_forward_ios_rounded),
-                                onPressed: isCurrentMonth ? null : _nextMonth,
-                                tooltip: 'الشهر التالي',
-                              ),
                             ],
                           ),
                         ),
@@ -349,6 +396,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
   Widget _buildCompactPhotoCard(BuildContext context, CapturedPhoto photo, ThemeData theme) {
     final colorScheme = theme.colorScheme;
     final dateStr = DateFormat('dd-MM-yyyy hh:mm a').format(photo.capturedAt);
+    final isPending = photo.uid.startsWith('pending_');
 
     return Card(
       elevation: 0,
@@ -356,17 +404,47 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
       color: colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+        side: BorderSide(
+          color: isPending
+              ? Colors.orange.withValues(alpha: 0.6)
+              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
       child: ListTile(
         onTap: () => _showPhotoDetails(context, photo),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: photo.photoUrl.startsWith('http')
+                ? CachedNetworkImage(
+                    imageUrl: photo.photoUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: colorScheme.primaryContainer,
+                      child: Icon(Icons.broken_image_rounded, color: colorScheme.primary),
+                    ),
+                  )
+                : Image.file(
+                    File(photo.photoUrl),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.orange.shade100,
+                      child: Icon(Icons.cloud_upload_rounded, color: Colors.orange.shade800),
+                    ),
+                  ),
           ),
-          child: Icon(Icons.image_outlined, color: colorScheme.onPrimaryContainer),
         ),
         title: Text(
           photo.branchName,
@@ -374,11 +452,43 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        subtitle: Text(
-          dateStr,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
+        subtitle: Row(
+          children: [
+            if (isPending) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud_upload_rounded, size: 10, color: Colors.orange.shade900),
+                    const SizedBox(width: 3),
+                    Text(
+                      'قيد الرفع',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Expanded(
+              child: Text(
+                dateStr,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         trailing: Icon(Icons.chevron_left_rounded, color: colorScheme.onSurfaceVariant),
       ),

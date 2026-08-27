@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/marketing/presentation/pages/marketing_home_screen.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
@@ -77,7 +78,10 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
       case 'settings':
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => SettingsScreen(delegate: widget.delegate),
+            builder: (_) => SettingsScreen(
+              delegate: widget.delegate,
+              showAppBar: true,
+            ),
           ),
         );
         break;
@@ -104,6 +108,12 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
             AdminTasksScreen(adminDelegate: delegate),
           ]
         : [
+            MarketingHomeScreen(
+              delegate: delegate,
+              onNavigateTab: (tabIndex) {
+                setState(() => _currentIndex = tabIndex);
+              },
+            ),
             BranchHomeScreen(marketingUser: delegate),
             BlocProvider(
               create: (_) => di.sl<PhotoPermissionBloc>(),
@@ -122,11 +132,22 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
     if (isPromotionOnly) {
       subtitle = _currentIndex == 0 ? 'أذونات التصوير' : 'المهام';
     } else {
-      subtitle = _currentIndex == 0
-          ? 'الفروع'
-          : _currentIndex == 1
-              ? 'أذونات التصوير'
-              : 'قسم الغرامات والمخالفات';
+      switch (_currentIndex) {
+        case 0:
+          subtitle = 'الرئيسية';
+          break;
+        case 1:
+          subtitle = 'الفروع ومتابعة الحضور';
+          break;
+        case 2:
+          subtitle = 'أذونات التصوير';
+          break;
+        case 3:
+          subtitle = 'قسم الغرامات والمخالفات';
+          break;
+        default:
+          subtitle = 'تسويق الفروع';
+      }
     }
 
     return Scaffold(
@@ -265,6 +286,11 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                 ),
               ]
             : const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home_rounded),
+                  label: 'الرئيسية',
+                ),
                 NavigationDestination(
                   icon: Icon(Icons.store_outlined),
                   selectedIcon: Icon(Icons.store_rounded),

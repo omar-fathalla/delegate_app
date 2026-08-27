@@ -112,6 +112,8 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
         penaltyId: event.penalty.penaltyId,
         companyId: event.penalty.companyId,
         companyName: event.penalty.companyName,
+        branchId: event.penalty.branchId,
+        branchName: event.penalty.branchName,
         createdById: event.penalty.createdById,
         createdByName: event.penalty.createdByName,
         title: event.penalty.title,
@@ -121,6 +123,9 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
         currency: event.penalty.currency,
         status: event.penalty.status,
         evidenceFiles: uploadedEvidences,
+        targetDelegateId: event.penalty.targetDelegateId,
+        targetDelegateName: event.penalty.targetDelegateName,
+        isRepeated: event.penalty.isRepeated,
         createdAt: event.penalty.createdAt,
         updatedAt: event.penalty.updatedAt,
       );

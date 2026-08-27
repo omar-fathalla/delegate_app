@@ -169,6 +169,8 @@ class PenaltyEntity extends Equatable {
   final String penaltyId;
   final String companyId;
   final String companyName;
+  final String? branchId;
+  final String? branchName;
   final String createdById;
   final String createdByName;
   final String title;
@@ -193,6 +195,8 @@ class PenaltyEntity extends Equatable {
     required this.penaltyId,
     required this.companyId,
     required this.companyName,
+    this.branchId,
+    this.branchName,
     required this.createdById,
     required this.createdByName,
     required this.title,
@@ -219,6 +223,8 @@ class PenaltyEntity extends Equatable {
         penaltyId,
         companyId,
         companyName,
+        branchId,
+        branchName,
         createdById,
         createdByName,
         title,

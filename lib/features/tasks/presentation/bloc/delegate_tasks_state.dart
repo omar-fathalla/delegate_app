@@ -67,5 +67,9 @@ class DelegateTasksError extends DelegateTasksState {
 }
 
 class TaskStatusUpdateSuccess extends DelegateTasksState {
-  const TaskStatusUpdateSuccess({super.statusFilter});
+  final TaskStatus? newStatus;
+  const TaskStatusUpdateSuccess({this.newStatus, super.statusFilter});
+
+  @override
+  List<Object?> get props => [newStatus, statusFilter];
 }

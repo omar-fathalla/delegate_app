@@ -90,6 +90,16 @@ void main() {
       expect(find.byIcon(Icons.logout_rounded), findsAtLeastNWidgets(1));
     });
 
+    testWidgets('renders AppBar with back button by default', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(buildSettingsScreen());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
+    });
+
     testWidgets('dark mode switch toggles theme', (WidgetTester tester) async {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();

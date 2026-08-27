@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
 import 'package:delegate_app/features/penalties/domain/entities/standard_violation.dart';
@@ -36,6 +37,11 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
   List<Map<String, String>> _companyDelegates = [];
   bool _isLoadingDelegates = false;
 
+  String? _selectedBranchId;
+  String? _selectedBranchName;
+  List<Map<String, String>> _branches = [];
+  bool _isLoadingBranches = true;
+
   List<Map<String, String>> _companies = [];
   bool _isLoadingCompanies = true;
 
@@ -47,6 +53,48 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
   void initState() {
     super.initState();
     _fetchCompanies();
+    _fetchBranches();
+  }
+
+  Future<void> _fetchBranches() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('branches').get();
+      if (!mounted) return;
+      final list = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final name = (data['branchName'] as String?) ??
+            (data['name'] as String?) ??
+            (data['title'] as String?) ??
+            doc.id;
+        return {
+          'id': doc.id,
+          'name': name,
+        };
+      }).toList();
+      list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+
+      // Check for pinned branch from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final defaultBranchId = prefs.getString('pinned_penalty_branch_id_${widget.adminDelegate.uid}');
+
+      setState(() {
+        _branches = list;
+        if (defaultBranchId != null && list.any((b) => b['id'] == defaultBranchId)) {
+          _selectedBranchId = defaultBranchId;
+          final match = list.firstWhere((b) => b['id'] == defaultBranchId);
+          _selectedBranchName = match['name'];
+        } else if (list.isNotEmpty) {
+          _selectedBranchId = list.first['id'];
+          _selectedBranchName = list.first['name'];
+        }
+        _isLoadingBranches = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingBranches = false;
+      });
+    }
   }
 
   Future<void> _fetchCompanies() async {
@@ -253,6 +301,13 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       return;
     }
 
+    if (_selectedBranchId == null || _selectedBranchId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('الرجاء اختيار الفرع الذي حدثت به الواقعة')),
+      );
+      return;
+    }
+
     final rawTitle = _selectedOfficialViolation != null
         ? _selectedOfficialViolation!.title
         : _titleController.text.trim();
@@ -271,6 +326,8 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       penaltyId: '',
       companyId: _selectedCompanyId!,
       companyName: _selectedCompanyName ?? _selectedCompanyId!,
+      branchId: _selectedBranchId,
+      branchName: _selectedBranchName,
       createdById: widget.adminDelegate.uid,
       createdByName: widget.adminDelegate.fullName,
       title: finalTitle,
@@ -492,6 +549,61 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                     const SizedBox(height: 20),
                   ],
 
+                  // 1.c Branch Selector (الفرع الذي حدثت به الواقعة)
+                  Text(
+                    'الفرع الذي حدثت به الواقعة',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _isLoadingBranches
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      : DropdownButtonFormField<String>(
+                          initialValue: _selectedBranchId,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            hintText: 'اختر الفرع...',
+                            prefixIcon: const Icon(Icons.storefront_rounded),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          items: _branches.map((b) {
+                            return DropdownMenuItem<String>(
+                              value: b['id'],
+                              child: Text(
+                                b['name'] ?? '',
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedBranchId = val;
+                              if (val != null) {
+                                final selected = _branches.firstWhere(
+                                  (b) => b['id'] == val,
+                                  orElse: () => {'name': ''},
+                                );
+                                _selectedBranchName = selected['name'];
+                              }
+                            });
+                          },
+                          validator: (val) =>
+                              (val == null || val.isEmpty) ? 'الرجاء اختيار الفرع' : null,
+                        ),
+                  const SizedBox(height: 20),
+
                   // 2. Official Violations Schedule Dropdown (لائحة المخالفات الرسمية)
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -536,13 +648,10 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                             ),
                           ),
                           items: officialViolationsSchedule.map((v) {
-                            final fineLabel = v.defaultFine > 0
-                                ? '${v.defaultFine.toStringAsFixed(0)} ج.م'
-                                : 'لفت نظر';
                             return DropdownMenuItem<StandardViolation>(
                               value: v,
                               child: Text(
-                                '${v.id}. ${v.title} ($fineLabel)',
+                                '${v.id}. ${v.title}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -637,11 +746,15 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _fineAmountController,
+                    readOnly: true,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
-                      hintText: '5000.00',
-                      prefixIcon: const Icon(Icons.attach_money_rounded),
+                      hintText: '0.00',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixText: 'ج.م (محدد باللائحة)',
+                      filled: true,
+                      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 14,
@@ -652,7 +765,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                     ),
                     validator: (val) {
                       if (val == null || val.trim().isEmpty) {
-                        return 'الرجاء أدخل مبلغ الغرامة';
+                        return 'الرجاء اختيار المخالفة لتحديد المبلغ';
                       }
                       if (double.tryParse(val) == null) return 'مبلغ غير صحيح';
                       return null;

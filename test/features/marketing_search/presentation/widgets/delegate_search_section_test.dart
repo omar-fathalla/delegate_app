@@ -23,7 +23,7 @@ void main() {
     // Verify UI elements
     expect(find.text('البحث عن مندوب'), findsOneWidget);
     expect(find.text('رقم الموبايل'), findsOneWidget);
-    expect(find.text('أدخل رقم الموبايل (مثال: 01012345678)'), findsOneWidget);
+    expect(find.text('أدخل رقم الموبايل'), findsOneWidget);
     expect(find.text('بحث عن المندوب'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
     expect(find.byType(ElevatedButton), findsOneWidget);

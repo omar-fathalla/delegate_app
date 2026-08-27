@@ -21,7 +21,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 Never throwFirestoreFailure(FirebaseException e, String message) {
   if (e.code == 'permission-denied') {
     _healAnonymousSession();
-    throw ServerFailure('$message (خطأ الصلاحية: ${e.code})');
+    throw ServerFailure('$message (خطأ في الصلاحيات، يرجى إعادة المحاولة)');
+  } else if (e.code == 'unavailable' || e.code == 'network-request-failed') {
+    throw const ServerFailure('لا يوجد اتصال بالإنترنت أو الخادم غير متاح مؤقتاً. يرجى التحقق من الشبكة.');
+  } else if (e.code == 'deadline-exceeded') {
+    throw const ServerFailure('استغرق الاتصال بالخادم وقتاً أطول من المعتاد. يرجى التحقق من جودة الشبكة وإعادة المحاولة.');
   }
   final codeDetails = e.code.isNotEmpty ? ' [رمز الخطأ: ${e.code}]' : '';
   throw ServerFailure('$message$codeDetails');

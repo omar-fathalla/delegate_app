@@ -52,10 +52,15 @@ class CapturedPhotosLoaded extends PhotoPermissionState {
 
 class PhotoUploadSuccess extends PhotoPermissionState {
   final CapturedPhoto photo;
-  const PhotoUploadSuccess({required this.photo});
+  final bool isOffline;
+
+  const PhotoUploadSuccess({
+    required this.photo,
+    this.isOffline = false,
+  });
 
   @override
-  List<Object?> get props => [photo];
+  List<Object?> get props => [photo, isOffline];
 }
 
 class PhotoPermissionActionSuccess extends PhotoPermissionState {

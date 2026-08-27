@@ -65,6 +65,7 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
             return BranchModel.fromFirestore(doc);
           })
           .toList();
+      branches.sort((a, b) => a.branchName.compareTo(b.branchName));
       developer.log('DEBUG: getBranches parsed successfully: ${branches.length} branches');
       return branches;
     } on FirebaseException catch (e) {

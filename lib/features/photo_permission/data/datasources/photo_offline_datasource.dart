@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -42,6 +44,23 @@ class PhotoOfflineDataSource {
     ''');
   }
 
+  /// Copies temporary image file to persistent App Documents Directory
+  /// so that it will never be deleted by Android/iOS cache clear or temporary cleanup.
+  Future<String> saveImageToPersistentDirectory(File imageFile) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final photosDir = Directory('${appDir.path}/offline_captured_photos');
+      if (!await photosDir.exists()) {
+        await photosDir.create(recursive: true);
+      }
+      final fileName = 'offline_${DateTime.now().millisecondsSinceEpoch}_${basename(imageFile.path)}';
+      final savedFile = await imageFile.copy('${photosDir.path}/$fileName');
+      return savedFile.path;
+    } catch (_) {
+      return imageFile.path;
+    }
+  }
+
   Future<void> savePendingPhoto(Map<String, dynamic> photoData) async {
     final db = await database;
     await db.insert(
@@ -54,6 +73,16 @@ class PhotoOfflineDataSource {
   Future<List<Map<String, dynamic>>> getPendingPhotos() async {
     final db = await database;
     return await db.query(tableName, orderBy: 'timestamp ASC');
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingPhotosForDelegate(String delegateUID) async {
+    final db = await database;
+    return await db.query(
+      tableName,
+      where: 'delegateUID = ?',
+      whereArgs: [delegateUID],
+      orderBy: 'timestamp DESC',
+    );
   }
 
   Future<void> deletePendingPhoto(int id) async {

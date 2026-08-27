@@ -19,6 +19,7 @@ class SuperAdminDashboardScreen extends StatefulWidget {
   final VoidCallback? onNavigateToBranches;
   final VoidCallback? onNavigateToAddBranch;
   final VoidCallback? onNavigateToCreateAdmin;
+  final VoidCallback? onNavigateToSendNotification;
 
   const SuperAdminDashboardScreen({
     super.key,
@@ -26,6 +27,7 @@ class SuperAdminDashboardScreen extends StatefulWidget {
     this.onNavigateToBranches,
     this.onNavigateToAddBranch,
     this.onNavigateToCreateAdmin,
+    this.onNavigateToSendNotification,
   });
 
   @override
@@ -600,7 +602,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 label: 'إرسال إشعار جديد',
                 icon: Icons.send_time_extension_rounded,
                 color: Colors.indigo.shade800,
-                onTap: () {
+                onTap: widget.onNavigateToSendNotification ?? () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => SendNotificationScreen(senderDelegate: widget.delegate),

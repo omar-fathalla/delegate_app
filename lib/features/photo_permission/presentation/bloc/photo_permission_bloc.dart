@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:bloc/bloc.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:equatable/equatable.dart';
 import 'package:get_it/get_it.dart';
 import 'package:delegate_app/core/services/sync_manager.dart';
@@ -185,11 +186,53 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     Emitter<PhotoPermissionState> emit,
   ) async {
     emit(PhotoPermissionUploadInProgress());
+
+    // 1. Check if device is connected to the internet -> Direct Upload to Cloud
+    bool isConnected = false;
+    try {
+      final connectivityResults = await Connectivity().checkConnectivity();
+      isConnected = connectivityResults.any((r) =>
+          r == ConnectivityResult.mobile ||
+          r == ConnectivityResult.wifi ||
+          r == ConnectivityResult.ethernet);
+    } catch (_) {
+      isConnected = true; // Attempt upload if check fails
+    }
+
+    if (isConnected) {
+      try {
+        final result = await uploadCapturedPhoto(
+          UploadCapturedPhotoParams(
+            organizationUID: event.organizationUID,
+            companyUID: event.companyUID,
+            permissionId: event.permissionId,
+            branchId: event.branchId,
+            branchName: event.branchName,
+            delegateUID: event.delegateUID,
+            delegateName: event.delegateName,
+            imageFile: event.imageFile,
+            comment: event.comment,
+            latitude: event.latitude,
+            longitude: event.longitude,
+          ),
+        );
+
+        if (result.isRight()) {
+          final uploadedPhoto = result.getOrElse(() => throw Exception());
+          emit(PhotoUploadSuccess(photo: uploadedPhoto, isOffline: false));
+          return;
+        }
+      } catch (_) {
+        // Fall through to offline persistent fallback if network upload fails
+      }
+    }
+
+    // 2. Offline Fallback: Save image to persistent App Documents Directory and SQLite queue
     try {
       final offlineDataSource = GetIt.I<PhotoOfflineDataSource>();
-      final syncManager = GetIt.I<SyncManager>();
+      final persistentImagePath =
+          await offlineDataSource.saveImageToPersistentDirectory(event.imageFile);
 
-      // Save locally
       await offlineDataSource.savePendingPhoto({
         'organizationUID': event.organizationUID,
         'companyUID': event.companyUID,
@@ -198,16 +241,14 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
         'branchName': event.branchName,
         'delegateUID': event.delegateUID,
         'delegateName': event.delegateName,
-        'imagePath': event.imageFile.path,
+        'imagePath': persistentImagePath,
         'comment': event.comment,
         'latitude': event.latitude,
         'longitude': event.longitude,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
 
-      // We emit success so UI can pop, then trigger sync
-      // using a dummy model to fulfill PhotoUploadSuccess expectations.
-      final dummyPhoto = CapturedPhotoModel(
+      final offlinePhoto = CapturedPhotoModel(
         uid: 'pending_${DateTime.now().millisecondsSinceEpoch}',
         permissionId: event.permissionId,
         organizationUID: event.organizationUID,
@@ -216,19 +257,19 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
         branchName: event.branchName,
         delegateUID: event.delegateUID,
         delegateName: event.delegateName,
-        photoUrl: 'local', // Placeholder
+        photoUrl: persistentImagePath,
         comment: event.comment,
         latitude: event.latitude,
         longitude: event.longitude,
         capturedAt: DateTime.now(),
       );
 
-      emit(PhotoUploadSuccess(photo: dummyPhoto));
+      emit(PhotoUploadSuccess(photo: offlinePhoto, isOffline: true));
 
-      // Attempt to sync immediately if internet is available
-      syncManager.syncPendingPhotos();
+      // Trigger background sync service when connection is restored
+      GetIt.I<SyncManager>().syncPendingPhotos();
     } catch (e) {
-      emit(PhotoPermissionError(message: 'فشل في حفظ الصورة محلياً: $e'));
+      emit(PhotoPermissionError(message: 'فشل في حفظ الصورة: $e'));
     }
   }
 

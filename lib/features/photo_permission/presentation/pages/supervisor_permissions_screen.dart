@@ -662,6 +662,7 @@ class _CreateRequestBottomSheetState extends State<_CreateRequestBottomSheet> {
     super.initState();
     _startDate = DateTime.now();
     _endDate = DateTime.now().add(const Duration(days: 30));
+    context.read<BranchBloc>().add(BranchLoadRequested());
   }
 
   @override

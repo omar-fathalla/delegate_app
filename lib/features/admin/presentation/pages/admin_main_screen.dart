@@ -66,17 +66,23 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       ];
     } else if (isTechnicalSupport) {
       _screens = [
-        BlocProvider(
-          create: (_) => di.sl<PhotoPermissionBloc>()
-            ..add(const LoadPermissionsRequested(
-              organizationUID: '',
-              companyUID: '',
-            )),
-          child: MarketingPermissionsScreen(marketingDelegate: delegate),
+        SuperAdminDashboardScreen(
+          delegate: delegate,
+          onNavigateToBranches: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AdminBranchesScreen(showAppBar: true)),
+          ),
+          onNavigateToAddBranch: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AddBranchScreen(showAppBar: true)),
+          ),
+          onNavigateToCreateAdmin: () => setState(() => _currentIndex = 2),
+          onNavigateToSendNotification: () => setState(() => _currentIndex = 1),
         ),
-        const AdminBranchesScreen(),
-        const AddBranchScreen(),
-        CreateAdminScreen(organizationUID: delegate.organizationUID, currentDelegate: delegate),
+        SendNotificationScreen(senderDelegate: delegate, showAppBar: false),
+        CreateAdminScreen(
+          organizationUID: delegate.organizationUID,
+          currentDelegate: delegate,
+          currentUserRole: delegate.role,
+        ),
       ];
     } else if (isBranchesMarketingManager) {
       _screens = [
@@ -134,6 +140,30 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
 
   void _onMenuSelected(String value) {
     switch (value) {
+      case 'branches':
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminBranchesScreen(showAppBar: true)),
+        );
+        break;
+      case 'add_branch':
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AddBranchScreen(showAppBar: true)),
+        );
+        break;
+      case 'photo_permissions':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BlocProvider(
+              create: (_) => di.sl<PhotoPermissionBloc>()
+                ..add(const LoadPermissionsRequested(
+                  organizationUID: '',
+                  companyUID: '',
+                )),
+              child: MarketingPermissionsScreen(marketingDelegate: widget.delegate),
+            ),
+          ),
+        );
+        break;
       case 'manage_admins':
         Navigator.of(
           context,
@@ -231,11 +261,9 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               : l10n.createAdmin)
         : isTechnicalSupport
         ? (_currentIndex == 0
-              ? l10n.photoPermissions
+              ? l10n.home
               : _currentIndex == 1
-              ? l10n.branches
-              : _currentIndex == 2
-              ? l10n.addBranch
+              ? 'إرسال إشعار جديد'
               : l10n.createAdmin)
         : isOrganizationAdmin
         ? (_currentIndex == 0
@@ -296,6 +324,35 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           const SizedBox(width: 4),
         ],
         menuItems: [
+          if (isTechnicalSupport) ...[
+            const PopupMenuItem(
+              value: 'branches',
+              child: ListTile(
+                leading: Icon(Icons.storefront_rounded),
+                title: Text('الفروع'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'add_branch',
+              child: ListTile(
+                leading: Icon(Icons.add_location_alt_rounded),
+                title: Text('إضافة فرع'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'photo_permissions',
+              child: ListTile(
+                leading: Icon(Icons.photo_library_rounded),
+                title: Text('أذونات التصوير'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
           if (isSuperAdmin || isTechnicalSupport) ...[
             PopupMenuItem(
               value: 'manage_admins',
@@ -427,20 +484,18 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               },
               destinations: [
                 NavigationDestination(
-                  icon: const Icon(Icons.photo_library_outlined),
-                  selectedIcon: const Icon(Icons.photo_library_rounded),
-                  label: l10n.photoPermissions,
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home_rounded),
+                  label: l10n.home,
                 ),
-                NavigationDestination(
-                  icon: const Icon(Icons.storefront_rounded),
-                  label: l10n.branches,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.add_location_alt_rounded),
-                  label: l10n.addBranch,
+                const NavigationDestination(
+                  icon: Icon(Icons.campaign_outlined),
+                  selectedIcon: Icon(Icons.campaign_rounded),
+                  label: 'إرسال إشعار',
                 ),
                 NavigationDestination(
                   icon: const Icon(Icons.admin_panel_settings_rounded),
+                  selectedIcon: const Icon(Icons.admin_panel_settings_rounded),
                   label: l10n.createAdmin,
                 ),
               ],

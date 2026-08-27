@@ -3,8 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
-import 'package:delegate_app/core/models/pagination_response.dart'; // Added this import
+import 'package:delegate_app/core/models/pagination_response.dart';
+import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
+import 'package:delegate_app/injection_container.dart';
 
 abstract class AttendanceRemoteDataSource {
   Future<AttendanceModel> checkIn(
@@ -96,11 +98,18 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           })
           .timeout(const Duration(seconds: 15));
 
+      DateTime currentTime;
+      try {
+        currentTime = sl<TrustedTimeService>().now;
+      } catch (_) {
+        currentTime = DateTime.now();
+      }
+
       return AttendanceModel(
         id: docRef.id,
         userId: userId,
         organizationId: organizationId,
-        checkInTime: DateTime.now(),
+        checkInTime: currentTime,
         latitude: lat,
         longitude: long,
         branchName: branchName,
@@ -147,12 +156,19 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           })
           .timeout(const Duration(seconds: 15));
 
+      DateTime currentOutTime;
+      try {
+        currentOutTime = sl<TrustedTimeService>().now;
+      } catch (_) {
+        currentOutTime = DateTime.now();
+      }
+
       return AttendanceModel(
         id: attendanceId,
         userId: userId,
         organizationId: organizationId,
         checkInTime: (lastData['timestamp'] as Timestamp).toDate(),
-        checkOutTime: DateTime.now(),
+        checkOutTime: currentOutTime,
         latitude: (lastData['location']['latitude'] as num).toDouble(),
         longitude: (lastData['location']['longitude'] as num).toDouble(),
         branchName: lastData['branchName'],

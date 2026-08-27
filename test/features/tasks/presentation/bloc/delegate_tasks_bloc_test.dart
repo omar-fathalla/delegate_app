@@ -83,7 +83,7 @@ void main() {
     // Using TaskStatusUpdateSuccess causes it to not update tasks locally, so we expect TaskStatusUpdateSuccess
     act: (bloc) => bloc.add(const UpdateTaskStatusRequested(organizationId: 'org1', taskId: 'task123', newStatus: TaskStatus.completed)),
     expect: () => [
-      const TaskStatusUpdateSuccess(),
+      const TaskStatusUpdateSuccess(newStatus: TaskStatus.completed),
     ],
   );
 

@@ -98,12 +98,30 @@ class DelegateModel extends Delegate {
       }
     }
 
+    final rawFullName = (json['fullName'] as String?)?.trim();
+    final first = (json['firstName'] as String?)?.trim() ?? '';
+    final middle = (json['middleName'] as String?)?.trim() ?? '';
+    final last = (json['lastName'] as String?)?.trim() ?? '';
+    final combined = [first, middle, last].where((s) => s.isNotEmpty).join(' ');
+    final altName = (json['name'] as String?)?.trim();
+    final effectiveFullName = (rawFullName != null && rawFullName.isNotEmpty)
+        ? rawFullName
+        : (combined.isNotEmpty
+            ? combined
+            : (altName != null && altName.isNotEmpty ? altName : ''));
+
+    final rawCompanyName = (json['companyName'] as String?)?.trim();
+    final altCompanyName = (json['company_name'] as String?)?.trim();
+    final effectiveCompanyName = (rawCompanyName != null && rawCompanyName.isNotEmpty)
+        ? rawCompanyName
+        : (altCompanyName ?? '');
+
     return DelegateModel(
       uid: uid,
-      firstName: json['firstName'] ?? '',
-      middleName: json['middleName'] ?? '',
-      lastName: json['lastName'] ?? '',
-      fullName: json['fullName'] ?? '',
+      firstName: first,
+      middleName: middle,
+      lastName: last,
+      fullName: effectiveFullName,
       nationalityID: json['nationalityID'] ?? '',
       motherName: json['motherName'] ?? '',
       city: json['city'] ?? '',
@@ -114,7 +132,7 @@ class DelegateModel extends Delegate {
       organizationUID: json['organizationUID'] ?? '',
       organizationName: json['organizationName'] ?? '',
       companyUID: json['companyUID'] ?? '',
-      companyName: json['companyName'] ?? '',
+      companyName: effectiveCompanyName,
       status: parseStatus(json['status']),
       statusReason: json['statusReason'],
       delegatePublicId: json['delegatePublicId'] ?? '',

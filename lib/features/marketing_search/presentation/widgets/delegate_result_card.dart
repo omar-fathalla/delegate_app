@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../profile/domain/entities/delegate.dart';
@@ -26,7 +27,7 @@ class DelegateResultCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // يمكن إضافة التنقل لصفحة تفاصيل المندوب هنا
+          context.push('/profile', extra: delegate);
         },
         child: Padding(
           padding: const EdgeInsets.all(16),

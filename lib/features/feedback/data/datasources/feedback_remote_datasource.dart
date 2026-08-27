@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/features/feedback/data/models/feedback_model.dart';
 import 'package:delegate_app/features/feedback/domain/entities/feedback_entity.dart';
@@ -26,16 +27,47 @@ class FeedbackRemoteDataSourceImpl implements FeedbackRemoteDataSource {
     required this.storage,
   });
 
+  Future<void> _ensureAuth() async {
+    try {
+      final auth = FirebaseAuth.instance;
+      if (auth.currentUser == null) {
+        await auth.signInAnonymously();
+      } else {
+        try {
+          await auth.currentUser!.getIdToken(true);
+        } catch (_) {
+          if (auth.currentUser?.isAnonymous == true) {
+            await auth.signOut();
+            await auth.signInAnonymously();
+          }
+        }
+      }
+    } catch (_) {
+      // In tests or offline environments, proceed gracefully
+    }
+  }
+
   @override
   Future<void> submitFeedback(FeedbackModel feedback, File? screenshot) async {
     String? screenshotUrl;
 
     // رفع الصورة إذا كانت موجودة
     if (screenshot != null) {
+      await _ensureAuth();
       final fileName = 'feedback_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = storage.ref().child('feedback_screenshots/$fileName');
-      await ref.putFile(screenshot);
-      screenshotUrl = await ref.getDownloadURL();
+      
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        customMetadata: {
+          'userId': feedback.userId,
+          'userName': feedback.userName,
+          'type': feedback.type.value,
+        },
+      );
+
+      final uploadTask = await ref.putFile(screenshot, metadata);
+      screenshotUrl = await uploadTask.ref.getDownloadURL();
     }
 
     // إنشاء المقترح مع رابط الصورة
