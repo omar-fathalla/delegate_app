@@ -134,13 +134,16 @@ echo -e "  ${DIM}حجم:${NC} ${IPA_SIZE}"
 echo -e "  ${GREEN}✅ IPA تم تصديره${NC}"
 echo ""
 
-# ======== الخطوة 6: رفع على Firebase ========
+# ======== الخطوة 6: رفع على Firebase (اختياري) ========
 echo -e "${CYAN}${BOLD}━━━ ☁️  الخطوة 6/6: Firebase App Distribution ━━━${NC}"
-firebase appdistribution:distribute "$IPA_FILE" \
+if firebase appdistribution:distribute "$IPA_FILE" \
   --app "$FIREBASE_APP_ID" \
   --release-notes "iOS v${VERSION_NAME} (Build ${NEW_BUILD})" \
-  --project "$FIREBASE_PROJECT" 2>&1 | grep -E "✔|✗|⚠|Error"
-echo -e "  ${GREEN}✅ تم الرفع على Firebase${NC}"
+  --project "$FIREBASE_PROJECT" 2>&1 | grep -E "✔|✗|⚠|Error"; then
+  echo -e "  ${GREEN}✅ تم الرفع على Firebase App Distribution${NC}"
+else
+  echo -e "  ${YELLOW}⚠️ تم تخطي / تعذر الرفع على Firebase، ولكن ملف IPA جاهز تماماً للاستخدام في Transporter!${NC}"
+fi
 echo ""
 
 # ======== الملخص ========
