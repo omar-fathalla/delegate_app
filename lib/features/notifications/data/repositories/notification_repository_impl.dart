@@ -1,13 +1,28 @@
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
+import 'package:delegate_app/features/notifications/data/datasources/notification_local_data_source.dart';
 import 'package:delegate_app/features/notifications/data/datasources/notification_remote_data_source.dart';
 import 'package:delegate_app/features/notifications/domain/entities/notification_entity.dart';
 import 'package:delegate_app/features/notifications/domain/repositories/notification_repository.dart';
 
 class NotificationRepositoryImpl implements NotificationRepository {
   final NotificationRemoteDataSource remoteDataSource;
+  final NotificationLocalDataSource? localDataSource;
 
-  NotificationRepositoryImpl({required this.remoteDataSource});
+  NotificationRepositoryImpl({
+    required this.remoteDataSource,
+    this.localDataSource,
+  });
+
+  @override
+  Future<List<NotificationEntity>> getCachedNotifications(String delegateUid) async {
+    if (localDataSource == null) return [];
+    try {
+      return await localDataSource!.getCachedNotifications(delegateUid);
+    } catch (_) {
+      return [];
+    }
+  }
 
   @override
   Future<Either<Failure, List<NotificationEntity>>> getNotifications(
@@ -21,8 +36,17 @@ class NotificationRepositoryImpl implements NotificationRepository {
         organizationId,
         phoneNumber: phoneNumber,
       );
+      if (localDataSource != null) {
+        await localDataSource!.cacheNotifications(delegateUid, notifications);
+      }
       return Right(notifications);
     } catch (e) {
+      if (localDataSource != null) {
+        final cached = await localDataSource!.getCachedNotifications(delegateUid);
+        if (cached.isNotEmpty) {
+          return Right(cached);
+        }
+      }
       return Left(ServerFailure(e.toString()));
     }
   }
@@ -56,6 +80,9 @@ class NotificationRepositoryImpl implements NotificationRepository {
     String organizationId,
   ) async {
     try {
+      if (localDataSource != null) {
+        await localDataSource!.markAllAsReadInCache(delegateUid);
+      }
       await remoteDataSource.markAllAsRead(delegateUid, organizationId);
       return const Right(null);
     } catch (e) {
@@ -69,6 +96,9 @@ class NotificationRepositoryImpl implements NotificationRepository {
     String userUid,
   ) async {
     try {
+      if (localDataSource != null) {
+        await localDataSource!.deleteNotificationInCache(userUid, notificationId);
+      }
       await remoteDataSource.deleteNotificationForUser(notificationId, userUid);
       return const Right(null);
     } catch (e) {

@@ -233,11 +233,13 @@ void main() {
   group('updatePenaltyStatus', () {
     test('should update status successfully', () async {
       when(() => mockDocumentReference.update(any())).thenAnswer((_) async {});
+      when(() => mockDocumentReference.get()).thenAnswer((_) async => mockQueryDocumentSnapshot);
+      when(() => mockQueryDocumentSnapshot.exists).thenReturn(false);
 
       await dataSource.updatePenaltyStatus(penaltyId: 'test_id', status: PenaltyStatus.acknowledged);
 
-      verify(() => mockFirestore.collection('penalties')).called(1);
-      verify(() => mockCollectionReference.doc('test_id')).called(1);
+      verify(() => mockFirestore.collection('penalties')).called(greaterThanOrEqualTo(1));
+      verify(() => mockCollectionReference.doc('test_id')).called(greaterThanOrEqualTo(1));
       verify(() => mockDocumentReference.update(any())).called(1);
     });
 

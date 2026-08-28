@@ -40,6 +40,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
   String? _selectedBranchId;
   String? _selectedBranchName;
   List<Map<String, String>> _branches = [];
+  List<String> _pinnedBranchIds = [];
   bool _isLoadingBranches = true;
 
   List<Map<String, String>> _companies = [];
@@ -73,20 +74,45 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       }).toList();
       list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
 
-      // Check for pinned branch from SharedPreferences
+      // Check for pinned branch from SharedPreferences (multi or single)
       final prefs = await SharedPreferences.getInstance();
-      final defaultBranchId = prefs.getString('pinned_penalty_branch_id_${widget.adminDelegate.uid}');
+      final keyMulti = 'pinned_penalty_branch_ids_${widget.adminDelegate.uid}';
+      final keySingle = 'pinned_penalty_branch_id_${widget.adminDelegate.uid}';
+
+      List<String>? savedList = prefs.getStringList(keyMulti);
+      if (savedList == null || savedList.isEmpty) {
+        final single = prefs.getString(keySingle);
+        if (single != null && single.isNotEmpty && single != 'all') {
+          savedList = [single];
+        }
+      }
+
+      final pinnedIds = <String>[];
+      if (savedList != null) {
+        for (final id in savedList) {
+          if (list.any((b) => b['id'] == id)) {
+            pinnedIds.add(id);
+          }
+        }
+      }
+
+      String? initialSelectedId;
+      String? initialSelectedName;
+
+      if (pinnedIds.isNotEmpty) {
+        initialSelectedId = pinnedIds.first;
+        final match = list.firstWhere((b) => b['id'] == pinnedIds.first);
+        initialSelectedName = match['name'];
+      } else if (list.isNotEmpty) {
+        initialSelectedId = list.first['id'];
+        initialSelectedName = list.first['name'];
+      }
 
       setState(() {
         _branches = list;
-        if (defaultBranchId != null && list.any((b) => b['id'] == defaultBranchId)) {
-          _selectedBranchId = defaultBranchId;
-          final match = list.firstWhere((b) => b['id'] == defaultBranchId);
-          _selectedBranchName = match['name'];
-        } else if (list.isNotEmpty) {
-          _selectedBranchId = list.first['id'];
-          _selectedBranchName = list.first['name'];
-        }
+        _pinnedBranchIds = pinnedIds;
+        _selectedBranchId = initialSelectedId;
+        _selectedBranchName = initialSelectedName;
         _isLoadingBranches = false;
       });
     } catch (_) {
@@ -550,12 +576,71 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                   ],
 
                   // 1.c Branch Selector (الفرع الذي حدثت به الواقعة)
-                  Text(
-                    'الفرع الذي حدثت به الواقعة',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        'الفرع الذي حدثت به الواقعة',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (_pinnedBranchIds.isNotEmpty) ...[
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'قطاعك المثبت 📌',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
+                  if (_pinnedBranchIds.length > 1) ...[
+                    const SizedBox(height: 6),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: _pinnedBranchIds.map((bId) {
+                          final branchObj = _branches.firstWhere(
+                            (b) => b['id'] == bId,
+                            orElse: () => {'name': bId},
+                          );
+                          final isSelected = _selectedBranchId == bId;
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: ChoiceChip(
+                              label: Text(
+                                branchObj['name'] ?? bId,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                              selected: isSelected,
+                              onSelected: (val) {
+                                if (val) {
+                                  setState(() {
+                                    _selectedBranchId = bId;
+                                    _selectedBranchName = branchObj['name'];
+                                  });
+                                }
+                              },
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   _isLoadingBranches
                       ? const Center(
@@ -565,7 +650,10 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                           ),
                         )
                       : DropdownButtonFormField<String>(
-                          initialValue: _selectedBranchId,
+                          key: ValueKey(_selectedBranchId),
+                          initialValue: _branches.any((b) => b['id'] == _selectedBranchId)
+                              ? _selectedBranchId
+                              : (_branches.isNotEmpty ? _branches.first['id'] : null),
                           isExpanded: true,
                           decoration: InputDecoration(
                             hintText: 'اختر الفرع...',
@@ -579,11 +667,23 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                             ),
                           ),
                           items: _branches.map((b) {
+                            final isPinned = _pinnedBranchIds.contains(b['id']);
                             return DropdownMenuItem<String>(
                               value: b['id'],
-                              child: Text(
-                                b['name'] ?? '',
-                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      b['name'] ?? '',
+                                      style: const TextStyle(fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                  if (isPinned)
+                                    Text(
+                                      '📌',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                ],
                               ),
                             );
                           }).toList(),

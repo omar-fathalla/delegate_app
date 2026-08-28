@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/photo_permission/presentation/widgets/sync_status_banner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,6 +16,9 @@ class DelegateHomeScreen extends StatefulWidget {
 
 class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     with AutomaticKeepAliveClientMixin {
+  static final Map<String, List<Map<String, dynamic>>> _supervisorsCache = {};
+  static final Map<String, DateTime> _supervisorsCacheTime = {};
+
   List<Map<String, dynamic>> _supervisorsData = [];
   bool _loadingSupervisor = false;
   String? _supervisorError;
@@ -25,20 +29,28 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   @override
   void initState() {
     super.initState();
+    final cacheKey = '${widget.delegate.organizationUID}_${widget.delegate.companyUID}';
+    if (_supervisorsCache.containsKey(cacheKey)) {
+      _supervisorsData = List.from(_supervisorsCache[cacheKey]!);
+    }
     _fetchSupervisors();
   }
 
-  Future<void> _fetchSupervisors() async {
+  Future<void> _fetchSupervisors({bool forceRefresh = false}) async {
     final orgId = widget.delegate.organizationUID;
     final compId = widget.delegate.companyUID;
 
     if (orgId.isEmpty || compId.isEmpty) return;
 
-    setState(() {
-      _loadingSupervisor = true;
-      _supervisorError = null;
-      _supervisorsData = [];
-    });
+    final cacheKey = '${orgId}_$compId';
+    final hasCached = _supervisorsCache.containsKey(cacheKey);
+
+    if (!hasCached && !forceRefresh) {
+      setState(() {
+        _loadingSupervisor = true;
+        _supervisorError = null;
+      });
+    }
 
     try {
       final List<Map<String, dynamic>> fetchedSupervisors = [];
@@ -112,6 +124,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         }
       }
 
+      _supervisorsCache[cacheKey] = fetchedSupervisors;
+      _supervisorsCacheTime[cacheKey] = DateTime.now();
+
       if (mounted) {
         setState(() {
           _supervisorsData = fetchedSupervisors;
@@ -157,7 +172,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         onRefresh: () async {
-          await _fetchSupervisors();
+          await _fetchSupervisors(forceRefresh: true);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -165,6 +180,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SyncStatusBanner(),
               _buildWelcomeHeroCard(context),
               const SizedBox(height: 16),
               ..._buildSupervisorsList(context),

@@ -74,6 +74,7 @@ void main() {
   });
 
   setUp(() {
+    AttendanceBloc.clearCache();
     mockCheckIn = MockCheckIn();
     mockCheckOut = MockCheckOut();
     mockGetHistory = MockGetHistory();

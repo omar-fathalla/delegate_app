@@ -96,15 +96,20 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       } catch (_) {}
     }
 
-    // 5. Try getting user phone number from users/delegates to match phone-targeted notifications
+    // 5. Try getting user phone number, companyId, and role from users/delegates
     try {
       String? phone;
+      String? userCompanyId;
+      String? userRole;
+
       final userDoc = await firestore.collection('users').doc(delegateUid).get();
       if (userDoc.exists) {
         final userData = userDoc.data();
         phone = (userData?['phoneNumber'] ??
                 userData?['phone'] ??
                 userData?['mobileNumber']) as String?;
+        userCompanyId = (userData?['companyUID'] ?? userData?['companyId']) as String?;
+        userRole = userData?['role']?.toString();
       }
       if (phone == null || phone.isEmpty) {
         final userQuery = await firestore
@@ -117,6 +122,8 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           phone = (userData['phoneNumber'] ??
                   userData['phone'] ??
                   userData['mobileNumber']) as String?;
+          userCompanyId ??= (userData['companyUID'] ?? userData['companyId']) as String?;
+          userRole ??= userData['role']?.toString();
         }
       }
       if (phone == null || phone.isEmpty) {
@@ -130,6 +137,45 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           phone = (delData['phoneNumber'] ??
                   delData['phone'] ??
                   delData['mobileNumber']) as String?;
+          userCompanyId ??= (delData['companyUID'] ?? delData['companyId']) as String?;
+          userRole ??= delData['role']?.toString();
+        }
+      }
+
+      // Company-level & Supervisor notifications
+      if (userCompanyId != null && userCompanyId.isNotEmpty) {
+        final compSnap1 = await _collection
+            .where('delegateUid', isEqualTo: 'company_$userCompanyId')
+            .limit(30)
+            .get();
+        addDocs(compSnap1.docs);
+
+        final compSnap2 = await _collection
+            .where('delegateUid', isEqualTo: 'supervisor_$userCompanyId')
+            .limit(30)
+            .get();
+        addDocs(compSnap2.docs);
+
+        final compSnap3 = await _collection
+            .where('companyId', isEqualTo: userCompanyId)
+            .where('delegateUid', isEqualTo: 'all_company_supervisors')
+            .limit(30)
+            .get();
+        addDocs(compSnap3.docs);
+      }
+
+      // Role-specific broadcasts
+      final normalizedRole = userRole?.toLowerCase() ?? '';
+      if (normalizedRole.contains('marketing') || normalizedRole.contains('branches')) {
+        for (final r in ['branchesMarketingManager', 'branches_marketing', 'marketing']) {
+          final rSnap = await _collection.where('delegateUid', isEqualTo: r).limit(30).get();
+          addDocs(rSnap.docs);
+        }
+      }
+      if (normalizedRole.contains('org') || normalizedRole.contains('organization')) {
+        for (final r in ['organizationAdmin', 'organization_admin']) {
+          final rSnap = await _collection.where('delegateUid', isEqualTo: r).limit(30).get();
+          addDocs(rSnap.docs);
         }
       }
 

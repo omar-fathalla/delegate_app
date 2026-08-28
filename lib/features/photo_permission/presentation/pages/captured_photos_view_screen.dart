@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
+import 'package:delegate_app/core/widgets/app_photo_image.dart';
+import 'package:delegate_app/core/services/photo_cache_manager.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
 
@@ -64,7 +67,12 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
       body: BlocBuilder<PhotoPermissionBloc, PhotoPermissionState>(
         builder: (context, state) {
           if (state is PhotoPermissionLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: AppLoadingIndicator(
+                style: AppLoadingStyle.threeArchedCircle,
+                label: 'جاري تحميل التقارير المصورة...',
+              ),
+            );
           }
 
           if (state is CapturedPhotosLoaded) {
@@ -252,24 +260,10 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                                       child: Stack(
                                         fit: StackFit.expand,
                                         children: [
-                                          Image.network(
-                                            photo.photoUrl,
+                                          AppPhotoImage(
+                                            photoUrl: photo.photoUrl,
+                                            isThumbnail: true,
                                             fit: BoxFit.cover,
-                                            loadingBuilder: (context, child, loadingProgress) {
-                                              if (loadingProgress == null) return child;
-                                              return const Center(
-                                                child: CircularProgressIndicator(),
-                                              );
-                                            },
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Container(
-                                                color: colorScheme.errorContainer,
-                                                child: Icon(
-                                                  Icons.broken_image_rounded,
-                                                  color: colorScheme.onErrorContainer,
-                                                ),
-                                              );
-                                            },
                                           ),
                                           Positioned(
                                             bottom: 0,
@@ -364,44 +358,124 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
   void _showFullImage(BuildContext context, String url, String comment) {
     showDialog(
       context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  color: Colors.black,
-                ),
-                child: InteractiveViewer(
-                  maxScale: 4.0,
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
+      builder: (dialogContext) {
+        bool isSaving = false;
+        bool saveSuccess = false;
+        String? statusText;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.black,
+                    ),
+                    child: InteractiveViewer(
+                      maxScale: 4.0,
+                      child: AppPhotoImage(
+                        photoUrl: url,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            setDialogState(() {
+                              isSaving = true;
+                              statusText = null;
+                            });
+                            try {
+                              final success = await PhotoCacheManager.savePhotoToGallery(
+                                context,
+                                photoUrl: url,
+                              );
+                              if (dialogContext.mounted) {
+                                setDialogState(() {
+                                  isSaving = false;
+                                  saveSuccess = success;
+                                  statusText = success
+                                      ? '✅ تم حفظ الصورة في الهاتف بنجاح'
+                                      : '⚠️ يرجى منح إذن الوصول للصور من الإعدادات.';
+                                });
+                              }
+                            } catch (e) {
+                              if (dialogContext.mounted) {
+                                setDialogState(() {
+                                  isSaving = false;
+                                  saveSuccess = false;
+                                  statusText = '❌ تعذر حفظ الصورة: $e';
+                                });
+                              }
+                            }
+                          },
+                    icon: isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Icon(
+                            saveSuccess ? Icons.check_circle_rounded : Icons.download_rounded,
+                            size: 18,
+                          ),
+                    label: Text(
+                      isSaving
+                          ? 'جاري حفظ الصورة...'
+                          : saveSuccess
+                              ? 'تم الحفظ في الهاتف ✓'
+                              : 'حفظ الصورة',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: saveSuccess ? Colors.green.shade700 : null,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  if (statusText != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: saveSuccess ? Colors.green.shade900.withValues(alpha: 0.8) : Colors.amber.shade900.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        statusText!,
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                  if (comment.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        comment,
+                        style: const TextStyle(color: Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              if (comment.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    comment,
-                    style: const TextStyle(color: Colors.white),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ],
-          ),
+            );
+          },
         );
       },
     );

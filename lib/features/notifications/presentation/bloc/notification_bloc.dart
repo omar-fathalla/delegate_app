@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bloc/bloc.dart';
 import 'package:delegate_app/features/notifications/domain/entities/notification_entity.dart';
+import 'package:delegate_app/features/notifications/domain/usecases/get_cached_notifications.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/delete_notification_for_user.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/get_notifications.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/get_unread_count.dart';
@@ -14,6 +15,7 @@ part 'notification_state.dart';
 
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final GetNotifications getNotifications;
+  final GetCachedNotifications? getCachedNotifications;
   final GetUnreadCount getUnreadCount;
   final MarkNotificationRead markNotificationRead;
   final MarkAllNotificationsRead markAllNotificationsRead;
@@ -24,6 +26,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
 
   NotificationBloc({
     required this.getNotifications,
+    this.getCachedNotifications,
     required this.getUnreadCount,
     required this.markNotificationRead,
     required this.markAllNotificationsRead,
@@ -41,8 +44,29 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     LoadNotifications event,
     Emitter<NotificationState> emit,
   ) async {
-    emit(NotificationLoading());
+    // 1. Instant Cache-First Load (0 ms)
+    List<NotificationEntity> cachedList = [];
+    if (getCachedNotifications != null) {
+      try {
+        cachedList = await getCachedNotifications!(event.delegateUid);
+        if (cachedList.isNotEmpty) {
+          emit(
+            NotificationLoaded(
+              notifications: cachedList,
+              unreadCount: _currentUnreadCount > 0
+                  ? _currentUnreadCount
+                  : cachedList.where((n) => !n.isRead).length,
+            ),
+          );
+        }
+      } catch (_) {}
+    }
 
+    if (cachedList.isEmpty) {
+      emit(NotificationLoading());
+    }
+
+    // 2. Background Remote Sync (Stale-While-Revalidate)
     final result = await getNotifications(
       GetNotificationsParams(
         delegateUid: event.delegateUid,
@@ -52,7 +76,11 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     );
 
     result.fold(
-      (failure) => emit(NotificationError(failure.message)),
+      (failure) {
+        if (cachedList.isEmpty) {
+          emit(NotificationError(failure.message));
+        }
+      },
       (notifications) => emit(
         NotificationLoaded(
           notifications: notifications,

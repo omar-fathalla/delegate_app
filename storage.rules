@@ -8,40 +8,10 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function getUserData() {
-      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function isSuperAdmin() {
-      return isAuthenticated() && getUserData().role == 'super-admin';
-    }
-
-    function isOrgAdmin() {
-      return isAuthenticated() && getUserData().role == 'org-admin';
-    }
-
-    function isCompanyAdmin() {
-      return isAuthenticated() && getUserData().role == 'company-admin';
-    }
-
-    function belongsToOrganization(orgId) {
-      return isAuthenticated() && getUserData().organizationUID == orgId;
-    }
-
-    function belongsToCompany(compId) {
-      return isAuthenticated() && getUserData().companyUID == compId;
-    }
-
     // ==================== FEEDBACK SCREENSHOTS ====================
-    // Screenshots attached to user feedbacks
+    // Screenshots attached to user feedbacks (delegates, supervisors, admins, marketing)
     match /feedback_screenshots/{fileName} {
-      // Read: Authenticated users only
-      allow read: if isAuthenticated();
-      
-      // Write: Only authenticated users can upload
-      // Max size: 10MB
-      allow write: if isAuthenticated() &&
-        request.resource.size < 10 * 1024 * 1024;
+      allow read, write: if isAuthenticated();
     }
 
     // ==================== PHOTO PERMISSION IMAGES ====================
@@ -50,113 +20,49 @@ service firebase.storage {
     }
 
     // ==================== ORGANIZATION FILES ====================
-    // Files under organizations/{orgId}/...
     match /organizations/{orgId}/{allPaths=**} {
-      // Super Admin: full access
-      allow read, write: if isSuperAdmin();
-      
-      // Org Admin & Company Admin: read access to their organization
-      allow read: if belongsToOrganization(orgId);
-      
-      // Org Admin: write access to their organization
-      allow write: if isOrgAdmin() && belongsToOrganization(orgId);
+      allow read, write: if isAuthenticated();
     }
 
     // ==================== COMPANY FILES ====================
-    // Files under companies/{compId}/...
     match /companies/{compId}/{allPaths=**} {
-      // Super Admin: full access
-      allow read, write: if isSuperAdmin();
-      
-      // Company Admin: full access to their company
-      allow read, write: if isCompanyAdmin() && belongsToCompany(compId);
-      
-      // Org Admin: full access
-      allow read, write: if isOrgAdmin();
-      
-      // Any authenticated user from the same organization: read access
-      allow read: if belongsToOrganization(
-        firestore.get(/databases/(default)/documents/companies/$(compId)).data.organizationUID
-      );
+      allow read, write: if isAuthenticated();
     }
 
-    // Files directly under /companies/ (without compId)
     match /companies/{fileName} {
       allow read, write: if isAuthenticated();
     }
 
     // ==================== DELEGATE FILES ====================
-    // Files under delegates/{delegateId}/...
     match /delegates/{delegateId}/{allPaths=**} {
-      // Super Admin: full access
-      allow read, write: if isSuperAdmin();
-      
-      // Delegate: read their own files
-      allow read: if isAuthenticated() && request.auth.uid == delegateId;
-      
-      // Org Admin & Company Admin: read access
-      allow read: if isOrgAdmin() || isCompanyAdmin();
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== PENALTIES ATTACHMENTS ====================
+    match /penalties/{allPaths=**} {
+      allow read, write: if isAuthenticated();
     }
 
     // ==================== PUBLIC FILES ====================
-    // Publicly accessible files (logos, etc.)
     match /public/{allPaths=**} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // ==================== LEGACY PATHS (OLD STRUCTURE) ====================
-    // These paths don't follow the new structure but are still in use
-    // Allow authenticated users to read them
-    
-    // Personal photos
-    match /personalPhoto/{allPaths=**} {
+    // ==================== STAGING PATH ====================
+    match /staging/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== GUIDE VIDEOS PATH ====================
+    match /guide-videos/{fileName} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
 
-    // Authorization letters
-    match /authorizationLetter/{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Insurance letters
-    match /insuranceLetter/{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Nationality IDs
-    match /nationalityId/{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Company logos
-    match /companyLogo/{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Any other legacy paths (single level)
-    match /{fileName} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // ==================== CATCH-ALL FOR UNKNOWN PATHS ====================
-    // Some files have weird prefixes or nested structures we don't know about
-    // Allow authenticated users to access them
-    match /{prefix}/{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // ==================== DEFAULT DENY ====================
-    // Any path not explicitly matched above will be denied
+    // ==================== FALLBACK FOR ALL OTHER AUTHENTICATED PATHS ====================
     match /{allPaths=**} {
-      allow read, write: if false;
+      allow read, write: if isAuthenticated();
     }
   }
 }

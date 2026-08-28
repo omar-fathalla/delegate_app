@@ -9,6 +9,7 @@ class NotificationEntity extends Equatable {
   final String body;
   final String type;
   final String? taskId;
+  final String? penaltyId;
   final bool isRead;
   final DateTime createdAt;
   final List<String> deletedBy;
@@ -22,6 +23,7 @@ class NotificationEntity extends Equatable {
     required this.body,
     required this.type,
     this.taskId,
+    this.penaltyId,
     required this.isRead,
     required this.createdAt,
     this.deletedBy = const [],
@@ -37,6 +39,7 @@ class NotificationEntity extends Equatable {
         body,
         type,
         taskId,
+        penaltyId,
         isRead,
         createdAt,
         deletedBy,

@@ -216,6 +216,15 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
             ),
             onSelected: _onMenuSelected,
             itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'profile',
+                child: ListTile(
+                  leading: Icon(Icons.person_outline_rounded),
+                  title: Text('الملف الشخصي'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
               if (!isPromotionOnly)
                 PopupMenuItem(
                   value: 'search',
@@ -251,15 +260,6 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.settings_outlined),
                   title: Text(l10n.settings),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'profile',
-                child: ListTile(
-                  leading: Icon(Icons.person_outline_rounded),
-                  title: Text('الملف الشخصي'),
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                 ),

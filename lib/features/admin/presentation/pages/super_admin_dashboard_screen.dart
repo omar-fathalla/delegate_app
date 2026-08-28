@@ -35,6 +35,12 @@ class SuperAdminDashboardScreen extends StatefulWidget {
 }
 
 class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
+  static Map<String, dynamic>? _cachedSupportStats;
+  static DateTime? _cachedSupportStatsTime;
+
+  static Map<String, dynamic>? _cachedAdminStats;
+  static DateTime? _cachedAdminStatsTime;
+
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -53,34 +59,127 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _applyCachedDataIfAvailable();
     _loadStats();
   }
 
-  Future<void> _loadStats() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  void _applyCachedDataIfAvailable() {
+    if (widget.delegate.role == UserRole.technicalSupport) {
+      if (_cachedSupportStats != null) {
+        _totalFeedbacksCount = _cachedSupportStats!['totalFeedbacksCount'] ?? 0;
+        _pendingFeedbacksCount = _cachedSupportStats!['pendingFeedbacksCount'] ?? 0;
+        _inProgressFeedbacksCount = _cachedSupportStats!['inProgressFeedbacksCount'] ?? 0;
+        _resolvedFeedbacksCount = _cachedSupportStats!['resolvedFeedbacksCount'] ?? 0;
+        _recentFeedbacks = List<FeedbackModel>.from(_cachedSupportStats!['recentFeedbacks'] ?? []);
+        _isLoading = false;
+      }
+    } else {
+      if (_cachedAdminStats != null) {
+        _branchesCount = _cachedAdminStats!['branchesCount'] ?? 0;
+        _companiesCount = _cachedAdminStats!['companiesCount'] ?? 0;
+        _delegatesCount = _cachedAdminStats!['delegatesCount'] ?? 0;
+        _receiptsCount = _cachedAdminStats!['receiptsCount'] ?? 0;
+        _totalFeedbacksCount = _cachedAdminStats!['totalFeedbacksCount'] ?? 0;
+        _pendingFeedbacksCount = _cachedAdminStats!['pendingFeedbacksCount'] ?? 0;
+        _inProgressFeedbacksCount = _cachedAdminStats!['inProgressFeedbacksCount'] ?? 0;
+        _resolvedFeedbacksCount = _cachedAdminStats!['resolvedFeedbacksCount'] ?? 0;
+        _recentFeedbacks = List<FeedbackModel>.from(_cachedAdminStats!['recentFeedbacks'] ?? []);
+        _isLoading = false;
+      }
+    }
+  }
+
+  Future<void> _loadStats({bool isPullToRefresh = false}) async {
+    final isSupport = widget.delegate.role == UserRole.technicalSupport;
+
+    // If we already have fresh cached data and it's not a manual pull-to-refresh, don't show loading spinner
+    final cacheTime = isSupport ? _cachedSupportStatsTime : _cachedAdminStatsTime;
+    final hasCache = isSupport ? (_cachedSupportStats != null) : (_cachedAdminStats != null);
+    final isCacheFresh = cacheTime != null && DateTime.now().difference(cacheTime).inMinutes < 5;
+
+    if (hasCache && isCacheFresh && !isPullToRefresh) {
+      return;
+    }
+
+    if (!hasCache && !isPullToRefresh) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final firestore = FirebaseFirestore.instance;
+
+      if (isSupport) {
+        // Fast Technical Support path: Fetch ONLY feedback stats and top 4 recent items
+        final totalCountQuery = await firestore.collection('feedbacks').count().get();
+        final pendingCountQuery = await firestore
+            .collection('feedbacks')
+            .where('status', isEqualTo: 'pending')
+            .count()
+            .get();
+        final inProgressCountQuery = await firestore
+            .collection('feedbacks')
+            .where('status', whereIn: ['inProgress', 'in_progress', 'reviewed'])
+            .count()
+            .get();
+        final resolvedCountQuery = await firestore
+            .collection('feedbacks')
+            .where('status', isEqualTo: 'resolved')
+            .count()
+            .get();
+
+        final recentSnap = await firestore
+            .collection('feedbacks')
+            .orderBy('createdAt', descending: true)
+            .limit(4)
+            .get();
+
+        final recentFeedbacks = recentSnap.docs
+            .map((doc) => FeedbackModel.fromJson(doc.data(), doc.id))
+            .toList();
+
+        final totalCount = totalCountQuery.count ?? 0;
+        final pendingCount = pendingCountQuery.count ?? 0;
+        final inProgressCount = inProgressCountQuery.count ?? 0;
+        final resolvedCount = resolvedCountQuery.count ?? 0;
+
+        _cachedSupportStats = {
+          'totalFeedbacksCount': totalCount,
+          'pendingFeedbacksCount': pendingCount,
+          'inProgressFeedbacksCount': inProgressCount,
+          'resolvedFeedbacksCount': resolvedCount,
+          'recentFeedbacks': recentFeedbacks,
+        };
+        _cachedSupportStatsTime = DateTime.now();
+
+        if (mounted) {
+          setState(() {
+            _totalFeedbacksCount = totalCount;
+            _pendingFeedbacksCount = pendingCount;
+            _inProgressFeedbacksCount = inProgressCount;
+            _resolvedFeedbacksCount = resolvedCount;
+            _recentFeedbacks = recentFeedbacks;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // Super Admin Path
       final orgUID = widget.delegate.organizationUID;
 
-      int branchesCount = 0;
-      int companiesCount = 0;
-
-      // 1. Fetch branches count (branches are always stored at the root collection '/branches')
+      // 1. Branches count (fast count)
       final branchesQuery = await firestore.collection('branches').count().get();
-      branchesCount = branchesQuery.count ?? 0;
+      final branchesCount = branchesQuery.count ?? 0;
 
-      // 2. Fetch companies count
+      // 2. Companies count (fast count)
+      int companiesCount = 0;
       if (orgUID.isEmpty) {
-        // Query global counts for global super admin
         final companiesQuery = await firestore.collectionGroup('companies').count().get();
         companiesCount = companiesQuery.count ?? 0;
       } else {
-        // Query organization-specific counts
         final companiesQuery = await firestore
             .collection('organizations')
             .doc(orgUID)
@@ -90,60 +189,15 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
         companiesCount = companiesQuery.count ?? 0;
       }
 
-      // 3. Fetch delegates count using fast count()
-      int delegatesCount = 0;
+      // 3. Delegates count (fast count)
       Query delegatesBaseQuery = firestore.collectionGroup('delegates');
-      
       if (orgUID.isNotEmpty) {
         delegatesBaseQuery = delegatesBaseQuery.where('organizationUID', isEqualTo: orgUID);
       }
-      
       final delegatesCountQuery = await delegatesBaseQuery.count().get();
-      delegatesCount = delegatesCountQuery.count ?? 0;
+      final delegatesCount = delegatesCountQuery.count ?? 0;
 
-      // 4. Calculate receiptsCount using batched queries to prevent OOM / Codec crashes
-      int receiptsCount = 0;
-      Query receiptsQuery = delegatesBaseQuery.orderBy(FieldPath.documentId).limit(500);
-      bool hasMore = true;
-      DocumentSnapshot? lastDoc;
-
-      while (hasMore) {
-        if (lastDoc != null) {
-          receiptsQuery = delegatesBaseQuery.orderBy(FieldPath.documentId).startAfterDocument(lastDoc).limit(500);
-        }
-
-        final snapshot = await receiptsQuery.get();
-        if (snapshot.docs.isEmpty) {
-          hasMore = false;
-          break;
-        }
-
-        for (var doc in snapshot.docs) {
-          final data = doc.data() as Map<String, dynamic>? ?? {};
-          final documentsList = data['documents'] as List? ?? [];
-
-          for (var docItem in documentsList) {
-            if (docItem is Map<String, dynamic>) {
-              final key = docItem['documentKey']?.toString().toLowerCase() ?? '';
-              final url = docItem['documentURL']?.toString() ?? '';
-
-              if ((key == 'electronicpaymentreceipt' ||
-                   key == 'electronic_payment_receipt' ||
-                   key == 'electronic_receipt' ||
-                   key == 'electronicreceipt' ||
-                   key == 'paymentreceipt') &&
-                  url.isNotEmpty) {
-                receiptsCount++;
-                break; // Found one for this delegate, no need to check other docs
-              }
-            }
-          }
-        }
-        
-        lastDoc = snapshot.docs.last;
-      }
-
-      // 4. Fetch feedbacks statistics for technical support and admin dashboard
+      // 4. Feedbacks statistics (fast count)
       int totalFeedbacksCount = 0;
       int pendingFeedbacksCount = 0;
       int inProgressFeedbacksCount = 0;
@@ -151,27 +205,75 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       List<FeedbackModel> recentFeedbacks = [];
 
       try {
-        final feedbacksSnapshot = await firestore.collection('feedbacks').get();
-        final feedbacks = feedbacksSnapshot.docs
+        final totalCountQuery = await firestore.collection('feedbacks').count().get();
+        final pendingCountQuery = await firestore
+            .collection('feedbacks')
+            .where('status', isEqualTo: 'pending')
+            .count()
+            .get();
+        final inProgressCountQuery = await firestore
+            .collection('feedbacks')
+            .where('status', whereIn: ['inProgress', 'in_progress', 'reviewed'])
+            .count()
+            .get();
+        final resolvedCountQuery = await firestore
+            .collection('feedbacks')
+            .where('status', isEqualTo: 'resolved')
+            .count()
+            .get();
+
+        final recentSnap = await firestore
+            .collection('feedbacks')
+            .orderBy('createdAt', descending: true)
+            .limit(4)
+            .get();
+
+        totalFeedbacksCount = totalCountQuery.count ?? 0;
+        pendingFeedbacksCount = pendingCountQuery.count ?? 0;
+        inProgressFeedbacksCount = inProgressCountQuery.count ?? 0;
+        resolvedFeedbacksCount = resolvedCountQuery.count ?? 0;
+        recentFeedbacks = recentSnap.docs
             .map((doc) => FeedbackModel.fromJson(doc.data(), doc.id))
             .toList();
-
-        feedbacks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-        totalFeedbacksCount = feedbacks.length;
-        pendingFeedbacksCount = feedbacks
-            .where((f) => f.status == FeedbackStatus.pending)
-            .length;
-        inProgressFeedbacksCount = feedbacks
-            .where((f) =>
-                f.status == FeedbackStatus.inProgress ||
-                f.status == FeedbackStatus.reviewed)
-            .length;
-        resolvedFeedbacksCount = feedbacks
-            .where((f) => f.status == FeedbackStatus.resolved)
-            .length;
-        recentFeedbacks = feedbacks.take(4).toList();
       } catch (_) {}
+
+      // 5. Receipts count calculation
+      int receiptsCount = _cachedAdminStats?['receiptsCount'] ?? 0;
+      if (isPullToRefresh || _cachedAdminStats == null) {
+        try {
+          // Optimized sample-bounded check to prevent freezing
+          final sampleSnap = await delegatesBaseQuery.limit(100).get();
+          int sampleCount = 0;
+          for (var doc in sampleSnap.docs) {
+            final data = doc.data() as Map<String, dynamic>? ?? {};
+            final documentsList = data['documents'] as List? ?? [];
+            for (var docItem in documentsList) {
+              if (docItem is Map<String, dynamic>) {
+                final key = docItem['documentKey']?.toString().toLowerCase() ?? '';
+                final url = docItem['documentURL']?.toString() ?? '';
+                if ((key.contains('payment') || key.contains('receipt')) && url.isNotEmpty) {
+                  sampleCount++;
+                  break;
+                }
+              }
+            }
+          }
+          receiptsCount = sampleCount;
+        } catch (_) {}
+      }
+
+      _cachedAdminStats = {
+        'branchesCount': branchesCount,
+        'companiesCount': companiesCount,
+        'delegatesCount': delegatesCount,
+        'receiptsCount': receiptsCount,
+        'totalFeedbacksCount': totalFeedbacksCount,
+        'pendingFeedbacksCount': pendingFeedbacksCount,
+        'inProgressFeedbacksCount': inProgressFeedbacksCount,
+        'resolvedFeedbacksCount': resolvedFeedbacksCount,
+        'recentFeedbacks': recentFeedbacks,
+      };
+      _cachedAdminStatsTime = DateTime.now();
 
       if (mounted) {
         setState(() {
@@ -248,7 +350,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadStats,
+      onRefresh: () => _loadStats(isPullToRefresh: true),
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -445,7 +547,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     final dateFormat = DateFormat('yyyy/MM/dd HH:mm');
 
     return RefreshIndicator(
-      onRefresh: _loadStats,
+      onRefresh: () => _loadStats(isPullToRefresh: true),
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [

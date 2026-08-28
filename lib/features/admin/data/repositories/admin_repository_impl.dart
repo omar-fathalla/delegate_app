@@ -227,17 +227,15 @@ class AdminRepositoryImpl implements AdminRepository {
     String companyUID,
   ) async {
     try {
-      final delegates = await remoteDataSource.getCompanyDelegates(
-        organizationUID,
-        companyUID,
-      );
-      final checkedInCount = await remoteDataSource.getTodayCheckedInCount(
-        organizationUID,
-        companyUID,
-      );
-      final totalCompanies = await remoteDataSource.getTotalCompaniesCount(
-        organizationUID,
-      );
+      final results = await Future.wait([
+        remoteDataSource.getCompanyDelegates(organizationUID, companyUID),
+        remoteDataSource.getTodayCheckedInCount(organizationUID, companyUID),
+        remoteDataSource.getTotalCompaniesCount(organizationUID),
+      ]);
+
+      final delegates = results[0] as List<Delegate>;
+      final checkedInCount = results[1] as int;
+      final totalCompanies = results[2] as int;
 
       final totalDelegates = delegates.length;
       final absentToday = (totalDelegates - checkedInCount).clamp(

@@ -324,6 +324,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           const SizedBox(width: 4),
         ],
         menuItems: [
+          const PopupMenuItem(
+            value: 'profile',
+            child: ListTile(
+              leading: Icon(Icons.person_outline_rounded),
+              title: Text('الملف الشخصي'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
           if (isTechnicalSupport) ...[
             const PopupMenuItem(
               value: 'branches',
@@ -424,15 +433,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ),
             ),
           ],
-          PopupMenuItem(
-            value: 'profile',
-            child: ListTile(
-              leading: const Icon(Icons.person_outline_rounded),
-              title: const Text('الملف الشخصي'),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
           PopupMenuItem(
             value: 'settings',
             child: ListTile(

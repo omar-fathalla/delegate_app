@@ -20,6 +20,9 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   final SyncAttendance syncAttendance;
   final ReviewService? _reviewService;
 
+  static final Map<String, AttendanceHistoryLoaded> _cachedHistoryState = {};
+  static void clearCache() => _cachedHistoryState.clear();
+
   AttendanceBloc({
     required this.checkIn,
     required this.checkOut,
@@ -41,6 +44,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     CheckInRequested event,
     Emitter<AttendanceState> emit,
   ) async {
+    _cachedHistoryState.remove(event.userId);
     emit(AttendanceLoading());
     final result = await checkIn(
       CheckInParams(
@@ -69,6 +73,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     CheckOutRequested event,
     Emitter<AttendanceState> emit,
   ) async {
+    _cachedHistoryState.remove(event.userId);
     emit(AttendanceLoading());
     final result = await checkOut(
       CheckOutParams(
@@ -92,7 +97,12 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     HistoryRequested event,
     Emitter<AttendanceState> emit,
   ) async {
-    emit(AttendanceLoading());
+    final cached = _cachedHistoryState[event.userId];
+    if (cached != null) {
+      emit(cached);
+    } else {
+      emit(AttendanceLoading());
+    }
 
     final failureOrResult = await getHistoryPaginated(
       GetHistoryPaginatedParams(
@@ -105,7 +115,11 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     );
 
     failureOrResult.fold(
-      (failure) => emit(AttendanceError(message: failure.message)),
+      (failure) {
+        if (cached == null) {
+          emit(AttendanceError(message: failure.message));
+        }
+      },
       (result) {
         // Check for any active check-in (checkOutTime is null)
         Attendance? activeAttendance;
@@ -117,14 +131,15 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
           activeAttendance = null;
         }
 
-        emit(
-          AttendanceHistoryLoaded(
-            history: result.items,
-            activeAttendance: activeAttendance,
-            lastDoc: result.lastDoc,
-            hasReachedMax: result.hasReachedMax,
-          ),
+        final loadedState = AttendanceHistoryLoaded(
+          history: result.items,
+          activeAttendance: activeAttendance,
+          lastDoc: result.lastDoc,
+          hasReachedMax: result.hasReachedMax,
         );
+
+        _cachedHistoryState[event.userId] = loadedState;
+        emit(loadedState);
       },
     );
   }

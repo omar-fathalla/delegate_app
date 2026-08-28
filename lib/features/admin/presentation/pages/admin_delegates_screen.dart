@@ -26,13 +26,14 @@ class AdminDelegatesScreen extends StatelessWidget {
             companyUID: adminDelegate.companyUID,
           ),
         ),
-      child: const AdminDelegatesView(),
+      child: AdminDelegatesView(adminDelegate: adminDelegate),
     );
   }
 }
 
 class AdminDelegatesView extends StatefulWidget {
-  const AdminDelegatesView({super.key});
+  final Delegate adminDelegate;
+  const AdminDelegatesView({super.key, required this.adminDelegate});
 
   @override
   State<AdminDelegatesView> createState() => _AdminDelegatesViewState();
@@ -82,7 +83,12 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
                 const SizedBox(height: 16),
                 FilledButton.tonal(
                   onPressed: () {
-                    // Logic already exists to provide admin params when recreated.
+                    context.read<AdminDelegatesBloc>().add(
+                      LoadCompanyDelegates(
+                        organizationUID: widget.adminDelegate.organizationUID,
+                        companyUID: widget.adminDelegate.companyUID,
+                      ),
+                    );
                   },
                   child: Text(l10n.retry),
                 ),
@@ -180,28 +186,45 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
 
                 // ── Delegate List ──
                 Expanded(
-                  child: filteredDelegates.isEmpty
-                      ? _NoResultsView(
-                          isSearching:
-                              _searchController.text.isNotEmpty ||
-                              _selectedStatus != null,
-                          allEmpty: allDelegates.isEmpty,
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.only(
-                            left: 16,
-                            right: 16,
-                            top: 12,
-                            bottom: 88,
-                          ),
-                          itemCount: filteredDelegates.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final delegate = filteredDelegates[index];
-                            return _DelegateCard(delegate: delegate);
-                          },
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<AdminDelegatesBloc>().add(
+                        LoadCompanyDelegates(
+                          organizationUID: widget.adminDelegate.organizationUID,
+                          companyUID: widget.adminDelegate.companyUID,
                         ),
+                      );
+                    },
+                    child: filteredDelegates.isEmpty
+                        ? SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.5,
+                              child: _NoResultsView(
+                                isSearching:
+                                    _searchController.text.isNotEmpty ||
+                                    _selectedStatus != null,
+                                allEmpty: allDelegates.isEmpty,
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(
+                              left: 16,
+                              right: 16,
+                              top: 12,
+                              bottom: 88,
+                            ),
+                            itemCount: filteredDelegates.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final delegate = filteredDelegates[index];
+                              return _DelegateCard(delegate: delegate);
+                            },
+                          ),
+                  ),
                 ),
               ],
             ),

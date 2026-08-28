@@ -2,8 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import '../widgets/sync_status_banner.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
 
@@ -23,9 +24,6 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
   String? _selectedBranchName;
   File? _imageFile;
   final TextEditingController _commentController = TextEditingController();
-  bool _gettingLocation = false;
-  double? _latitude;
-  double? _longitude;
 
   @override
   void initState() {
@@ -62,53 +60,9 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
         setState(() {
           _imageFile = File(photo.path);
         });
-        // محاولة جلب الموقع كمعلومة إضافية بدون تعطيل العملية
-        _getCurrentLocation();
       }
     } catch (e) {
       _showErrorSnackBar('فشل في فتح الكاميرا: $e');
-    }
-  }
-
-  Future<void> _getCurrentLocation() async {
-    setState(() {
-      _gettingLocation = true;
-    });
-
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() => _gettingLocation = false);
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          setState(() => _gettingLocation = false);
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        setState(() => _gettingLocation = false);
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-
-      setState(() {
-        _latitude = position.latitude;
-        _longitude = position.longitude;
-        _gettingLocation = false;
-      });
-    } catch (_) {
-      setState(() => _gettingLocation = false);
     }
   }
 
@@ -165,8 +119,6 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
             setState(() {
               _imageFile = null;
               _commentController.clear();
-              _latitude = null;
-              _longitude = null;
             });
             _loadOngoingPermissions();
           } else if (state is PhotoPermissionError) {
@@ -179,7 +131,12 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
           }
 
           if (state is PhotoPermissionLoading && _cachedPermissions == null) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: AppLoadingIndicator(
+                style: AppLoadingStyle.threeArchedCircle,
+                label: 'جاري جلب معلومات أذونات التصوير...',
+              ),
+            );
           }
 
           final permissionsToUse = _cachedPermissions ??
@@ -202,6 +159,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const SyncStatusBanner(),
                   // Auto-selected permission/campaign info
                   ...(() {
                     if (_selectedPermission == null && delegatePermissions.isNotEmpty) {
@@ -219,113 +177,140 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          color: colorScheme.primaryContainer.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
                         ),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary.withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Icons.verified_rounded, color: colorScheme.primary),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'العرض المصرح لك به',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
+                            Row(
+                              children: [
+                                Icon(Icons.verified_rounded, color: colorScheme.primary, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'إذن تصوير العروض: ${activePermission.companyName}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: colorScheme.onSurface,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'إذن تصوير العروض - ${activePermission.companyName}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
-                                ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'الشركة: ${activePermission.companyName}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'تاريخ الإذن: من ${activePermission.startDate.toString().split(' ').first} إلى ${activePermission.endDate.toString().split(' ').first}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
 
-                      // Step 1: Select Branch
-                      Text(
-                        '1. حدد الفرع الذي تتواجد فيه الآن:',
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
+                      // Branch selector dropdown
                       DropdownButtonFormField<String>(
+                        initialValue: _selectedBranchId,
                         decoration: InputDecoration(
+                          labelText: 'اختر الفرع *',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          prefixIcon: const Icon(Icons.store_rounded),
                         ),
-                        hint: const Text('اختر الفرع المتواجد به'),
-                        initialValue: _selectedBranchId != null && activePermission.branchIds.contains(_selectedBranchId) 
-                            ? _selectedBranchId 
-                            : null,
                         items: List.generate(activePermission.branchIds.length, (index) {
                           final id = activePermission.branchIds[index];
                           final name = activePermission.branchNames[index];
-                          return DropdownMenuItem(
+                          return DropdownMenuItem<String>(
                             value: id,
                             child: Text(name),
                           );
                         }),
-                        onChanged: (val) {
+                        onChanged: (value) {
+                          if (value == null) return;
+                          final index = activePermission.branchIds.indexOf(value);
                           setState(() {
-                            _selectedPermission = activePermission;
-                            _selectedBranchId = val;
-                            _selectedBranchName = activePermission.branchNames[
-                                activePermission.branchIds.indexOf(val!)];
+                            _selectedBranchId = value;
+                            _selectedBranchName = index != -1
+                                ? activePermission.branchNames[index]
+                                : value;
                           });
                         },
                       ),
-                      const SizedBox(height: 24),
                     ];
                   })(),
 
-                  // Step 3: Capture & comment
+                  const SizedBox(height: 20),
+
+                  // Camera capture preview area
                   if (_selectedBranchId != null) ...[
-                    Text(
-                      '2. التقاط الصورة الميدانية:',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
                     if (_imageFile == null)
-                      ElevatedButton.icon(
-                        onPressed: _captureImage,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          shape: RoundedRectangleBorder(
+                      InkWell(
+                        onTap: _captureImage,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          height: 220,
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant,
+                              width: 1.5,
+                              strokeAlign: BorderSide.strokeAlignInside,
+                            ),
                           ),
-                          backgroundColor: colorScheme.primaryContainer,
-                          foregroundColor: colorScheme.onPrimaryContainer,
-                        ),
-                        icon: const Icon(Icons.camera_alt_rounded, size: 28),
-                        label: const Text(
-                          'فتح الكاميرا والتقاط الصورة',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.camera_alt_rounded,
+                                size: 54,
+                                color: colorScheme.primary,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'التقط صورة العرض الميداني بالكاميرا',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'يتم التقاط الصورة بالكاميرا المباشرة فقط',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       )
                     else ...[
-                      // Display captured photo
-                      Container(
-                        height: 250,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: colorScheme.outlineVariant),
-                          image: DecorationImage(
-                            image: FileImage(_imageFile!),
+                      // Photo preview
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          height: 240,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: colorScheme.outlineVariant),
+                          ),
+                          child: Image.file(
+                            _imageFile!,
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -337,31 +322,6 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                         label: const Text('إعادة التقاط الصورة'),
                       ),
                       const SizedBox(height: 20),
-
-                      // Coordinates info (optional)
-                      Row(
-                        children: [
-                          Icon(
-                            _latitude != null ? Icons.location_on_rounded : Icons.info_outline_rounded,
-                            color: _latitude != null ? Colors.green : Colors.blue,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _gettingLocation
-                                  ? 'جاري رصد إحداثيات الموقع اختيارياً...'
-                                  : (_latitude != null
-                                      ? 'تم ربط الموقع الجغرافي بالتقرير بنجاح.'
-                                      : 'التسجيل متاح بناءً على اختيار الفرع (الموقع اختياري).'),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: _latitude != null ? Colors.green : Colors.blue,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
 
                       // Comment input
                       TextField(
@@ -387,13 +347,10 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: colorScheme.primary,
-                                    ),
+                                  AppLoadingIndicator(
+                                    size: 24,
+                                    color: colorScheme.primary,
+                                    style: AppLoadingStyle.threeArchedCircle,
                                   ),
                                   const SizedBox(width: 12),
                                   Text(
@@ -428,8 +385,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                         delegateName: widget.delegate.fullName,
                                         imageFile: _imageFile!,
                                         comment: _commentController.text,
-                                        latitude: _latitude ?? 0.0,
-                                        longitude: _longitude ?? 0.0,
+                                        latitude: 0.0,
+                                        longitude: 0.0,
                                       ),
                                     );
                               },

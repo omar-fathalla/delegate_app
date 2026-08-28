@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
+import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
@@ -17,8 +18,22 @@ class BranchHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => di.sl<MarketingBloc>()
-        ..add(LoadBranchPreferences(userId: marketingUser.uid)),
+      create: (_) {
+        final bloc = di.sl<MarketingBloc>();
+        final prefService = di.sl<BranchPreferenceService>();
+        final favorites = prefService.getFavoriteBranches(marketingUser.uid);
+        if (favorites.isNotEmpty) {
+          bloc.add(
+            LoadAllFavoriteBranchesAttendance(
+              favoriteBranches: favorites,
+              organizationId: marketingUser.organizationUID,
+              date: DateTime.now(),
+            ),
+          );
+        }
+        bloc.add(LoadBranchPreferences(userId: marketingUser.uid));
+        return bloc;
+      },
       child: _BranchHomeView(marketingUser: marketingUser),
     );
   }
@@ -36,6 +51,17 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   List<String> _favoriteBranches = [];
   bool _prefsLoaded = false;
   DateTime _selectedDate = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      final prefService = di.sl<BranchPreferenceService>();
+      final favorites = prefService.getFavoriteBranches(widget.marketingUser.uid);
+      _favoriteBranches = favorites;
+      _prefsLoaded = true;
+    } catch (_) {}
+  }
 
   void _loadAllBranches(BuildContext context, List<String> favorites) {
     if (favorites.isEmpty) return;

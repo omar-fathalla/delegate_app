@@ -9,6 +9,8 @@ abstract class NotificationRepository {
     String? phoneNumber,
   });
 
+  Future<List<NotificationEntity>> getCachedNotifications(String delegateUid);
+
   Stream<int> getUnreadCount(
     String delegateUid,
     String organizationId, {

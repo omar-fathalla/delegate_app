@@ -291,6 +291,8 @@ class _NotificationListItemState extends State<NotificationListItem> {
 
   IconData _getIcon(String type) {
     switch (type) {
+      case 'penalty':
+        return Icons.gavel_rounded;
       case 'task':
         return Icons.task_alt_rounded;
       case 'support_alert':
@@ -307,6 +309,8 @@ class _NotificationListItemState extends State<NotificationListItem> {
 
   Color _getIconColor(String type, ColorScheme colorScheme) {
     switch (type) {
+      case 'penalty':
+        return Colors.red.shade700;
       case 'task':
         return Colors.teal.shade700;
       case 'support_alert':
@@ -323,6 +327,8 @@ class _NotificationListItemState extends State<NotificationListItem> {
 
   Color _getIconBackgroundColor(String type, ColorScheme colorScheme) {
     switch (type) {
+      case 'penalty':
+        return Colors.red.shade50;
       case 'task':
         return Colors.teal.shade50;
       case 'support_alert':

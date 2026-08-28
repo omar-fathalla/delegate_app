@@ -1,12 +1,13 @@
-import 'dart:io';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
+import 'package:delegate_app/core/widgets/app_photo_image.dart';
+import 'package:delegate_app/core/services/photo_cache_manager.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import '../widgets/sync_status_banner.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/captured_photo.dart';
 
@@ -84,7 +85,6 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
   }
 
   void _nextMonth() {
-    // عدم السماح بتخطي الشهر الحالي
     final now = _now;
     if (_selectedMonth.year >= now.year && _selectedMonth.month >= now.month) {
       return;
@@ -108,39 +108,49 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
     final isCurrentMonth = _selectedMonth.year == now.year && _selectedMonth.month == now.month;
 
     return Scaffold(
-      appBar: widget.showAppBar ? AppBar(
-        title: const Text('تقارير الصور الشهرية'),
-      ) : null,
-      backgroundColor: colorScheme.surfaceContainerLow,
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text(
+                'تقارير الصور الشهرية',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              centerTitle: true,
+              elevation: 0,
+              scrolledUnderElevation: 1,
+            )
+          : null,
+      backgroundColor: colorScheme.surfaceContainerLowest,
       body: BlocBuilder<PhotoPermissionBloc, PhotoPermissionState>(
         builder: (context, state) {
           if (state is PhotoPermissionLoading) {
             return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text(
-                    'جاري تحميل تقارير الصور...',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
+              child: AppLoadingIndicator(
+                style: AppLoadingStyle.threeArchedCircle,
+                label: 'جاري تحميل تقارير الصور...',
               ),
             );
           }
 
           if (state is CapturedPhotosLoaded) {
-            // تصفية الصور حسب الشهر المحدد محلياً
+            // Filter photos for the selected month
             final filteredPhotos = state.photos.where((photo) {
               return photo.capturedAt.year == _selectedMonth.year &&
                   photo.capturedAt.month == _selectedMonth.month;
             }).toList();
 
-            // حساب الإحصائيات
+            // Pre-cache all photos in the background into local persistent disk cache
+            if (filteredPhotos.isNotEmpty) {
+              PhotoCacheManager.precachePhotos(filteredPhotos.map((p) => p.photoUrl));
+            }
+
+            // Statistics calculation
             final totalPhotos = filteredPhotos.length;
             final uniqueBranches = filteredPhotos.map((p) => p.branchId).toSet().length;
-            
+
             final today = now;
             final photosToday = filteredPhotos.where((p) =>
                 p.capturedAt.year == today.year &&
@@ -154,108 +164,115 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  // شريط التنقل بين الأشهر
+                  // Sync Status Banner
+                  const SliverToBoxAdapter(
+                    child: SyncStatusBanner(),
+                  ),
+
+                  // Modern M3 Month Selector Navigator
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                          border: Border.all(
+                            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                          ),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.arrow_back_ios_rounded),
-                                    onPressed: _previousMonth,
-                                    tooltip: 'الشهر السابق',
-                                  ),
-                                  Text(
-                                    _getMonthNameArabic(_selectedMonth),
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary,
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.arrow_forward_ios_rounded),
-                                    onPressed: isCurrentMonth ? null : _nextMonth,
-                                    tooltip: 'الشهر التالي',
-                                  ),
-                                ],
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton.filledTonal(
+                              style: IconButton.styleFrom(
+                                backgroundColor: colorScheme.surface,
+                                foregroundColor: colorScheme.primary,
+                                padding: const EdgeInsets.all(8),
+                                minimumSize: const Size(36, 36),
                               ),
-                              if (!isCurrentMonth)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: InkWell(
+                              icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                              onPressed: _previousMonth,
+                              tooltip: 'الشهر السابق',
+                            ),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _getMonthNameArabic(_selectedMonth),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                                if (!isCurrentMonth) ...[
+                                  const SizedBox(height: 2),
+                                  InkWell(
                                     onTap: _resetToCurrentMonth,
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(6),
                                     child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.history_rounded, size: 14, color: colorScheme.primary),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'العودة للشهر الحالي ↩',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: colorScheme.primary,
-                                            ),
-                                          ),
-                                        ],
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                      child: Text(
+                                        'الشهر الحالي ↩',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: colorScheme.secondary,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                            ],
-                          ),
+                                ],
+                              ],
+                            ),
+                            IconButton.filledTonal(
+                              style: IconButton.styleFrom(
+                                backgroundColor: colorScheme.surface,
+                                foregroundColor: isCurrentMonth ? colorScheme.outline : colorScheme.primary,
+                                padding: const EdgeInsets.all(8),
+                                minimumSize: const Size(36, 36),
+                              ),
+                              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                              onPressed: isCurrentMonth ? null : _nextMonth,
+                              tooltip: 'الشهر التالي',
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
 
-                  // كروت الإحصائيات
+                  // M3 Summary Metrics Cards
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: Row(
                         children: [
                           Expanded(
-                            child: _buildStatCard(
+                            child: _buildMetricCard(
                               title: 'إجمالي الصور',
                               value: '$totalPhotos',
                               icon: Icons.photo_library_rounded,
-                              color: Colors.blue,
                               theme: theme,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: _buildStatCard(
+                            child: _buildMetricCard(
                               title: 'الفروع المزارة',
                               value: '$uniqueBranches',
-                              icon: Icons.store_rounded,
-                              color: Colors.green,
+                              icon: Icons.storefront_rounded,
                               theme: theme,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: _buildStatCard(
+                            child: _buildMetricCard(
                               title: 'التقاطات اليوم',
                               value: '$photosToday',
                               icon: Icons.today_rounded,
-                              color: Colors.orange,
                               theme: theme,
                             ),
                           ),
@@ -264,34 +281,44 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                     ),
                   ),
 
-                  // شريط اختيار طريقة العرض
+                  // M3 Refined Filter Toggle (By Date vs By Branch)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: SegmentedButton<GroupMode>(
-                        segments: const [
-                          ButtonSegment<GroupMode>(
-                            value: GroupMode.byDate,
-                            label: Text('حسب التاريخ'),
-                            icon: Icon(Icons.calendar_month_rounded),
-                          ),
-                          ButtonSegment<GroupMode>(
-                            value: GroupMode.byBranch,
-                            label: Text('حسب الفرع'),
-                            icon: Icon(Icons.store_rounded),
-                          ),
-                        ],
-                        selected: <GroupMode>{_currentGroupMode},
-                        onSelectionChanged: (Set<GroupMode> newSelection) {
-                          setState(() {
-                            _currentGroupMode = newSelection.first;
-                          });
-                        },
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildSegmentButton(
+                                title: 'حسب التاريخ',
+                                icon: Icons.calendar_month_rounded,
+                                isSelected: _currentGroupMode == GroupMode.byDate,
+                                onTap: () => setState(() => _currentGroupMode = GroupMode.byDate),
+                                colorScheme: colorScheme,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildSegmentButton(
+                                title: 'حسب الفرع',
+                                icon: Icons.store_rounded,
+                                isSelected: _currentGroupMode == GroupMode.byBranch,
+                                onTap: () => setState(() => _currentGroupMode = GroupMode.byBranch),
+                                colorScheme: colorScheme,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
 
-                  // عرض الصور أو حالة خلو البيانات
+                  // Photos list or Empty state
                   if (filteredPhotos.isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
@@ -299,9 +326,12 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                     )
                   else
                     SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       sliver: _buildGroupedPhotosList(filteredPhotos, theme),
                     ),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 24),
+                  ),
                 ],
               ),
             );
@@ -314,10 +344,10 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline_rounded, size: 64, color: colorScheme.error),
+                    Icon(Icons.error_outline_rounded, size: 56, color: colorScheme.error),
                     const SizedBox(height: 16),
                     Text(
-                      'خطأ أثناء تحميل البيانات',
+                      'تعذر تحميل تقارير الصور',
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
@@ -326,10 +356,10 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                       style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
+                    const SizedBox(height: 20),
+                    FilledButton.tonalIcon(
                       onPressed: _loadPhotos,
-                      icon: const Icon(Icons.refresh_rounded),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
                       label: const Text('إعادة المحاولة'),
                     ),
                   ],
@@ -344,167 +374,115 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
     );
   }
 
-  Widget _buildStatCard({
+  Widget _buildSegmentButton({
     required String title,
-    required String value,
     required IconData icon,
-    required Color color,
-    required ThemeData theme,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required ColorScheme colorScheme,
   }) {
-    final colorScheme = theme.colorScheme;
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: 0.25),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
               ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCompactPhotoCard(BuildContext context, CapturedPhoto photo, ThemeData theme) {
+  Widget _buildMetricCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required ThemeData theme,
+  }) {
     final colorScheme = theme.colorScheme;
-    final dateStr = DateFormat('dd-MM-yyyy hh:mm a').format(photo.capturedAt);
-    final isPending = photo.uid.startsWith('pending_');
-
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 8),
-      color: colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isPending
-              ? Colors.orange.withValues(alpha: 0.6)
-              : colorScheme.outlineVariant.withValues(alpha: 0.4),
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
-      child: ListTile(
-        onTap: () => _showPhotoDetails(context, photo),
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: photo.photoUrl.startsWith('http')
-                ? CachedNetworkImage(
-                    imageUrl: photo.photoUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                      child: const Center(
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: colorScheme.primaryContainer,
-                      child: Icon(Icons.broken_image_rounded, color: colorScheme.primary),
-                    ),
-                  )
-                : Image.file(
-                    File(photo.photoUrl),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: Colors.orange.shade100,
-                      child: Icon(Icons.cloud_upload_rounded, color: Colors.orange.shade800),
-                    ),
-                  ),
-          ),
-        ),
-        title: Text(
-          photo.branchName,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Row(
-          children: [
-            if (isPending) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.cloud_upload_rounded, size: 10, color: Colors.orange.shade900),
-                    const SizedBox(width: 3),
-                    Text(
-                      'قيد الرفع',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-            ],
-            Expanded(
-              child: Text(
-                dateStr,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+              shape: BoxShape.circle,
             ),
-          ],
-        ),
-        trailing: Icon(Icons.chevron_left_rounded, color: colorScheme.onSurfaceVariant),
+            child: Icon(icon, color: colorScheme.primary, size: 16),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 11,
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildGroupedPhotosList(List<CapturedPhoto> photos, ThemeData theme) {
     if (_currentGroupMode == GroupMode.byDate) {
-      // Group by date (day)
       final Map<String, List<CapturedPhoto>> grouped = {};
       for (var photo in photos) {
         final dateKey = DateFormat('yyyy-MM-dd').format(photo.capturedAt);
         grouped.putIfAbsent(dateKey, () => []).add(photo);
       }
-      
-      // Sort keys descending
+
       final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
       return SliverList(
@@ -513,8 +491,8 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             final key = sortedKeys[index];
             final groupPhotos = grouped[key]!;
             final displayDate = DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.parse(key));
-            
-            return _buildGroupExpansionTile(
+
+            return _buildGroupSection(
               title: displayDate,
               icon: Icons.calendar_today_rounded,
               photos: groupPhotos,
@@ -525,12 +503,11 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
         ),
       );
     } else {
-      // Group by branch
       final Map<String, List<CapturedPhoto>> grouped = {};
       for (var photo in photos) {
         grouped.putIfAbsent(photo.branchName, () => []).add(photo);
       }
-      
+
       final sortedKeys = grouped.keys.toList()..sort();
 
       return SliverList(
@@ -538,10 +515,10 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
           (context, index) {
             final key = sortedKeys[index];
             final groupPhotos = grouped[key]!;
-            
-            return _buildGroupExpansionTile(
+
+            return _buildGroupSection(
               title: key,
-              icon: Icons.store_rounded,
+              icon: Icons.storefront_rounded,
               photos: groupPhotos,
               theme: theme,
             );
@@ -552,55 +529,214 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
     }
   }
 
-  Widget _buildGroupExpansionTile({
+  Widget _buildGroupSection({
     required String title,
     required IconData icon,
     required List<CapturedPhoto> photos,
     required ThemeData theme,
   }) {
     final colorScheme = theme.colorScheme;
-    
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          initiallyExpanded: false,
           collapsedBackgroundColor: colorScheme.surface,
           backgroundColor: colorScheme.surfaceContainerLowest,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
           leading: Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
+              color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: colorScheme.onPrimaryContainer),
+            child: Icon(icon, color: colorScheme.primary, size: 18),
           ),
           title: Text(
             title,
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: const TextStyle(
+              fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
           ),
-          subtitle: Text(
-            '${photos.length} صور',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${photos.length} صور',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.expand_more_rounded, size: 20),
+            ],
+          ),
+          children: photos.map((photo) => _buildCompactPhotoCard(context, photo, theme)).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactPhotoCard(BuildContext context, CapturedPhoto photo, ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+    final dateStr = DateFormat('yyyy-MM-dd • hh:mm a', 'ar').format(photo.capturedAt);
+    final isPending = photo.uid.startsWith('pending_');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isPending
+              ? Colors.amber.shade300
+              : colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showPhotoDetails(context, photo),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              children: [
+                // Thumbnail 52x52
+                AppPhotoImage(
+                  photoUrl: photo.photoUrl,
+                  width: 52,
+                  height: 52,
+                  isThumbnail: true,
+                  borderRadius: BorderRadius.circular(10),
+                  fit: BoxFit.cover,
+                ),
+                const SizedBox(width: 12),
+
+                // Info: Branch name + Date & time + status chip
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        photo.branchName,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        dateStr,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          if (isPending) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.amber.shade300, width: 0.8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.cloud_off_rounded, size: 10, color: Colors.amber.shade900),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'معلقة بالهاتف',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.amber.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.green.shade300, width: 0.8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.cloud_done_rounded, size: 10, color: Colors.green.shade700),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'مرفوعة بالسيرفر',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if (photo.comment.trim().isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '💬 ${photo.comment.trim()}',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Trailing action
+                Icon(
+                  Icons.chevron_left_rounded,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  size: 20,
+                ),
+              ],
             ),
           ),
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                children: photos.map((photo) => _buildCompactPhotoCard(context, photo, theme)).toList(),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -613,24 +749,33 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.no_photography_rounded,
-              size: 72,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.photo_library_outlined,
+                size: 56,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               'لا توجد صور ملتقطة في هذا الشهر',
-              style: theme.textTheme.titleMedium?.copyWith(
+              style: TextStyle(
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: colorScheme.onSurfaceVariant,
+                color: colorScheme.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
-              'صور العروض الميدانية التي تقوم بالتقاطها عن طريق الكاميرا خلال هذا الشهر ستظهر هنا كتقارير منظمة.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              'صور العروض الميدانية الملتقطة خلال هذا الشهر ستظهر هنا تلقائياً.',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -655,179 +800,229 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (modalContext) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.85,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // مقبض السحب
-                  Center(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 12),
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: colorScheme.outlineVariant,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
+        bool isSaving = false;
+        bool saveSuccess = false;
+        String? statusText;
 
-                  // العنوان وزر الإغلاق
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'تفاصيل الصورة الميدانية',
-                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => Navigator.pop(modalContext),
-                        ),
-                      ],
-                    ),
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.85,
+              minChildSize: 0.5,
+              maxChildSize: 0.95,
+              builder: (context, scrollController) {
+                return Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                   ),
-                  const Divider(),
-
-                  Expanded(
-                    child: ListView(
-                      controller: scrollController,
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        // الصورة التفاعلية (مع قرص للتكبير)
-                        Container(
-                          height: 350,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Pull Handle
+                      Center(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 12),
+                          width: 40,
+                          height: 4,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: colorScheme.outlineVariant),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: InteractiveViewer(
-                            panEnabled: true,
-                            minScale: 1.0,
-                            maxScale: 4.0,
-                            child: photo.photoUrl.startsWith('http')
-                                ? CachedNetworkImage(
-                                    imageUrl: photo.photoUrl,
-                                    fit: BoxFit.contain,
-                                    placeholder: (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                    errorWidget: (context, url, error) => const Center(
-                                      child: Icon(Icons.broken_image, size: 64),
-                                    ),
-                                  )
-                                : Image.file(
-                                    File(photo.photoUrl),
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (context, error, stackTrace) => const Center(
-                                      child: Icon(Icons.broken_image, size: 64),
-                                    ),
-                                  ),
+                            color: colorScheme.outlineVariant,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        const Center(
-                          child: Text(
-                            '💡 يمكنك قرص الصورة أو استخدام إصبعين لتكبير التفاصيل',
-                            style: TextStyle(fontSize: 11, color: Colors.grey),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
+                      ),
 
-                        // تفاصيل التقرير
-                        _buildDetailItem(
-                          icon: Icons.store_rounded,
-                          title: 'الفرع المعتمد:',
-                          value: photo.branchName,
-                          theme: theme,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildDetailItem(
-                          icon: Icons.calendar_today_rounded,
-                          title: 'وقت وتاريخ الالتقاط:',
-                          value: formattedDate,
-                          theme: theme,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildDetailItem(
-                          icon: Icons.person_rounded,
-                          title: 'بواسطة المندوب:',
-                          value: photo.delegateName,
-                          theme: theme,
-                        ),
-                        
-                        if (photo.comment.trim().isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          _buildDetailItem(
-                            icon: Icons.comment_rounded,
-                            title: 'تعليق المندوب:',
-                            value: photo.comment,
-                            theme: theme,
-                            isComment: true,
-                          ),
-                        ],
-                        
-                        const SizedBox(height: 24),
-                        const Divider(),
-                        const SizedBox(height: 12),
-
-                        // إحداثيات الموقع والملاحة
-                        Text(
-                          'الموقع الجغرافي للالتقاط:',
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
+                      // Header title
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                            const Text(
+                              'تفاصيل الصورة الميدانية',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 20),
+                              onPressed: () => Navigator.pop(modalContext),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+
+                      Expanded(
+                        child: ListView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            // Interactive image with zoom
+                            Container(
+                              height: 340,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: InteractiveViewer(
+                                panEnabled: true,
+                                minScale: 1.0,
+                                maxScale: 4.0,
+                                child: AppPhotoImage(
+                                  photoUrl: photo.photoUrl,
+                                  fit: BoxFit.contain,
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'خط العرض (Lat): ${photo.latitude.toStringAsFixed(6)}',
-                                      style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace'),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Center(
+                              child: Text(
+                                '💡 يمكنك قرص الصورة أو استخدام إصبعين لتكبير التفاصيل',
+                                style: TextStyle(fontSize: 11, color: Colors.grey),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Save to Gallery Button with concise text and live feedback
+                            FilledButton.icon(
+                              onPressed: isSaving
+                                  ? null
+                                  : () async {
+                                      setSheetState(() {
+                                        isSaving = true;
+                                        statusText = null;
+                                      });
+                                      try {
+                                        final success = await PhotoCacheManager.savePhotoToGallery(
+                                          context,
+                                          photoUrl: photo.photoUrl,
+                                        );
+                                        if (sheetContext.mounted) {
+                                          setSheetState(() {
+                                            isSaving = false;
+                                            saveSuccess = success;
+                                            statusText = success
+                                                ? '✅ تم حفظ الصورة في ألبوم صور الهاتف بنجاح.'
+                                                : '⚠️ يرجى منح الإذن للوصول للصور من إعدادات الهاتف.';
+                                          });
+                                        }
+                                      } catch (e) {
+                                        if (sheetContext.mounted) {
+                                          setSheetState(() {
+                                            isSaving = false;
+                                            saveSuccess = false;
+                                            statusText = '❌ تعذر حفظ الصورة: $e';
+                                          });
+                                        }
+                                      }
+                                    },
+                              icon: isSaving
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Icon(
+                                      saveSuccess ? Icons.check_circle_rounded : Icons.download_rounded,
+                                      size: 18,
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'خط الطول (Lng): ${photo.longitude.toStringAsFixed(6)}',
-                                      style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace'),
+                              label: Text(
+                                isSaving
+                                    ? 'جاري حفظ الصورة...'
+                                    : saveSuccess
+                                        ? 'تم الحفظ في الهاتف ✓'
+                                        : 'حفظ الصورة',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: saveSuccess ? Colors.green.shade700 : null,
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+
+                            // In-Modal Status Notification Banner
+                            if (statusText != null) ...[
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: saveSuccess ? Colors.green.shade50 : Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: saveSuccess ? Colors.green.shade300 : Colors.amber.shade300,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      saveSuccess ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                                      color: saveSuccess ? Colors.green.shade700 : Colors.amber.shade800,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        statusText!,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: saveSuccess ? Colors.green.shade800 : Colors.amber.shade900,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            ElevatedButton.icon(
-                              onPressed: () => _openMap(photo.latitude, photo.longitude),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: colorScheme.primary,
-                                foregroundColor: colorScheme.onPrimary,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ],
+                            const SizedBox(height: 16),
+
+                        // Report details card
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildDetailItem(
+                                icon: Icons.storefront_rounded,
+                                title: 'الفرع المعتمد:',
+                                value: photo.branchName,
+                                theme: theme,
                               ),
-                              icon: const Icon(Icons.map_rounded),
-                              label: const Text('الخريطة'),
-                            ),
-                          ],
+                              const Divider(height: 18),
+                              _buildDetailItem(
+                                icon: Icons.calendar_today_rounded,
+                                title: 'وقت وتاريخ الالتقاط:',
+                                value: formattedDate,
+                                theme: theme,
+                              ),
+                              const Divider(height: 18),
+                              _buildDetailItem(
+                                icon: Icons.person_rounded,
+                                title: 'بواسطة المندوب:',
+                                value: photo.delegateName,
+                                theme: theme,
+                              ),
+                              if (photo.comment.trim().isNotEmpty) ...[
+                                const Divider(height: 18),
+                                _buildDetailItem(
+                                  icon: Icons.comment_rounded,
+                                  title: 'تعليق المندوب:',
+                                  value: photo.comment,
+                                  theme: theme,
+                                  isComment: true,
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -839,7 +1034,9 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
         );
       },
     );
-  }
+  },
+);
+}
 
   Widget _buildDetailItem({
     required IconData icon,
@@ -852,20 +1049,21 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
     return Row(
       crossAxisAlignment: isComment ? CrossAxisAlignment.start : CrossAxisAlignment.center,
       children: [
-        Icon(icon, color: colorScheme.primary, size: 20),
-        const SizedBox(width: 12),
+        Icon(icon, color: colorScheme.primary, size: 18),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: theme.textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 2),
               Text(
                 value,
-                style: theme.textTheme.bodyMedium?.copyWith(
+                style: TextStyle(
+                  fontSize: 13,
                   fontWeight: FontWeight.bold,
                   fontStyle: isComment ? FontStyle.italic : FontStyle.normal,
                 ),
@@ -875,13 +1073,5 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
         ),
       ],
     );
-  }
-
-  Future<void> _openMap(double latitude, double longitude) async {
-    final googleMapsUrl = Uri.parse(
-        'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude');
-    if (await canLaunchUrl(googleMapsUrl)) {
-      await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
-    }
   }
 }

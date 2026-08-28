@@ -23,6 +23,7 @@ void main() {
   late MockGetDashboardSummary mockGetDashboardSummary;
 
   setUp(() {
+    AdminDashboardBloc.clearCache();
     mockGetDashboardSummary = MockGetDashboardSummary();
     bloc = AdminDashboardBloc(
       getDashboardSummary: mockGetDashboardSummary

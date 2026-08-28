@@ -167,16 +167,6 @@ class _MainScreenState extends State<MainScreen> {
                           ),
                         ),
                         PopupMenuItem<String>(
-                          value: 'settings',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.settings_outlined),
-                              const SizedBox(width: 12),
-                              Text(l10n.settings),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem<String>(
                           value: 'penalties',
                           child: Row(
                             children: [
@@ -199,6 +189,16 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                           ),
                         ],
+                        PopupMenuItem<String>(
+                          value: 'settings',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.settings_outlined),
+                              const SizedBox(width: 12),
+                              Text(l10n.settings),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(width: 8),

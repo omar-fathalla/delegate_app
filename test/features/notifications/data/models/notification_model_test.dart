@@ -69,7 +69,9 @@ void main() {
         'body': 'Notification body',
         'type': 'general',
         'taskId': 'task123',
+        'penaltyId': null,
         'isRead': false,
+        'read': false,
         'createdAt': tTimestamp,
         'deletedBy': const [],
       };

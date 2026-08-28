@@ -221,3 +221,13 @@ Before declaring any widget or page design complete, verify:
 - [ ] Do all buttons use stadium/pill rounded shapes (28dp)?
 - [ ] Do all cards, inputs, dialogs, and sheets use standard corner radii (12dp, 16dp, 28dp)?
 - [ ] Is all padding and alignment directional (`EdgeInsetsDirectional`) for full RTL Arabic support?
+- [ ] In all Header Menus / `PopupMenuButton`s, is **Settings (`settings` / الإعدادات)** positioned as the **LAST** item?
+
+---
+
+## 8. Header & App Bar Popup Menu Ordering Standard (All 9 User Roles)
+
+In all App Bars / Header Menus / `PopupMenuButton` widgets across all 9 user roles:
+1. **Top Items**: Profile (`profile` / الملف الشخصي), followed by role-specific tools (Search, Tasks, Penalties, Admin tools, Org Switch).
+2. **Bottom-Most Item**: **Settings (`settings` / الإعدادات) MUST ALWAYS BE THE LAST ITEM** in the menu list. Any future menu options added to the app bar popup menu must be inserted before `settings`.
+

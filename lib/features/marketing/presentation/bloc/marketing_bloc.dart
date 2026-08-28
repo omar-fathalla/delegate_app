@@ -279,6 +279,8 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
   }
 
   // ─── Load ALL favorite branches attendance at once ──────────────────────────
+  static final Map<String, AllBranchesAttendanceLoaded> _branchesAttendanceCache = {};
+  static void clearCache() => _branchesAttendanceCache.clear();
 
   Future<void> _onLoadAllFavoriteBranchesAttendance(
     LoadAllFavoriteBranchesAttendance event,
@@ -292,7 +294,15 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
       return;
     }
 
-    emit(AllBranchesAttendanceLoading());
+    final date = event.date ?? DateTime.now();
+    final cacheKey = '${event.organizationId}_${event.favoriteBranches.join(',')}_${date.year}_${date.month}_${date.day}';
+    final cached = _branchesAttendanceCache[cacheKey];
+
+    if (cached != null) {
+      emit(cached);
+    } else {
+      emit(AllBranchesAttendanceLoading());
+    }
 
     try {
       // جلب بيانات كل الفروع بالتوازي
@@ -300,7 +310,7 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
         (branch) => remoteDataSource.getTodayAttendanceByBranch(
           branchName: branch,
           organizationId: event.organizationId,
-          date: event.date,
+          date: date,
         ),
       );
 
@@ -311,14 +321,19 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
         data[event.favoriteBranches[i]] = results[i];
       }
 
-      emit(AllBranchesAttendanceLoaded(
+      final loadedState = AllBranchesAttendanceLoaded(
         data: data,
         favoriteBranches: event.favoriteBranches,
-      ));
+      );
+
+      _branchesAttendanceCache[cacheKey] = loadedState;
+      emit(loadedState);
     } catch (e) {
-      emit(AllBranchesAttendanceError(
-        message: 'فشل في جلب بيانات الفروع: ${e.toString()}',
-      ));
+      if (cached == null) {
+        emit(AllBranchesAttendanceError(
+          message: 'فشل في جلب بيانات الفروع: ${e.toString()}',
+        ));
+      }
     }
   }
 }

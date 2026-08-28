@@ -32,6 +32,22 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
   bool get _isTechnicalSupport =>
       widget.marketingDelegate.role == UserRole.technicalSupport;
 
+  bool get _canApproveOrReject =>
+      widget.marketingDelegate.role == UserRole.marketingPromotion ||
+      widget.marketingDelegate.role == UserRole.technicalSupport ||
+      widget.marketingDelegate.role == UserRole.superAdmin;
+
+  String get _approverText {
+    final approverName = widget.marketingDelegate.fullName.isNotEmpty
+        ? widget.marketingDelegate.fullName
+        : '${widget.marketingDelegate.firstName} ${widget.marketingDelegate.lastName}'.trim();
+    if (approverName.isNotEmpty) return approverName;
+    if (widget.marketingDelegate.role == UserRole.technicalSupport) {
+      return 'الدعم الفني';
+    }
+    return widget.marketingDelegate.uid;
+  }
+
   Future<void> _openPhone(String phone) async {
     final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
     final uri = Uri.parse('tel:$cleanPhone');
@@ -873,7 +889,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (_isSuperAdmin) ...[
+                if (_isSuperAdmin || _isTechnicalSupport) ...[
                   IconButton(
                     onPressed: () => _confirmDeletePermission(context, permission),
                     tooltip: 'حذف الإذن نهائياً',
@@ -884,61 +900,49 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   ),
                   const Spacer(),
                 ],
-                OutlinedButton.icon(
-                  onPressed: () {
-                    final approverName = widget.marketingDelegate.fullName.isNotEmpty
-                        ? widget.marketingDelegate.fullName
-                        : '${widget.marketingDelegate.firstName} ${widget.marketingDelegate.lastName}'.trim();
-                    final approverText = approverName.isNotEmpty
-                        ? approverName
-                        : widget.marketingDelegate.uid;
-
-                    context.read<PhotoPermissionBloc>().add(
-                          ApprovePermissionRequested(
-                            organizationUID: permission.organizationUID,
-                            companyUID: permission.companyUID,
-                            permissionId: permission.uid,
-                            status: 'rejected',
-                            approvedBy: approverText,
-                          ),
-                        );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                if (_canApproveOrReject) ...[
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      context.read<PhotoPermissionBloc>().add(
+                            ApprovePermissionRequested(
+                              organizationUID: permission.organizationUID,
+                              companyUID: permission.companyUID,
+                              permissionId: permission.uid,
+                              status: 'rejected',
+                              approvedBy: _approverText,
+                            ),
+                          );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('رفض'),
                   ),
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                  label: const Text('رفض'),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    final approverName = widget.marketingDelegate.fullName.isNotEmpty
-                        ? widget.marketingDelegate.fullName
-                        : '${widget.marketingDelegate.firstName} ${widget.marketingDelegate.lastName}'.trim();
-                    final approverText = approverName.isNotEmpty
-                        ? approverName
-                        : widget.marketingDelegate.uid;
-
-                    context.read<PhotoPermissionBloc>().add(
-                          ApprovePermissionRequested(
-                            organizationUID: permission.organizationUID,
-                            companyUID: permission.companyUID,
-                            permissionId: permission.uid,
-                            status: 'approved',
-                            approvedBy: approverText,
-                          ),
-                        );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      context.read<PhotoPermissionBloc>().add(
+                            ApprovePermissionRequested(
+                              organizationUID: permission.organizationUID,
+                              companyUID: permission.companyUID,
+                              permissionId: permission.uid,
+                              status: 'approved',
+                              approvedBy: _approverText,
+                            ),
+                          );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('الموافقة'),
                   ),
-                  icon: const Icon(Icons.check_rounded, size: 18),
-                  label: const Text('الموافقة'),
-                ),
+                ],
               ],
             ),
           ],
@@ -1032,6 +1036,55 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                 ),
               ),
             ),
+            if (permission.status.toLowerCase() == 'pending' && _canApproveOrReject) ...[
+              const Divider(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      context.read<PhotoPermissionBloc>().add(
+                            ApprovePermissionRequested(
+                              organizationUID: permission.organizationUID,
+                              companyUID: permission.companyUID,
+                              permissionId: permission.uid,
+                              status: 'rejected',
+                              approvedBy: _approverText,
+                            ),
+                          );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('رفض'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      context.read<PhotoPermissionBloc>().add(
+                            ApprovePermissionRequested(
+                              organizationUID: permission.organizationUID,
+                              companyUID: permission.companyUID,
+                              permissionId: permission.uid,
+                              status: 'approved',
+                              approvedBy: _approverText,
+                            ),
+                          );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('الموافقة'),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
