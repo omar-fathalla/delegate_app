@@ -443,6 +443,28 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       return docs;
     } on FirebaseException catch (e) {
       debugPrint('Firestore Error in getDelegateCapturedPhotos: $e');
+      if (e.code == 'failed-precondition') {
+        try {
+          // Fallback: جلب أذونات المندوب ثم صورها الفرعية بشكل مباشر
+          final permissionsSnap = await firestore
+              .collectionGroup('photo_permissions')
+              .where('delegateUID', isEqualTo: delegateUID)
+              .get();
+
+          final List<CapturedPhotoModel> fallbackDocs = [];
+          for (final pDoc in permissionsSnap.docs) {
+            final photosSnap =
+                await pDoc.reference.collection('captured_photos').get();
+            fallbackDocs.addAll(
+              photosSnap.docs.map((d) => CapturedPhotoModel.fromFirestore(d)),
+            );
+          }
+          fallbackDocs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+          return fallbackDocs;
+        } catch (fallbackError) {
+          debugPrint('Fallback in getDelegateCapturedPhotos failed: $fallbackError');
+        }
+      }
       throw ServerFailure('فشل في جلب تقرير صور المندوب: [${e.code}] ${e.message}');
     } catch (e) {
       debugPrint('Unexpected Error in getDelegateCapturedPhotos: $e');
@@ -471,6 +493,28 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       return docs;
     } on FirebaseException catch (e) {
       debugPrint('Firestore Error in getCompanyCapturedPhotos: $e');
+      if (e.code == 'failed-precondition' && companyUID.isNotEmpty) {
+        try {
+          // Fallback: جلب أذونات الشركة ثم صورها الفرعية بشكل مباشر
+          final permissionsSnap = await firestore
+              .collectionGroup('photo_permissions')
+              .where('companyUID', isEqualTo: companyUID)
+              .get();
+
+          final List<CapturedPhotoModel> fallbackDocs = [];
+          for (final pDoc in permissionsSnap.docs) {
+            final photosSnap =
+                await pDoc.reference.collection('captured_photos').get();
+            fallbackDocs.addAll(
+              photosSnap.docs.map((d) => CapturedPhotoModel.fromFirestore(d)),
+            );
+          }
+          fallbackDocs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+          return fallbackDocs;
+        } catch (fallbackError) {
+          debugPrint('Fallback in getCompanyCapturedPhotos failed: $fallbackError');
+        }
+      }
       throw ServerFailure('فشل في جلب صور الشركة: [${e.code}] ${e.message}');
     } catch (e) {
       debugPrint('Unexpected Error in getCompanyCapturedPhotos: $e');
