@@ -430,41 +430,36 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
   }) async {
     try {
       await _ensureAuth();
-      final snapshot = await firestore
-          .collectionGroup('captured_photos')
-          .where('delegateUID', isEqualTo: delegateUID)
-          .get();
+      try {
+        final snapshot = await firestore
+            .collectionGroup('captured_photos')
+            .where('delegateUID', isEqualTo: delegateUID)
+            .get();
 
-      final docs = snapshot.docs
-          .map((doc) => CapturedPhotoModel.fromFirestore(doc))
-          .toList();
+        final docs = snapshot.docs
+            .map((doc) => CapturedPhotoModel.fromFirestore(doc))
+            .toList();
 
-      docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
-      return docs;
+        docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+        return docs;
+      } on FirebaseException catch (e) {
+        if (e.code == 'failed-precondition') {
+          debugPrint(
+            'Delegate captured photos index missing/building, fetching collectionGroup and filtering locally in Dart',
+          );
+          final snapshot =
+              await firestore.collectionGroup('captured_photos').get();
+          final docs = snapshot.docs
+              .map((doc) => CapturedPhotoModel.fromFirestore(doc))
+              .where((photo) => photo.delegateUID == delegateUID)
+              .toList();
+          docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+          return docs;
+        }
+        rethrow;
+      }
     } on FirebaseException catch (e) {
       debugPrint('Firestore Error in getDelegateCapturedPhotos: $e');
-      if (e.code == 'failed-precondition') {
-        try {
-          // Fallback: جلب أذونات المندوب ثم صورها الفرعية بشكل مباشر
-          final permissionsSnap = await firestore
-              .collectionGroup('photo_permissions')
-              .where('delegateUID', isEqualTo: delegateUID)
-              .get();
-
-          final List<CapturedPhotoModel> fallbackDocs = [];
-          for (final pDoc in permissionsSnap.docs) {
-            final photosSnap =
-                await pDoc.reference.collection('captured_photos').get();
-            fallbackDocs.addAll(
-              photosSnap.docs.map((d) => CapturedPhotoModel.fromFirestore(d)),
-            );
-          }
-          fallbackDocs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
-          return fallbackDocs;
-        } catch (fallbackError) {
-          debugPrint('Fallback in getDelegateCapturedPhotos failed: $fallbackError');
-        }
-      }
       throw ServerFailure('فشل في جلب تقرير صور المندوب: [${e.code}] ${e.message}');
     } catch (e) {
       debugPrint('Unexpected Error in getDelegateCapturedPhotos: $e');
@@ -479,42 +474,40 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
   }) async {
     try {
       await _ensureAuth();
-      Query query = firestore.collectionGroup('captured_photos');
-      if (companyUID.isNotEmpty) {
-        query = query.where('companyUID', isEqualTo: companyUID);
+      try {
+        Query query = firestore.collectionGroup('captured_photos');
+        if (companyUID.isNotEmpty) {
+          query = query.where('companyUID', isEqualTo: companyUID);
+        }
+        final snapshot = await query.get();
+
+        final docs = snapshot.docs
+            .map((doc) => CapturedPhotoModel.fromFirestore(doc))
+            .toList();
+
+        docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+        return docs;
+      } on FirebaseException catch (e) {
+        if (e.code == 'failed-precondition') {
+          debugPrint(
+            'Company captured photos index missing/building, fetching collectionGroup and filtering locally in Dart',
+          );
+          final snapshot =
+              await firestore.collectionGroup('captured_photos').get();
+          final docs = snapshot.docs
+              .map((doc) => CapturedPhotoModel.fromFirestore(doc))
+              .where(
+                (photo) =>
+                    companyUID.isEmpty || photo.companyUID == companyUID,
+              )
+              .toList();
+          docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+          return docs;
+        }
+        rethrow;
       }
-      final snapshot = await query.get();
-
-      final docs = snapshot.docs
-          .map((doc) => CapturedPhotoModel.fromFirestore(doc))
-          .toList();
-
-      docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
-      return docs;
     } on FirebaseException catch (e) {
       debugPrint('Firestore Error in getCompanyCapturedPhotos: $e');
-      if (e.code == 'failed-precondition' && companyUID.isNotEmpty) {
-        try {
-          // Fallback: جلب أذونات الشركة ثم صورها الفرعية بشكل مباشر
-          final permissionsSnap = await firestore
-              .collectionGroup('photo_permissions')
-              .where('companyUID', isEqualTo: companyUID)
-              .get();
-
-          final List<CapturedPhotoModel> fallbackDocs = [];
-          for (final pDoc in permissionsSnap.docs) {
-            final photosSnap =
-                await pDoc.reference.collection('captured_photos').get();
-            fallbackDocs.addAll(
-              photosSnap.docs.map((d) => CapturedPhotoModel.fromFirestore(d)),
-            );
-          }
-          fallbackDocs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
-          return fallbackDocs;
-        } catch (fallbackError) {
-          debugPrint('Fallback in getCompanyCapturedPhotos failed: $fallbackError');
-        }
-      }
       throw ServerFailure('فشل في جلب صور الشركة: [${e.code}] ${e.message}');
     } catch (e) {
       debugPrint('Unexpected Error in getCompanyCapturedPhotos: $e');
