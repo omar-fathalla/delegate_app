@@ -84,5 +84,12 @@
 		<false/>
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>tel</string>
+			<string>telprompt</string>
+			<string>https</string>
+			<string>http</string>
+		</array>
 	</dict>
 </plist>

@@ -291,8 +291,15 @@ class _NotificationListItemState extends State<NotificationListItem> {
 
   IconData _getIcon(String type) {
     switch (type) {
+      case 'attendance_check_in':
+        return Icons.login_rounded;
+      case 'attendance_check_out':
+        return Icons.logout_rounded;
       case 'penalty':
         return Icons.gavel_rounded;
+      case 'photo_permission':
+      case 'permission':
+        return Icons.camera_alt_rounded;
       case 'task':
         return Icons.task_alt_rounded;
       case 'support_alert':
@@ -309,8 +316,15 @@ class _NotificationListItemState extends State<NotificationListItem> {
 
   Color _getIconColor(String type, ColorScheme colorScheme) {
     switch (type) {
+      case 'attendance_check_in':
+        return Colors.green.shade700;
+      case 'attendance_check_out':
+        return Colors.blueGrey.shade700;
       case 'penalty':
         return Colors.red.shade700;
+      case 'photo_permission':
+      case 'permission':
+        return Colors.amber.shade800;
       case 'task':
         return Colors.teal.shade700;
       case 'support_alert':
@@ -327,8 +341,15 @@ class _NotificationListItemState extends State<NotificationListItem> {
 
   Color _getIconBackgroundColor(String type, ColorScheme colorScheme) {
     switch (type) {
+      case 'attendance_check_in':
+        return Colors.green.shade50;
+      case 'attendance_check_out':
+        return Colors.blueGrey.shade50;
       case 'penalty':
         return Colors.red.shade50;
+      case 'photo_permission':
+      case 'permission':
+        return Colors.amber.shade50;
       case 'task':
         return Colors.teal.shade50;
       case 'support_alert':

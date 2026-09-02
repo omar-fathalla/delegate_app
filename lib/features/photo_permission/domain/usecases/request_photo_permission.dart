@@ -22,6 +22,7 @@ class RequestPhotoPermission implements UseCase<PhotoPermission, RequestPhotoPer
       startDate: params.startDate,
       endDate: params.endDate,
       requestedBy: params.requestedBy,
+      department: params.department,
     );
   }
 }
@@ -36,6 +37,7 @@ class RequestPhotoPermissionParams extends Equatable {
   final DateTime startDate;
   final DateTime endDate;
   final String requestedBy;
+  final String? department;
 
   const RequestPhotoPermissionParams({
     required this.organizationUID,
@@ -47,6 +49,7 @@ class RequestPhotoPermissionParams extends Equatable {
     required this.startDate,
     required this.endDate,
     required this.requestedBy,
+    this.department,
   });
 
   @override
@@ -60,5 +63,6 @@ class RequestPhotoPermissionParams extends Equatable {
         startDate,
         endDate,
         requestedBy,
+        department,
       ];
 }

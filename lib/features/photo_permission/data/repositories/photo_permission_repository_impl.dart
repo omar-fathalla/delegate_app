@@ -22,6 +22,7 @@ class PhotoPermissionRepositoryImpl implements PhotoPermissionRepository {
     required DateTime startDate,
     required DateTime endDate,
     required String requestedBy,
+    String? department,
   }) async {
     try {
       final result = await remoteDataSource.requestPermission(
@@ -34,6 +35,7 @@ class PhotoPermissionRepositoryImpl implements PhotoPermissionRepository {
         startDate: startDate,
         endDate: endDate,
         requestedBy: requestedBy,
+        department: department,
       );
       return Right(result);
     } on Failure catch (f) {
@@ -144,6 +146,30 @@ class PhotoPermissionRepositoryImpl implements PhotoPermissionRepository {
       return Left(f);
     } catch (_) {
       return const Left(ServerFailure('حدث خطأ غير متوقع أثناء تعديل فروع الإذن.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updatePermissionDates({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      await remoteDataSource.updatePermissionDates(
+        organizationUID: organizationUID,
+        companyUID: companyUID,
+        permissionId: permissionId,
+        startDate: startDate,
+        endDate: endDate,
+      );
+      return const Right(null);
+    } on Failure catch (f) {
+      return Left(f);
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ غير متوقع أثناء تعديل تاريخ الإذن.'));
     }
   }
 

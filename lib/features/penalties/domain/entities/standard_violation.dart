@@ -191,4 +191,25 @@ const List<StandardViolation> officialViolationsSchedule = [
     action2: '100 غرامة فورية',
     category: ViolationCategory.protocolBreach,
   ),
+  StandardViolation(
+    id: 25,
+    title: 'تزوير شهادة صحية',
+    defaultFine: 1000.0,
+    action1: '1000 غرامة',
+    category: ViolationCategory.protocolBreach,
+  ),
+  StandardViolation(
+    id: 26,
+    title: 'تزوير في البرنت التأميني',
+    defaultFine: 20000.0,
+    action1: '20000 غرامة',
+    category: ViolationCategory.protocolBreach,
+  ),
+  StandardViolation(
+    id: 27,
+    title: 'إدخال بيانات بالخطأ',
+    defaultFine: 200.0,
+    action1: '200 غرامة',
+    category: ViolationCategory.dataMissing,
+  ),
 ];

@@ -241,6 +241,7 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
     );
     final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
     final active = branchPreferenceService.getActiveBranch(event.userId);
+    _branchesAttendanceCache.clear();
     emit(BranchPreferencesLoaded(
       favoriteBranches: favorites,
       activeBranch: active,
@@ -257,6 +258,7 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
     );
     final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
     final active = branchPreferenceService.getActiveBranch(event.userId);
+    _branchesAttendanceCache.clear();
     emit(BranchPreferencesLoaded(
       favoriteBranches: favorites,
       activeBranch: active,
@@ -305,21 +307,12 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
     }
 
     try {
-      // جلب بيانات كل الفروع بالتوازي
-      final futures = event.favoriteBranches.map(
-        (branch) => remoteDataSource.getTodayAttendanceByBranch(
-          branchName: branch,
-          organizationId: event.organizationId,
-          date: date,
-        ),
+      // جلب بيانات كل الفروع دفعة واحدة باستعلام موحد ومحسن
+      final data = await remoteDataSource.getTodayAttendanceForBranches(
+        branchNames: event.favoriteBranches,
+        organizationId: event.organizationId,
+        date: date,
       );
-
-      final results = await Future.wait(futures);
-
-      final Map<String, List<Map<String, dynamic>>> data = {};
-      for (var i = 0; i < event.favoriteBranches.length; i++) {
-        data[event.favoriteBranches[i]] = results[i];
-      }
 
       final loadedState = AllBranchesAttendanceLoaded(
         data: data,

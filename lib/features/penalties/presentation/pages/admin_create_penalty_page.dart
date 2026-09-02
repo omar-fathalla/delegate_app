@@ -10,6 +10,7 @@ import 'package:delegate_app/features/penalties/domain/entities/standard_violati
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
+import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evidence_viewer.dart';
 
 class AdminCreatePenaltyPage extends StatefulWidget {
   final Delegate adminDelegate;
@@ -123,19 +124,55 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
     }
   }
 
+  String _effectiveOrgUid = '';
+
+  Future<String> _getEffectiveOrgUid() async {
+    if (_effectiveOrgUid.isNotEmpty) return _effectiveOrgUid;
+    if (widget.adminDelegate.organizationUID.isNotEmpty &&
+        widget.adminDelegate.organizationUID != 'all') {
+      _effectiveOrgUid = widget.adminDelegate.organizationUID;
+      return _effectiveOrgUid;
+    }
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final orgsSnap = await firestore.collection('organizations').get();
+      if (orgsSnap.docs.isNotEmpty) {
+        final fathallaDoc = orgsSnap.docs.firstWhere(
+          (doc) {
+            final name = doc.data()['name']?.toString().toLowerCase() ?? '';
+            return name.contains('fathalla');
+          },
+          orElse: () {
+            var bestDoc = orgsSnap.docs.first;
+            int maxCompanies = 0;
+            for (final d in orgsSnap.docs) {
+              final count = (d.data()['companies'] as num?)?.toInt() ?? 0;
+              if (count > maxCompanies) {
+                maxCompanies = count;
+                bestDoc = d;
+              }
+            }
+            return bestDoc;
+          },
+        );
+        _effectiveOrgUid = fathallaDoc.id;
+        return _effectiveOrgUid;
+      }
+    } catch (_) {}
+    _effectiveOrgUid = 'PiioBFgxaHAeuRdjlDgj';
+    return _effectiveOrgUid;
+  }
+
   Future<void> _fetchCompanies() async {
     try {
       final firestore = FirebaseFirestore.instance;
-      QuerySnapshot<Map<String, dynamic>> snapshot;
-      if (widget.adminDelegate.organizationUID.isNotEmpty) {
-        snapshot = await firestore
-            .collection('organizations')
-            .doc(widget.adminDelegate.organizationUID)
-            .collection('companies')
-            .get();
-      } else {
-        snapshot = await firestore.collectionGroup('companies').get();
-      }
+      final orgUid = await _getEffectiveOrgUid();
+
+      final snapshot = await firestore
+          .collection('organizations')
+          .doc(orgUid)
+          .collection('companies')
+          .get();
 
       if (!mounted) return;
 
@@ -177,13 +214,14 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
     try {
       final firestore = FirebaseFirestore.instance;
       final Map<String, Map<String, String>> delegatesMap = {};
+      final orgUid = await _getEffectiveOrgUid();
 
       // Strategy 1: Fetch from subcollection /organizations/{org}/companies/{comp}/delegates
-      if (widget.adminDelegate.organizationUID.isNotEmpty) {
+      if (orgUid.isNotEmpty) {
         try {
           final subSnapshot = await firestore
               .collection('organizations')
-              .doc(widget.adminDelegate.organizationUID)
+              .doc(orgUid)
               .collection('companies')
               .doc(companyId)
               .collection('delegates')
@@ -282,16 +320,66 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
   }
 
   Future<void> _pickFiles() async {
-    final images = await _picker.pickMultiImage();
-    if (!mounted) return;
-    
-    if (images.isNotEmpty) {
-      setState(() {
-        for (var img in images) {
-          _attachedFiles.add(File(img.path));
-        }
-      });
-    }
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'إرفاق إيصال / مستند المخالفة',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFE8F5E9),
+                  child: Icon(Icons.camera_alt_rounded, color: Colors.green),
+                ),
+                title: const Text('التقاط صورة بالكاميرا'),
+                subtitle: const Text('تصوير الإيصال أو الواقعة مباشرة'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final photo = await _picker.pickImage(source: ImageSource.camera);
+                  if (photo != null && mounted) {
+                    setState(() {
+                      _attachedFiles.add(File(photo.path));
+                    });
+                  }
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFE3F2FD),
+                  child: Icon(Icons.photo_library_rounded, color: Colors.blue),
+                ),
+                title: const Text('اختيار من المعرض'),
+                subtitle: const Text('تحديد صورة أو إيصال محفوظ بالجهاز'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final images = await _picker.pickMultiImage();
+                  if (images.isNotEmpty && mounted) {
+                    setState(() {
+                      for (var img in images) {
+                        _attachedFiles.add(File(img.path));
+                      }
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showCompanySearchSheet() {
@@ -356,6 +444,9 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       branchName: _selectedBranchName,
       createdById: widget.adminDelegate.uid,
       createdByName: widget.adminDelegate.fullName,
+      createdByPhone: widget.adminDelegate.phoneNumber.isNotEmpty
+          ? widget.adminDelegate.phoneNumber
+          : null,
       title: finalTitle,
       category: _selectedCategory,
       incidentDescription: _descriptionController.text.trim(),
@@ -736,7 +827,8 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                           initialValue: _selectedOfficialViolation,
                           isExpanded: true,
                           decoration: InputDecoration(
-                            hintText: 'اختر المخالفة حسب اللائحة (1 - 24)...',
+                            hintText:
+                                'اختر المخالفة حسب اللائحة (1 - ${officialViolationsSchedule.length})...',
                             fillColor: colorScheme.surface,
                             filled: true,
                             contentPadding: const EdgeInsets.symmetric(
@@ -934,19 +1026,76 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                     )
                   else
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 10,
+                      runSpacing: 10,
                       children: _attachedFiles.map((f) {
                         final name = f.path.split('/').last.split('\\').last;
-                        return Chip(
-                          avatar: const Icon(Icons.insert_drive_file_rounded,
-                              size: 16),
-                          label: Text(name),
-                          onDeleted: () {
-                            setState(() {
-                              _attachedFiles.remove(f);
-                            });
-                          },
+                        final isImg = name.toLowerCase().endsWith('.jpg') ||
+                            name.toLowerCase().endsWith('.jpeg') ||
+                            name.toLowerCase().endsWith('.png') ||
+                            name.toLowerCase().endsWith('.webp');
+
+                        return InkWell(
+                          onTap: () => PenaltyEvidenceViewer.showLocalImageLightbox(
+                            context,
+                            file: f,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isImg)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Image.file(
+                                      f,
+                                      width: 28,
+                                      height: 28,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                else
+                                  Icon(Icons.insert_drive_file_rounded,
+                                      size: 20, color: colorScheme.primary),
+                                const SizedBox(width: 8),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 140),
+                                  child: Text(
+                                    name,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _attachedFiles.remove(f);
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(2.0),
+                                    child: Icon(
+                                      Icons.cancel_rounded,
+                                      size: 18,
+                                      color: colorScheme.error,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         );
                       }).toList(),
                     ),

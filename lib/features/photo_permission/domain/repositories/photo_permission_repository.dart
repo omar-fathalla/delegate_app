@@ -15,6 +15,7 @@ abstract class PhotoPermissionRepository {
     required DateTime startDate,
     required DateTime endDate,
     required String requestedBy,
+    String? department,
   });
 
   Future<Either<Failure, PhotoPermission>> approvePermission({
@@ -47,6 +48,14 @@ abstract class PhotoPermissionRepository {
     required String permissionId,
     required List<String> branchIds,
     required List<String> branchNames,
+  });
+
+  Future<Either<Failure, void>> updatePermissionDates({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required DateTime startDate,
+    required DateTime endDate,
   });
 
   Future<Either<Failure, void>> deletePermission({

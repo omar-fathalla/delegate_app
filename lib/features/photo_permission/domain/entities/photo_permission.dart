@@ -16,6 +16,7 @@ class PhotoPermission extends Equatable {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isSupervisorEnabled;
+  final String? department;
 
   const PhotoPermission({
     required this.uid,
@@ -33,6 +34,7 @@ class PhotoPermission extends Equatable {
     required this.createdAt,
     required this.updatedAt,
     required this.isSupervisorEnabled,
+    this.department,
   });
 
   @override
@@ -52,5 +54,6 @@ class PhotoPermission extends Equatable {
         createdAt,
         updatedAt,
         isSupervisorEnabled,
+        department,
       ];
 }

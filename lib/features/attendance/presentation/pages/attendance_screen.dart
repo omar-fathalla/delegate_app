@@ -14,6 +14,7 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
+import 'package:delegate_app/core/services/security_audit_service.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -1055,6 +1056,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
       // --- Anti-Fraud: Fake GPS / Mock Location Detection ---
       if (position.isMocked) {
+        _logMockViolation(position);
         if (context.mounted) {
           AppSnackBar.showError(
             context,
@@ -1069,6 +1071,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final lastPosition = await Geolocator.getLastKnownPosition();
       if (lastPosition != null) {
         if (lastPosition.isMocked) {
+          _logMockViolation(lastPosition);
           if (context.mounted) {
             AppSnackBar.showError(
               context,
@@ -1106,6 +1109,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
     } catch (_) {}
     return 'Unknown Device';
+  }
+
+  void _logMockViolation(Position position) {
+    _getDeviceInfo().then((device) {
+      SecurityAuditService.logMockLocationViolation(
+        delegate: widget.delegate,
+        position: position,
+        deviceModel: device,
+      );
+    }).catchError((_) {});
   }
 
   void _showForgotCheckoutDialog(

@@ -19,6 +19,7 @@ abstract class PhotoPermissionRemoteDataSource {
     required DateTime startDate,
     required DateTime endDate,
     required String requestedBy,
+    String? department,
   });
 
   Future<PhotoPermissionModel> approvePermission({
@@ -51,6 +52,14 @@ abstract class PhotoPermissionRemoteDataSource {
     required String permissionId,
     required List<String> branchIds,
     required List<String> branchNames,
+  });
+
+  Future<void> updatePermissionDates({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required DateTime startDate,
+    required DateTime endDate,
   });
 
   Future<void> deletePermission({
@@ -133,6 +142,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required DateTime startDate,
     required DateTime endDate,
     required String requestedBy,
+    String? department,
   }) async {
     try {
       await _ensureAuth();
@@ -184,6 +194,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         isSupervisorEnabled: true,
+        department: department,
       );
 
       await docRef.set(model.toFirestore());
@@ -422,13 +433,13 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       final snapshot = await firestore
           .collectionGroup('captured_photos')
           .where('delegateUID', isEqualTo: delegateUID)
-          .orderBy('capturedAt', descending: true)
           .get();
 
       final docs = snapshot.docs
           .map((doc) => CapturedPhotoModel.fromFirestore(doc))
           .toList();
 
+      docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
       return docs;
     } on FirebaseException catch (e) {
       debugPrint('Firestore Error in getDelegateCapturedPhotos: $e');
@@ -450,13 +461,13 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       if (companyUID.isNotEmpty) {
         query = query.where('companyUID', isEqualTo: companyUID);
       }
-      query = query.orderBy('capturedAt', descending: true);
       final snapshot = await query.get();
 
       final docs = snapshot.docs
           .map((doc) => CapturedPhotoModel.fromFirestore(doc))
           .toList();
 
+      docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
       return docs;
     } on FirebaseException catch (e) {
       debugPrint('Firestore Error in getCompanyCapturedPhotos: $e');
@@ -477,22 +488,89 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
   }) async {
     try {
       await _ensureAuth();
-      final snapshot = await firestore
-          .collectionGroup('captured_photos')
-          .where('photoId', isEqualTo: photoId)
-          .get();
-          
-      for (var doc in snapshot.docs) {
+
+      // 1. Delete image from Storage if URL is available
+      if (photoUrl.isNotEmpty) {
         try {
-          final imageUrl = doc.data()['imageUrl'] as String?;
-          if (imageUrl != null) {
-            final ref = storage.refFromURL(imageUrl);
-            await ref.delete();
+          final ref = storage.refFromURL(photoUrl);
+          await ref.delete();
+        } catch (e) {
+          debugPrint('Error deleting image from storage using photoUrl: $e');
+        }
+      }
+
+      // 2. Direct document deletion if path IDs are present
+      bool deletedDirectly = false;
+      if (organizationUID.isNotEmpty &&
+          companyUID.isNotEmpty &&
+          permissionId.isNotEmpty &&
+          photoId.isNotEmpty) {
+        try {
+          final directDocRef = firestore
+              .collection('organizations')
+              .doc(organizationUID)
+              .collection('companies')
+              .doc(companyUID)
+              .collection('photo_permissions')
+              .doc(permissionId)
+              .collection('captured_photos')
+              .doc(photoId);
+
+          final directDoc = await directDocRef.get();
+          if (directDoc.exists) {
+            final storedUrl = directDoc.data()?['photoUrl'] as String?;
+            if (photoUrl.isEmpty && storedUrl != null && storedUrl.isNotEmpty) {
+              try {
+                final ref = storage.refFromURL(storedUrl);
+                await ref.delete();
+              } catch (_) {}
+            }
+            await directDocRef.delete();
+            deletedDirectly = true;
           }
         } catch (e) {
-          debugPrint('Error deleting image from storage: $e');
+          debugPrint('Direct doc deletion attempt: $e');
         }
-        await doc.reference.delete();
+      }
+
+      // 3. Fallback: Search across collectionGroup if not deleted directly
+      if (!deletedDirectly && photoId.isNotEmpty) {
+        final snapshot = await firestore
+            .collectionGroup('captured_photos')
+            .where(FieldPath.documentId, isEqualTo: photoId)
+            .get();
+
+        for (var doc in snapshot.docs) {
+          try {
+            final storedUrl = (doc.data()['photoUrl'] ?? doc.data()['imageUrl']) as String?;
+            if (storedUrl != null && storedUrl.isNotEmpty) {
+              final ref = storage.refFromURL(storedUrl);
+              await ref.delete();
+            }
+          } catch (e) {
+            debugPrint('Error deleting image from storage: $e');
+          }
+          await doc.reference.delete();
+        }
+
+        // Also check if stored by uid field
+        if (snapshot.docs.isEmpty) {
+          final uidSnapshot = await firestore
+              .collectionGroup('captured_photos')
+              .where('uid', isEqualTo: photoId)
+              .get();
+
+          for (var doc in uidSnapshot.docs) {
+            try {
+              final storedUrl = (doc.data()['photoUrl'] ?? doc.data()['imageUrl']) as String?;
+              if (storedUrl != null && storedUrl.isNotEmpty) {
+                final ref = storage.refFromURL(storedUrl);
+                await ref.delete();
+              }
+            } catch (_) {}
+            await doc.reference.delete();
+          }
+        }
       }
     } on FirebaseException catch (e) {
       debugPrint('Firestore Error in deleteCapturedPhoto: $e');
@@ -600,6 +678,54 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     } catch (e) {
       debugPrint('Unexpected Error in updatePermissionBranches: $e');
       throw ServerFailure('حدث خطأ غير متوقع أثناء التعديل: $e');
+    }
+  }
+
+  @override
+  Future<void> updatePermissionDates({
+    required String organizationUID,
+    required String companyUID,
+    required String permissionId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      await _ensureAuth();
+      if (organizationUID.isNotEmpty && companyUID.isNotEmpty) {
+        final docRef = firestore
+            .collection('organizations')
+            .doc(organizationUID)
+            .collection('companies')
+            .doc(companyUID)
+            .collection('photo_permissions')
+            .doc(permissionId);
+
+        await docRef.update({
+          'startDate': Timestamp.fromDate(startDate),
+          'endDate': Timestamp.fromDate(endDate),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+
+      // Fallback search in collectionGroup if org/company was missing
+      final q = await firestore
+          .collectionGroup('photo_permissions')
+          .where(FieldPath.documentId, isEqualTo: permissionId)
+          .limit(1)
+          .get();
+      if (q.docs.isNotEmpty) {
+        await q.docs.first.reference.update({
+          'startDate': Timestamp.fromDate(startDate),
+          'endDate': Timestamp.fromDate(endDate),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } on FirebaseException catch (e) {
+      throwFirestoreFailure(e, 'فشل في تعديل تاريخ صلاحية إذن التصوير.');
+    } catch (e) {
+      debugPrint('Unexpected Error in updatePermissionDates: $e');
+      throw ServerFailure('حدث خطأ غير متوقع أثناء تعديل التاريخ: $e');
     }
   }
 }

@@ -18,6 +18,7 @@ class PhotoPermissionModel extends PhotoPermission {
     required super.createdAt,
     required super.updatedAt,
     required super.isSupervisorEnabled,
+    super.department,
   });
 
   factory PhotoPermissionModel.fromFirestore(DocumentSnapshot doc) {
@@ -52,6 +53,7 @@ class PhotoPermissionModel extends PhotoPermission {
       createdAt: parseDateTime(data['createdAt']),
       updatedAt: parseDateTime(data['updatedAt']),
       isSupervisorEnabled: data['isSupervisorEnabled'] != false,
+      department: data['department']?.toString(),
     );
   }
 
@@ -71,6 +73,7 @@ class PhotoPermissionModel extends PhotoPermission {
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'isSupervisorEnabled': isSupervisorEnabled,
+      if (department != null && department!.isNotEmpty) 'department': department,
     };
   }
 }

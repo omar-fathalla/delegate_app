@@ -8,6 +8,7 @@ import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
+import '../../domain/entities/photo_permission_departments.dart';
 import 'captured_photos_view_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
@@ -538,6 +539,32 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
                 ),
               ],
             ),
+            if (permission.department != null && permission.department!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colorScheme.primary.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.category_rounded, size: 14, color: colorScheme.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'القسم: ${permission.department}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Text(
               'الفروع المعتمدة (${permission.branchNames.length}):',
@@ -656,12 +683,14 @@ class _CreateRequestBottomSheet extends StatefulWidget {
 class _CreateRequestBottomSheetState extends State<_CreateRequestBottomSheet> {
   late DateTime _startDate;
   late DateTime _endDate;
+  String? _selectedDepartment;
 
   @override
   void initState() {
     super.initState();
     _startDate = DateTime.now();
     _endDate = DateTime.now().add(const Duration(days: 30));
+    _selectedDepartment = kPhotoPermissionDepartments.first;
     context.read<BranchBloc>().add(BranchLoadRequested());
   }
 
@@ -691,188 +720,246 @@ class _CreateRequestBottomSheetState extends State<_CreateRequestBottomSheet> {
 
             final isLoadingBranches = state is BranchLoading;
 
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'إرسال طلب إذن تصوير جديد',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const Divider(),
-                const SizedBox(height: 12),
-                // كارت توضيح مدة الإذن تلقائياً لمدة شهر
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.timer_rounded, color: colorScheme.primary, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'مدة إذن التصوير:',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'شهر واحد (30 يوم)',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        'إرسال طلب إذن تصوير جديد',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Icon(Icons.calendar_today_rounded, size: 16, color: colorScheme.onSurfaceVariant),
-                          const SizedBox(width: 6),
-                          Text(
-                            'تاريخ البداية (اليوم): ${DateFormat('yyyy-MM-dd').format(_startDate)}',
-                            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.event_available_rounded, size: 16, color: colorScheme.onSurfaceVariant),
-                          const SizedBox(width: 6),
-                          Text(
-                            'تاريخ النهاية تلقائياً: ${DateFormat('yyyy-MM-dd').format(_endDate)}',
-                            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ],
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(context),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                // كارت توضيح سريان الإذن على جميع الفروع تلقائياً
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.secondaryContainer.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.store_rounded, color: colorScheme.secondary, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'نطاق الفروع:',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  // كارت اختيار القسم للتصوير
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.category_rounded, color: colorScheme.primary, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'القسم المطلوب للتصوير:',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedDepartment,
+                          hint: const Text('اختر القسم (إرشادات التصوير)'),
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: colorScheme.surface,
                           ),
-                          if (isLoadingBranches)
-                            const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          else
+                          items: kPhotoPermissionDepartments.map((dept) {
+                            return DropdownMenuItem<String>(
+                              value: dept,
+                              child: Text(
+                                dept,
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedDepartment = val;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // كارت توضيح مدة الإذن تلقائياً لمدة شهر
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.timer_rounded, color: colorScheme.primary, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'مدة إذن التصوير:',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: colorScheme.secondary,
+                                color: colorScheme.primary,
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Text(
-                                'جميع الفروع (${branches.length})',
-                                style: const TextStyle(
+                              child: const Text(
+                                'شهر واحد (30 يوم)',
+                                style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'سيتم تطبيق إذن التصوير تلقائياً على كافة فروع الشركة بدون استثناء.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: (isLoadingBranches || branches.isEmpty)
-                      ? null
-                      : () {
-                          widget.parentContext.read<PhotoPermissionBloc>().add(
-                                RequestPermissionRequested(
-                                  organizationUID: widget.supervisorDelegate.organizationUID,
-                                  companyUID: widget.supervisorDelegate.companyUID,
-                                  companyName: widget.supervisorDelegate.companyName,
-                                  companyCode: null,
-                                  branchIds: branches.map((b) => b.id).toList(),
-                                  branchNames: branches.map((b) => b.branchName).toList(),
-                                  startDate: _startDate,
-                                  endDate: _endDate,
-                                  requestedBy: widget.supervisorDelegate.uid,
-                                ),
-                              );
-                          Navigator.pop(context);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today_rounded, size: 16, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 6),
+                            Text(
+                              'تاريخ البداية (اليوم): ${DateFormat('yyyy-MM-dd').format(_startDate)}',
+                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.event_available_rounded, size: 16, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 6),
+                            Text(
+                              'تاريخ النهاية تلقائياً: ${DateFormat('yyyy-MM-dd').format(_endDate)}',
+                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  child: const Text(
-                    'إرسال الطلب للاعتماد (شامل كل الفروع)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  const SizedBox(height: 16),
+                  // كارت توضيح سريان الإذن على جميع الفروع تلقائياً
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondaryContainer.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.store_rounded, color: colorScheme.secondary, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'نطاق الفروع:',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (isLoadingBranches)
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.secondary,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  'جميع الفروع (${branches.length})',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'سيتم تطبيق إذن التصوير تلقائياً على كافة فروع الشركة بدون استثناء.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: (isLoadingBranches || branches.isEmpty)
+                        ? null
+                        : () {
+                            widget.parentContext.read<PhotoPermissionBloc>().add(
+                                  RequestPermissionRequested(
+                                    organizationUID: widget.supervisorDelegate.organizationUID,
+                                    companyUID: widget.supervisorDelegate.companyUID,
+                                    companyName: widget.supervisorDelegate.companyName,
+                                    companyCode: null,
+                                    branchIds: branches.map((b) => b.id).toList(),
+                                    branchNames: branches.map((b) => b.branchName).toList(),
+                                    startDate: _startDate,
+                                    endDate: _endDate,
+                                    requestedBy: widget.supervisorDelegate.uid,
+                                    department: _selectedDepartment,
+                                  ),
+                                );
+                            Navigator.pop(context);
+                          },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'إرسال الطلب للاعتماد (شامل كل الفروع)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         ),

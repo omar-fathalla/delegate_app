@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
 import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -363,71 +364,85 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // ── Branch Header ──
-          GestureDetector(
-            onLongPress: () => _confirmRemoveBranch(context, branchName),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primaryContainer,
-                    colorScheme.secondaryContainer,
-                  ],
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                ),
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                  bottom: Radius.circular(4),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.location_on_rounded,
-                      color: colorScheme.primary,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      branchName,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                  ),
-                  // Badge عدد المندوبين
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${records.length} مندوب',
-                      style: TextStyle(
-                        color: colorScheme.onPrimary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primaryContainer,
+                  colorScheme.secondaryContainer,
                 ],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
               ),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+                bottom: Radius.circular(4),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.location_on_rounded,
+                    color: colorScheme.primary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    branchName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+                // Badge عدد المندوبين
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${records.length} مندوب',
+                    style: TextStyle(
+                      color: colorScheme.onPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // زر حذف الفرع المباشر
+                IconButton(
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: colorScheme.error,
+                    size: 20,
+                  ),
+                  tooltip: 'إزالة الفرع من القائمة',
+                  style: IconButton.styleFrom(
+                    backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
+                    padding: const EdgeInsets.all(6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => _confirmRemoveBranch(context, branchName),
+                ),
+              ],
             ),
           ),
 
@@ -503,6 +518,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   ) {
     final String fullName = record['fullName'] as String? ?? 'مندوب';
     final String companyName = record['companyName'] as String? ?? '';
+    final String? imageUrl = record['personalPhotoURL'] as String? ??
+        record['imageUrl'] as String?;
     final checkIn = record['checkInTime'] as Timestamp?;
     final checkOut = record['checkOutTime'] as Timestamp?;
     final bool hasCheckOut = checkOut != null;
@@ -514,27 +531,71 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         ? DateFormat('hh:mm a', 'ar').format(checkOut.toDate())
         : '--:--';
 
+    final hasPhoto = imageUrl != null && imageUrl.isNotEmpty;
+
     return InkWell(
       onTap: () => _openAttendanceHistory(context, record),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            // Avatar
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: hasCheckOut
-                  ? colorScheme.surfaceContainerHighest
-                  : colorScheme.primaryContainer,
-              child: Text(
-                fullName.isNotEmpty ? fullName[0] : '؟',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: hasCheckOut
-                      ? colorScheme.onSurfaceVariant
-                      : colorScheme.onPrimaryContainer,
-                ),
+            // Avatar (صورة المندوب أو الحرف الأول مع إمكانية التكبير عند الضغط)
+            GestureDetector(
+              onTap: hasPhoto
+                  ? () => _showImagePreview(
+                        context,
+                        imageUrl,
+                        fullName,
+                        companyName,
+                      )
+                  : null,
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: hasCheckOut
+                        ? colorScheme.surfaceContainerHighest
+                        : colorScheme.primaryContainer,
+                    backgroundImage: hasPhoto
+                        ? CachedNetworkImageProvider(imageUrl)
+                        : null,
+                    child: !hasPhoto
+                        ? Text(
+                            fullName.isNotEmpty ? fullName[0] : '؟',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: hasCheckOut
+                                  ? colorScheme.onSurfaceVariant
+                                  : colorScheme.onPrimaryContainer,
+                            ),
+                          )
+                        : null,
+                  ),
+                  if (hasPhoto)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 3,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.zoom_in_rounded,
+                          size: 10,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(width: 12),
@@ -667,6 +728,112 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     }
   }
 
+  // ─── Image Preview (تكبير الصورة) ──────────────────────────────────────────
+  void _showImagePreview(
+    BuildContext context,
+    String imageUrl,
+    String name,
+    String company,
+  ) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header with name & close button
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.75),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          if (company.isNotEmpty)
+                            Text(
+                              company,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              // Image Container with InteractiveViewer (pinch & zoom)
+              Flexible(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                  child: Container(
+                    color: Colors.black,
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.65,
+                      maxWidth: double.infinity,
+                    ),
+                    child: InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 4.0,
+                      child: CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) => const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(40),
+                            child: CircularProgressIndicator(color: Colors.white),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(40),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.broken_image_rounded, color: Colors.white54, size: 48),
+                                SizedBox(height: 8),
+                                Text(
+                                  'تعذّر عرض الصورة',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // ─── Branch Picker ─────────────────────────────────────────────────────────
   void _showBranchPicker(BuildContext context) {
     final bloc = context.read<MarketingBloc>();
@@ -686,12 +853,6 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             userId: widget.marketingUser.uid,
             branchName: branchName,
           ));
-          // أعد تحميل كل الفروع بعد الإضافة
-          final newFavorites = [..._favoriteBranches, branchName];
-          bloc.add(LoadAllFavoriteBranchesAttendance(
-            favoriteBranches: newFavorites,
-            organizationId: widget.marketingUser.organizationUID,
-          ));
         },
       ),
     );
@@ -702,14 +863,25 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('حذف الفرع'),
-        content: Text('هل تريد حذف "$branchName" من قائمتك؟'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Text('حذف الفرع'),
+          ],
+        ),
+        content: Text('هل تريد إزالة "$branchName" من قائمة فروعك المتابعة؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('إلغاء'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
             onPressed: () {
               Navigator.pop(context);
               final bloc = context.read<MarketingBloc>();
@@ -717,14 +889,6 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                 userId: widget.marketingUser.uid,
                 branchName: branchName,
               ));
-              final newFavorites =
-                  _favoriteBranches.where((b) => b != branchName).toList();
-              if (newFavorites.isNotEmpty) {
-                bloc.add(LoadAllFavoriteBranchesAttendance(
-                  favoriteBranches: newFavorites,
-                  organizationId: widget.marketingUser.organizationUID,
-                ));
-              }
             },
             child: const Text('حذف'),
           ),
@@ -852,12 +1016,11 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
               '';
           return {
             'id': d.id,
-            ...data,
             'branchName': name,
           };
-        }).toList();
+        }).where((b) => (b['branchName'] as String).isNotEmpty).toList();
         docs.sort((a, b) =>
-            (a['branchName'] as String? ?? '').compareTo(b['branchName'] as String? ?? ''));
+            (a['branchName'] ?? '').compareTo(b['branchName'] ?? ''));
         setState(() {
           _allBranches = docs;
           _filtered = _allBranches;

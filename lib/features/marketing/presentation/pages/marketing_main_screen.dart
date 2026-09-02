@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/marketing_home_screen.dart';
+import 'package:delegate_app/features/marketing/presentation/pages/marketing_promotion_home_screen.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 
@@ -37,8 +39,10 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
     final isPromotionOnly = delegate.role == UserRole.marketingPromotion;
 
     switch (value) {
+      case 'profile':
+        context.push('/user-profile');
+        break;
       case 'search':
-        if (isPromotionOnly) break;
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => MarketingSearchScreen(
@@ -47,18 +51,29 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
           ),
         );
         break;
-      case 'tasks':
-        if (isPromotionOnly) break;
+      case 'photo_report':
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => isPromotionOnly
-                ? AdminTasksScreen(adminDelegate: delegate)
-                : BlocProvider(
-                    create: (_) => di.sl<DelegateTasksBloc>(),
-                    child: DelegateTasksScreen(delegate: delegate),
-                  ),
+            builder: (_) => MonthlyPhotoReportScreen(
+              delegate: delegate,
+              showAppBar: true,
+            ),
           ),
         );
+        break;
+      case 'tasks':
+        if (isPromotionOnly) {
+          setState(() => _currentIndex = 2);
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => BlocProvider(
+                create: (_) => di.sl<DelegateTasksBloc>(),
+                child: DelegateTasksScreen(delegate: delegate),
+              ),
+            ),
+          );
+        }
         break;
       case 'penalties':
         if (isPromotionOnly) break;
@@ -85,9 +100,6 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
           ),
         );
         break;
-      case 'profile':
-        context.push('/user-profile');
-        break;
     }
   }
 
@@ -101,6 +113,12 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
 
     final screens = isPromotionOnly
         ? [
+            MarketingPromotionHomeScreen(
+              delegate: delegate,
+              onNavigateTab: (tabIndex) {
+                setState(() => _currentIndex = tabIndex);
+              },
+            ),
             BlocProvider(
               create: (_) => di.sl<PhotoPermissionBloc>(),
               child: MarketingPermissionsScreen(marketingDelegate: delegate),
@@ -130,7 +148,19 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
 
     final String subtitle;
     if (isPromotionOnly) {
-      subtitle = _currentIndex == 0 ? 'أذونات التصوير' : 'المهام';
+      switch (_currentIndex) {
+        case 0:
+          subtitle = 'الرئيسية';
+          break;
+        case 1:
+          subtitle = 'أذونات التصوير';
+          break;
+        case 2:
+          subtitle = 'المهام الميدانية';
+          break;
+        default:
+          subtitle = 'تسويق العروض الترويجية';
+      }
     } else {
       switch (_currentIndex) {
         case 0:
@@ -208,7 +238,7 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
           ),
           const SizedBox(width: 4),
 
-          // 2. المنيو العلوي (البحث، المهام، الإعدادات، الملف الشخصي)
+          // 2. المنيو العلوي (الملف الشخصي، البحث، التقارير، الإعدادات)
           PopupMenuButton<String>(
             icon: const Icon(Icons.menu_rounded),
             shape: RoundedRectangleBorder(
@@ -225,12 +255,21 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              if (!isPromotionOnly)
-                PopupMenuItem(
-                  value: 'search',
+              PopupMenuItem(
+                value: 'search',
+                child: ListTile(
+                  leading: const Icon(Icons.search_rounded),
+                  title: Text(l10n.search),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              if (isPromotionOnly)
+                const PopupMenuItem(
+                  value: 'photo_report',
                   child: ListTile(
-                    leading: const Icon(Icons.search_rounded),
-                    title: Text(l10n.search),
+                    leading: Icon(Icons.collections_rounded),
+                    title: Text('تقارير الصور الميدانية'),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -274,6 +313,11 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
         destinations: isPromotionOnly
             ? const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home_rounded),
+                  label: 'الرئيسية',
+                ),
                 NavigationDestination(
                   icon: Icon(Icons.photo_library_outlined),
                   selectedIcon: Icon(Icons.photo_library_rounded),

@@ -135,6 +135,11 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
                           isArabic: isArabic,
                           onTap: () =>
                               _showFeedbackDetails(context, feedback, isArabic),
+                          onDelete: () => _showDeleteConfirmationDialog(
+                            context,
+                            feedback,
+                            isArabic,
+                          ),
                         );
                       },
                     ),
@@ -338,7 +343,115 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
       ),
       builder: (sheetContext) => BlocProvider.value(
         value: context.read<AdminFeedbackBloc>(),
-        child: _FeedbackDetailsSheet(feedback: feedback, isArabic: isArabic),
+        child: _FeedbackDetailsSheet(
+          feedback: feedback,
+          isArabic: isArabic,
+          onDelete: () => _showDeleteConfirmationDialog(
+            context,
+            feedback,
+            isArabic,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmationDialog(
+    BuildContext context,
+    FeedbackEntity feedback,
+    bool isArabic,
+  ) {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.delete_forever_rounded, color: theme.colorScheme.error),
+            const SizedBox(width: 8),
+            Text(
+              isArabic ? 'حذف المقترح' : 'Delete Feedback',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isArabic
+                  ? 'هل أنت متأكد من رغبتك في حذف هذا المقترح نهائياً؟'
+                  : 'Are you sure you want to delete this feedback?',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${feedback.type.getLabel(isArabic)} - ${feedback.userName}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    feedback.content,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(isArabic ? 'إلغاء' : 'Cancel'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.read<AdminFeedbackBloc>().add(
+                    DeleteFeedbackEvent(feedback.id ?? ''),
+                  );
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    isArabic
+                        ? 'تم حذف المقترح بنجاح'
+                        : 'Feedback deleted successfully',
+                  ),
+                  backgroundColor: theme.colorScheme.error,
+                ),
+              );
+            },
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: Text(isArabic ? 'تأكيد الحذف' : 'Delete'),
+          ),
+        ],
       ),
     );
   }
@@ -348,11 +461,13 @@ class _AdminFeedbackCard extends StatelessWidget {
   final FeedbackEntity feedback;
   final bool isArabic;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   const _AdminFeedbackCard({
     required this.feedback,
     required this.isArabic,
     required this.onTap,
+    this.onDelete,
   });
 
   Color _getStatusColor(FeedbackStatus status) {
@@ -431,8 +546,8 @@ class _AdminFeedbackCard extends StatelessWidget {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                      horizontal: 10,
+                      vertical: 4,
                     ),
                     decoration: BoxDecoration(
                       color: _getStatusColor(
@@ -453,6 +568,20 @@ class _AdminFeedbackCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (onDelete != null) ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 20,
+                        color: theme.colorScheme.error.withValues(alpha: 0.8),
+                      ),
+                      tooltip: isArabic ? 'حذف المقترح' : 'Delete Feedback',
+                      onPressed: onDelete,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 12),
@@ -498,8 +627,13 @@ class _AdminFeedbackCard extends StatelessWidget {
 class _FeedbackDetailsSheet extends StatefulWidget {
   final FeedbackEntity feedback;
   final bool isArabic;
+  final VoidCallback? onDelete;
 
-  const _FeedbackDetailsSheet({required this.feedback, required this.isArabic});
+  const _FeedbackDetailsSheet({
+    required this.feedback,
+    required this.isArabic,
+    this.onDelete,
+  });
 
   @override
   State<_FeedbackDetailsSheet> createState() => _FeedbackDetailsSheetState();
@@ -706,41 +840,80 @@ class _FeedbackDetailsSheetState extends State<_FeedbackDetailsSheet> {
                       ),
                       const SizedBox(height: 24),
 
-                      // زر الحفظ
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            context.read<AdminFeedbackBloc>().add(
-                              UpdateFeedbackStatusEvent(
-                                feedbackId: widget.feedback.id!,
-                                status: _selectedStatus,
-                                adminResponse:
-                                    _responseController.text.trim().isEmpty
-                                    ? null
-                                    : _responseController.text.trim(),
+                      // أزرار الحفظ والحذف
+                      Row(
+                        children: [
+                          if (widget.onDelete != null) ...[
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                widget.onDelete?.call();
+                              },
+                              icon: Icon(
+                                Icons.delete_outline_rounded,
+                                color: theme.colorScheme.error,
+                                size: 20,
                               ),
-                            );
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  widget.isArabic
-                                      ? 'تم تحديث المقترح بنجاح'
-                                      : 'Feedback updated successfully',
+                              label: Text(
+                                widget.isArabic ? 'حذف المقترح' : 'Delete',
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                backgroundColor: Colors.green,
                               ),
-                            );
-                          },
-                          icon: const Icon(Icons.save),
-                          label: Text(
-                            widget.isArabic ? 'حفظ التغييرات' : 'Save Changes',
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: theme.colorScheme.error.withValues(alpha: 0.6),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                context.read<AdminFeedbackBloc>().add(
+                                  UpdateFeedbackStatusEvent(
+                                    feedbackId: widget.feedback.id!,
+                                    status: _selectedStatus,
+                                    adminResponse:
+                                        _responseController.text.trim().isEmpty
+                                        ? null
+                                        : _responseController.text.trim(),
+                                  ),
+                                );
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      widget.isArabic
+                                          ? 'تم تحديث المقترح بنجاح'
+                                          : 'Feedback updated successfully',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.save),
+                              label: Text(
+                                widget.isArabic ? 'حفظ التغييرات' : 'Save Changes',
+                              ),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
                           ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.all(16),
-                          ),
-                        ),
+                        ],
                       ),
                     ],
                   ),

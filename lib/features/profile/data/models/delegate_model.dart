@@ -48,23 +48,20 @@ class DelegateModel extends Delegate {
     }
 
     DelegatePosition parsePosition(String? position) {
-      return position == 'Supervisor'
+      final p = position?.trim().toLowerCase();
+      return (p == 'supervisor' || p == 'مشرف')
           ? DelegatePosition.supervisor
           : DelegatePosition.promoter;
     }
 
     DelegateStatus parseStatus(String? status) {
-      switch (status) {
-        case 'Approved':
+      switch (status?.trim().toLowerCase()) {
         case 'approved':
           return DelegateStatus.approved;
-        case 'Suspended':
         case 'suspended':
           return DelegateStatus.suspended;
-        case 'Rejected':
         case 'rejected':
           return DelegateStatus.rejected;
-        case 'Active':
         case 'active':
           return DelegateStatus.active;
         default:
@@ -73,25 +70,35 @@ class DelegateModel extends Delegate {
     }
 
     UserRole parseRole(String? role) {
-      switch (role) {
+      switch (role?.trim().toLowerCase()) {
         case 'super_admin':
+        case 'superadmin':
           return UserRole.superAdmin;
         case 'organization-admin':
+        case 'organization_admin':
+        case 'organizationadmin':
           return UserRole.organizationAdmin;
         case 'admin':
         case 'company-admin':
+        case 'company_admin':
+        case 'companyadmin':
+        case 'supervisor':
+        case 'company_supervisor':
           return UserRole.admin;
         case 'marketing':
           return UserRole.marketing;
         case 'marketing_promotion':
+        case 'marketingpromotion':
           return UserRole.marketingPromotion;
         case 'technical_support':
         case 'technical-support':
         case 'tech_support':
+        case 'techsupport':
           return UserRole.technicalSupport;
         case 'branches_marketing':
         case 'branches-marketing':
         case 'branches_marketing_manager':
+        case 'branchesmarketingmanager':
           return UserRole.branchesMarketingManager;
         default:
           return UserRole.delegate;

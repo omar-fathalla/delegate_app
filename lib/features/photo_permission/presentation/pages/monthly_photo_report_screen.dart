@@ -48,9 +48,12 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
     _selectedMonth = _now;
 
     final isGeneralManagerOrAdmin =
+        widget.delegate.role == UserRole.admin ||
+        widget.delegate.position == DelegatePosition.supervisor ||
         widget.delegate.role == UserRole.organizationAdmin ||
         widget.delegate.role == UserRole.superAdmin ||
-        widget.delegate.role == UserRole.admin ||
+        widget.delegate.role == UserRole.marketing ||
+        widget.delegate.role == UserRole.marketingPromotion ||
         widget.delegate.role == UserRole.branchesMarketingManager;
 
     if (isGeneralManagerOrAdmin) {
@@ -60,11 +63,20 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
     _loadPhotos();
   }
 
+  bool get _canDeletePhoto {
+    final r = widget.delegate.role;
+    final pos = widget.delegate.position;
+    return r != UserRole.delegate || pos == DelegatePosition.supervisor;
+  }
+
   void _loadPhotos() {
     final isGeneralManagerOrAdmin =
+        widget.delegate.role == UserRole.admin ||
+        widget.delegate.position == DelegatePosition.supervisor ||
         widget.delegate.role == UserRole.organizationAdmin ||
         widget.delegate.role == UserRole.superAdmin ||
-        widget.delegate.role == UserRole.admin ||
+        widget.delegate.role == UserRole.marketing ||
+        widget.delegate.role == UserRole.marketingPromotion ||
         widget.delegate.role == UserRole.branchesMarketingManager;
 
     if (isGeneralManagerOrAdmin) {
@@ -75,6 +87,91 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
       context.read<PhotoPermissionBloc>().add(
             LoadDelegateCapturedPhotosRequested(delegateUID: widget.delegate.uid),
           );
+    }
+  }
+
+  Future<void> _confirmDeletePhoto(BuildContext context, CapturedPhoto photo) async {
+    final bloc = context.read<PhotoPermissionBloc>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'تأكيد حذف الصورة',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'هل أنت متأكد من حذف هذه الصورة المرسلة من المندوب "${photo.delegateName}" بفرع "${photo.branchName}"؟',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'سيتم حذف الصورة بشكل نهائي من قاعدة البيانات ومساحة التخزين.',
+                      style: TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_forever_rounded, size: 18),
+            label: const Text('حذف نهائي'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      bloc.add(
+        DeleteCapturedPhotoRequested(
+          photoId: photo.uid,
+          organizationUID: photo.organizationUID.isNotEmpty
+              ? photo.organizationUID
+              : widget.delegate.organizationUID,
+          companyUID: photo.companyUID.isNotEmpty
+              ? photo.companyUID
+              : widget.delegate.companyUID,
+          permissionId: photo.permissionId,
+          photoUrl: photo.photoUrl,
+        ),
+      );
     }
   }
 
@@ -124,7 +221,27 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             )
           : null,
       backgroundColor: colorScheme.surfaceContainerLowest,
-      body: BlocBuilder<PhotoPermissionBloc, PhotoPermissionState>(
+      body: BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
+        listener: (context, state) {
+          if (state is PhotoPermissionActionSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            _loadPhotos();
+          } else if (state is PhotoPermissionError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
         builder: (context, state) {
           if (state is PhotoPermissionLoading) {
             return const Center(
@@ -842,9 +959,23 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                               'تفاصيل الصورة الميدانية',
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 20),
-                              onPressed: () => Navigator.pop(modalContext),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_canDeletePhoto)
+                                  IconButton(
+                                    tooltip: 'حذف الصورة نهائياً',
+                                    icon: Icon(Icons.delete_outline_rounded, size: 22, color: Colors.red.shade700),
+                                    onPressed: () {
+                                      Navigator.pop(modalContext);
+                                      _confirmDeletePhoto(context, photo);
+                                    },
+                                  ),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 20),
+                                  onPressed: () => Navigator.pop(modalContext),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -883,65 +1014,90 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                             ),
                             const SizedBox(height: 16),
 
-                            // Save to Gallery Button with concise text and live feedback
-                            FilledButton.icon(
-                              onPressed: isSaving
-                                  ? null
-                                  : () async {
-                                      setSheetState(() {
-                                        isSaving = true;
-                                        statusText = null;
-                                      });
-                                      try {
-                                        final success = await PhotoCacheManager.savePhotoToGallery(
-                                          context,
-                                          photoUrl: photo.photoUrl,
-                                        );
-                                        if (sheetContext.mounted) {
-                                          setSheetState(() {
-                                            isSaving = false;
-                                            saveSuccess = success;
-                                            statusText = success
-                                                ? '✅ تم حفظ الصورة في ألبوم صور الهاتف بنجاح.'
-                                                : '⚠️ يرجى منح الإذن للوصول للصور من إعدادات الهاتف.';
-                                          });
-                                        }
-                                      } catch (e) {
-                                        if (sheetContext.mounted) {
-                                          setSheetState(() {
-                                            isSaving = false;
-                                            saveSuccess = false;
-                                            statusText = '❌ تعذر حفظ الصورة: $e';
-                                          });
-                                        }
-                                      }
+                            // Action Buttons (Save + Delete if permitted)
+                            Row(
+                              children: [
+                                if (_canDeletePhoto) ...[
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      Navigator.pop(modalContext);
+                                      _confirmDeletePhoto(context, photo);
                                     },
-                              icon: isSaving
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : Icon(
-                                      saveSuccess ? Icons.check_circle_rounded : Icons.download_rounded,
-                                      size: 18,
+                                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                                    label: const Text(
+                                      'حذف الصورة',
+                                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
                                     ),
-                              label: Text(
-                                isSaving
-                                    ? 'جاري حفظ الصورة...'
-                                    : saveSuccess
-                                        ? 'تم الحفظ في الهاتف ✓'
-                                        : 'حفظ الصورة',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                              ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: saveSuccess ? Colors.green.shade700 : null,
-                                padding: const EdgeInsets.symmetric(vertical: 13),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: Colors.redAccent),
+                                      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: isSaving
+                                        ? null
+                                        : () async {
+                                            setSheetState(() {
+                                              isSaving = true;
+                                              statusText = null;
+                                            });
+                                            try {
+                                              final success = await PhotoCacheManager.savePhotoToGallery(
+                                                context,
+                                                photoUrl: photo.photoUrl,
+                                              );
+                                              if (sheetContext.mounted) {
+                                                setSheetState(() {
+                                                  isSaving = false;
+                                                  saveSuccess = success;
+                                                  statusText = success
+                                                      ? '✅ تم حفظ الصورة في ألبوم صور الهاتف بنجاح.'
+                                                      : '⚠️ يرجى منح الإذن للوصول للصور من إعدادات الهاتف.';
+                                                });
+                                              }
+                                            } catch (e) {
+                                              if (sheetContext.mounted) {
+                                                setSheetState(() {
+                                                  isSaving = false;
+                                                  saveSuccess = false;
+                                                  statusText = '❌ تعذر حفظ الصورة: $e';
+                                                });
+                                              }
+                                            }
+                                          },
+                                    icon: isSaving
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Icon(
+                                            saveSuccess ? Icons.check_circle_rounded : Icons.download_rounded,
+                                            size: 18,
+                                          ),
+                                    label: Text(
+                                      isSaving
+                                          ? 'جاري حفظ الصورة...'
+                                          : saveSuccess
+                                              ? 'تم الحفظ في الهاتف ✓'
+                                              : 'حفظ الصورة',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: saveSuccess ? Colors.green.shade700 : null,
+                                      padding: const EdgeInsets.symmetric(vertical: 13),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
 
                             // In-Modal Status Notification Banner

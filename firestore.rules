@@ -496,13 +496,30 @@ service cloud.firestore {
     }
 
     // ==================== NOTIFICATIONS COLLECTIONS ====================
-    // In-app notifications for delegates, admins, and technical support
     match /notifications/{notificationId} {
       allow read, write: if true;
     }
-
-    // Sent notifications history and outbox for Technical Support & Admins
     match /sent_notifications/{docId} {
+      allow read, write: if true;
+    }
+
+    // ==================== MONTHLY COLLECTIONS & BILLING ====================
+    // Monthly collections, deductions, and invoicing records
+    match /monthly_collections/{periodId} {
+      allow read, write: if true;
+      match /transactions/{transactionId} {
+        allow read, write: if true;
+      }
+    }
+    match /{path=**}/monthly_collections/{periodId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/transactions/{transactionId} {
+      allow read, write: if true;
+    }
+
+    // ==================== SECURITY AUDIT LOGS ====================
+    match /security_audit_logs/{logId} {
       allow read, write: if true;
     }
 

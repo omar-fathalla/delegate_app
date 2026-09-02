@@ -8,12 +8,14 @@ import 'package:delegate_app/features/photo_permission/presentation/pages/superv
 import 'package:delegate_app/features/photo_permission/presentation/pages/marketing_permissions_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/super_admin_permissions_report_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_payment_receipts_report_screen.dart';
+import 'package:delegate_app/features/admin/presentation/pages/super_admin_collections_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_branch_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_branches_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/create_admin_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_dashboard_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/manage_admins_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/manage_marketing_screen.dart';
+import 'package:delegate_app/features/admin/presentation/pages/anti_fraud_audit_screen.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_penalties_list_page.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
@@ -29,7 +31,8 @@ import 'package:delegate_app/features/feedback/presentation/bloc/admin_feedback_
 import 'package:delegate_app/features/feedback/presentation/pages/admin_feedbacks_screen.dart';
 import 'package:delegate_app/features/notifications/presentation/pages/send_notification_screen.dart';
 import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
-
+import 'package:delegate_app/features/marketing/presentation/pages/branches_marketing_home_screen.dart';
+import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 
 class AdminMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -52,16 +55,31 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       _screens = [
         SuperAdminDashboardScreen(
           delegate: delegate,
-          onNavigateToBranches: () => setState(() => _currentIndex = 1),
-          onNavigateToAddBranch: () => setState(() => _currentIndex = 2),
-          onNavigateToCreateAdmin: () => setState(() => _currentIndex = 3),
+          onNavigateToBranches: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AdminBranchesScreen(showAppBar: true)),
+          ),
+          onNavigateToAddBranch: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AddBranchScreen(showAppBar: true)),
+          ),
+          onNavigateToCreateAdmin: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CreateAdminScreen(
+                organizationUID: delegate.organizationUID,
+                currentDelegate: delegate,
+                currentUserRole: delegate.role,
+              ),
+            ),
+          ),
+          onNavigateToSendNotification: () => setState(() => _currentIndex = 2),
         ),
-        const AdminBranchesScreen(),
-        const AddBranchScreen(),
-        CreateAdminScreen(
-          organizationUID: delegate.organizationUID,
-          currentDelegate: delegate,
-          currentUserRole: delegate.role,
+        // 2. كشف التزييف وسجل الأمان
+        AntiFraudAuditScreen(delegate: delegate),
+        // 3. إرسال إشعار
+        SendNotificationScreen(senderDelegate: delegate, showAppBar: false),
+        // 4. منظومة الغرامات والمخالفات
+        BlocProvider(
+          create: (_) => di.sl<PenaltyBloc>(),
+          child: AdminPenaltiesListPage(adminDelegate: delegate, showAppBar: false),
         ),
       ];
     } else if (isTechnicalSupport) {
@@ -86,7 +104,10 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       ];
     } else if (isBranchesMarketingManager) {
       _screens = [
-        MarketingSearchScreen(organizationUID: delegate.organizationUID),
+        BranchesMarketingHomeScreen(
+          delegate: delegate,
+          onNavigateTab: (tabIndex) => setState(() => _currentIndex = tabIndex),
+        ),
         BlocProvider(
           create: (_) => di.sl<PhotoPermissionBloc>()
             ..add(const LoadPermissionsRequested(
@@ -95,6 +116,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             )),
           child: MarketingPermissionsScreen(marketingDelegate: delegate),
         ),
+        BranchHomeScreen(marketingUser: delegate),
         BlocProvider(
           create: (_) => di.sl<PenaltyBloc>(),
           child: CompanyPenaltiesSettingsPage(delegate: delegate),
@@ -148,6 +170,17 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       case 'add_branch':
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AddBranchScreen(showAppBar: true)),
+        );
+        break;
+      case 'create_admin':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CreateAdminScreen(
+              organizationUID: widget.delegate.organizationUID,
+              currentDelegate: widget.delegate,
+              currentUserRole: widget.delegate.role,
+            ),
+          ),
         );
         break;
       case 'photo_permissions':
@@ -208,12 +241,35 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
         );
         break;
+      case 'collections':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SuperAdminCollectionsScreen(delegate: widget.delegate),
+          ),
+        );
+        break;
       case 'penalties_management':
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => BlocProvider(
               create: (_) => di.sl<PenaltyBloc>(),
               child: AdminPenaltiesListPage(adminDelegate: widget.delegate),
+            ),
+          ),
+        );
+        break;
+      case 'tasks':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AdminTasksScreen(adminDelegate: widget.delegate),
+          ),
+        );
+        break;
+      case 'search':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MarketingSearchScreen(
+              organizationUID: widget.delegate.organizationUID,
             ),
           ),
         );
@@ -249,21 +305,23 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final headerTitle = delegate.role == UserRole.technicalSupport
         ? (isArabic ? 'الدعم الفني' : 'Technical Support')
+        : isBranchesMarketingManager
+        ? (isArabic ? 'مدير تسويق الفروع' : 'Branches Marketing Manager')
         : (isSuperAdmin ? null : delegate.companyName);
 
     final subtitle = isSuperAdmin
         ? (_currentIndex == 0
               ? l10n.home
               : _currentIndex == 1
-              ? l10n.adminUser(delegate.firstName)
+              ? (isArabic ? 'كشف التزييف وسجل الأمان' : 'Anti-Fraud & Security Audit')
               : _currentIndex == 2
-              ? l10n.addBranch
-              : l10n.createAdmin)
+              ? (isArabic ? 'إرسال إشعار' : 'Send Notification')
+              : (isArabic ? 'سجل المخالفات والغرامات' : 'Penalties Management'))
         : isTechnicalSupport
         ? (_currentIndex == 0
               ? l10n.home
               : _currentIndex == 1
-              ? 'إرسال إشعار جديد'
+              ? (isArabic ? 'إرسال إشعار' : 'Send Notification')
               : l10n.createAdmin)
         : isOrganizationAdmin
         ? (_currentIndex == 0
@@ -275,10 +333,12 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               : 'المخالفات والغرامات')
         : isBranchesMarketingManager
         ? (_currentIndex == 0
-              ? 'الاستعلامات'
+              ? (isArabic ? 'الرئيسية' : 'Home')
               : _currentIndex == 1
-              ? 'أذونات التصوير'
-              : 'المخالفات والغرامات')
+              ? (isArabic ? 'أذونات التصوير' : 'Photo Permissions')
+              : _currentIndex == 2
+              ? (isArabic ? 'متابعة الفروع' : 'Branch Marketing')
+              : (isArabic ? 'المخالفات والغرامات' : 'Penalties'))
         : (_currentIndex == 0
               ? l10n.supervisorUser(delegate.firstName)
               : _currentIndex == 1
@@ -333,7 +393,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               contentPadding: EdgeInsets.zero,
             ),
           ),
-          if (isTechnicalSupport) ...[
+          if (isSuperAdmin || isTechnicalSupport) ...[
             const PopupMenuItem(
               value: 'branches',
               child: ListTile(
@@ -352,17 +412,28 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
             ),
-            const PopupMenuItem(
-              value: 'photo_permissions',
-              child: ListTile(
-                leading: Icon(Icons.photo_library_rounded),
-                title: Text('أذونات التصوير'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
+            if (isSuperAdmin) ...[
+              PopupMenuItem(
+                value: 'create_admin',
+                child: ListTile(
+                  leading: const Icon(Icons.person_add_alt_1_rounded),
+                  title: Text(l10n.createAdmin),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
-            ),
-          ],
-          if (isSuperAdmin || isTechnicalSupport) ...[
+            ],
+            if (isTechnicalSupport) ...[
+              const PopupMenuItem(
+                value: 'photo_permissions',
+                child: ListTile(
+                  leading: Icon(Icons.photo_library_rounded),
+                  title: Text('أذونات التصوير'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
             PopupMenuItem(
               value: 'manage_admins',
               child: ListTile(
@@ -390,15 +461,17 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
             ),
-            PopupMenuItem(
-              value: 'send_notification',
-              child: ListTile(
-                leading: const Icon(Icons.send_rounded),
-                title: const Text('إرسال إشعار جديد'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
+            if (isTechnicalSupport) ...[
+              PopupMenuItem(
+                value: 'send_notification',
+                child: ListTile(
+                  leading: const Icon(Icons.send_rounded),
+                  title: const Text('إرسال إشعار جديد'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
-            ),
+            ],
             if (delegate.role != UserRole.technicalSupport) ...[
               PopupMenuItem(
                 value: 'permissions_report',
@@ -418,11 +491,41 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
+              const PopupMenuItem(
+                value: 'collections',
+                child: ListTile(
+                  leading: Icon(Icons.request_quote_rounded),
+                  title: Text('التحصيلات والفواتير'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
             ],
           ],
 
-          // نظام الغرامات في القائمة للـ superAdmin و admin (للـ organizationAdmin موجود كتبويب مباشر)
-          if (!isOrganizationAdmin) ...[
+          if (isBranchesMarketingManager) ...[
+            PopupMenuItem(
+              value: 'tasks',
+              child: ListTile(
+                leading: const Icon(Icons.task_alt_rounded),
+                title: Text(isArabic ? 'إدارة المهام' : 'Tasks Management'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            PopupMenuItem(
+              value: 'search',
+              child: ListTile(
+                leading: const Icon(Icons.person_search_rounded),
+                title: Text(isArabic ? 'الاستعلامات والبحث' : 'Search'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+
+          // نظام الغرامات في القائمة للأدوار التي لا تملكه كتبويب سفلي مباشر
+          if (!isOrganizationAdmin && !isSuperAdmin && !isBranchesMarketingManager) ...[
             const PopupMenuItem(
               value: 'penalties_management',
               child: ListTile(
@@ -433,6 +536,8 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ),
             ),
           ],
+
+          // الإعدادات دائماً في أسفل القائمة
           PopupMenuItem(
             value: 'settings',
             child: ListTile(
@@ -461,16 +566,19 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   label: l10n.home,
                 ),
                 NavigationDestination(
-                  icon: const Icon(Icons.storefront_rounded),
-                  label: l10n.branches,
+                  icon: const Icon(Icons.security_outlined),
+                  selectedIcon: const Icon(Icons.security_rounded),
+                  label: isArabic ? 'كشف التزييف' : 'Anti-Fraud',
                 ),
                 NavigationDestination(
-                  icon: const Icon(Icons.add_location_alt_rounded),
-                  label: l10n.addBranch,
+                  icon: const Icon(Icons.campaign_outlined),
+                  selectedIcon: const Icon(Icons.campaign_rounded),
+                  label: isArabic ? 'إرسال إشعار' : 'Notification',
                 ),
                 NavigationDestination(
-                  icon: const Icon(Icons.admin_panel_settings_rounded),
-                  label: l10n.createAdmin,
+                  icon: const Icon(Icons.gavel_outlined),
+                  selectedIcon: const Icon(Icons.gavel_rounded),
+                  label: isArabic ? 'الغرامات' : 'Penalties',
                 ),
               ],
             )
@@ -488,10 +596,10 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   selectedIcon: const Icon(Icons.home_rounded),
                   label: l10n.home,
                 ),
-                const NavigationDestination(
-                  icon: Icon(Icons.campaign_outlined),
-                  selectedIcon: Icon(Icons.campaign_rounded),
-                  label: 'إرسال إشعار',
+                NavigationDestination(
+                  icon: const Icon(Icons.campaign_outlined),
+                  selectedIcon: const Icon(Icons.campaign_rounded),
+                  label: isArabic ? 'إرسال إشعار' : 'Notification',
                 ),
                 NavigationDestination(
                   icon: const Icon(Icons.admin_panel_settings_rounded),
@@ -539,18 +647,23 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   _currentIndex = index;
                 });
               },
-              destinations: const [
+              destinations: [
                 NavigationDestination(
-                  icon: Icon(Icons.search_rounded),
-                  selectedIcon: Icon(Icons.search_rounded),
-                  label: 'الاستعلامات',
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home_rounded),
+                  label: isArabic ? 'الرئيسية' : 'Home',
                 ),
-                NavigationDestination(
+                const NavigationDestination(
                   icon: Icon(Icons.photo_library_outlined),
                   selectedIcon: Icon(Icons.photo_library_rounded),
                   label: 'أذونات التصوير',
                 ),
                 NavigationDestination(
+                  icon: const Icon(Icons.store_outlined),
+                  selectedIcon: const Icon(Icons.store_rounded),
+                  label: isArabic ? 'الفروع' : 'Branches',
+                ),
+                const NavigationDestination(
                   icon: Icon(Icons.gavel_outlined),
                   selectedIcon: Icon(Icons.gavel_rounded),
                   label: 'الغرامات',

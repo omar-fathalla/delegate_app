@@ -6,6 +6,7 @@ import 'package:delegate_app/core/widgets/app_photo_image.dart';
 import 'package:delegate_app/core/services/photo_cache_manager.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
+import '../../domain/entities/captured_photo.dart';
 
 class CapturedPhotosViewScreen extends StatefulWidget {
   final PhotoPermission photoPermission;
@@ -36,6 +37,93 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
         );
   }
 
+  Future<void> _confirmDeletePhoto(BuildContext context, CapturedPhoto photo) async {
+    final bloc = context.read<PhotoPermissionBloc>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'تأكيد حذف الصورة',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'هل أنت متأكد من حذف هذه الصورة المرسلة من المندوب "${photo.delegateName}" بفرع "${photo.branchName}"؟',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'سيتم حذف الصورة بشكل نهائي من قاعدة البيانات ومساحة التخزين.',
+                      style: TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_forever_rounded, size: 18),
+            label: const Text('حذف نهائي'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      bloc.add(
+        DeleteCapturedPhotoRequested(
+          photoId: photo.uid,
+          organizationUID: photo.organizationUID.isNotEmpty
+              ? photo.organizationUID
+              : widget.photoPermission.organizationUID,
+          companyUID: photo.companyUID.isNotEmpty
+              ? photo.companyUID
+              : widget.photoPermission.companyUID,
+          permissionId: photo.permissionId.isNotEmpty
+              ? photo.permissionId
+              : widget.photoPermission.uid,
+          photoUrl: photo.photoUrl,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -64,7 +152,27 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
           ),
         ],
       ),
-      body: BlocBuilder<PhotoPermissionBloc, PhotoPermissionState>(
+      body: BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
+        listener: (context, state) {
+          if (state is PhotoPermissionActionSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            _loadPhotos();
+          } else if (state is PhotoPermissionError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
         builder: (context, state) {
           if (state is PhotoPermissionLoading) {
             return const Center(
@@ -95,13 +203,6 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'سيظهر هنا عمل المناديب فور التقاطهم صور في الفروع.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                      ),
-                    ),
                   ],
                 ),
               );
@@ -111,91 +212,119 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
             final availableBranches = <String, String>{};
             final availableDelegates = <String, String>{};
             for (var photo in photos) {
-              availableBranches[photo.branchId] = photo.branchName;
-              availableDelegates[photo.delegateUID] = photo.delegateName;
+              if (photo.branchId.isNotEmpty && photo.branchName.isNotEmpty) {
+                availableBranches[photo.branchId] = photo.branchName;
+              }
+              if (photo.delegateUID.isNotEmpty && photo.delegateName.isNotEmpty) {
+                availableDelegates[photo.delegateUID] = photo.delegateName;
+              }
             }
 
             // Filter photos
             final filteredPhotos = photos.where((photo) {
-              final matchBranch = _selectedBranchId == null || photo.branchId == _selectedBranchId;
-              final matchDelegate = _selectedDelegateUID == null || photo.delegateUID == _selectedDelegateUID;
-              return matchBranch && matchDelegate;
+              if (_selectedBranchId != null && photo.branchId != _selectedBranchId) {
+                return false;
+              }
+              if (_selectedDelegateUID != null && photo.delegateUID != _selectedDelegateUID) {
+                return false;
+              }
+              return true;
             }).toList();
 
             return Column(
               children: [
-                // Filter Bar
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: Row(
+                // Filter Header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerLow,
+                    border: Border(bottom: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                  ),
+                  child: Column(
                     children: [
-                      // Branch Filter
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          initialValue: _selectedBranchId,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: 'تصفية بالفرع',
-                            labelStyle: const TextStyle(fontSize: 12),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String?>(
+                              isExpanded: true,
+                              initialValue: _selectedBranchId,
+                              decoration: InputDecoration(
+                                labelText: 'تصفية حسب الفرع',
+                                prefixIcon: const Icon(Icons.store_rounded, size: 20),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                isDense: true,
+                              ),
+                              items: [
+                                const DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('جميع الفروع', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                ),
+                                ...availableBranches.entries.map((e) => DropdownMenuItem<String?>(
+                                      value: e.key,
+                                      child: Text(e.value, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                    )),
+                              ],
+                              onChanged: (val) => setState(() => _selectedBranchId = val),
                             ),
                           ),
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Text('كل الفروع', style: TextStyle(fontSize: 12)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: DropdownButtonFormField<String?>(
+                              isExpanded: true,
+                              initialValue: _selectedDelegateUID,
+                              decoration: InputDecoration(
+                                labelText: 'تصفية حسب المندوب',
+                                prefixIcon: const Icon(Icons.badge_rounded, size: 20),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                isDense: true,
+                              ),
+                              items: [
+                                const DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('جميع المناديب', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                ),
+                                ...availableDelegates.entries.map((e) => DropdownMenuItem<String?>(
+                                      value: e.key,
+                                      child: Text(e.value, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                    )),
+                              ],
+                              onChanged: (val) => setState(() => _selectedDelegateUID = val),
                             ),
-                            ...availableBranches.entries.map((e) => DropdownMenuItem<String>(
-                                  value: e.key,
-                                  child: Text(e.value, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                                )),
-                          ],
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedBranchId = val;
-                            });
-                          },
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      // Delegate Filter
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          initialValue: _selectedDelegateUID,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: 'تصفية بالمندوب',
-                            labelStyle: const TextStyle(fontSize: 12),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                      if (_selectedBranchId != null || _selectedDelegateUID != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'النتائج المعروضة: ${filteredPhotos.length} من أصل ${photos.length}',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Text('كل المناديب', style: TextStyle(fontSize: 12)),
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _selectedBranchId = null;
+                                  _selectedDelegateUID = null;
+                                });
+                              },
+                              child: Text(
+                                'إلغاء الفلاتر',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: colorScheme.error,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                            ...availableDelegates.entries.map((e) => DropdownMenuItem<String>(
-                                  value: e.key,
-                                  child: Text(e.value, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                                )),
                           ],
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedDelegateUID = val;
-                            });
-                          },
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -207,30 +336,9 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.filter_list_off_rounded,
-                                size: 64,
-                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                              ),
+                              Icon(Icons.filter_list_off_rounded, size: 64, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
                               const SizedBox(height: 16),
-                              Text(
-                                'لا توجد نتائج مطابقة للبحث',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _selectedBranchId = null;
-                                    _selectedDelegateUID = null;
-                                  });
-                                },
-                                icon: const Icon(Icons.clear_all_rounded),
-                                label: const Text('إعادة تعيين الفلاتر'),
-                              ),
+                              Text('لا توجد نتائج مطابقة للبحث', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant)),
                             ],
                           ),
                         )
@@ -246,13 +354,11 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                           itemBuilder: (context, index) {
                             final photo = filteredPhotos[index];
                             return GestureDetector(
-                              onTap: () => _showFullImage(context, photo.photoUrl, photo.comment),
+                              onTap: () => _showFullImage(context, photo),
                               child: Card(
                                 clipBehavior: Clip.antiAlias,
                                 elevation: 3,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
@@ -274,22 +380,36 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                                                 gradient: LinearGradient(
                                                   begin: Alignment.bottomCenter,
                                                   end: Alignment.topCenter,
-                                                  colors: [
-                                                    Colors.black.withValues(alpha: 0.8),
-                                                    Colors.transparent,
-                                                  ],
+                                                  colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
                                                 ),
                                               ),
                                               padding: const EdgeInsets.all(8),
                                               child: Text(
                                                 photo.branchName,
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ),
+                                          // زر حذف الصورة السريع
+                                          Positioned(
+                                            top: 6,
+                                            left: 6,
+                                            child: Material(
+                                              color: Colors.black.withValues(alpha: 0.6),
+                                              shape: const CircleBorder(),
+                                              child: InkWell(
+                                                customBorder: const CircleBorder(),
+                                                onTap: () => _confirmDeletePhoto(context, photo),
+                                                child: const Padding(
+                                                  padding: EdgeInsets.all(6),
+                                                  child: Icon(
+                                                    Icons.delete_outline_rounded,
+                                                    color: Colors.redAccent,
+                                                    size: 18,
+                                                  ),
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -308,9 +428,7 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                                               Expanded(
                                                 child: Text(
                                                   photo.delegateName,
-                                                  style: theme.textTheme.labelSmall?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
+                                                  style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
@@ -320,20 +438,14 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                                           const SizedBox(height: 4),
                                           Text(
                                             photo.comment.isEmpty ? 'بدون تعليق' : photo.comment,
-                                            style: theme.textTheme.bodySmall?.copyWith(
-                                              fontSize: 11,
-                                              color: colorScheme.onSurfaceVariant,
-                                            ),
+                                            style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, color: colorScheme.onSurfaceVariant),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
                                             DateFormat('MM-dd HH:mm').format(photo.capturedAt),
-                                            style: theme.textTheme.labelSmall?.copyWith(
-                                              fontSize: 9,
-                                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                                            ),
+                                            style: theme.textTheme.labelSmall?.copyWith(fontSize: 9, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
                                           ),
                                         ],
                                       ),
@@ -355,7 +467,9 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
     );
   }
 
-  void _showFullImage(BuildContext context, String url, String comment) {
+  void _showFullImage(BuildContext context, CapturedPhoto photo) {
+    final url = photo.photoUrl;
+    final comment = photo.comment;
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -386,61 +500,84 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: isSaving
-                        ? null
-                        : () async {
-                            setDialogState(() {
-                              isSaving = true;
-                              statusText = null;
-                            });
-                            try {
-                              final success = await PhotoCacheManager.savePhotoToGallery(
-                                context,
-                                photoUrl: url,
-                              );
-                              if (dialogContext.mounted) {
-                                setDialogState(() {
-                                  isSaving = false;
-                                  saveSuccess = success;
-                                  statusText = success
-                                      ? '✅ تم حفظ الصورة في الهاتف بنجاح'
-                                      : '⚠️ يرجى منح إذن الوصول للصور من الإعدادات.';
-                                });
-                              }
-                            } catch (e) {
-                              if (dialogContext.mounted) {
-                                setDialogState(() {
-                                  isSaving = false;
-                                  saveSuccess = false;
-                                  statusText = '❌ تعذر حفظ الصورة: $e';
-                                });
-                              }
-                            }
-                          },
-                    icon: isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : Icon(
-                            saveSuccess ? Icons.check_circle_rounded : Icons.download_rounded,
-                            size: 18,
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          _confirmDeletePhoto(context, photo);
+                        },
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                        label: const Text(
+                          'حذف الصورة',
+                          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.redAccent),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  setDialogState(() {
+                                    isSaving = true;
+                                    statusText = null;
+                                  });
+                                  try {
+                                    final success = await PhotoCacheManager.savePhotoToGallery(
+                                      context,
+                                      photoUrl: url,
+                                    );
+                                    if (dialogContext.mounted) {
+                                      setDialogState(() {
+                                        isSaving = false;
+                                        saveSuccess = success;
+                                        statusText = success
+                                            ? '✅ تم حفظ الصورة في الهاتف بنجاح'
+                                            : '⚠️ يرجى منح إذن الوصول للصور من الإعدادات.';
+                                      });
+                                    }
+                                  } catch (e) {
+                                    if (dialogContext.mounted) {
+                                      setDialogState(() {
+                                        isSaving = false;
+                                        saveSuccess = false;
+                                        statusText = '❌ تعذر حفظ الصورة: $e';
+                                      });
+                                    }
+                                  }
+                                },
+                          icon: isSaving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : Icon(
+                                  saveSuccess ? Icons.check_circle_rounded : Icons.download_rounded,
+                                  size: 18,
+                                ),
+                          label: Text(
+                            isSaving
+                                ? 'جاري حفظ الصورة...'
+                                : saveSuccess
+                                    ? 'تم الحفظ في الهاتف ✓'
+                                    : 'حفظ الصورة',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                    label: Text(
-                      isSaving
-                          ? 'جاري حفظ الصورة...'
-                          : saveSuccess
-                              ? 'تم الحفظ في الهاتف ✓'
-                              : 'حفظ الصورة',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: saveSuccess ? Colors.green.shade700 : null,
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: saveSuccess ? Colors.green.shade700 : null,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   if (statusText != null) ...[
                     const SizedBox(height: 8),

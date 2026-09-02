@@ -1,20 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
+import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evidence_viewer.dart';
+import 'package:delegate_app/features/penalties/presentation/utils/penalty_creator_helper.dart';
 import 'admin_create_penalty_page.dart';
 
 class AdminPenaltiesListPage extends StatefulWidget {
   final Delegate adminDelegate;
+  final bool showAppBar;
 
-  const AdminPenaltiesListPage({super.key, required this.adminDelegate});
+  const AdminPenaltiesListPage({
+    super.key,
+    required this.adminDelegate,
+    this.showAppBar = true,
+  });
 
   @override
   State<AdminPenaltiesListPage> createState() => _AdminPenaltiesListPageState();
@@ -570,22 +577,24 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'سجل المخالفات والغرامات',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'تحديث البيانات',
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () {
-              _loadData();
-              _loadBranchesAndPinned();
-            },
-          ),
-        ],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text(
+                'سجل المخالفات والغرامات',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'تحديث البيانات',
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: () {
+                    _loadData();
+                    _loadBranchesAndPinned();
+                  },
+                ),
+              ],
+            )
+          : null,
       floatingActionButton: widget.adminDelegate.role == UserRole.admin
           ? null
           : FloatingActionButton.extended(
@@ -1163,6 +1172,10 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
     }
   }
 
+  Future<void> _callCreator(BuildContext context, PenaltyEntity penalty) async {
+    await PenaltyCreatorHelper.callCreator(context, penalty);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1192,98 +1205,100 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
             children: [
               // Top Row: Status badge, Company badge, Branch badge, Fine amount, Chevron
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Status Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                    ),
-                    child: Text(
-                      widget.penalty.status.displayName,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-
-                  // Company Badge
-                  if (widget.penalty.companyName.isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        widget.penalty.companyName,
-                        style: TextStyle(
-                          color: colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-
-                  // Branch Badge (if available)
-                  if (widget.penalty.branchName != null &&
-                      widget.penalty.branchName!.isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.storefront_rounded,
-                            size: 11,
-                            color: colorScheme.onSecondaryContainer,
+                  Expanded(
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        // Status Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                           ),
-                          const SizedBox(width: 3),
-                          Text(
-                            widget.penalty.branchName!,
+                          child: Text(
+                            widget.penalty.status.displayName,
                             style: TextStyle(
-                              color: colorScheme.onSecondaryContainer,
-                              fontWeight: FontWeight.bold,
+                              color: statusColor,
                               fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-
-                  if (widget.penalty.isRepeated) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'مكررة',
-                        style: TextStyle(
-                          color: colorScheme.onErrorContainer,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10.5,
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
 
-                  const Spacer(),
+                        // Company Badge
+                        if (widget.penalty.companyName.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              widget.penalty.companyName,
+                              style: TextStyle(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ),
+
+                        // Branch Badge (if available)
+                        if (widget.penalty.branchName != null &&
+                            widget.penalty.branchName!.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.storefront_rounded,
+                                  size: 11,
+                                  color: colorScheme.onSecondaryContainer,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  widget.penalty.branchName!,
+                                  style: TextStyle(
+                                    color: colorScheme.onSecondaryContainer,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        if (widget.penalty.isRepeated)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: colorScheme.errorContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'مكررة',
+                              style: TextStyle(
+                                color: colorScheme.onErrorContainer,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
 
                   // Fine Amount
                   Text(
@@ -1410,16 +1425,239 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                   const SizedBox(height: 8),
                 ],
 
+                // Attachments / Evidence Section
+                if (widget.penalty.evidenceFiles.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.attach_file_rounded,
+                              size: 15,
+                              color: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'المرفقات والمستندات (${widget.penalty.evidenceFiles.length})',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              'اضغط للمعاينة والتكبير',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: widget.penalty.evidenceFiles.asMap().entries.map((entry) {
+                            final idx = entry.key;
+                            final file = entry.value;
+                            final isImage = file.fileType.toUpperCase() == 'IMAGE' ||
+                                file.fileType.toUpperCase() == 'IMG' ||
+                                file.fileName.toLowerCase().endsWith('.jpg') ||
+                                file.fileName.toLowerCase().endsWith('.jpeg') ||
+                                file.fileName.toLowerCase().endsWith('.png') ||
+                                file.fileName.toLowerCase().endsWith('.webp');
+
+                            return InkWell(
+                              onTap: () {
+                                if (isImage) {
+                                  PenaltyEvidenceViewer.showImageLightbox(
+                                    context,
+                                    imageUrl: file.fileUrl,
+                                    title: widget.penalty.title,
+                                    subtitle:
+                                        '${widget.penalty.companyName} (${idx + 1}/${widget.penalty.evidenceFiles.length})',
+                                    fileName: file.fileName,
+                                  );
+                                } else {
+                                  PenaltyEvidenceViewer.showEvidence(
+                                    context,
+                                    penalty: widget.penalty,
+                                  );
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                width: 68,
+                                height: 68,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: isImage
+                                            ? CachedNetworkImage(
+                                                imageUrl: file.fileUrl,
+                                                fit: BoxFit.cover,
+                                                placeholder: (context, url) => Center(
+                                                  child: SizedBox(
+                                                    width: 18,
+                                                    height: 18,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: colorScheme.primary,
+                                                    ),
+                                                  ),
+                                                ),
+                                                errorWidget: (context, url, err) => Center(
+                                                  child: Icon(
+                                                    Icons.broken_image_rounded,
+                                                    size: 24,
+                                                    color: colorScheme.error,
+                                                  ),
+                                                ),
+                                              )
+                                            : Center(
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(
+                                                      file.fileType == 'PDF'
+                                                          ? Icons.picture_as_pdf_rounded
+                                                          : Icons.insert_drive_file_rounded,
+                                                      color: colorScheme.primary,
+                                                      size: 26,
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      file.fileType,
+                                                      style: TextStyle(
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: colorScheme.primary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+                                    if (isImage)
+                                      Positioned(
+                                        top: 3,
+                                        right: 3,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(alpha: 0.55),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.zoom_in_rounded,
+                                            size: 13,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ] else ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.attach_file_rounded,
+                          size: 13,
+                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'لا توجد مستندات أو صور مرفقة بهذه المخالفة',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
                 // Metadata Row
                 Row(
                   children: [
                     Icon(Icons.badge_outlined, size: 13, color: colorScheme.onSurfaceVariant),
                     const SizedBox(width: 4),
-                    Text(
-                      'المحرر: ${widget.penalty.createdByName}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colorScheme.onSurfaceVariant,
+                    Flexible(
+                      child: Text(
+                        'المحرر: ${widget.penalty.createdByName}',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: () => _callCreator(context, widget.penalty),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.phone_in_talk_rounded, size: 11, color: Colors.green.shade700),
+                            const SizedBox(width: 3),
+                            Text(
+                              'اتصال',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const Spacer(),
@@ -1443,44 +1681,65 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                     if (!widget.isReadOnly &&
                         (widget.currentDelegate.role == UserRole.superAdmin ||
                             widget.currentDelegate.role == UserRole.organizationAdmin))
-                      PopupMenuButton<PenaltyStatus>(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        onSelected: widget.onStatusChanged,
-                        itemBuilder: (context) => PenaltyStatus.values.map((st) {
-                          return PopupMenuItem(
-                            value: st,
-                            child: Text(st.displayName, style: const TextStyle(fontSize: 12.5)),
-                          );
-                        }).toList(),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+                      Flexible(
+                        child: PopupMenuButton<PenaltyStatus>(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'تغيير الحالة (${widget.penalty.status.displayName})',
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
+                          tooltip: 'تغيير حالة المخالفة',
+                          onSelected: widget.onStatusChanged,
+                          itemBuilder: (context) => PenaltyStatus.values.map((st) {
+                            return PopupMenuItem(
+                              value: st,
+                              child: Text(st.displayName, style: const TextStyle(fontSize: 12.5)),
+                            );
+                          }).toList(),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    widget.penalty.status.displayName,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      color: statusColor,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(Icons.arrow_drop_down_rounded, size: 16, color: statusColor),
-                            ],
+                                const SizedBox(width: 4),
+                                Icon(Icons.arrow_drop_down_rounded, size: 18, color: statusColor),
+                              ],
+                            ),
                           ),
                         ),
                       ),
 
+                    const SizedBox(width: 6),
+
+                    // Call creator action button
+                    IconButton(
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.green.withValues(alpha: 0.1),
+                        foregroundColor: Colors.green.shade700,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      icon: const Icon(Icons.phone_forwarded_rounded, size: 18),
+                      tooltip: 'اتصال بمحرر المخالفة (${widget.penalty.createdByName})',
+                      onPressed: () => _callCreator(context, widget.penalty),
+                    ),
+
                     if (!widget.isReadOnly && widget.onDelete != null) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       IconButton(
                         style: IconButton.styleFrom(
                           backgroundColor: Colors.red.withValues(alpha: 0.1),
@@ -1499,18 +1758,15 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        onPressed: () {
-                          final file = widget.penalty.evidenceFiles.first;
-                          launchUrl(
-                            Uri.parse(file.fileUrl),
-                            mode: LaunchMode.externalApplication,
-                          );
-                        },
+                        onPressed: () => PenaltyEvidenceViewer.showEvidence(
+                          context,
+                          penalty: widget.penalty,
+                        ),
                         icon: const Icon(Icons.attach_file_rounded, size: 15),
                         label: Text(
                           'المستندات (${widget.penalty.evidenceFiles.length})',

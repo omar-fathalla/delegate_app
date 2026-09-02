@@ -3,12 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
+import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evidence_viewer.dart';
+import 'package:delegate_app/features/penalties/presentation/utils/penalty_creator_helper.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_create_penalty_page.dart';
 
 class CompanyPenaltiesSettingsPage extends StatefulWidget {
@@ -1156,6 +1158,10 @@ class _PenaltyCardState extends State<_PenaltyCard> {
     );
   }
 
+  Future<void> _callCreator(BuildContext context, PenaltyEntity penalty) async {
+    await PenaltyCreatorHelper.callCreator(context, penalty);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1388,35 +1394,270 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                   const SizedBox(height: 4),
                 ],
 
+                // Attachments / Evidence Section
+                if (widget.penalty.evidenceFiles.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.attach_file_rounded,
+                              size: 15,
+                              color: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'المرفقات والمستندات (${widget.penalty.evidenceFiles.length})',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              'اضغط للمعاينة والتكبير',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: widget.penalty.evidenceFiles.asMap().entries.map((entry) {
+                            final idx = entry.key;
+                            final file = entry.value;
+                            final isImage = file.fileType.toUpperCase() == 'IMAGE' ||
+                                file.fileType.toUpperCase() == 'IMG' ||
+                                file.fileName.toLowerCase().endsWith('.jpg') ||
+                                file.fileName.toLowerCase().endsWith('.jpeg') ||
+                                file.fileName.toLowerCase().endsWith('.png') ||
+                                file.fileName.toLowerCase().endsWith('.webp');
+
+                            return InkWell(
+                              onTap: () {
+                                if (isImage) {
+                                  PenaltyEvidenceViewer.showImageLightbox(
+                                    context,
+                                    imageUrl: file.fileUrl,
+                                    title: widget.penalty.title,
+                                    subtitle:
+                                        '${widget.penalty.companyName} (${idx + 1}/${widget.penalty.evidenceFiles.length})',
+                                    fileName: file.fileName,
+                                  );
+                                } else {
+                                  _showEvidenceSheet(context, widget.penalty);
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                width: 68,
+                                height: 68,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: isImage
+                                            ? CachedNetworkImage(
+                                                imageUrl: file.fileUrl,
+                                                fit: BoxFit.cover,
+                                                placeholder: (context, url) => Center(
+                                                  child: SizedBox(
+                                                    width: 18,
+                                                    height: 18,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: colorScheme.primary,
+                                                    ),
+                                                  ),
+                                                ),
+                                                errorWidget: (context, url, err) => Center(
+                                                  child: Icon(
+                                                    Icons.broken_image_rounded,
+                                                    size: 24,
+                                                    color: colorScheme.error,
+                                                  ),
+                                                ),
+                                              )
+                                            : Center(
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(
+                                                      file.fileType == 'PDF'
+                                                          ? Icons.picture_as_pdf_rounded
+                                                          : Icons.insert_drive_file_rounded,
+                                                      color: colorScheme.primary,
+                                                      size: 26,
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      file.fileType,
+                                                      style: TextStyle(
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: colorScheme.primary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+                                    if (isImage)
+                                      Positioned(
+                                        top: 3,
+                                        right: 3,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(alpha: 0.55),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.zoom_in_rounded,
+                                            size: 13,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ] else ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.attach_file_rounded,
+                          size: 13,
+                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'لا توجد مستندات أو صور مرفقة بهذه المخالفة',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
                 Row(
                   children: [
+                    if (widget.penalty.createdByName.isNotEmpty) ...[
+                      Icon(Icons.badge_outlined, size: 13, color: colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'المحرر: ${widget.penalty.createdByName}',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      InkWell(
+                        onTap: () => _callCreator(context, widget.penalty),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.green.withValues(alpha: 0.35)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.phone_in_talk_rounded, size: 11, color: Colors.green.shade700),
+                              const SizedBox(width: 3),
+                              Text(
+                                'اتصال',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                    ],
                     Icon(Icons.calendar_today_rounded,
-                        size: 14, color: colorScheme.onSurfaceVariant),
+                        size: 13, color: colorScheme.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Text(
                       dateStr,
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
+                        fontSize: 11,
                       ),
                     ),
-                    const Spacer(),
-                    if (widget.penalty.evidenceFiles.isNotEmpty)
+                    if (widget.penalty.createdByName.isEmpty) const Spacer(),
+                    if (widget.penalty.evidenceFiles.isNotEmpty) ...[
+                      const SizedBox(width: 8),
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                              horizontal: 8, vertical: 4),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
                         onPressed: () => _showEvidenceSheet(context, widget.penalty),
-                        icon: const Icon(Icons.attach_file_rounded, size: 16),
+                        icon: const Icon(Icons.attach_file_rounded, size: 15),
                         label: Text(
                           'المستندات (${widget.penalty.evidenceFiles.length})',
-                          style: const TextStyle(fontSize: 12),
+                          style: const TextStyle(fontSize: 11.5),
                         ),
                       ),
+                    ],
                   ],
                 ),
 
@@ -1588,48 +1829,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
   }
 
   void _showEvidenceSheet(BuildContext context, PenaltyEntity penalty) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'الأدلة والمستندات المرفقة',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              ...penalty.evidenceFiles.map(
-                (file) => ListTile(
-                  leading: Icon(
-                    file.fileType == 'PDF'
-                        ? Icons.picture_as_pdf_rounded
-                        : Icons.image_rounded,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  title: Text(file.fileName),
-                  trailing: const Icon(Icons.open_in_new_rounded),
-                  onTap: () async {
-                    final uri = Uri.parse(file.fileUrl);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    PenaltyEvidenceViewer.showEvidence(context, penalty: penalty);
   }
 }
 

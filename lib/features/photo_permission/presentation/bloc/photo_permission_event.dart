@@ -17,6 +17,7 @@ class RequestPermissionRequested extends PhotoPermissionEvent {
   final DateTime startDate;
   final DateTime endDate;
   final String requestedBy;
+  final String? department;
 
   const RequestPermissionRequested({
     required this.organizationUID,
@@ -28,6 +29,7 @@ class RequestPermissionRequested extends PhotoPermissionEvent {
     required this.startDate,
     required this.endDate,
     required this.requestedBy,
+    this.department,
   });
 
   @override
@@ -41,6 +43,7 @@ class RequestPermissionRequested extends PhotoPermissionEvent {
         startDate,
         endDate,
         requestedBy,
+        department,
       ];
 }
 
@@ -184,13 +187,21 @@ class LoadCompanyCapturedPhotosRequested extends PhotoPermissionEvent {
 
 class DeleteCapturedPhotoRequested extends PhotoPermissionEvent {
   final String photoId;
+  final String organizationUID;
+  final String companyUID;
+  final String permissionId;
+  final String photoUrl;
 
   const DeleteCapturedPhotoRequested({
     required this.photoId,
+    this.organizationUID = '',
+    this.companyUID = '',
+    this.permissionId = '',
+    this.photoUrl = '',
   });
 
   @override
-  List<Object?> get props => [photoId];
+  List<Object?> get props => [photoId, organizationUID, companyUID, permissionId, photoUrl];
 }
 
 class DeletePhotoPermissionRequested extends PhotoPermissionEvent {
@@ -230,3 +241,29 @@ class UpdatePhotoPermissionBranchesRequested extends PhotoPermissionEvent {
   @override
   List<Object?> get props => [organizationUID, companyUID, permissionId, branchIds, branchNames];
 }
+
+class UpdatePhotoPermissionDatesRequested extends PhotoPermissionEvent {
+  final String organizationUID;
+  final String companyUID;
+  final String permissionId;
+  final DateTime startDate;
+  final DateTime endDate;
+
+  const UpdatePhotoPermissionDatesRequested({
+    required this.organizationUID,
+    required this.companyUID,
+    required this.permissionId,
+    required this.startDate,
+    required this.endDate,
+  });
+
+  @override
+  List<Object?> get props => [
+        organizationUID,
+        companyUID,
+        permissionId,
+        startDate,
+        endDate,
+      ];
+}
+

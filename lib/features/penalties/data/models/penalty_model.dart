@@ -10,6 +10,7 @@ class PenaltyModel extends PenaltyEntity {
     super.branchName,
     required super.createdById,
     required super.createdByName,
+    super.createdByPhone,
     required super.title,
     required super.category,
     required super.incidentDescription,
@@ -58,6 +59,9 @@ class PenaltyModel extends PenaltyEntity {
       branchName: data['branchName'],
       createdById: data['createdById'] ?? '',
       createdByName: data['createdByName'] ?? '',
+      createdByPhone: data['createdByPhone']?.toString() ??
+          data['creatorPhone']?.toString() ??
+          data['phone']?.toString(),
       title: data['title'] ?? '',
       category: ViolationCategory.fromString(data['category'] ?? ''),
       incidentDescription: data['incidentDescription'] ?? '',
@@ -87,6 +91,7 @@ class PenaltyModel extends PenaltyEntity {
       if (branchName != null) 'branchName': branchName,
       'createdById': createdById,
       'createdByName': createdByName,
+      if (createdByPhone != null) 'createdByPhone': createdByPhone,
       'title': title,
       'category': category.toFirestoreString(),
       'incidentDescription': incidentDescription,
@@ -120,6 +125,7 @@ class PenaltyModel extends PenaltyEntity {
       branchName: entity.branchName,
       createdById: entity.createdById,
       createdByName: entity.createdByName,
+      createdByPhone: entity.createdByPhone,
       title: entity.title,
       category: entity.category,
       incidentDescription: entity.incidentDescription,

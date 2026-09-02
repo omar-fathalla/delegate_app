@@ -134,6 +134,7 @@ import 'package:delegate_app/features/photo_permission/domain/usecases/get_compa
 import 'package:delegate_app/features/photo_permission/domain/usecases/delete_captured_photo.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/delete_photo_permission.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/update_photo_permission_branches.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/update_photo_permission_dates.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/get_delegate_captured_photos.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/core/services/review_service.dart';
@@ -519,6 +520,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       deleteCapturedPhoto: sl(),
       deletePhotoPermission: sl(),
       updatePhotoPermissionBranches: sl(),
+      updatePhotoPermissionDates: sl(),
     ),
   );
 
@@ -535,6 +537,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => DeleteCapturedPhoto(sl()));
   sl.registerLazySingleton(() => DeletePhotoPermission(sl()));
   sl.registerLazySingleton(() => UpdatePhotoPermissionBranches(sl()));
+  sl.registerLazySingleton(() => UpdatePhotoPermissionDates(sl()));
 
   // Repository
   sl.registerLazySingleton<PhotoPermissionRepository>(

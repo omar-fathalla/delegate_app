@@ -105,6 +105,17 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         currentTime = DateTime.now();
       }
 
+      unawaited(
+        _notifySupervisorsOfAttendance(
+          userId: userId,
+          companyId: companyId,
+          organizationId: organizationId,
+          branchName: branchName,
+          type: 'check_in',
+          time: currentTime,
+        ),
+      );
+
       return AttendanceModel(
         id: docRef.id,
         userId: userId,
@@ -162,6 +173,17 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       } catch (_) {
         currentOutTime = DateTime.now();
       }
+
+      unawaited(
+        _notifySupervisorsOfAttendance(
+          userId: userId,
+          companyId: companyId ?? '',
+          organizationId: organizationId,
+          branchName: lastData['branchName'] as String?,
+          type: 'check_out',
+          time: currentOutTime,
+        ),
+      );
 
       return AttendanceModel(
         id: attendanceId,
@@ -468,5 +490,122 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     } catch (_) {
       throwUnexpectedFailure('حدث خطأ غير متوقع أثناء حفظ بيانات الفرع.');
     }
+  }
+
+  Future<void> _notifySupervisorsOfAttendance({
+    required String userId,
+    required String companyId,
+    required String organizationId,
+    required String? branchName,
+    required String type,
+    required DateTime time,
+  }) async {
+    try {
+      if (companyId.isEmpty) return;
+
+      // 1. Resolve delegate name
+      String delegateName = 'المندوب';
+      try {
+        final userDoc = await firestore.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+          final data = userDoc.data();
+          final name = data?['fullName'] ??
+              data?['name'] ??
+              '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim();
+          if (name is String && name.trim().isNotEmpty) {
+            delegateName = name.trim();
+          }
+        }
+      } catch (_) {}
+
+      // Format time in Arabic: e.g. 02:00 م
+      final isAm = time.hour < 12;
+      final hour12 = time.hour == 0 ? 12 : (time.hour > 12 ? time.hour - 12 : time.hour);
+      final hourStr = hour12.toString().padLeft(2, '0');
+      final minStr = time.minute.toString().padLeft(2, '0');
+      final periodStr = isAm ? 'ص' : 'م';
+      final formattedTime = '$hourStr:$minStr $periodStr';
+      final safeBranchName =
+          (branchName != null && branchName.trim().isNotEmpty) ? branchName.trim() : 'الفرع';
+
+      final bool isCheckIn = type == 'check_in';
+      final title = isCheckIn
+          ? '🟢 تسجيل حضور مندوب: $delegateName'
+          : '🔴 تسجيل انصراف مندوب: $delegateName';
+      final body = isCheckIn
+          ? 'قام المندوب $delegateName بتسجيل الحضور بنجاح في فرع ($safeBranchName) الساعة $formattedTime.'
+          : 'قام المندوب $delegateName بتسجيل الانصراف بنجاح من فرع ($safeBranchName) الساعة $formattedTime.';
+      final notifType = isCheckIn ? 'attendance_check_in' : 'attendance_check_out';
+
+      final notifiedSupervisorUids = <String>{};
+
+      // 2. Direct Supervisor Notifications from users collection
+      final supervisorQueries = [
+        firestore.collection('users').where('companyUID', isEqualTo: companyId),
+        firestore.collection('users').where('companyId', isEqualTo: companyId),
+      ];
+
+      for (final q in supervisorQueries) {
+        try {
+          final snap = await q.get();
+          for (final doc in snap.docs) {
+            if (notifiedSupervisorUids.contains(doc.id)) continue;
+            final uData = doc.data();
+            final role = uData['role']?.toString().toLowerCase() ?? '';
+            final pos = uData['position']?.toString().toLowerCase() ?? '';
+            if (role.contains('supervisor') ||
+                role.contains('admin') ||
+                role.contains('company') ||
+                pos.contains('supervisor') ||
+                role == 'admin') {
+              notifiedSupervisorUids.add(doc.id);
+              final phone =
+                  (uData['phoneNumber'] ?? uData['phone'] ?? uData['mobileNumber']) as String?;
+              await firestore.collection('notifications').add({
+                'title': title,
+                'body': body,
+                'type': notifType,
+                'attendanceType': type,
+                'companyId': companyId,
+                'organizationId': organizationId,
+                'branchName': safeBranchName,
+                'targetDelegateId': userId,
+                'targetDelegateName': delegateName,
+                'delegateUid': doc.id,
+                if (phone != null && phone.isNotEmpty) 'phoneNumber': phone,
+                'isRead': false,
+                'read': false,
+                'createdAt': Timestamp.fromDate(time),
+                'deletedBy': <String>[],
+              });
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 3. Broadcast channels for company & supervisors
+      for (final targetKey in [
+        'supervisor_$companyId',
+        'company_$companyId',
+        'all_company_supervisors',
+      ]) {
+        await firestore.collection('notifications').add({
+          'title': title,
+          'body': body,
+          'type': notifType,
+          'attendanceType': type,
+          'companyId': companyId,
+          'organizationId': organizationId,
+          'branchName': safeBranchName,
+          'targetDelegateId': userId,
+          'targetDelegateName': delegateName,
+          'delegateUid': targetKey,
+          'isRead': false,
+          'read': false,
+          'createdAt': Timestamp.fromDate(time),
+          'deletedBy': <String>[],
+        });
+      }
+    } catch (_) {}
   }
 }

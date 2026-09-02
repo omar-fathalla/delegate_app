@@ -13,6 +13,7 @@ import 'package:delegate_app/features/photo_permission/domain/usecases/get_compa
 import 'package:delegate_app/features/photo_permission/domain/usecases/delete_captured_photo.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/delete_photo_permission.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/update_photo_permission_branches.dart';
+import 'package:delegate_app/features/photo_permission/domain/usecases/update_photo_permission_dates.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/features/photo_permission/domain/entities/photo_permission.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,6 +31,7 @@ class MockGetCompanyCapturedPhotos extends Mock implements GetCompanyCapturedPho
 class MockDeleteCapturedPhoto extends Mock implements DeleteCapturedPhoto {}
 class MockDeletePhotoPermission extends Mock implements DeletePhotoPermission {}
 class MockUpdatePhotoPermissionBranches extends Mock implements UpdatePhotoPermissionBranches {}
+class MockUpdatePhotoPermissionDates extends Mock implements UpdatePhotoPermissionDates {}
 
 class FakeRequestPhotoPermissionParams extends Fake implements RequestPhotoPermissionParams {}
 class FakeApprovePhotoPermissionParams extends Fake implements ApprovePhotoPermissionParams {}
@@ -43,6 +45,7 @@ class FakeGetCompanyCapturedPhotosParams extends Fake implements GetCompanyCaptu
 class FakeDeleteCapturedPhotoParams extends Fake implements DeleteCapturedPhotoParams {}
 class FakeDeletePhotoPermissionParams extends Fake implements DeletePhotoPermissionParams {}
 class FakeUpdatePhotoPermissionBranchesParams extends Fake implements UpdatePhotoPermissionBranchesParams {}
+class FakeUpdatePhotoPermissionDatesParams extends Fake implements UpdatePhotoPermissionDatesParams {}
 
 void main() {
   late PhotoPermissionBloc bloc;
@@ -58,6 +61,7 @@ void main() {
   late MockDeleteCapturedPhoto mockDeleteCapturedPhoto;
   late MockDeletePhotoPermission mockDeletePhotoPermission;
   late MockUpdatePhotoPermissionBranches mockUpdatePhotoPermissionBranches;
+  late MockUpdatePhotoPermissionDates mockUpdatePhotoPermissionDates;
 
   setUpAll(() {
     registerFallbackValue(FakeRequestPhotoPermissionParams());
@@ -72,6 +76,7 @@ void main() {
     registerFallbackValue(FakeDeleteCapturedPhotoParams());
     registerFallbackValue(FakeDeletePhotoPermissionParams());
     registerFallbackValue(FakeUpdatePhotoPermissionBranchesParams());
+    registerFallbackValue(FakeUpdatePhotoPermissionDatesParams());
   });
 
   setUp(() {
@@ -87,6 +92,7 @@ void main() {
     mockDeleteCapturedPhoto = MockDeleteCapturedPhoto();
     mockDeletePhotoPermission = MockDeletePhotoPermission();
     mockUpdatePhotoPermissionBranches = MockUpdatePhotoPermissionBranches();
+    mockUpdatePhotoPermissionDates = MockUpdatePhotoPermissionDates();
 
     bloc = PhotoPermissionBloc(
       requestPhotoPermission: mockRequestPhotoPermission,
@@ -101,6 +107,7 @@ void main() {
       deleteCapturedPhoto: mockDeleteCapturedPhoto,
       deletePhotoPermission: mockDeletePhotoPermission,
       updatePhotoPermissionBranches: mockUpdatePhotoPermissionBranches,
+      updatePhotoPermissionDates: mockUpdatePhotoPermissionDates,
     );
   });
 
@@ -218,6 +225,50 @@ void main() {
       expect: () => [
         PhotoPermissionLoading(),
         const PhotoPermissionError(message: 'Failed to delete'),
+      ],
+    );
+
+    blocTest<PhotoPermissionBloc, PhotoPermissionState>(
+      'should emit [PhotoPermissionLoading, PhotoPermissionActionSuccess] when updating permission dates succeeds',
+      build: () {
+        when(() => mockUpdatePhotoPermissionDates(any()))
+            .thenAnswer((_) async => const Right(null));
+        return bloc;
+      },
+      act: (bloc) => bloc.add(
+        UpdatePhotoPermissionDatesRequested(
+          organizationUID: 'org123',
+          companyUID: 'comp123',
+          permissionId: 'perm123',
+          startDate: DateTime(2026, 1, 1),
+          endDate: DateTime(2026, 2, 1),
+        ),
+      ),
+      expect: () => [
+        PhotoPermissionLoading(),
+        const PhotoPermissionActionSuccess(message: 'تم تعديل تاريخ صلاحية إذن التصوير بنجاح'),
+      ],
+    );
+
+    blocTest<PhotoPermissionBloc, PhotoPermissionState>(
+      'should emit [PhotoPermissionLoading, PhotoPermissionError] when updating permission dates fails',
+      build: () {
+        when(() => mockUpdatePhotoPermissionDates(any()))
+            .thenAnswer((_) async => const Left(ServerFailure('Failed to update dates')));
+        return bloc;
+      },
+      act: (bloc) => bloc.add(
+        UpdatePhotoPermissionDatesRequested(
+          organizationUID: 'org123',
+          companyUID: 'comp123',
+          permissionId: 'perm123',
+          startDate: DateTime(2026, 1, 1),
+          endDate: DateTime(2026, 2, 1),
+        ),
+      ),
+      expect: () => [
+        PhotoPermissionLoading(),
+        const PhotoPermissionError(message: 'Failed to update dates'),
       ],
     );
   });

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -44,10 +45,14 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
   bool _isLoading = true;
   String? _errorMessage;
 
-  int _branchesCount = 0;
-  int _companiesCount = 0;
-  int _delegatesCount = 0;
-  int _receiptsCount = 0;
+  // Electronic Payment Receipt Stats
+  int _electronicWithImageCount = 0;
+  int _electronicEmptyCount = 0;
+  int _electronicApprovedCount = 0;
+  int _deductedFromCompanyCount = 0;
+  int _totalDelegatesCount = 0;
+
+  StreamSubscription<QuerySnapshot>? _delegatesSubscription;
 
   // Technical Support Suggestions / Feedbacks Stats
   int _totalFeedbacksCount = 0;
@@ -61,6 +66,106 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     super.initState();
     _applyCachedDataIfAvailable();
     _loadStats();
+    _startRealtimeDelegatesListener();
+  }
+
+  @override
+  void dispose() {
+    _delegatesSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _startRealtimeDelegatesListener() {
+    if (widget.delegate.role != UserRole.superAdmin) return;
+    _delegatesSubscription?.cancel();
+
+    Query delegatesQuery = FirebaseFirestore.instance.collectionGroup('delegates');
+    if (widget.delegate.organizationUID.isNotEmpty) {
+      delegatesQuery = delegatesQuery.where('organizationUID', isEqualTo: widget.delegate.organizationUID);
+    }
+
+    _delegatesSubscription = delegatesQuery.snapshots().listen((snapshot) {
+      _processDelegatesSnapshot(snapshot.docs);
+    }, onError: (e) {
+      debugPrint('Error in delegates realtime stream: $e');
+    });
+  }
+
+  void _processDelegatesSnapshot(List<QueryDocumentSnapshot> docs) {
+    int withImage = 0;
+    int emptyOrMissing = 0;
+    int approved = 0;
+    int deducted = 0;
+    int total = 0;
+
+    for (final doc in docs) {
+      final pathParts = doc.reference.path.split('/');
+      final orgUid = pathParts.length > 1 ? pathParts[1] : '';
+      if (widget.delegate.organizationUID.isNotEmpty && orgUid != widget.delegate.organizationUID) {
+        continue;
+      }
+
+      total++;
+      final data = doc.data() as Map<String, dynamic>? ?? {};
+      if (data['isDeductedFromCompany'] == true) {
+        deducted++;
+      }
+
+      final documentsList = data['documents'] as List? ?? [];
+      Map<String, dynamic>? electronicDoc;
+
+      for (final docItem in documentsList) {
+        if (docItem is Map<String, dynamic>) {
+          final key = docItem['documentKey']?.toString().toLowerCase() ?? '';
+          if (key == 'electronicpaymentreceipt' ||
+              key == 'electronic_payment_receipt' ||
+              key == 'electronicreceipt' ||
+              key == 'electronic_receipt') {
+            electronicDoc = docItem;
+            break;
+          }
+        }
+      }
+
+      if (electronicDoc != null) {
+        final url = (electronicDoc['documentURL']?.toString() ??
+                     electronicDoc['secondaryURL']?.toString() ?? '').trim();
+        final status = electronicDoc['documentStatus']?.toString().toLowerCase() ?? '';
+
+        if (url.isNotEmpty) {
+          withImage++;
+          if (status == 'approved') {
+            approved++;
+          }
+        } else {
+          emptyOrMissing++;
+        }
+      } else {
+        emptyOrMissing++;
+      }
+    }
+
+    _cachedAdminStats = {
+      ...?_cachedAdminStats,
+      'electronicWithImageCount': withImage,
+      'electronicEmptyCount': emptyOrMissing,
+      'electronicApprovedCount': approved,
+      'deductedFromCompanyCount': deducted,
+      'totalDelegatesCount': total,
+      'delegatesCount': total,
+    };
+    _cachedAdminStatsTime = DateTime.now();
+
+    if (mounted) {
+      setState(() {
+        _electronicWithImageCount = withImage;
+        _electronicEmptyCount = emptyOrMissing;
+        _electronicApprovedCount = approved;
+        _deductedFromCompanyCount = deducted;
+        _totalDelegatesCount = total;
+        _isLoading = false;
+      });
+    }
   }
 
   void _applyCachedDataIfAvailable() {
@@ -75,10 +180,11 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       }
     } else {
       if (_cachedAdminStats != null) {
-        _branchesCount = _cachedAdminStats!['branchesCount'] ?? 0;
-        _companiesCount = _cachedAdminStats!['companiesCount'] ?? 0;
-        _delegatesCount = _cachedAdminStats!['delegatesCount'] ?? 0;
-        _receiptsCount = _cachedAdminStats!['receiptsCount'] ?? 0;
+        _electronicWithImageCount = _cachedAdminStats!['electronicWithImageCount'] ?? 0;
+        _electronicEmptyCount = _cachedAdminStats!['electronicEmptyCount'] ?? 0;
+        _electronicApprovedCount = _cachedAdminStats!['electronicApprovedCount'] ?? 0;
+        _deductedFromCompanyCount = _cachedAdminStats!['deductedFromCompanyCount'] ?? 0;
+        _totalDelegatesCount = _cachedAdminStats!['totalDelegatesCount'] ?? 0;
         _totalFeedbacksCount = _cachedAdminStats!['totalFeedbacksCount'] ?? 0;
         _pendingFeedbacksCount = _cachedAdminStats!['pendingFeedbacksCount'] ?? 0;
         _inProgressFeedbacksCount = _cachedAdminStats!['inProgressFeedbacksCount'] ?? 0;
@@ -170,34 +276,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       // Super Admin Path
       final orgUID = widget.delegate.organizationUID;
 
-      // 1. Branches count (fast count)
-      final branchesQuery = await firestore.collection('branches').count().get();
-      final branchesCount = branchesQuery.count ?? 0;
-
-      // 2. Companies count (fast count)
-      int companiesCount = 0;
-      if (orgUID.isEmpty) {
-        final companiesQuery = await firestore.collectionGroup('companies').count().get();
-        companiesCount = companiesQuery.count ?? 0;
-      } else {
-        final companiesQuery = await firestore
-            .collection('organizations')
-            .doc(orgUID)
-            .collection('companies')
-            .count()
-            .get();
-        companiesCount = companiesQuery.count ?? 0;
-      }
-
-      // 3. Delegates count (fast count)
-      Query delegatesBaseQuery = firestore.collectionGroup('delegates');
-      if (orgUID.isNotEmpty) {
-        delegatesBaseQuery = delegatesBaseQuery.where('organizationUID', isEqualTo: orgUID);
-      }
-      final delegatesCountQuery = await delegatesBaseQuery.count().get();
-      final delegatesCount = delegatesCountQuery.count ?? 0;
-
-      // 4. Feedbacks statistics (fast count)
+      // 1. Feedbacks statistics (fast count)
       int totalFeedbacksCount = 0;
       int pendingFeedbacksCount = 0;
       int inProgressFeedbacksCount = 0;
@@ -237,36 +316,18 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
             .toList();
       } catch (_) {}
 
-      // 5. Receipts count calculation
-      int receiptsCount = _cachedAdminStats?['receiptsCount'] ?? 0;
-      if (isPullToRefresh || _cachedAdminStats == null) {
-        try {
-          // Optimized sample-bounded check to prevent freezing
-          final sampleSnap = await delegatesBaseQuery.limit(100).get();
-          int sampleCount = 0;
-          for (var doc in sampleSnap.docs) {
-            final data = doc.data() as Map<String, dynamic>? ?? {};
-            final documentsList = data['documents'] as List? ?? [];
-            for (var docItem in documentsList) {
-              if (docItem is Map<String, dynamic>) {
-                final key = docItem['documentKey']?.toString().toLowerCase() ?? '';
-                final url = docItem['documentURL']?.toString() ?? '';
-                if ((key.contains('payment') || key.contains('receipt')) && url.isNotEmpty) {
-                  sampleCount++;
-                  break;
-                }
-              }
-            }
-          }
-          receiptsCount = sampleCount;
-        } catch (_) {}
+      // 2. If pull to refresh, refresh delegates explicitly
+      if (isPullToRefresh) {
+        Query delegatesBaseQuery = firestore.collectionGroup('delegates');
+        if (orgUID.isNotEmpty) {
+          delegatesBaseQuery = delegatesBaseQuery.where('organizationUID', isEqualTo: orgUID);
+        }
+        final snap = await delegatesBaseQuery.get();
+        _processDelegatesSnapshot(snap.docs);
       }
 
       _cachedAdminStats = {
-        'branchesCount': branchesCount,
-        'companiesCount': companiesCount,
-        'delegatesCount': delegatesCount,
-        'receiptsCount': receiptsCount,
+        ...?_cachedAdminStats,
         'totalFeedbacksCount': totalFeedbacksCount,
         'pendingFeedbacksCount': pendingFeedbacksCount,
         'inProgressFeedbacksCount': inProgressFeedbacksCount,
@@ -277,10 +338,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
 
       if (mounted) {
         setState(() {
-          _branchesCount = branchesCount;
-          _companiesCount = companiesCount;
-          _delegatesCount = delegatesCount;
-          _receiptsCount = receiptsCount;
           _totalFeedbacksCount = totalFeedbacksCount;
           _pendingFeedbacksCount = pendingFeedbacksCount;
           _inProgressFeedbacksCount = inProgressFeedbacksCount;
@@ -394,7 +451,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'إليك إحصائيات النظام العامة اليوم ونظرة سريعة على فروع ومستندات المنظمة.',
+                  'إليك إحصائيات إيصالات الدفع الإلكتروني والنظام لحظة بلحظة مع التحديث المباشر.',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white70,
@@ -407,20 +464,55 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
 
           // Statistics Header Title
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.query_stats_rounded, color: colorScheme.primary, size: 26),
-              const SizedBox(width: 8),
-              Text(
-                'إحصائيات النظام المتاحة',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+              Row(
+                children: [
+                  Icon(Icons.receipt_long_rounded, color: colorScheme.primary, size: 26),
+                  const SizedBox(width: 8),
+                  Text(
+                    'إحصائيات إيصالات الدفع الإلكتروني',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'مباشر ($_totalDelegatesCount مندوب)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
 
-          // Stats Grid Layout
+          // Stats Grid Layout - Dedicated to electronicPaymentReceipt
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
@@ -430,40 +522,68 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
             childAspectRatio: 1.1,
             children: [
               _buildStatCard(
-                title: 'عدد الفروع',
-                value: _branchesCount.toString(),
-                subtitle: 'فرع مفعل ومسجل',
-                icon: Icons.storefront_rounded,
+                title: 'مرفوعة بالصورة',
+                value: _electronicWithImageCount.toString(),
+                subtitle: 'إيصال دفع إلكتروني مخزن',
+                icon: Icons.photo_library_rounded,
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF3F51B5), Color(0xFF5C6BC0)],
+                  colors: [Color(0xFF1E88E5), Color(0xFF42A5F5)],
                 ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SuperAdminPaymentReceiptsReportScreen(delegate: widget.delegate),
+                    ),
+                  );
+                },
               ),
               _buildStatCard(
-                title: 'إيصالات الدفع',
-                value: _receiptsCount.toString(),
-                subtitle: 'إيصال دفع إلكتروني',
-                icon: Icons.receipt_long_rounded,
+                title: 'ملفات فارغة / معلقة',
+                value: _electronicEmptyCount.toString(),
+                subtitle: 'بدون صورة أو لم يتم الرفع',
+                icon: Icons.hourglass_empty_rounded,
                 gradient: const LinearGradient(
                   colors: [Color(0xFFFF9800), Color(0xFFFFB74D)],
                 ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SuperAdminPaymentReceiptsReportScreen(delegate: widget.delegate),
+                    ),
+                  );
+                },
               ),
               _buildStatCard(
-                title: 'الشركات المسجلة',
-                value: _companiesCount.toString(),
-                subtitle: 'شركة نشطة بالمنظمة',
-                icon: Icons.business_rounded,
+                title: 'إيصالات معتمدة',
+                value: _electronicApprovedCount.toString(),
+                subtitle: 'تمت مراجعتها واعتمادها',
+                icon: Icons.verified_rounded,
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF009688), Color(0xFF4DB6AC)],
+                  colors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
                 ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SuperAdminPaymentReceiptsReportScreen(delegate: widget.delegate),
+                    ),
+                  );
+                },
               ),
               _buildStatCard(
-                title: 'إجمالي المناديب',
-                value: _delegatesCount.toString(),
-                subtitle: 'مندوب مسجل بالنظام',
-                icon: Icons.people_alt_rounded,
+                title: 'خصم من الشركة',
+                value: _deductedFromCompanyCount.toString(),
+                subtitle: 'مندوب بنظام الخصم',
+                icon: Icons.account_balance_rounded,
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF9C27B0), Color(0xFFBA68C8)],
+                  colors: [Color(0xFF8E24AA), Color(0xFFBA68C8)],
                 ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SuperAdminPaymentReceiptsReportScreen(delegate: widget.delegate),
+                    ),
+                  );
+                },
               ),
             ],
           ),
