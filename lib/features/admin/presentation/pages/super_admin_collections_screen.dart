@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -182,7 +182,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         setState(() {
           _isLoading = false;
           if (_totalDueReceiptsCount == 0) {
-            _errorMessage = 'حدث خطأ أثناء تحميل بيانات التحصيلات: $e';
+            _errorMessage = 'An error occurred while loading collections data: $e';
           }
         });
       }
@@ -246,18 +246,12 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
   String _formatCurrency(num amount) {
     final formatter = NumberFormat('#,##0.00', 'en_US');
-    return '${formatter.format(amount)} ج.م';
+    return '${formatter.format(amount)} EGP';
   }
 
   String _formatAmountOnly(num amount) {
     final formatter = NumberFormat('#,##0.00', 'en_US');
     return formatter.format(amount);
-  }
-
-  String _numberToWordsArabic(num number) {
-    if (number == 0) return 'صفر جنيه مصري فقط لا غير';
-    final formatter = NumberFormat('#,##0', 'ar');
-    return 'فقط ${formatter.format(number.toInt())} جنيهاً مصرياً لا غير.';
   }
 
   String _numberToWordsEnglish(num number) {
@@ -270,212 +264,215 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     final receiptsCountController = TextEditingController();
     final amountController = TextEditingController();
     final notesController = TextEditingController();
-    String selectedPaymentMethod = 'نقداً (Cash)';
+    String selectedPaymentMethod = 'Cash';
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.add_card_rounded, color: Colors.green, size: 22),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'تسجيل تحصيل وخصم',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              title: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade200),
+                      color: Colors.green.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline_rounded, size: 16, color: Colors.blue),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'المتبقي: $_remainingReceiptsCount إيصال (${_formatCurrency(_remainingBalanceAmount)})',
-                            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.blue),
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: const Icon(Icons.add_card_rounded, color: Colors.green, size: 22),
                   ),
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    controller: receiptsCountController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'عدد الإيصالات المحصلة (Qty)',
-                      hintText: 'مثلاً: 385',
-                      prefixIcon: const Icon(Icons.receipt_long_rounded, size: 20),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onChanged: (val) {
-                      final count = int.tryParse(val) ?? 0;
-                      if (count > 0) {
-                        final computedAmount = count * _receiptUnitPrice;
-                        amountController.text = computedAmount.toStringAsFixed(0);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-
-                  TextField(
-                    controller: amountController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'المبلغ المحصل (ج.م)',
-                      hintText: 'مثلاً: 38500',
-                      prefixIcon: const Icon(Icons.payments_rounded, size: 20),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedPaymentMethod,
-                    isDense: true,
-                    decoration: InputDecoration(
-                      labelText: 'طريقة الدفع',
-                      prefixIcon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'نقداً (Cash)', child: Text('نقداً (Cash)')),
-                      DropdownMenuItem(value: 'تحويل بنكي (Bank Transfer)', child: Text('تحويل بنكي')),
-                      DropdownMenuItem(value: 'شيك مصرفي (Cheque)', child: Text('شيك مصرفي')),
-                      DropdownMenuItem(value: 'إلكتروني (Online / Card)', child: Text('دفع إلكتروني')),
-                      DropdownMenuItem(value: 'خصم من المستحقات (Deduction)', child: Text('خصم من المستحقات')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedPaymentMethod = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-
-                  TextField(
-                    controller: notesController,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      labelText: 'ملاحظات / رقم الشيك',
-                      hintText: 'تفاصيل السداد أو رقم العملية...',
-                      prefixIcon: const Icon(Icons.edit_note_rounded, size: 20),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Record Collection & Deduction',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                   ),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء', style: TextStyle(fontSize: 12)),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () async {
-                  final qty = int.tryParse(receiptsCountController.text) ?? 0;
-                  final amount = double.tryParse(amountController.text) ?? (qty * _receiptUnitPrice);
-
-                  if (qty <= 0 && amount <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('يرجى إدخال عدد الإيصالات أو المبلغ المحصل.'),
-                        backgroundColor: Colors.red,
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
                       ),
-                    );
-                    return;
-                  }
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 16, color: Colors.blue),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Remaining: $_remainingReceiptsCount Receipts (${_formatCurrency(_remainingBalanceAmount)})',
+                              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.blue),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
-                  final messenger = ScaffoldMessenger.of(context);
-                  final nav = Navigator.of(ctx);
+                    TextField(
+                      controller: receiptsCountController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Collected Receipts Count (Qty)',
+                        hintText: 'e.g. 385',
+                        prefixIcon: const Icon(Icons.receipt_long_rounded, size: 20),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onChanged: (val) {
+                        final count = int.tryParse(val) ?? 0;
+                        if (count > 0) {
+                          final computedAmount = count * _receiptUnitPrice;
+                          amountController.text = computedAmount.toStringAsFixed(0);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 10),
 
-                  try {
-                    final firestore = FirebaseFirestore.instance;
-                    final docRef = firestore
-                        .collection('monthly_collections')
-                        .doc(_periodKey)
-                        .collection('transactions')
-                        .doc();
+                    TextField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Collected Amount (EGP)',
+                        hintText: 'e.g. 38500',
+                        prefixIcon: const Icon(Icons.payments_rounded, size: 20),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
 
-                    await docRef.set({
-                      'id': docRef.id,
-                      'receiptsCount': qty,
-                      'unitPrice': _receiptUnitPrice,
-                      'collectedAmount': amount,
-                      'paymentMethod': selectedPaymentMethod,
-                      'notes': notesController.text.trim(),
-                      'createdAt': FieldValue.serverTimestamp(),
-                      'createdBy': widget.delegate.fullName,
-                      'periodKey': _periodKey,
-                    });
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedPaymentMethod,
+                      isDense: true,
+                      decoration: InputDecoration(
+                        labelText: 'Payment Method',
+                        prefixIcon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                        DropdownMenuItem(value: 'Bank Transfer', child: Text('Bank Transfer')),
+                        DropdownMenuItem(value: 'Cheque', child: Text('Cheque')),
+                        DropdownMenuItem(value: 'Online / Card', child: Text('Online / Card')),
+                        DropdownMenuItem(value: 'Deduction from Dues', child: Text('Deduction from Dues')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() => selectedPaymentMethod = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 10),
 
-                    if (mounted) {
-                      nav.pop();
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text('تم تسجيل تحصيل $qty إيصال بمبلغ ${_formatCurrency(amount)} بنجاح.'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                      _fetchBillingAndCollectionsData();
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text('حدث خطأ أثناء حفظ التحصيل: $e'),
+                    TextField(
+                      controller: notesController,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: 'Notes / Cheque No.',
+                        hintText: 'Payment details or transaction number...',
+                        prefixIcon: const Icon(Icons.edit_note_rounded, size: 20),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () async {
+                    final qty = int.tryParse(receiptsCountController.text) ?? 0;
+                    final amount = double.tryParse(amountController.text) ?? (qty * _receiptUnitPrice);
+
+                    if (qty <= 0 && amount <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter the receipts count or collected amount.'),
                           backgroundColor: Colors.red,
                         ),
                       );
+                      return;
                     }
-                  }
-                },
-                icon: const Icon(Icons.check_rounded, size: 16),
-                label: const Text('تأكيد الخصم', style: TextStyle(fontSize: 12)),
-              ),
-            ],
-          );
-        },
+
+                    final messenger = ScaffoldMessenger.of(context);
+                    final nav = Navigator.of(ctx);
+
+                    try {
+                      final firestore = FirebaseFirestore.instance;
+                      final docRef = firestore
+                          .collection('monthly_collections')
+                          .doc(_periodKey)
+                          .collection('transactions')
+                          .doc();
+
+                      await docRef.set({
+                        'id': docRef.id,
+                        'receiptsCount': qty,
+                        'unitPrice': _receiptUnitPrice,
+                        'collectedAmount': amount,
+                        'paymentMethod': selectedPaymentMethod,
+                        'notes': notesController.text.trim(),
+                        'createdAt': FieldValue.serverTimestamp(),
+                        'createdBy': widget.delegate.fullName,
+                        'periodKey': _periodKey,
+                      });
+
+                      if (mounted) {
+                        nav.pop();
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Successfully recorded collection of $qty receipts amounting to ${_formatCurrency(amount)}.'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        _fetchBillingAndCollectionsData();
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Error saving collection: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.check_rounded, size: 16),
+                  label: const Text('Confirm Deduction', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -483,30 +480,33 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
   Future<void> _deleteCollectionTransaction(String docId, int qty, double amount) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 22),
-            SizedBox(width: 8),
-            Text('تأكيد الحذف', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 22),
+              SizedBox(width: 8),
+              Text('Confirm Deletion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ],
+          ),
+          content: Text(
+            'Are you sure you want to delete this collection entry of $qty receipts amounting to ${_formatCurrency(amount)} and restore it to the due balance?',
+            style: const TextStyle(fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete'),
+            ),
           ],
         ),
-        content: Text(
-          'هل تريد حذف دفعة تحصيل $qty إيصال بمبلغ ${_formatCurrency(amount)} وإعادتها للمستحق؟',
-          style: const TextStyle(fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('حذف'),
-          ),
-        ],
       ),
     );
 
@@ -522,7 +522,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تم حذف عملية التحصيل وتحديث الأرصدة.'),
+              content: Text('Collection entry deleted and balances updated.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -532,7 +532,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('حدث خطأ أثناء الحذف: $e'),
+              content: Text('Error deleting collection entry: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -577,7 +577,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('حدث خطأ أثناء طباعة الفاتورة: $e'),
+            content: Text('Error printing invoice: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -606,13 +606,13 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
       // ignore: deprecated_member_use
       await Share.shareXFiles(
         [XFile(imagePath)],
-        text: 'فاتورة التحصيلات الرسمية (${_showRemainingInvoice ? 'الرصيد المتبقي' : 'الإجمالي الكلي'}) - رقم: $invoiceNo للفترة: ${DateFormat('MMMM yyyy', 'ar').format(_selectedPeriod)} بمبلغ ${_formatCurrency(_invoiceGrandTotal)}',
+        text: 'Official Collections Invoice (${_showRemainingInvoice ? 'Net Remaining Balance' : 'Gross Total'}) - Invoice No: $invoiceNo for period: ${DateFormat('MMMM yyyy', 'en_US').format(_selectedPeriod)} - Total: ${_formatCurrency(_invoiceGrandTotal)}',
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('حدث خطأ أثناء مشاركة الفاتورة: $e'),
+            content: Text('Error sharing invoice: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -634,138 +634,141 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          title: const Row(
-            children: [
-              Icon(Icons.tune_rounded, color: Colors.blue, size: 22),
-              SizedBox(width: 8),
-              Text(
-                'إعدادات الأسعار والنسب',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            title: const Row(
               children: [
-                TextField(
-                  controller: receiptPriceController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'سعر الإيصال الإلكتروني (ج.م)',
-                    prefixIcon: const Icon(Icons.receipt_long_rounded, size: 20),
-                    isDense: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                TextField(
-                  controller: adPriceController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'سعر ترخيص شركة الدعاية (ج.م)',
-                    prefixIcon: const Icon(Icons.campaign_rounded, size: 20),
-                    isDense: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                TextField(
-                  controller: adCountController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'عدد شركات الدعاية (Qty)',
-                    prefixIcon: const Icon(Icons.numbers_rounded, size: 20),
-                    isDense: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Divider(),
-                const SizedBox(height: 6),
-
-                const Text(
-                  'توزيع النسب المئوية (%):',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: tashilPercController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'تسهيل (%)',
-                          isDense: true,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onChanged: (v) {
-                          final val = double.tryParse(v) ?? 70.0;
-                          if (val <= 100) {
-                            marketPercController.text = (100.0 - val).toStringAsFixed(0);
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: marketPercController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'فتح الله (%)',
-                          isDense: true,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                  ],
+                Icon(Icons.tune_rounded, color: Colors.blue, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'Pricing & Ratios Settings',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade800,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: receiptPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Receipt Unit Price (EGP)',
+                      prefixIcon: const Icon(Icons.receipt_long_rounded, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: adPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Ad Company License Price (EGP)',
+                      prefixIcon: const Icon(Icons.campaign_rounded, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: adCountController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Ad Companies Count (Qty)',
+                      prefixIcon: const Icon(Icons.numbers_rounded, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 6),
+
+                  const Text(
+                    'Percentage Split (%):',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: tashilPercController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Tashil (%)',
+                            isDense: true,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onChanged: (v) {
+                            final val = double.tryParse(v) ?? 70.0;
+                            if (val <= 100) {
+                              marketPercController.text = (100.0 - val).toStringAsFixed(0);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: marketPercController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Fathalla (%)',
+                            isDense: true,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              onPressed: () {
-                final rPrice = double.tryParse(receiptPriceController.text) ?? 100.0;
-                final aPrice = double.tryParse(adPriceController.text) ?? 20000.0;
-                final aCount = int.tryParse(adCountController.text) ?? 7;
-                final tPerc = double.tryParse(tashilPercController.text) ?? 70.0;
-                final mPerc = double.tryParse(marketPercController.text) ?? 30.0;
-
-                setState(() {
-                  _receiptUnitPrice = rPrice;
-                  _adCompanyUnitPrice = aPrice;
-                  _adCompanyCount = aCount;
-                  _tashilPercentage = tPerc;
-                  _marketPercentage = mPerc;
-                });
-
-                _savePreferences();
-                Navigator.pop(ctx);
-              },
-              child: const Text('حفظ'),
             ),
-          ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade800,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  final rPrice = double.tryParse(receiptPriceController.text) ?? 100.0;
+                  final aPrice = double.tryParse(adPriceController.text) ?? 20000.0;
+                  final aCount = int.tryParse(adCountController.text) ?? 7;
+                  final tPerc = double.tryParse(tashilPercController.text) ?? 70.0;
+                  final mPerc = double.tryParse(marketPercController.text) ?? 30.0;
+
+                  setState(() {
+                    _receiptUnitPrice = rPrice;
+                    _adCompanyUnitPrice = aPrice;
+                    _adCompanyCount = aCount;
+                    _tashilPercentage = tPerc;
+                    _marketPercentage = mPerc;
+                  });
+
+                  _savePreferences();
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -778,7 +781,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
       initialDate: _selectedPeriod,
       firstDate: DateTime(2023),
       lastDate: DateTime(now.year + 2),
-      helpText: 'اختر شهر وسنة التحصيل',
+      helpText: 'Select collection month & year',
     );
 
     if (picked != null) {
@@ -794,243 +797,246 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: false,
-        title: const Text(
-          'التحصيلات والفواتير',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.tune_rounded, size: 20),
-            tooltip: 'الإعدادات والنسب',
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            onPressed: _showSettingsDialog,
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Scaffold(
+        appBar: AppBar(
+          centerTitle: false,
+          title: const Text(
+            'Collections & Invoices',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
-          IconButton(
-            icon: const Icon(Icons.print_rounded, size: 20),
-            tooltip: 'طباعة الفاتورة',
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            onPressed: _printInvoice,
-          ),
-          IconButton(
-            icon: const Icon(Icons.share_rounded, size: 20),
-            tooltip: 'مشاركة الفاتورة',
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            onPressed: _shareInvoiceImage,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, size: 20),
-            tooltip: 'تحديث البيانات',
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            onPressed: _fetchBillingAndCollectionsData,
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddCollectionDialog,
-        icon: const Icon(Icons.add_card_rounded, size: 20),
-        label: const Text('تسجيل تحصيل وخصم', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        backgroundColor: Colors.green.shade700,
-        foregroundColor: Colors.white,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 44),
-                    const SizedBox(height: 10),
-                    Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
-                    const SizedBox(height: 14),
-                    ElevatedButton(
-                      onPressed: _fetchBillingAndCollectionsData,
-                      child: const Text('إعادة المحاولة'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _fetchBillingAndCollectionsData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 80),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 1. شريط اختيار الفترة الزمنية
-                    _buildPeriodSelectorHeader(colorScheme),
-
-                    const SizedBox(height: 12),
-
-                    // 2. بطاقات النبض المالي المترابطة (المستحق | المحصل | المتبقي)
-                    _buildTripleFinancialCards(colorScheme),
-
-                    const SizedBox(height: 16),
-
-                    // 3. الفاتورة الرسمية المعتمدة (مع خيار المتبقي/الإجمالي + الطباعة والمشاركة)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.description_rounded, color: Colors.indigo, size: 20),
-                            const SizedBox(width: 6),
-                            Text(
-                              _showRemainingInvoice ? 'فاتورة الرصيد المتبقي ⏳' : 'الفاتورة الشهرية الإجمالية 📑',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            FilledButton.tonalIcon(
-                              onPressed: _printInvoice,
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              icon: const Icon(Icons.print_rounded, size: 14),
-                              label: const Text('طباعة', style: TextStyle(fontSize: 11)),
-                            ),
-                            const SizedBox(width: 6),
-                            FilledButton.tonalIcon(
-                              onPressed: _shareInvoiceImage,
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              icon: const Icon(Icons.share_rounded, size: 14),
-                              label: const Text('مشاركة', style: TextStyle(fontSize: 11)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-
-                    // Switcher: Remaining vs Gross Total
-                    Row(
-                      children: [
-                        ChoiceChip(
-                          label: const Text('فاتورة المتبقي للتحصيل (صافي)'),
-                          selected: _showRemainingInvoice,
-                          labelStyle: TextStyle(
-                            fontSize: 11,
-                            fontWeight: _showRemainingInvoice ? FontWeight.bold : FontWeight.normal,
-                          ),
-                          onSelected: (val) {
-                            if (val) setState(() => _showRemainingInvoice = true);
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('الفاتورة الإجمالية للشهر'),
-                          selected: !_showRemainingInvoice,
-                          labelStyle: TextStyle(
-                            fontSize: 11,
-                            fontWeight: !_showRemainingInvoice ? FontWeight.bold : FontWeight.normal,
-                          ),
-                          onSelected: (val) {
-                            if (val) setState(() => _showRemainingInvoice = false);
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Screenshot Wrapper for Invoice Table
-                    Screenshot(
-                      controller: _screenshotController,
-                      child: _buildOfficialInvoiceDocument(colorScheme),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // 4. سجل عمليات التحصيل المعتمدة
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.history_edu_rounded, color: Colors.teal, size: 20),
-                            const SizedBox(width: 6),
-                            Text(
-                              'سجل دفعات التحصيل والخصم (${_collectionTransactions.length})',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                          ],
-                        ),
-                        TextButton.icon(
-                          onPressed: _showAddCollectionDialog,
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          icon: const Icon(Icons.add_rounded, size: 16),
-                          label: const Text('إضافة دفعة', style: TextStyle(fontSize: 12)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-
-                    if (_collectionTransactions.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(18),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(Icons.pending_actions_rounded, size: 36, color: Colors.grey.shade400),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'لم يتم تسجيل أي عمليات تحصيل لهذا الشهر.',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'اضغط على زر "تسجيل تحصيل وخصم" بالأسفل لخصم عدد الإيصالات والمبالغ.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 10.5, color: colorScheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _collectionTransactions.length,
-                        itemBuilder: (context, index) {
-                          final item = _collectionTransactions[index];
-                          return _buildTransactionCard(item, colorScheme, index + 1);
-                        },
-                      ),
-                  ],
-                ),
-              ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.tune_rounded, size: 20),
+              tooltip: 'Pricing & Ratios Settings',
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              onPressed: _showSettingsDialog,
             ),
+            IconButton(
+              icon: const Icon(Icons.print_rounded, size: 20),
+              tooltip: 'Print Invoice',
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              onPressed: _printInvoice,
+            ),
+            IconButton(
+              icon: const Icon(Icons.share_rounded, size: 20),
+              tooltip: 'Share Invoice',
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              onPressed: _shareInvoiceImage,
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+              tooltip: 'Refresh Data',
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              onPressed: _fetchBillingAndCollectionsData,
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _showAddCollectionDialog,
+          icon: const Icon(Icons.add_card_rounded, size: 20),
+          label: const Text('Record Collection & Deduction', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          backgroundColor: Colors.green.shade700,
+          foregroundColor: Colors.white,
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red, size: 44),
+                      const SizedBox(height: 10),
+                      Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
+                      const SizedBox(height: 14),
+                      ElevatedButton(
+                        onPressed: _fetchBillingAndCollectionsData,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : RefreshIndicator(
+                onRefresh: _fetchBillingAndCollectionsData,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 80),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. Service Period Selector Header
+                      _buildPeriodSelectorHeader(colorScheme),
+
+                      const SizedBox(height: 12),
+
+                      // 2. Financial Pulse Cards (Total Due | Collected | Remaining)
+                      _buildTripleFinancialCards(colorScheme),
+
+                      const SizedBox(height: 16),
+
+                      // 3. Official Invoice Card (Remaining / Gross Switcher + Print/Share)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.description_rounded, color: Colors.indigo, size: 20),
+                              const SizedBox(width: 6),
+                              Text(
+                                _showRemainingInvoice ? 'Net Remaining Invoice ⏳' : 'Monthly Gross Invoice 📑',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              FilledButton.tonalIcon(
+                                onPressed: _printInvoice,
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                icon: const Icon(Icons.print_rounded, size: 14),
+                                label: const Text('Print', style: TextStyle(fontSize: 11)),
+                              ),
+                              const SizedBox(width: 6),
+                              FilledButton.tonalIcon(
+                                onPressed: _shareInvoiceImage,
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                icon: const Icon(Icons.share_rounded, size: 14),
+                                label: const Text('Share', style: TextStyle(fontSize: 11)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Switcher: Remaining vs Gross Total
+                      Row(
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Net Remaining Invoice (Net)'),
+                            selected: _showRemainingInvoice,
+                            labelStyle: TextStyle(
+                              fontSize: 11,
+                              fontWeight: _showRemainingInvoice ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            onSelected: (val) {
+                              if (val) setState(() => _showRemainingInvoice = true);
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('Monthly Gross Invoice'),
+                            selected: !_showRemainingInvoice,
+                            labelStyle: TextStyle(
+                              fontSize: 11,
+                              fontWeight: !_showRemainingInvoice ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            onSelected: (val) {
+                              if (val) setState(() => _showRemainingInvoice = false);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Screenshot Wrapper for Invoice Table
+                      Screenshot(
+                        controller: _screenshotController,
+                        child: _buildOfficialInvoiceDocument(colorScheme),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // 4. Collection Transactions Log
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.history_edu_rounded, color: Colors.teal, size: 20),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Collection & Deduction Log (${_collectionTransactions.length})',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                            ],
+                          ),
+                          TextButton.icon(
+                            onPressed: _showAddCollectionDialog,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            label: const Text('Add Entry', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+
+                      if (_collectionTransactions.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(18),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.pending_actions_rounded, size: 36, color: Colors.grey.shade400),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'No collection transactions recorded for this month.',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Tap "Record Collection & Deduction" below to deduct receipts and amounts.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 10.5, color: colorScheme.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _collectionTransactions.length,
+                          itemBuilder: (context, index) {
+                            final item = _collectionTransactions[index];
+                            return _buildTransactionCard(item, colorScheme, index + 1);
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+      ),
     );
   }
 
   Widget _buildPeriodSelectorHeader(ColorScheme colorScheme) {
-    final periodName = DateFormat('MMMM yyyy', 'ar').format(_selectedPeriod);
+    final periodName = DateFormat('MMMM yyyy', 'en_US').format(_selectedPeriod);
     final periodCode = DateFormat('MMM-yy', 'en_US').format(_selectedPeriod);
 
     return Container(
@@ -1057,7 +1063,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'فترة الخدمة والتحصيل:',
+                  'Service & Collection Period:',
                   style: TextStyle(fontSize: 10, color: Colors.grey),
                 ),
                 Text(
@@ -1070,7 +1076,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
           OutlinedButton.icon(
             onPressed: _pickServicePeriod,
             icon: const Icon(Icons.edit_calendar_rounded, size: 14),
-            label: const Text('تغيير الشهر', style: TextStyle(fontSize: 11)),
+            label: const Text('Change Month', style: TextStyle(fontSize: 11)),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               visualDensity: VisualDensity.compact,
@@ -1086,7 +1092,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
   Widget _buildTripleFinancialCards(ColorScheme colorScheme) {
     return Column(
       children: [
-        // 1. الكارت الرئيسي: إجمالي المستحق الكلي
+        // 1. Grand Total Due Card
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -1115,7 +1121,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'إجمالي التحصيل المستحق (Grand Total)',
+                        'Total Due Collections (Grand Total)',
                         style: TextStyle(color: Colors.white70, fontSize: 11),
                       ),
                       const SizedBox(height: 2),
@@ -1136,7 +1142,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '$_totalDueReceiptsCount إيصال',
+                      '$_totalDueReceiptsCount Receipts',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -1154,15 +1160,15 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 children: [
                   Expanded(
                     child: Text(
-                      'تسهيل (70%): ${_formatCurrency(_tashilDueAmount)}',
+                      'Tashil (70%): ${_formatCurrency(_tashilDueAmount)}',
                       style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
                     ),
                   ),
                   Expanded(
                     child: Text(
-                      'فتح الله (30%): ${_formatCurrency(_marketDueAmount)}',
+                      'Fathalla (30%): ${_formatCurrency(_marketDueAmount)}',
                       style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
-                      textAlign: TextAlign.left,
+                      textAlign: TextAlign.right,
                     ),
                   ),
                 ],
@@ -1173,10 +1179,10 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
         const SizedBox(height: 10),
 
-        // 2. بطاقتين متجاورتين: (المحصل الفعلي) و (المتبقي للتحصيل)
+        // 2. Collected & Remaining Cards
         Row(
           children: [
-            // بطاقة تم تحصيله (Collected)
+            // Collected Card
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(12),
@@ -1198,11 +1204,11 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'المحصل ✅',
+                          'Collected ✅',
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                         Text(
-                          '$_totalCollectedReceiptsCount إيصال',
+                          '$_totalCollectedReceiptsCount Receipts',
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 9.5),
                         ),
                       ],
@@ -1216,7 +1222,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'تسهيل: ${_formatAmountOnly(_tashilCollectedAmount)} | فتح الله: ${_formatAmountOnly(_marketCollectedAmount)}',
+                      'Tashil: ${_formatAmountOnly(_tashilCollectedAmount)} | Fathalla: ${_formatAmountOnly(_marketCollectedAmount)}',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 8.5),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1227,7 +1233,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
             ),
             const SizedBox(width: 8),
 
-            // بطاقة المتبقي للتحصيل (Remaining)
+            // Remaining Card
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(12),
@@ -1249,11 +1255,11 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'المتبقي ⏳',
+                          'Remaining ⏳',
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                         Text(
-                          '$_remainingReceiptsCount إيصال',
+                          '$_remainingReceiptsCount Receipts',
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 9.5),
                         ),
                       ],
@@ -1267,7 +1273,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'تسهيل: ${_formatAmountOnly(_tashilRemainingAmount)} | فتح الله: ${_formatAmountOnly(_marketRemainingAmount)}',
+                      'Tashil: ${_formatAmountOnly(_tashilRemainingAmount)} | Fathalla: ${_formatAmountOnly(_marketRemainingAmount)}',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 8.5),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1281,7 +1287,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
         const SizedBox(height: 8),
 
-        // شريط تقدم الإنجاز في التحصيل
+        // Monthly Progress Indicator
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
@@ -1295,7 +1301,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'نسبة إنجاز التحصيل الفعلي للشهر:',
+                    'Monthly Collection Progress:',
                     style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
                   ),
                   Text(
@@ -1331,427 +1337,415 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     );
   }
 
-  /// الفاتورة الرسمية المعتمدة بتصميم منسق ومدمج 100% يعكس الرصيد المتبقي أو الإجمالي
+  /// الفاتورة الرسمية المعتمدة بتصميم منسق ومدمج 100% باللغة الإنجليزية ومن اليسار لليمين (LTR)
   Widget _buildOfficialInvoiceDocument(ColorScheme colorScheme) {
     final invoiceDateStr = DateFormat('d/M/yyyy').format(_selectedPeriod);
     final servicePeriodStr = DateFormat('MMM-yy', 'en_US').format(_selectedPeriod);
     final invoiceNo = '${_selectedPeriod.year}${_selectedPeriod.month}000/46';
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF0D47A1), width: 1.2),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Header Information Section
-          Table(
-            border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
-            columnWidths: const {
-              0: FlexColumnWidth(1.15),
-              1: FlexColumnWidth(1.0),
-            },
-            children: [
-              const TableRow(
-                decoration: BoxDecoration(color: Color(0xFFF1F5F9)),
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    child: Text(
-                      'Bill To (الجهة المستلمة)',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0D47A1), fontSize: 11),
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    child: Text(
-                      'Invoice Details (بيانات الفاتورة)',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0D47A1), fontSize: 11),
-                    ),
-                  ),
-                ],
-              ),
-              TableRow(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    child: Text('Customer: Fathalla Market', style: TextStyle(fontSize: 10, color: Colors.black87)),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    child: Text('Invoice No: $invoiceNo', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87)),
-                  ),
-                ],
-              ),
-              TableRow(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    child: Text('Attn: Mr. Mohamed A. Hassan', style: TextStyle(fontSize: 10, color: Colors.black87)),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    child: Text('Date: $invoiceDateStr', style: const TextStyle(fontSize: 10, color: Colors.black87)),
-                  ),
-                ],
-              ),
-              TableRow(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    child: Text(
-                      _showRemainingInvoice ? 'Type: Net Remaining Balance' : 'Company: All Companies',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    child: Text('Period: $servicePeriodStr', style: const TextStyle(fontSize: 10, color: Colors.black87)),
-                  ),
-                ],
-              ),
-              const TableRow(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    child: Text('System: Tashil Business', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    child: Text('Payment: Official / Cash', style: TextStyle(fontSize: 10, color: Colors.black87)),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          // 2. Main Items Table
-          Table(
-            border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
-            columnWidths: const {
-              0: FlexColumnWidth(2.2),
-              1: FlexColumnWidth(0.7),
-              2: FlexColumnWidth(1.0),
-              3: FlexColumnWidth(1.3),
-            },
-            children: [
-              const TableRow(
-                decoration: BoxDecoration(color: Color(0xFF0D47A1)),
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                    child: Text(
-                      'Description',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                    child: Text(
-                      'Qty',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                    child: Text(
-                      'Price',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                    child: Text(
-                      'Total (EGP)',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-
-              // Item 1: Electronic Receipts (Shows Remaining Qty if _showRemainingInvoice is true)
-              TableRow(
-                decoration: const BoxDecoration(color: Colors.white),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                    child: Text(
-                      _showRemainingInvoice
-                          ? 'Issuing official electronic payment receipts\n(إيصالات الدفع الإلكترونية المتبقية للتحصيل)'
-                          : 'Issuing official electronic payment receipts\n(إصدار إيصالات الدفع الإلكترونية)',
-                      style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                    child: Text(
-                      NumberFormat('#,##0').format(_invoiceReceiptsQty),
-                      style: const TextStyle(fontSize: 10, color: Colors.black87),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                    child: Text(
-                      _formatAmountOnly(_receiptUnitPrice),
-                      style: const TextStyle(fontSize: 10, color: Colors.black87),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                    child: Text(
-                      _formatAmountOnly(_invoiceReceiptsTotal),
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
-                      textAlign: TextAlign.right,
-                    ),
-                  ),
-                ],
-              ),
-
-              // Item 2: Advertising Company Subscription
-              TableRow(
-                decoration: const BoxDecoration(color: Color(0xFFFAFAFA)),
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                    child: Text(
-                      'Advertising Company Subscription\n(اشتراك شركات الدعاية)',
-                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                    child: Text(
-                      '$_adCompanyCount',
-                      style: const TextStyle(fontSize: 10, color: Colors.black87),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                    child: Text(
-                      _formatAmountOnly(_adCompanyUnitPrice),
-                      style: const TextStyle(fontSize: 10, color: Colors.black87),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                    child: Text(
-                      _formatAmountOnly(_adCompanyTotalAmount),
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
-                      textAlign: TextAlign.right,
-                    ),
-                  ),
-                ],
-              ),
-
-              // Grand Total Row
-              TableRow(
-                decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                    child: Text(''),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                    child: Text(''),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                    child: Text(
-                      _showRemainingInvoice ? 'Net Total' : 'Grand Total',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5, color: Color(0xFF0D47A1)),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  Container(
-                    color: const Color(0xFF0D47A1),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                    child: Text(
-                      _formatAmountOnly(_invoiceGrandTotal),
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 10.5),
-                      textAlign: TextAlign.right,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          // Written Amount Note
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF0D47A1), width: 1.2),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Header Information Section (LTR: Bill To on left, Invoice Details on right)
+            Table(
+              border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
+              columnWidths: const {
+                0: FlexColumnWidth(1.15),
+                1: FlexColumnWidth(1.0),
+              },
               children: [
-                Text(
-                  _numberToWordsEnglish(_invoiceGrandTotal),
-                  style: const TextStyle(
-                    fontStyle: FontStyle.italic,
-                    fontSize: 9.5,
-                    color: Color(0xFF1E3A8A),
-                    fontWeight: FontWeight.w600,
-                  ),
+                const TableRow(
+                  decoration: BoxDecoration(color: Color(0xFFF1F5F9)),
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      child: Text(
+                        'Bill To',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0D47A1), fontSize: 11),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      child: Text(
+                        'Invoice Details',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0D47A1), fontSize: 11),
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  _numberToWordsArabic(_invoiceGrandTotal),
-                  style: TextStyle(
-                    fontStyle: FontStyle.italic,
-                    fontSize: 9.5,
-                    color: Colors.grey.shade700,
-                    fontWeight: FontWeight.w600,
-                  ),
+                TableRow(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('Customer: Fathalla Market', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('Invoice No: $invoiceNo', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87)),
+                    ),
+                  ],
+                ),
+                TableRow(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('Attn: Mr. Mohamed A. Hassan', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('Date: $invoiceDateStr', style: const TextStyle(fontSize: 10, color: Colors.black87)),
+                    ),
+                  ],
+                ),
+                TableRow(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text(
+                        _showRemainingInvoice ? 'Type: Net Remaining Balance' : 'Company: All Companies',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('Period: $servicePeriodStr', style: const TextStyle(fontSize: 10, color: Colors.black87)),
+                    ),
+                  ],
+                ),
+                const TableRow(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('System: Tashil Business', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('Payment: Official / Cash', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ),
 
-          const SizedBox(height: 6),
+            const SizedBox(height: 10),
 
-          // 3. Payment Split Table
-          Table(
-            border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
-            columnWidths: const {
-              0: FlexColumnWidth(2.0),
-              1: FlexColumnWidth(0.9),
-              2: FlexColumnWidth(1.3),
-            },
-            children: [
-              const TableRow(
-                decoration: BoxDecoration(color: Color(0xFF0D47A1)),
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-                    child: Text(
-                      'Payment Split (توزيع التحصيل)',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
-                      textAlign: TextAlign.center,
+            // 2. Main Items Table (LTR: Description -> Qty -> Price -> Total (EGP))
+            Table(
+              border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
+              columnWidths: const {
+                0: FlexColumnWidth(2.2),
+                1: FlexColumnWidth(0.7),
+                2: FlexColumnWidth(1.0),
+                3: FlexColumnWidth(1.3),
+              },
+              children: [
+                const TableRow(
+                  decoration: BoxDecoration(color: Color(0xFF0D47A1)),
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      child: Text(
+                        'Description',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 2, vertical: 5),
-                    child: Text(
-                      'Ratio',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
-                      textAlign: TextAlign.center,
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      child: Text(
+                        'Qty',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-                    child: Text(
-                      'Amount (EGP)',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
-                      textAlign: TextAlign.center,
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      child: Text(
+                        'Price',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
-                ],
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      child: Text(
+                        'Total (EGP)',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Item 1: Electronic Receipts (Shows Remaining Qty if _showRemainingInvoice is true)
+                TableRow(
+                  decoration: const BoxDecoration(color: Colors.white),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      child: Text(
+                        _showRemainingInvoice
+                            ? 'Issuing official electronic payment receipts\n(Remaining Balance)'
+                            : 'Issuing official electronic payment receipts',
+                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      child: Text(
+                        NumberFormat('#,##0').format(_invoiceReceiptsQty),
+                        style: const TextStyle(fontSize: 10, color: Colors.black87),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      child: Text(
+                        _formatAmountOnly(_receiptUnitPrice),
+                        style: const TextStyle(fontSize: 10, color: Colors.black87),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      child: Text(
+                        _formatAmountOnly(_invoiceReceiptsTotal),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Item 2: Advertising Company Subscription
+                TableRow(
+                  decoration: const BoxDecoration(color: Color(0xFFFAFAFA)),
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      child: Text(
+                        'Advertising Company Subscription',
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      child: Text(
+                        '$_adCompanyCount',
+                        style: const TextStyle(fontSize: 10, color: Colors.black87),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      child: Text(
+                        _formatAmountOnly(_adCompanyUnitPrice),
+                        style: const TextStyle(fontSize: 10, color: Colors.black87),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      child: Text(
+                        _formatAmountOnly(_adCompanyTotalAmount),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Grand Total Row
+                TableRow(
+                  decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      child: Text(''),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      child: Text(''),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      child: Text(
+                        _showRemainingInvoice ? 'Net Total' : 'Grand Total',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5, color: Color(0xFF0D47A1)),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Container(
+                      color: const Color(0xFF0D47A1),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      child: Text(
+                        _formatAmountOnly(_invoiceGrandTotal),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 10.5),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            // Written Amount Note (English only)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+              child: Text(
+                _numberToWordsEnglish(_invoiceGrandTotal),
+                style: const TextStyle(
+                  fontStyle: FontStyle.italic,
+                  fontSize: 9.5,
+                  color: Color(0xFF1E3A8A),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              TableRow(
-                decoration: const BoxDecoration(color: Colors.white),
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-                    child: Text(
-                      'Tashil Delegate Business (تطبيق تسهيل)',
-                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+            ),
+
+            const SizedBox(height: 6),
+
+            // 3. Payment Split Table (LTR: Payment Split -> Ratio -> Amount (EGP))
+            Table(
+              border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
+              columnWidths: const {
+                0: FlexColumnWidth(2.0),
+                1: FlexColumnWidth(0.9),
+                2: FlexColumnWidth(1.3),
+              },
+              children: [
+                const TableRow(
+                  decoration: BoxDecoration(color: Color(0xFF0D47A1)),
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                      child: Text(
+                        'Payment Split',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
-                    child: Text(
-                      '${_tashilPercentage.toStringAsFixed(0)}%',
-                      style: const TextStyle(fontSize: 9.5, color: Colors.black87),
-                      textAlign: TextAlign.center,
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+                      child: Text(
+                        'Ratio',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-                    child: Text(
-                      _formatAmountOnly(_invoiceTashilAmount),
-                      style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.black87),
-                      textAlign: TextAlign.right,
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                      child: Text(
+                        'Amount (EGP)',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              TableRow(
-                decoration: const BoxDecoration(color: Color(0xFFFAFAFA)),
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-                    child: Text(
-                      'Fathalla Market (فتح الله ماركت)',
-                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                  ],
+                ),
+                TableRow(
+                  decoration: const BoxDecoration(color: Colors.white),
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                      child: Text(
+                        'Tashil Delegate Business',
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
-                    child: Text(
-                      '${_marketPercentage.toStringAsFixed(0)}%',
-                      style: const TextStyle(fontSize: 9.5, color: Colors.black87),
-                      textAlign: TextAlign.center,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+                      child: Text(
+                        '${_tashilPercentage.toStringAsFixed(0)}%',
+                        style: const TextStyle(fontSize: 9.5, color: Colors.black87),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-                    child: Text(
-                      _formatAmountOnly(_invoiceMarketAmount),
-                      style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.black87),
-                      textAlign: TextAlign.right,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                      child: Text(
+                        _formatAmountOnly(_invoiceTashilAmount),
+                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                        textAlign: TextAlign.right,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              TableRow(
-                decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-                    child: Text(
-                      'Total (الإجمالي)',
-                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
+                  ],
+                ),
+                TableRow(
+                  decoration: const BoxDecoration(color: Color(0xFFFAFAFA)),
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                      child: Text(
+                        'Fathalla Market',
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                      ),
                     ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 2, vertical: 5),
-                    child: Text(
-                      '100%',
-                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
-                      textAlign: TextAlign.center,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+                      child: Text(
+                        '${_marketPercentage.toStringAsFixed(0)}%',
+                        style: const TextStyle(fontSize: 9.5, color: Colors.black87),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-                    child: Text(
-                      _formatAmountOnly(_invoiceGrandTotal),
-                      style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
-                      textAlign: TextAlign.right,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                      child: Text(
+                        _formatAmountOnly(_invoiceMarketAmount),
+                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                        textAlign: TextAlign.right,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
+                  ],
+                ),
+                TableRow(
+                  decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                      child: Text(
+                        'Total',
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+                      child: Text(
+                        '100%',
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                      child: Text(
+                        _formatAmountOnly(_invoiceGrandTotal),
+                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1764,11 +1758,24 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     final docId = item['id']?.toString() ?? '';
     final qty = (item['receiptsCount'] as num? ?? 0).toInt();
     final amount = (item['collectedAmount'] as num? ?? 0.0).toDouble();
-    final paymentMethod = item['paymentMethod']?.toString() ?? 'نقداً (Cash)';
+    final paymentMethodRaw = item['paymentMethod']?.toString() ?? 'Cash';
     final notes = item['notes']?.toString() ?? '';
     final createdBy = item['createdBy']?.toString() ?? '';
     final createdAt = (item['createdAt'] as Timestamp?)?.toDate();
-    final dateStr = createdAt != null ? DateFormat('yyyy-MM-dd  hh:mm a').format(createdAt) : 'غير محدد';
+    final dateStr = createdAt != null ? DateFormat('yyyy-MM-dd  hh:mm a', 'en_US').format(createdAt) : 'N/A';
+
+    String paymentMethod = paymentMethodRaw;
+    if (paymentMethodRaw.contains('نقداً') || paymentMethodRaw.toLowerCase() == 'cash') {
+      paymentMethod = 'Cash';
+    } else if (paymentMethodRaw.contains('تحويل') || paymentMethodRaw.toLowerCase().contains('bank')) {
+      paymentMethod = 'Bank Transfer';
+    } else if (paymentMethodRaw.contains('شيك') || paymentMethodRaw.toLowerCase().contains('cheque')) {
+      paymentMethod = 'Cheque';
+    } else if (paymentMethodRaw.contains('إلكتروني') || paymentMethodRaw.toLowerCase().contains('online') || paymentMethodRaw.toLowerCase().contains('card')) {
+      paymentMethod = 'Online / Card';
+    } else if (paymentMethodRaw.contains('خصم') || paymentMethodRaw.toLowerCase().contains('deduction')) {
+      paymentMethod = 'Deduction from Dues';
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1798,7 +1805,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'دفعة تحصيل: $qty إيصال',
+                          'Collection Entry: $qty Receipts',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         Text(
@@ -1845,7 +1852,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded, color: Colors.grey, size: 18),
-                  tooltip: 'حذف عملية التحصيل',
+                  tooltip: 'Delete Collection Entry',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   onPressed: () => _deleteCollectionTransaction(docId, qty, amount),
@@ -1856,7 +1863,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(
-                'ملاحظات: $notes',
+                'Notes: $notes',
                 style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
               ),
             ],
