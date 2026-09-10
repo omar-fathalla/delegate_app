@@ -16,6 +16,8 @@ class UploadCapturedPhoto implements UseCase<CapturedPhoto, UploadCapturedPhotoP
     return repository.uploadPhoto(
       organizationUID: params.organizationUID,
       companyUID: params.companyUID,
+      companyName: params.companyName,
+      companyCode: params.companyCode,
       permissionId: params.permissionId,
       branchId: params.branchId,
       branchName: params.branchName,
@@ -32,6 +34,8 @@ class UploadCapturedPhoto implements UseCase<CapturedPhoto, UploadCapturedPhotoP
 class UploadCapturedPhotoParams extends Equatable {
   final String organizationUID;
   final String companyUID;
+  final String companyName;
+  final int? companyCode;
   final String permissionId;
   final String branchId;
   final String branchName;
@@ -45,6 +49,8 @@ class UploadCapturedPhotoParams extends Equatable {
   const UploadCapturedPhotoParams({
     required this.organizationUID,
     required this.companyUID,
+    this.companyName = '',
+    this.companyCode,
     required this.permissionId,
     required this.branchId,
     required this.branchName,
@@ -60,6 +66,8 @@ class UploadCapturedPhotoParams extends Equatable {
   List<Object?> get props => [
         organizationUID,
         companyUID,
+        companyName,
+        companyCode,
         permissionId,
         branchId,
         branchName,

@@ -95,4 +95,21 @@ class DeleteNotificationRequested extends NotificationEvent {
   List<Object?> get props => [notificationId, delegateUid, organizationId, phoneNumber];
 }
 
+class DeleteAllNotificationsRequested extends NotificationEvent {
+  final String delegateUid;
+  final String organizationId;
+  final String? phoneNumber;
+  final List<String> notificationIds;
+
+  const DeleteAllNotificationsRequested({
+    required this.delegateUid,
+    required this.organizationId,
+    this.phoneNumber,
+    required this.notificationIds,
+  });
+
+  @override
+  List<Object?> get props => [delegateUid, organizationId, phoneNumber, notificationIds];
+}
+
 

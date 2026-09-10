@@ -40,6 +40,10 @@ class DelegateModel extends Delegate {
     required super.documents,
     super.role,
     super.email,
+    super.boundDeviceId,
+    super.boundDeviceModel,
+    super.deviceBoundAt,
+    super.isDeviceLocked = false,
   });
 
   factory DelegateModel.fromJson(Map<String, dynamic> json, String uid) {
@@ -167,6 +171,10 @@ class DelegateModel extends Delegate {
           .toList(),
       role: parseRole(json['role']),
       email: json['email'],
+      boundDeviceId: json['boundDeviceId'],
+      boundDeviceModel: json['boundDeviceModel'],
+      deviceBoundAt: DateTimeUtils.parseNullableDate(json['deviceBoundAt']),
+      isDeviceLocked: json['isDeviceLocked'] ?? false,
     );
   }
 
@@ -256,6 +264,10 @@ class DelegateModel extends Delegate {
           .toList(),
       'role': roleToString(role),
       'email': email,
+      'boundDeviceId': boundDeviceId,
+      'boundDeviceModel': boundDeviceModel,
+      'deviceBoundAt': deviceBoundAt != null ? Timestamp.fromDate(deviceBoundAt!) : null,
+      'isDeviceLocked': isDeviceLocked,
     };
   }
 
@@ -325,6 +337,10 @@ class DelegateModel extends Delegate {
           .toList(),
       'role': roleToString(role),
       'email': email,
+      'boundDeviceId': boundDeviceId,
+      'boundDeviceModel': boundDeviceModel,
+      'deviceBoundAt': deviceBoundAt?.toIso8601String(),
+      'isDeviceLocked': isDeviceLocked,
     };
   }
 }

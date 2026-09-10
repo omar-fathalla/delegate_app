@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
 import 'package:delegate_app/features/penalties/domain/entities/standard_violation.dart';
@@ -14,8 +15,29 @@ import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evi
 
 class AdminCreatePenaltyPage extends StatefulWidget {
   final Delegate adminDelegate;
+  final PenaltyEntity? penaltyToEdit;
+  final String? initialCompanyId;
+  final String? initialCompanyName;
+  final String? initialDelegateId;
+  final String? initialDelegateName;
+  final String? initialBranchId;
+  final String? initialBranchName;
+  final int? initialViolationId;
+  final String? initialIncidentDetails;
 
-  const AdminCreatePenaltyPage({super.key, required this.adminDelegate});
+  const AdminCreatePenaltyPage({
+    super.key,
+    required this.adminDelegate,
+    this.penaltyToEdit,
+    this.initialCompanyId,
+    this.initialCompanyName,
+    this.initialDelegateId,
+    this.initialDelegateName,
+    this.initialBranchId,
+    this.initialBranchName,
+    this.initialViolationId,
+    this.initialIncidentDetails,
+  });
 
   @override
   State<AdminCreatePenaltyPage> createState() => _AdminCreatePenaltyPageState();
@@ -27,6 +49,8 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
   final _descriptionController = TextEditingController();
   final _fineAmountController = TextEditingController();
   final _picker = ImagePicker();
+
+  bool get _isEditMode => widget.penaltyToEdit != null;
 
   String? _selectedCompanyId;
   String? _selectedCompanyName;
@@ -47,13 +71,97 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
   List<Map<String, String>> _companies = [];
   bool _isLoadingCompanies = true;
 
+  List<EvidenceFile> _existingEvidenceFiles = [];
   final List<File> _attachedFiles = [];
 
   bool _isRepeated = false;
 
+  String? get _effectiveCompanyId =>
+      (widget.penaltyToEdit?.companyId.isNotEmpty == true)
+          ? widget.penaltyToEdit!.companyId
+          : widget.initialCompanyId;
+
+  String? get _effectiveCompanyName =>
+      (widget.penaltyToEdit?.companyName.isNotEmpty == true)
+          ? widget.penaltyToEdit!.companyName
+          : widget.initialCompanyName;
+
+  String? get _effectiveBranchId =>
+      (widget.penaltyToEdit?.branchId?.isNotEmpty == true)
+          ? widget.penaltyToEdit!.branchId
+          : widget.initialBranchId;
+
+  String? get _effectiveBranchName =>
+      (widget.penaltyToEdit?.branchName?.isNotEmpty == true)
+          ? widget.penaltyToEdit!.branchName
+          : widget.initialBranchName;
+
+  String? get _effectiveDelegateId =>
+      (widget.penaltyToEdit?.targetDelegateId?.isNotEmpty == true)
+          ? widget.penaltyToEdit!.targetDelegateId
+          : widget.initialDelegateId;
+
+  String? get _effectiveDelegateName =>
+      (widget.penaltyToEdit?.targetDelegateName?.isNotEmpty == true)
+          ? widget.penaltyToEdit!.targetDelegateName
+          : widget.initialDelegateName;
+
   @override
   void initState() {
     super.initState();
+    if (widget.penaltyToEdit != null) {
+      final p = widget.penaltyToEdit!;
+      _selectedCompanyId = p.companyId.isNotEmpty ? p.companyId : null;
+      _selectedCompanyName = p.companyName.isNotEmpty ? p.companyName : null;
+      _selectedBranchId = (p.branchId?.isNotEmpty == true) ? p.branchId : null;
+      _selectedBranchName = (p.branchName?.isNotEmpty == true) ? p.branchName : null;
+      _selectedDelegateId = (p.targetDelegateId?.isNotEmpty == true) ? p.targetDelegateId : null;
+      _selectedDelegateName = (p.targetDelegateName?.isNotEmpty == true) ? p.targetDelegateName : null;
+      _selectedCategory = p.category;
+      _titleController.text = p.title;
+      _descriptionController.text = p.incidentDescription;
+      _fineAmountController.text = p.fineAmount.toStringAsFixed(0);
+      _isRepeated = p.isRepeated;
+      _existingEvidenceFiles = List<EvidenceFile>.from(p.evidenceFiles);
+
+      // Match official violation if possible
+      final cleanTitle = p.title.replaceAll('(مخالفة مكررة)', '').trim();
+      for (var v in officialViolationsSchedule) {
+        if (v.title.trim().toLowerCase() == cleanTitle.toLowerCase() ||
+            p.title.trim().toLowerCase() == v.title.trim().toLowerCase() ||
+            cleanTitle.toLowerCase().contains(v.title.trim().toLowerCase()) ||
+            v.title.trim().toLowerCase().contains(cleanTitle.toLowerCase())) {
+          _selectedOfficialViolation = v;
+          break;
+        }
+      }
+    } else {
+      if (widget.initialViolationId != null) {
+        final violation = officialViolationsSchedule.firstWhere(
+          (v) => v.id == widget.initialViolationId,
+          orElse: () => officialViolationsSchedule.firstWhere(
+            (v) => v.id == 28,
+            orElse: () => officialViolationsSchedule.first,
+          ),
+        );
+        _applyViolationSelection(violation, false);
+      }
+      if (widget.initialIncidentDetails != null && widget.initialIncidentDetails!.isNotEmpty) {
+        _descriptionController.text = widget.initialIncidentDetails!;
+      }
+      if (widget.initialCompanyId != null && widget.initialCompanyId!.isNotEmpty) {
+        _selectedCompanyId = widget.initialCompanyId;
+        _selectedCompanyName = widget.initialCompanyName;
+      }
+      if (widget.initialBranchId != null && widget.initialBranchId!.isNotEmpty) {
+        _selectedBranchId = widget.initialBranchId;
+        _selectedBranchName = widget.initialBranchName;
+      }
+      if (widget.initialDelegateId != null && widget.initialDelegateId!.isNotEmpty) {
+        _selectedDelegateId = widget.initialDelegateId;
+        _selectedDelegateName = widget.initialDelegateName;
+      }
+    }
     _fetchCompanies();
     _fetchBranches();
   }
@@ -100,7 +208,41 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       String? initialSelectedId;
       String? initialSelectedName;
 
-      if (pinnedIds.isNotEmpty) {
+      final targetBranchId = _selectedBranchId ?? _effectiveBranchId;
+      final targetBranchName = _selectedBranchName ?? _effectiveBranchName;
+
+      if (targetBranchId != null && targetBranchId.isNotEmpty) {
+        final match = list.firstWhere(
+          (b) => b['id'] == targetBranchId,
+          orElse: () => list.firstWhere(
+            (b) => (b['name'] ?? '').trim().toLowerCase() == (targetBranchName ?? '').trim().toLowerCase() ||
+                   (targetBranchName != null && (b['name'] ?? '').trim().toLowerCase().contains(targetBranchName.trim().toLowerCase())),
+            orElse: () => {
+              'id': targetBranchId,
+              'name': targetBranchName ?? targetBranchId,
+            },
+          ),
+        );
+        if (!list.any((b) => b['id'] == match['id'])) {
+          list.add(match);
+        }
+        initialSelectedId = match['id'];
+        initialSelectedName = match['name'];
+      } else if (targetBranchName != null && targetBranchName.isNotEmpty) {
+        final match = list.firstWhere(
+          (b) => (b['name'] ?? '').trim().toLowerCase() == targetBranchName.trim().toLowerCase() ||
+                 (b['name'] ?? '').trim().toLowerCase().contains(targetBranchName.trim().toLowerCase()),
+          orElse: () => {
+            'id': 'branch_$targetBranchName',
+            'name': targetBranchName,
+          },
+        );
+        if (!list.any((b) => b['id'] == match['id'])) {
+          list.add(match);
+        }
+        initialSelectedId = match['id'];
+        initialSelectedName = match['name'];
+      } else if (pinnedIds.isNotEmpty) {
         initialSelectedId = pinnedIds.first;
         final match = list.firstWhere((b) => b['id'] == pinnedIds.first);
         initialSelectedName = match['name'];
@@ -176,25 +318,89 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
 
       if (!mounted) return;
 
-      final list = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'name': data['name']?.toString() ?? data['companyName']?.toString() ?? doc.id,
-        };
-      }).toList();
+      final Map<String, Map<String, String>> compMap = {};
 
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final name = data['name']?.toString() ?? data['companyName']?.toString() ?? doc.id;
+        compMap[doc.id] = {
+          'id': doc.id,
+          'name': name,
+        };
+      }
+
+      // Also check root /companies in Firestore
+      try {
+        final rootCompSnap = await firestore.collection('companies').get();
+        for (var doc in rootCompSnap.docs) {
+          final data = doc.data();
+          final name = data['name']?.toString() ?? data['companyName']?.toString() ?? doc.id;
+          if (!compMap.containsKey(doc.id)) {
+            compMap[doc.id] = {
+              'id': doc.id,
+              'name': name,
+            };
+          }
+        }
+      } catch (_) {}
+
+      final list = compMap.values.toList();
       list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+
+      String? targetCompId;
+      String? targetCompName;
+
+      final initCompId = _selectedCompanyId ?? _effectiveCompanyId;
+      final initCompName = _selectedCompanyName ?? _effectiveCompanyName;
+
+      if (initCompId != null && initCompId.isNotEmpty) {
+        final match = list.firstWhere(
+          (c) => c['id'] == initCompId,
+          orElse: () => list.firstWhere(
+            (c) => (c['name'] ?? '').trim().toLowerCase() == (initCompName ?? '').trim().toLowerCase() ||
+                   (initCompName != null && (c['name'] ?? '').trim().toLowerCase().contains(initCompName.trim().toLowerCase())) ||
+                   (initCompName != null && initCompName.trim().toLowerCase().contains((c['name'] ?? '').trim().toLowerCase())),
+            orElse: () => {
+              'id': initCompId,
+              'name': initCompName?.isNotEmpty == true ? initCompName! : initCompId,
+            },
+          ),
+        );
+        if (!list.any((c) => c['id'] == match['id'])) {
+          list.add(match);
+        }
+        targetCompId = match['id'];
+        targetCompName = match['name'];
+      } else if (initCompName != null && initCompName.isNotEmpty) {
+        final match = list.firstWhere(
+          (c) => (c['name'] ?? '').trim().toLowerCase() == initCompName.trim().toLowerCase() ||
+                 (c['name'] ?? '').trim().toLowerCase().contains(initCompName.trim().toLowerCase()) ||
+                 initCompName.trim().toLowerCase().contains((c['name'] ?? '').trim().toLowerCase()),
+          orElse: () => {
+            'id': 'comp_$initCompName',
+            'name': initCompName,
+          },
+        );
+        if (!list.any((c) => c['id'] == match['id'])) {
+          list.add(match);
+        }
+        targetCompId = match['id'];
+        targetCompName = match['name'];
+      } else if (list.isNotEmpty) {
+        targetCompId = list.first['id'];
+        targetCompName = list.first['name'];
+      }
 
       setState(() {
         _companies = list;
-        if (list.isNotEmpty) {
-          _selectedCompanyId = list.first['id'];
-          _selectedCompanyName = list.first['name'];
-          _fetchCompanyDelegates(list.first['id']!);
-        }
+        _selectedCompanyId = targetCompId;
+        _selectedCompanyName = targetCompName;
         _isLoadingCompanies = false;
       });
+
+      if (targetCompId != null && targetCompId.isNotEmpty) {
+        _fetchCompanyDelegates(targetCompId);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -203,12 +409,14 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
     }
   }
 
-  Future<void> _fetchCompanyDelegates(String companyId) async {
+  Future<void> _fetchCompanyDelegates(String companyId, {bool resetSelection = false}) async {
     setState(() {
       _isLoadingDelegates = true;
       _companyDelegates = [];
-      _selectedDelegateId = null;
-      _selectedDelegateName = null;
+      if (resetSelection) {
+        _selectedDelegateId = null;
+        _selectedDelegateName = null;
+      }
     });
 
     try {
@@ -244,38 +452,110 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       }
 
       // Strategy 2: Fetch from users collection filtering out supervisors/admins
-      final userSnapshot = await firestore
-          .collection('users')
-          .where('companyUID', isEqualTo: companyId)
-          .get();
+      try {
+        final userSnapshot = await firestore
+            .collection('users')
+            .where('companyUID', isEqualTo: companyId)
+            .get();
 
-      for (var doc in userSnapshot.docs) {
-        final data = doc.data();
-        final role = data['role']?.toString().toLowerCase() ?? '';
-        // Skip supervisors, admins, company_admins
-        if (role.contains('admin') || role.contains('supervisor') || role.contains('manager')) {
-          continue;
+        for (var doc in userSnapshot.docs) {
+          final data = doc.data();
+          final role = data['role']?.toString().toLowerCase() ?? '';
+          if (role.contains('admin') || role.contains('supervisor') || role.contains('manager')) {
+            continue;
+          }
+
+          final name = data['displayName']?.toString() ??
+              data['fullName']?.toString() ??
+              data['name']?.toString() ??
+              doc.id;
+          final phone = data['phoneNumber']?.toString() ?? data['phone']?.toString() ?? '';
+
+          delegatesMap[doc.id] = {
+            'id': doc.id,
+            'name': name,
+            'phone': phone,
+          };
         }
+      } catch (_) {}
 
-        final name = data['displayName']?.toString() ??
-            data['fullName']?.toString() ??
-            data['name']?.toString() ??
-            doc.id;
-        final phone = data['phoneNumber']?.toString() ?? data['phone']?.toString() ?? '';
+      // Strategy 3: Also query users matching companyName
+      if (_selectedCompanyName != null && _selectedCompanyName!.isNotEmpty) {
+        try {
+          final nameSnapshot = await firestore
+              .collection('users')
+              .where('companyName', isEqualTo: _selectedCompanyName)
+              .get();
 
-        delegatesMap[doc.id] = {
-          'id': doc.id,
-          'name': name,
-          'phone': phone,
-        };
+          for (var doc in nameSnapshot.docs) {
+            final data = doc.data();
+            final role = data['role']?.toString().toLowerCase() ?? '';
+            if (role.contains('admin') || role.contains('supervisor') || role.contains('manager')) {
+              continue;
+            }
+
+            final name = data['displayName']?.toString() ??
+                data['fullName']?.toString() ??
+                data['name']?.toString() ??
+                doc.id;
+            final phone = data['phoneNumber']?.toString() ?? data['phone']?.toString() ?? '';
+
+            delegatesMap[doc.id] = {
+              'id': doc.id,
+              'name': name,
+              'phone': phone,
+            };
+          }
+        } catch (_) {}
       }
 
       final list = delegatesMap.values.toList();
       list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
 
+      String? targetDelId = resetSelection ? null : (_selectedDelegateId ?? _effectiveDelegateId);
+      String? targetDelName = resetSelection ? null : (_selectedDelegateName ?? _effectiveDelegateName);
+
+      if (targetDelId != null && targetDelId.isNotEmpty) {
+        final nonNullId = targetDelId;
+        final match = list.firstWhere(
+          (d) => d['id'] == nonNullId,
+          orElse: () => list.firstWhere(
+            (d) => (targetDelName != null && (d['name'] ?? '').trim().toLowerCase() == targetDelName.trim().toLowerCase()) ||
+                   (targetDelName != null && (d['name'] ?? '').trim().toLowerCase().contains(targetDelName.trim().toLowerCase())),
+            orElse: () => {
+              'id': nonNullId,
+              'name': targetDelName ?? nonNullId,
+            },
+          ),
+        );
+        if (!list.any((d) => d['id'] == match['id'])) {
+          list.add(match);
+        }
+        targetDelId = match['id'];
+        targetDelName = match['name'];
+      } else if (targetDelName != null && targetDelName.isNotEmpty) {
+        final nonNullName = targetDelName;
+        final match = list.firstWhere(
+          (d) => (d['name'] ?? '').trim().toLowerCase() == nonNullName.trim().toLowerCase() ||
+                 (d['name'] ?? '').trim().toLowerCase().contains(nonNullName.trim().toLowerCase()) ||
+                 nonNullName.trim().toLowerCase().contains((d['name'] ?? '').trim().toLowerCase()),
+          orElse: () => {
+            'id': 'del_$nonNullName',
+            'name': nonNullName,
+          },
+        );
+        if (!list.any((d) => d['id'] == match['id'])) {
+          list.add(match);
+        }
+        targetDelId = match['id'];
+        targetDelName = match['name'];
+      }
+
       if (!mounted) return;
       setState(() {
         _companyDelegates = list;
+        _selectedDelegateId = targetDelId;
+        _selectedDelegateName = targetDelName;
         _isLoadingDelegates = false;
       });
     } catch (_) {
@@ -399,7 +679,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
               _selectedCompanyId = id;
               _selectedCompanyName = name;
             });
-            _fetchCompanyDelegates(id);
+            _fetchCompanyDelegates(id, resetSelection: true);
           },
         );
       },
@@ -436,37 +716,76 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
     final finalTitle = _isRepeated ? '$rawTitle (مخالفة مكررة)' : rawTitle;
     final fineAmount = double.tryParse(_fineAmountController.text) ?? 0.0;
 
-    final penalty = PenaltyEntity(
-      penaltyId: '',
-      companyId: _selectedCompanyId!,
-      companyName: _selectedCompanyName ?? _selectedCompanyId!,
-      branchId: _selectedBranchId,
-      branchName: _selectedBranchName,
-      createdById: widget.adminDelegate.uid,
-      createdByName: widget.adminDelegate.fullName,
-      createdByPhone: widget.adminDelegate.phoneNumber.isNotEmpty
-          ? widget.adminDelegate.phoneNumber
-          : null,
-      title: finalTitle,
-      category: _selectedCategory,
-      incidentDescription: _descriptionController.text.trim(),
-      fineAmount: fineAmount,
-      currency: 'EGP',
-      status: PenaltyStatus.pendingBranchesMarketing,
-      evidenceFiles: const [],
-      targetDelegateId: _selectedDelegateId,
-      targetDelegateName: _selectedDelegateName,
-      isRepeated: _isRepeated,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+    if (_isEditMode) {
+      final old = widget.penaltyToEdit!;
+      final updatedPenalty = PenaltyEntity(
+        penaltyId: old.penaltyId,
+        companyId: _selectedCompanyId!,
+        companyName: _selectedCompanyName ?? _selectedCompanyId!,
+        branchId: _selectedBranchId,
+        branchName: _selectedBranchName,
+        createdById: old.createdById,
+        createdByName: old.createdByName,
+        createdByPhone: old.createdByPhone ??
+            (widget.adminDelegate.phoneNumber.isNotEmpty ? widget.adminDelegate.phoneNumber : null),
+        title: finalTitle,
+        category: _selectedCategory,
+        incidentDescription: _descriptionController.text.trim(),
+        fineAmount: fineAmount,
+        currency: old.currency,
+        status: old.status,
+        evidenceFiles: _existingEvidenceFiles,
+        branchesMarketingApprovedBy: old.branchesMarketingApprovedBy,
+        branchesMarketingApprovedAt: old.branchesMarketingApprovedAt,
+        generalManagerApprovedBy: old.generalManagerApprovedBy,
+        generalManagerApprovedAt: old.generalManagerApprovedAt,
+        rejectionReason: old.rejectionReason,
+        targetDelegateId: _selectedDelegateId,
+        targetDelegateName: _selectedDelegateName,
+        isRepeated: _isRepeated,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
 
-    context.read<PenaltyBloc>().add(
-          CreatePenaltyRequestedEvent(
-            penalty: penalty,
-            evidenceFilesToUpload: _attachedFiles,
-          ),
-        );
+      context.read<PenaltyBloc>().add(
+            UpdatePenaltyRequestedEvent(
+              penalty: updatedPenalty,
+              newEvidenceFilesToUpload: _attachedFiles,
+            ),
+          );
+    } else {
+      final penalty = PenaltyEntity(
+        penaltyId: '',
+        companyId: _selectedCompanyId!,
+        companyName: _selectedCompanyName ?? _selectedCompanyId!,
+        branchId: _selectedBranchId,
+        branchName: _selectedBranchName,
+        createdById: widget.adminDelegate.uid,
+        createdByName: widget.adminDelegate.fullName,
+        createdByPhone: widget.adminDelegate.phoneNumber.isNotEmpty
+            ? widget.adminDelegate.phoneNumber
+            : null,
+        title: finalTitle,
+        category: _selectedCategory,
+        incidentDescription: _descriptionController.text.trim(),
+        fineAmount: fineAmount,
+        currency: 'EGP',
+        status: PenaltyStatus.pendingBranchesMarketing,
+        evidenceFiles: const [],
+        targetDelegateId: _selectedDelegateId,
+        targetDelegateName: _selectedDelegateName,
+        isRepeated: _isRepeated,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      context.read<PenaltyBloc>().add(
+            CreatePenaltyRequestedEvent(
+              penalty: penalty,
+              evidenceFilesToUpload: _attachedFiles,
+            ),
+          );
+    }
   }
 
   @override
@@ -484,9 +803,9 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'تسجيل غرامة ومخالفة جديدة',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          _isEditMode ? 'تعديل بيانات ومستندات الغرامة' : 'تسجيل غرامة ومخالفة جديدة',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       body: BlocListener<PenaltyBloc, PenaltyState>(
@@ -620,7 +939,10 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                             ),
                           )
                         : DropdownButtonFormField<String?>(
-                            initialValue: _selectedDelegateId,
+                            key: ValueKey('delegate_${_selectedDelegateId}_${_companyDelegates.length}'),
+                            initialValue: _companyDelegates.any((d) => d['id'] == _selectedDelegateId)
+                                ? _selectedDelegateId
+                                : null,
                             isExpanded: true,
                             decoration: InputDecoration(
                               hintText: 'بدون تحديد مندوب (على الشركة فقط)',
@@ -824,7 +1146,13 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                         ),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<StandardViolation>(
-                          initialValue: _selectedOfficialViolation,
+                          key: ValueKey('violation_${_selectedOfficialViolation?.id}'),
+                          initialValue: _selectedOfficialViolation != null
+                              ? officialViolationsSchedule.firstWhere(
+                                  (v) => v.id == _selectedOfficialViolation!.id,
+                                  orElse: () => _selectedOfficialViolation!,
+                                )
+                              : null,
                           isExpanded: true,
                           decoration: InputDecoration(
                             hintText:
@@ -1016,15 +1344,127 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  if (_attachedFiles.isEmpty)
+
+                  // Existing Files (In Edit Mode)
+                  if (_existingEvidenceFiles.isNotEmpty) ...[
                     Text(
-                      'لم يتم إرفاق أي صور أو مستندات حتى الآن',
+                      'المستندات الحالية المحفوظة (${_existingEvidenceFiles.length}):',
                       style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 13,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
                       ),
-                    )
-                  else
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: _existingEvidenceFiles.map((ev) {
+                        final isImg = ev.fileType.toUpperCase() == 'IMAGE' ||
+                            ev.fileType.toUpperCase() == 'IMG' ||
+                            ev.fileName.toLowerCase().endsWith('.jpg') ||
+                            ev.fileName.toLowerCase().endsWith('.jpeg') ||
+                            ev.fileName.toLowerCase().endsWith('.png') ||
+                            ev.fileName.toLowerCase().endsWith('.webp');
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: colorScheme.primary.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: () {
+                                  if (isImg) {
+                                    PenaltyEvidenceViewer.showImageLightbox(
+                                      context,
+                                      imageUrl: ev.fileUrl,
+                                      title: _titleController.text.isNotEmpty
+                                          ? _titleController.text
+                                          : 'معاينة المستند',
+                                      fileName: ev.fileName,
+                                    );
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(6),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isImg)
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: CachedNetworkImage(
+                                          imageUrl: ev.fileUrl,
+                                          width: 28,
+                                          height: 28,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (context, url, error) => const Icon(Icons.broken_image_rounded, size: 20),
+                                        ),
+                                      )
+                                    else
+                                      Icon(
+                                        ev.fileType == 'PDF'
+                                            ? Icons.picture_as_pdf_rounded
+                                            : Icons.insert_drive_file_rounded,
+                                        size: 20,
+                                        color: colorScheme.primary,
+                                      ),
+                                    const SizedBox(width: 8),
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 130),
+                                      child: Text(
+                                        ev.fileName,
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _existingEvidenceFiles.remove(ev);
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(2.0),
+                                  child: Icon(
+                                    Icons.cancel_rounded,
+                                    size: 18,
+                                    color: colorScheme.error,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // New Attached Files
+                  if (_attachedFiles.isNotEmpty) ...[
+                    if (_existingEvidenceFiles.isNotEmpty)
+                      Text(
+                        'الملفات الجديدة المضافة حديثاً (${_attachedFiles.length}):',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade800,
+                        ),
+                      ),
+                    if (_existingEvidenceFiles.isNotEmpty) const SizedBox(height: 6),
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
@@ -1099,6 +1539,16 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                         );
                       }).toList(),
                     ),
+                  ],
+
+                  if (_existingEvidenceFiles.isEmpty && _attachedFiles.isEmpty)
+                    Text(
+                      'لم يتم إرفاق أي صور أو مستندات حتى الآن',
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 13,
+                      ),
+                    ),
 
                   const SizedBox(height: 32),
 
@@ -1113,6 +1563,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                         child: FilledButton(
                           onPressed: isLoading ? null : _submitForm,
                           style: FilledButton.styleFrom(
+                            backgroundColor: _isEditMode ? colorScheme.primary : null,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
@@ -1132,7 +1583,9 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                                     ),
                                     const SizedBox(width: 12),
                                     Text(
-                                      'جاري تسجيل الغرامة...',
+                                      _isEditMode
+                                          ? 'جاري حفظ التعديلات والمستندات...'
+                                          : 'جاري تسجيل الغرامة...',
                                       style: theme.textTheme.titleMedium?.copyWith(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -1145,10 +1598,17 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(Icons.gavel_rounded, size: 22),
+                                      Icon(
+                                        _isEditMode
+                                            ? Icons.save_rounded
+                                            : Icons.gavel_rounded,
+                                        size: 22,
+                                      ),
                                       const SizedBox(width: 10),
                                       Text(
-                                        'تسجيل وإصدار الغرامة',
+                                        _isEditMode
+                                            ? 'حفظ التعديلات والمستندات'
+                                            : 'تسجيل وإصدار الغرامة',
                                         style: theme.textTheme.titleMedium
                                             ?.copyWith(
                                           color: Colors.white,

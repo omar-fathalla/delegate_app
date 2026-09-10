@@ -7,6 +7,8 @@ class CapturedPhotoModel extends CapturedPhoto {
     required super.permissionId,
     required super.organizationUID,
     required super.companyUID,
+    super.companyName = '',
+    super.companyCode,
     required super.branchId,
     required super.branchName,
     required super.delegateUID,
@@ -28,6 +30,12 @@ class CapturedPhotoModel extends CapturedPhoto {
       permissionId: data['permissionId']?.toString() ?? '',
       organizationUID: data['organizationUID']?.toString() ?? '',
       companyUID: data['companyUID']?.toString() ?? '',
+      companyName: data['companyName']?.toString() ?? '',
+      companyCode: data['companyCode'] != null
+          ? int.tryParse(data['companyCode'].toString())
+          : (data['companyCodeInOrg'] != null
+              ? int.tryParse(data['companyCodeInOrg'].toString())
+              : null),
       branchId: data['branchId']?.toString() ?? '',
       branchName: data['branchName']?.toString() ?? '',
       delegateUID: data['delegateUID']?.toString() ?? '',
@@ -41,10 +49,13 @@ class CapturedPhotoModel extends CapturedPhoto {
   }
 
   Map<String, dynamic> toFirestore() {
+    final monthKey = '${capturedAt.year}-${capturedAt.month.toString().padLeft(2, '0')}';
     return {
       'permissionId': permissionId,
       'organizationUID': organizationUID,
       'companyUID': companyUID,
+      'companyName': companyName,
+      if (companyCode != null) 'companyCode': companyCode,
       'branchId': branchId,
       'branchName': branchName,
       'delegateUID': delegateUID,
@@ -53,6 +64,7 @@ class CapturedPhotoModel extends CapturedPhoto {
       'comment': comment,
       'location': GeoPoint(latitude, longitude),
       'capturedAt': Timestamp.fromDate(capturedAt),
+      'monthKey': monthKey,
     };
   }
 }

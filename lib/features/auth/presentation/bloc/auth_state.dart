@@ -43,3 +43,26 @@ class AuthError extends AuthState {
   @override
   List<Object> get props => [message];
 }
+
+class AuthDeviceMismatchState extends AuthState {
+  final Delegate delegate;
+  final String? boundDeviceModel;
+  final String? currentDeviceModel;
+  final String message;
+
+  const AuthDeviceMismatchState({
+    required this.delegate,
+    this.boundDeviceModel,
+    this.currentDeviceModel,
+    required this.message,
+  });
+
+  @override
+  List<Object> get props => [
+    delegate,
+    boundDeviceModel ?? '',
+    currentDeviceModel ?? '',
+    message,
+  ];
+}
+

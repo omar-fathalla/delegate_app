@@ -212,4 +212,11 @@ const List<StandardViolation> officialViolationsSchedule = [
     action1: '200 غرامة',
     category: ViolationCategory.dataMissing,
   ),
+  StandardViolation(
+    id: 28,
+    title: 'تزييف موقع الحضور والانصراف (Fake GPS)',
+    defaultFine: 200.0,
+    action1: '200 غرامة فورية وتوثيق بالسجل الأمني',
+    category: ViolationCategory.protocolBreach,
+  ),
 ];

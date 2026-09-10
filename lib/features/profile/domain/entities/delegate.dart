@@ -66,6 +66,10 @@ class Delegate extends Equatable {
   final List<DelegateDocument> documents;
   final UserRole role;
   final String? email;
+  final String? boundDeviceId;
+  final String? boundDeviceModel;
+  final DateTime? deviceBoundAt;
+  final bool isDeviceLocked;
 
   const Delegate({
     required this.uid,
@@ -104,6 +108,10 @@ class Delegate extends Equatable {
     required this.documents,
     this.role = UserRole.delegate,
     this.email,
+    this.boundDeviceId,
+    this.boundDeviceModel,
+    this.deviceBoundAt,
+    this.isDeviceLocked = false,
   });
 
   @override
@@ -144,6 +152,10 @@ class Delegate extends Equatable {
     documents,
     role,
     email,
+    boundDeviceId,
+    boundDeviceModel,
+    deviceBoundAt,
+    isDeviceLocked,
   ];
 }
 

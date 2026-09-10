@@ -1,9 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_create_penalty_page.dart';
@@ -25,12 +30,162 @@ class AntiFraudAuditScreen extends StatefulWidget {
 
 class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _deviceSearchController = TextEditingController();
   String _searchQuery = '';
-  String _timeFilter = 'all'; // all, today, week, month
+  String _deviceSearchQuery = '';
+  String _timeFilter = 'all'; // all, today
+  String _selectedBranchFilter = 'all'; // all, or specific detected branch name
+  String _currentTab = 'violations'; // violations, devices
+  String _deviceStatusFilter = 'all'; // all, locked, unbound
+  List<Map<String, dynamic>> _branchesList = [];
+  Map<String, String> _companiesMap = {};
+  bool _isExporting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBranches();
+    _loadCompanies();
+  }
+
+  Future<void> _loadBranches() async {
+    try {
+      final snap = await FirebaseFirestore.instance.collection('branches').get();
+      final list = snap.docs.map((d) {
+        final data = d.data();
+        final name = (data['branchName'] as String?) ??
+            (data['name'] as String?) ??
+            (data['title'] as String?) ??
+            d.id;
+        double? lat;
+        double? lng;
+        if (data['location'] is Map) {
+          lat = (data['location']['latitude'] as num?)?.toDouble();
+          lng = (data['location']['longitude'] as num?)?.toDouble();
+        } else if (data['latitude'] != null && data['longitude'] != null) {
+          lat = (data['latitude'] as num?)?.toDouble();
+          lng = (data['longitude'] as num?)?.toDouble();
+        }
+        return {
+          'id': d.id,
+          'name': name,
+          'latitude': lat,
+          'longitude': lng,
+        };
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _branchesList = list;
+        });
+      }
+    } catch (_) {}
+  }
+
+  String _resolveBranchName(Map<String, dynamic> item) {
+    final directBranch = (item['branchName'] as String?)?.trim() ?? '';
+    if (directBranch.isNotEmpty && directBranch != 'غير محدد') {
+      return directBranch;
+    }
+
+    final branchUid = (item['branchUID'] as String?)?.trim() ?? '';
+    if (branchUid.isNotEmpty) {
+      final match = _branchesList.firstWhere(
+        (b) => b['id'] == branchUid,
+        orElse: () => {'name': ''},
+      );
+      if ((match['name'] as String?)?.isNotEmpty == true) {
+        return match['name'] as String;
+      }
+    }
+
+    // Match closest branch from mock coordinates
+    final lat = (item['latitude'] as num?)?.toDouble();
+    final lng = (item['longitude'] as num?)?.toDouble();
+    if (lat != null && lng != null && _branchesList.isNotEmpty) {
+      double minDistance = double.infinity;
+      String bestName = '';
+      String bestId = '';
+
+      for (final b in _branchesList) {
+        final bLat = b['latitude'] as double?;
+        final bLng = b['longitude'] as double?;
+        if (bLat != null && bLng != null) {
+          final dist = Geolocator.distanceBetween(lat, lng, bLat, bLng);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestName = b['name'] as String;
+            bestId = b['id'] as String;
+          }
+        }
+      }
+
+      if (bestName.isNotEmpty) {
+        final docId = item['docId']?.toString();
+        if (docId != null && docId.isNotEmpty && item['_isUpdated'] != true) {
+          item['_isUpdated'] = true;
+          FirebaseFirestore.instance
+              .collection('security_audit_logs')
+              .doc(docId)
+              .update({
+                'branchName': bestName,
+                'branchUID': bestId,
+              })
+              .catchError((_) {});
+        }
+        return bestName;
+      }
+    }
+
+    return 'غير محدد';
+  }
+
+  Future<void> _loadCompanies() async {
+    try {
+      final snap = await FirebaseFirestore.instance.collectionGroup('companies').get();
+      final map = <String, String>{};
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final name = (data['name'] as String?)?.trim() ??
+            (data['companyName'] as String?)?.trim() ??
+            '';
+        if (name.isNotEmpty) {
+          map[doc.id] = name;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _companiesMap = map;
+        });
+      }
+    } catch (_) {}
+  }
+
+  String _resolveCompanyName(Map<String, dynamic> item) {
+    final compUid = (item['companyUID'] as String?)?.trim() ?? '';
+    if (compUid.isNotEmpty && _companiesMap.containsKey(compUid)) {
+      final officialName = _companiesMap[compUid]!;
+      final currentName = (item['companyName'] as String?)?.trim() ?? '';
+      if (currentName != officialName && item['_isCompUpdated'] != true) {
+        item['_isCompUpdated'] = true;
+        final docId = item['docId']?.toString();
+        if (docId != null && docId.isNotEmpty) {
+          FirebaseFirestore.instance
+              .collection('security_audit_logs')
+              .doc(docId)
+              .update({'companyName': officialName})
+              .catchError((_) {});
+        }
+      }
+      return officialName;
+    }
+    return (item['companyName'] as String?)?.trim() ?? '';
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _deviceSearchController.dispose();
     super.dispose();
   }
 
@@ -57,7 +212,282 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     } catch (_) {}
   }
 
+  Future<void> _openLocationOnMap(double lat, double lng) async {
+    final googleMapsUri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    try {
+      if (await canLaunchUrl(googleMapsUri)) {
+        await launchUrl(googleMapsUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(googleMapsUri, mode: LaunchMode.platformDefault);
+      }
+    } catch (_) {
+      try {
+        await launchUrl(googleMapsUri);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _exportToCSV(List<Map<String, dynamic>> logs) async {
+    if (logs.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('لا توجد سجلات لتصديرها حالياً'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isExporting = true);
+
+    try {
+      // Helper function to escape CSV cell contents
+      String escapeCsv(dynamic value) {
+        if (value == null) return '""';
+        final str = value.toString().replaceAll('"', '""');
+        return '"$str"';
+      }
+
+      // UTF-8 BOM (\uFEFF) ensures Excel properly displays Arabic characters
+      final buffer = StringBuffer();
+      buffer.write('\uFEFF');
+
+      // CSV Header Row
+      buffer.writeln([
+        'م',
+        'اسم المندوب',
+        'رقم الهاتف',
+        'الجهاز المستخدم',
+        'اسم الشركة',
+        'الفرع المرصود',
+        'تاريخ وتوقيت المحاولة',
+        'الإحداثيات المرصودة (Lat, Lng)',
+        'خط العرض (Latitude)',
+        'خط الطول (Longitude)',
+        'رابط خرائط جوجل (Google Maps)',
+        'موقع اتصال الإنترنت الفعلي (ISP & Location)',
+        'عنوان الـ IP',
+        'نوع العملية',
+        'حالة الرصد',
+      ].map(escapeCsv).join(','));
+
+      // CSV Data Rows
+      for (int i = 0; i < logs.length; i++) {
+        final data = logs[i];
+        final index = (i + 1).toString();
+        final delegateName = data['delegateName']?.toString() ?? 'غير محدد';
+        final delegatePhone = data['delegatePhone']?.toString() ?? '';
+        final deviceModel = data['deviceModel']?.toString() ?? 'غير معروف';
+        final companyName = _resolveCompanyName(data);
+        final branchName = _resolveBranchName(data);
+
+        // Attempt Timestamp
+        final ts = (data['timestamp'] as Timestamp?)?.toDate();
+        final realTs = data['realTimestamp'] != null
+            ? DateTime.tryParse(data['realTimestamp'].toString())
+            : (data['createdAt'] != null
+                ? DateTime.tryParse(data['createdAt'].toString())
+                : null);
+        final effectiveDate = ts ?? realTs;
+        final dateStr = effectiveDate != null
+            ? DateFormat('yyyy-MM-dd  hh:mm a').format(effectiveDate)
+            : 'غير محدد';
+
+        // Coordinates & Map Link
+        final lat = (data['latitude'] as num?)?.toDouble();
+        final lng = (data['longitude'] as num?)?.toDouble();
+        final coordsStr = (lat != null && lng != null)
+            ? '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}'
+            : '';
+        final latStr = lat != null ? lat.toStringAsFixed(6) : '';
+        final lngStr = lng != null ? lng.toStringAsFixed(6) : '';
+        final mapUrl = (lat != null && lng != null)
+            ? 'https://www.google.com/maps/search/?api=1&query=$lat,$lng'
+            : '';
+
+        final networkLocation = data['networkLocation']?.toString() ?? '';
+        final ipCity = data['ipCity']?.toString() ?? '';
+        final ipIsp = data['ipIsp']?.toString() ?? '';
+        final fullNetLoc = networkLocation.isNotEmpty
+            ? networkLocation
+            : (ipCity.isNotEmpty ? '$ipCity ($ipIsp)' : '');
+        final ipAddress = data['ipAddress']?.toString() ?? '';
+        final actionType = data['actionType']?.toString() ?? 'تسجيل حضور/انصراف';
+        const status = 'محظورة ⛔ (Fake GPS)';
+
+        buffer.writeln([
+          index,
+          delegateName,
+          delegatePhone,
+          deviceModel,
+          companyName,
+          branchName,
+          dateStr,
+          coordsStr,
+          latStr,
+          lngStr,
+          mapUrl,
+          fullNetLoc,
+          ipAddress,
+          actionType,
+          status,
+        ].map(escapeCsv).join(','));
+      }
+
+      final directory = await getTemporaryDirectory();
+      final nowStr = DateFormat('yyyy_MM_dd_HHmm').format(DateTime.now());
+      final file = File('${directory.path}/تقرير_محاولات_تزييف_الموقع_$nowStr.csv');
+      await file.writeAsString(buffer.toString());
+
+      if (mounted) {
+        // ignore: deprecated_member_use
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'تقرير سجلات كشف التزييف والأمان (Fake GPS Audit Report) - $nowStr',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ أثناء تصدير الملف: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
+  Future<void> _resetDelegateDevice(
+    BuildContext context,
+    String delegateUid,
+    String delegateName, {
+    String? orgId,
+    String? compId,
+  }) async {
+    if (delegateUid.trim().isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر تحديد معرف المندوب'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.phonelink_erase_rounded, color: Colors.amber, size: 28),
+            SizedBox(width: 8),
+            Text('فك ربط الجهاز', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('هل أنت متأكد من فك ربط جهاز المندوب "$delegateName"؟'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'سيتمكن المندوب من ربط جهازه الجديد تلقائياً بمجرد تسجيل دخوله القادم.',
+                      style: TextStyle(fontSize: 12, height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber.shade800,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('تأكيد فك الربط'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await DeviceBindingService.resetDelegateDeviceBinding(
+          delegateUid: delegateUid,
+          organizationUID: orgId,
+          companyUID: compId,
+          adminUid: widget.delegate.uid,
+        );
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم فك ربط جهاز المندوب "$delegateName" بنجاح. يستطيع الآن الدخول من هاتفه الجديد.'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('حدث خطأ أثناء فك الربط: $e'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _deleteAuditLog(BuildContext context, String docId, String delegateName) async {
+    if (docId.trim().isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر تحديد معرف السجل الأمني'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -114,12 +544,63 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   }
 
   void _createPenaltyForDelegate(BuildContext context, Map<String, dynamic> data) {
+    final companyUid = data['companyUID']?.toString() ?? '';
+    final companyName = _resolveCompanyName(data);
+    final delegateUid = data['delegateUid']?.toString() ?? '';
+    final delegateName = data['delegateName']?.toString() ?? '';
+    final resolvedBranchName = _resolveBranchName(data);
+    String resolvedBranchUid = data['branchUID']?.toString() ?? '';
+    if (resolvedBranchUid.isEmpty && resolvedBranchName != 'غير محدد') {
+      final match = _branchesList.firstWhere(
+        (b) => b['name'] == resolvedBranchName,
+        orElse: () => {'id': ''},
+      );
+      resolvedBranchUid = (match['id'] as String?) ?? '';
+    }
+    final deviceModel = data['deviceModel']?.toString() ?? 'جهاز غير محدد';
+    final actionType = data['actionType']?.toString() ?? 'تسجيل الحضور/الانصراف';
+
+    final networkLocation = data['networkLocation']?.toString() ?? '';
+
+    final ts = (data['timestamp'] as Timestamp?)?.toDate();
+    final realTs = data['realTimestamp'] != null
+        ? DateTime.tryParse(data['realTimestamp'].toString())
+        : (data['createdAt'] != null ? DateTime.tryParse(data['createdAt'].toString()) : null);
+    final effectiveRealDate = ts ?? realTs;
+    final realDateStr = effectiveRealDate != null
+        ? DateFormat('yyyy-MM-dd  hh:mm a').format(effectiveRealDate)
+        : '';
+
+    final incidentBuffer = StringBuffer();
+    incidentBuffer.write('تم رصد محاولة تزييف موقع جغرافي (Fake GPS) بواسطة جهاز ($deviceModel)');
+    if (actionType.isNotEmpty) {
+      incidentBuffer.write(' أثناء $actionType');
+    }
+    if (resolvedBranchName.isNotEmpty && resolvedBranchName != 'غير محدد') {
+      incidentBuffer.write(' بفرع $resolvedBranchName');
+    }
+    if (realDateStr.isNotEmpty) {
+      incidentBuffer.write(' بتاريخ $realDateStr');
+    }
+    if (networkLocation.isNotEmpty) {
+      incidentBuffer.write('، مع رصد اتصاله بالإنترنت من موقع ($networkLocation)');
+    }
+    incidentBuffer.write('، وتم اعتراض الإحداثيات وتوثيق الواقعة في سجل الأمان.');
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => BlocProvider(
           create: (_) => di.sl<PenaltyBloc>(),
           child: AdminCreatePenaltyPage(
             adminDelegate: widget.delegate,
+            initialCompanyId: companyUid.isNotEmpty ? companyUid : null,
+            initialCompanyName: companyName.isNotEmpty ? companyName : null,
+            initialDelegateId: delegateUid.isNotEmpty ? delegateUid : null,
+            initialDelegateName: delegateName.isNotEmpty ? delegateName : null,
+            initialBranchId: resolvedBranchUid.isNotEmpty ? resolvedBranchUid : null,
+            initialBranchName: resolvedBranchName != 'غير محدد' ? resolvedBranchName : null,
+            initialViolationId: 28, // بند تزييف موقع الحضور والانصراف (Fake GPS) - 200 جنيه
+            initialIncidentDetails: incidentBuffer.toString(),
           ),
         ),
       ),
@@ -135,12 +616,6 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         return timestamp.year == now.year &&
             timestamp.month == now.month &&
             timestamp.day == now.day;
-      case 'week':
-        final weekAgo = now.subtract(const Duration(days: 7));
-        return timestamp.isAfter(weekAgo);
-      case 'month':
-        final monthAgo = now.subtract(const Duration(days: 30));
-        return timestamp.isAfter(monthAgo);
       case 'all':
       default:
         return true;
@@ -178,6 +653,8 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         final Set<String> uniqueDelegates = {};
         final Set<String> uniqueDevices = {};
 
+        // Extract unique detected branch names from allLogs
+        final Set<String> detectedBranchesSet = {};
         for (final item in allLogs) {
           final ts = (item['timestamp'] as Timestamp?)?.toDate();
           if (ts != null &&
@@ -191,21 +668,35 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
 
           final dev = item['deviceModel']?.toString() ?? '';
           if (dev.isNotEmpty && dev != 'Unknown Device') uniqueDevices.add(dev);
+
+          final bName = _resolveBranchName(item).trim();
+          if (bName.isNotEmpty && bName != 'غير محدد') {
+            detectedBranchesSet.add(bName);
+          }
         }
+        final detectedBranches = detectedBranchesSet.toList()..sort();
 
         // Apply filters
         final filteredLogs = allLogs.where((item) {
-          // 1. Time filter
+          // 1. Time filter (All or Today)
           final ts = (item['timestamp'] as Timestamp?)?.toDate();
           if (!_matchesTimeFilter(ts)) return false;
 
-          // 2. Search query filter
+          // 2. Detected Branch filter
+          if (_selectedBranchFilter != 'all') {
+            final itemBranch = _resolveBranchName(item).trim();
+            if (itemBranch != _selectedBranchFilter) {
+              return false;
+            }
+          }
+
+          // 3. Search query filter
           if (_searchQuery.isNotEmpty) {
             final q = _searchQuery.toLowerCase();
             final name = (item['delegateName'] ?? '').toString().toLowerCase();
             final phone = (item['delegatePhone'] ?? '').toString().toLowerCase();
-            final comp = (item['companyName'] ?? '').toString().toLowerCase();
-            final branch = (item['branchName'] ?? '').toString().toLowerCase();
+            final comp = _resolveCompanyName(item).toLowerCase();
+            final branch = _resolveBranchName(item).toLowerCase();
             final dev = (item['deviceModel'] ?? '').toString().toLowerCase();
 
             if (!name.contains(q) &&
@@ -220,101 +711,328 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           return true;
         }).toList();
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            setState(() {});
-          },
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              // 1. Header Metrics Card
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: _buildHeaderMetrics(
-                    colorScheme: colorScheme,
-                    totalAttempts: allLogs.length,
-                    todayAttempts: todayAttempts,
-                    uniqueDelegatesCount: uniqueDelegates.length,
-                    uniqueDevicesCount: uniqueDevices.length,
-                    isArabic: isArabic,
-                  ),
+          return RefreshIndicator(
+            onRefresh: () async {
+              setState(() {});
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // Top Tab Switcher (Violations vs Device Binding)
+                SliverToBoxAdapter(
+                  child: _buildTabSwitcher(colorScheme, isArabic),
                 ),
-              ),
 
-              // 2. Search & Time Filters
+                if (_currentTab == 'devices') ...[
+                  SliverToBoxAdapter(
+                    child: _buildDeviceBindingSection(colorScheme, isArabic),
+                  ),
+                ] else ...[
+                  // 1. Header Metrics Card
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: _buildHeaderMetrics(
+                        colorScheme: colorScheme,
+                        totalAttempts: allLogs.length,
+                        todayAttempts: todayAttempts,
+                        uniqueDelegatesCount: uniqueDelegates.length,
+                        uniqueDevicesCount: uniqueDevices.length,
+                        isArabic: isArabic,
+                      ),
+                    ),
+                  ),
+
+              // 2. Branch Dropdown, Search & Time Filters
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Column(
                     children: [
-                      // Search bar
-                      TextField(
-                        controller: _searchController,
-                        onChanged: (val) => setState(() => _searchQuery = val.trim()),
-                        decoration: InputDecoration(
-                          hintText: isArabic
-                              ? 'بحث بالمندوب، الشركة، الفرع، أو نوع الجهاز...'
-                              : 'Search delegate, company, branch, or device...',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                )
-                              : null,
-                          filled: true,
-                          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          border: OutlineInputBorder(
+                      // Branch Filter Dropdown (الفروع المرصودة فقط)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _selectedBranchFilter != 'all'
+                                ? Colors.amber.shade700
+                                : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                            width: _selectedBranchFilter != 'all' ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: (detectedBranches.contains(_selectedBranchFilter) || _selectedBranchFilter == 'all')
+                                ? _selectedBranchFilter
+                                : 'all',
+                            isExpanded: true,
                             borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                            icon: Icon(
+                              Icons.arrow_drop_down_rounded,
+                              color: _selectedBranchFilter != 'all'
+                                  ? Colors.amber.shade900
+                                  : colorScheme.onSurfaceVariant,
                             ),
+                            items: [
+                              DropdownMenuItem<String>(
+                                value: 'all',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.storefront_rounded,
+                                      size: 18,
+                                      color: _selectedBranchFilter == 'all'
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        isArabic
+                                            ? 'جميع الفروع المرصودة (${allLogs.length})'
+                                            : 'All Detected Branches (${allLogs.length})',
+                                        style: TextStyle(
+                                          fontWeight: _selectedBranchFilter == 'all'
+                                              ? FontWeight.bold
+                                              : FontWeight.w500,
+                                          fontSize: 13,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ...detectedBranches.map((branchName) {
+                                final branchLogsCount = allLogs
+                                    .where((l) => _resolveBranchName(l).trim() == branchName)
+                                    .length;
+                                return DropdownMenuItem<String>(
+                                  value: branchName,
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_on_rounded,
+                                        size: 18,
+                                        color: Colors.amber.shade800,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '$branchName ($branchLogsCount)',
+                                          style: TextStyle(
+                                            fontWeight: _selectedBranchFilter == branchName
+                                                ? FontWeight.bold
+                                                : FontWeight.w500,
+                                            fontSize: 13,
+                                            color: _selectedBranchFilter == branchName
+                                                ? Colors.amber.shade900
+                                                : null,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => _selectedBranchFilter = val);
+                              }
+                            },
                           ),
                         ),
                       ),
                       const SizedBox(height: 10),
 
-                      // Time Filters
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _buildFilterChip('all', isArabic ? 'الكل (${allLogs.length})' : 'All', colorScheme),
-                            const SizedBox(width: 8),
-                            _buildFilterChip('today', isArabic ? 'اليوم ($todayAttempts)' : 'Today', colorScheme),
-                            const SizedBox(width: 8),
-                            _buildFilterChip('week', isArabic ? 'آخر 7 أيام' : 'Last 7 Days', colorScheme),
-                            const SizedBox(width: 8),
-                            _buildFilterChip('month', isArabic ? 'آخر 30 يوم' : 'Last 30 Days', colorScheme),
-                          ],
+                      // Search bar with Dedicated Search Action Button
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              textInputAction: TextInputAction.search,
+                              onSubmitted: (val) {
+                                setState(() => _searchQuery = val.trim());
+                              },
+                              decoration: InputDecoration(
+                                hintText: isArabic
+                                    ? 'بحث بالمندوب، الشركة، الفرع، أو نوع الجهاز...'
+                                    : 'Search delegate, company, branch, or device...',
+                                prefixIcon: IconButton(
+                                  icon: const Icon(Icons.search_rounded),
+                                  tooltip: isArabic ? 'تنفيذ البحث' : 'Search',
+                                  onPressed: () {
+                                    setState(() => _searchQuery = _searchController.text.trim());
+                                    FocusScope.of(context).unfocus();
+                                  },
+                                ),
+                                suffixIcon: _searchController.text.isNotEmpty || _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear_rounded),
+                                        tooltip: isArabic ? 'مسح البحث' : 'Clear search',
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() => _searchQuery = '');
+                                        },
+                                      )
+                                    : null,
+                                filled: true,
+                                fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            onPressed: () {
+                              setState(() => _searchQuery = _searchController.text.trim());
+                              FocusScope.of(context).unfocus();
+                            },
+                            icon: const Icon(Icons.search_rounded, size: 18),
+                            label: Text(
+                              isArabic ? 'بحث' : 'Search',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.red.shade800,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_searchQuery.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.filter_alt_rounded, size: 16, color: Colors.red.shade800),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  isArabic
+                                      ? 'نتائج البحث عن: "$_searchQuery" (${filteredLogs.length} سجل)'
+                                      : 'Results for "$_searchQuery" (${filteredLogs.length} items)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red.shade900,
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      isArabic ? 'إلغاء' : 'Clear',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red.shade700,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Icon(Icons.close_rounded, size: 14, color: Colors.red.shade700),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                      ],
+                      const SizedBox(height: 10),
+
+                      // Time Filters (Only: All, Today)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildFilterChip(
+                              'all',
+                              isArabic ? 'الكل (${allLogs.length})' : 'All (${allLogs.length})',
+                              colorScheme,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildFilterChip(
+                              'today',
+                              isArabic ? 'اليوم ($todayAttempts)' : 'Today ($todayAttempts)',
+                              colorScheme,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
               ),
 
-              // 3. Results Count
+              // 3. Results Count & Export Excel Button
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                   child: Row(
                     children: [
-                      Text(
-                        isArabic
-                            ? 'سجلات محاولات التزييف المكتشفة (${filteredLogs.length})'
-                            : 'Detected Violations (${filteredLogs.length})',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurfaceVariant,
+                      Expanded(
+                        child: Text(
+                          isArabic
+                              ? 'سجلات محاولات التزييف المكتشفة (${filteredLogs.length})'
+                              : 'Detected Violations (${filteredLogs.length})',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (filteredLogs.isNotEmpty)
+                        FilledButton.tonalIcon(
+                          onPressed: _isExporting ? null : () => _exportToCSV(filteredLogs),
+                          icon: _isExporting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.file_download_rounded, size: 18),
+                          label: Text(
+                            isArabic ? 'تصدير إكسيل' : 'Export Excel',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.green.shade50,
+                            foregroundColor: Colors.green.shade900,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: BorderSide(color: Colors.green.shade300),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -377,6 +1095,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     ),
                   ),
                 ),
+                ],
             ],
           ),
         );
@@ -581,17 +1300,33 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     required Map<String, dynamic> data,
     required bool isArabic,
   }) {
-    final docId = data['docId']?.toString() ?? '';
+    final docId = (data['docId'] != null && data['docId'].toString().trim().isNotEmpty)
+        ? data['docId'].toString().trim()
+        : (data['id']?.toString().trim() ?? '');
     final delegateName = data['delegateName']?.toString() ?? 'مندوب غير محدد';
     final delegatePhone = data['delegatePhone']?.toString() ?? '';
-    final companyName = data['companyName']?.toString() ?? '';
-    final branchName = data['branchName']?.toString() ?? '';
+    final companyName = _resolveCompanyName(data);
+    final branchName = _resolveBranchName(data);
     final deviceModel = data['deviceModel']?.toString() ?? 'جهاز غير معروف';
-    final violationTitle = data['violationTitle']?.toString() ?? 'تزييف موقع جغرافي';
+    final actionType = data['actionType']?.toString() ?? '';
+    final networkLocation = data['networkLocation']?.toString() ?? '';
+    final ipAddress = data['ipAddress']?.toString() ?? '';
+    final ipCity = data['ipCity']?.toString() ?? '';
+    final ipIsp = data['ipIsp']?.toString() ?? '';
+
+    // Coordinates
+    final lat = (data['latitude'] as num?)?.toDouble();
+    final lng = (data['longitude'] as num?)?.toDouble();
+
+    // Actual attempt timestamp
     final ts = (data['timestamp'] as Timestamp?)?.toDate();
-    final dateStr = ts != null
-        ? DateFormat('yyyy-MM-dd  hh:mm a').format(ts)
-        : (data['createdAt']?.toString() ?? 'غير محدد');
+    final realTs = data['realTimestamp'] != null
+        ? DateTime.tryParse(data['realTimestamp'].toString())
+        : (data['createdAt'] != null ? DateTime.tryParse(data['createdAt'].toString()) : null);
+    final effectiveRealDate = ts ?? realTs;
+    final realDateStr = effectiveRealDate != null
+        ? DateFormat('yyyy-MM-dd  hh:mm a').format(effectiveRealDate)
+        : 'غير محدد';
 
     final isApple = deviceModel.toLowerCase().contains('iphone') ||
         deviceModel.toLowerCase().contains('ipad') ||
@@ -609,9 +1344,8 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Row: Delegate Name & Violation Badge
+            // Top Row: Delegate Name & Avatar
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
                   backgroundColor: Colors.red.shade50,
@@ -619,7 +1353,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                   radius: 20,
                   child: const Icon(Icons.person_off_rounded, size: 22),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -627,12 +1361,14 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                       Text(
                         delegateName,
                         style: const TextStyle(
-                          fontSize: 15,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
-                      if (delegatePhone.isNotEmpty)
+                      if (delegatePhone.isNotEmpty) ...[
+                        const SizedBox(height: 2),
                         Text(
                           delegatePhone,
                           style: TextStyle(
@@ -640,30 +1376,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                // Violation Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade300),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.warning_amber_rounded, size: 14, color: Colors.red.shade900),
-                      const SizedBox(width: 4),
-                      Text(
-                        violationTitle.isNotEmpty ? violationTitle : 'Fake GPS',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red.shade900,
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -706,40 +1419,248 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
-            // Company & Branch & Date Row
+            // Branch & Company Tags Row
             Wrap(
               spacing: 8,
-              runSpacing: 4,
+              runSpacing: 6,
               children: [
-                if (companyName.isNotEmpty)
-                  Chip(
-                    label: Text(companyName),
-                    avatar: const Icon(Icons.business_rounded, size: 14),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    labelStyle: const TextStyle(fontSize: 11),
+                // Branch Tag
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.shade300),
                   ),
-                if (branchName.isNotEmpty)
-                  Chip(
-                    label: Text(branchName),
-                    avatar: const Icon(Icons.storefront_rounded, size: 14),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    labelStyle: const TextStyle(fontSize: 11),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.storefront_rounded, size: 15, color: Colors.amber.shade900),
+                      const SizedBox(width: 5),
+                      Text(
+                        'الفرع: $branchName',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
+                    ],
                   ),
-                Chip(
-                  label: Text(dateStr),
-                  avatar: const Icon(Icons.access_time_rounded, size: 14),
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  labelStyle: const TextStyle(fontSize: 11),
                 ),
+
+                // Company Tag
+                if (companyName.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.business_rounded, size: 15, color: colorScheme.primary),
+                        const SizedBox(width: 5),
+                        Text(
+                          'الشركة: $companyName',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
 
             const SizedBox(height: 10),
+
+            // Incident Details Box
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              child: Column(
+                children: [
+                  // Attempt Timestamp Row
+                  Row(
+                    children: [
+                      Icon(Icons.schedule_rounded, size: 16, color: Colors.green.shade700),
+                      const SizedBox(width: 6),
+                      Text(
+                        'توقيت المحاولة: ',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade800,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          realDateStr,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Text(
+                          'محظورة ⛔',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (lat != null && lng != null) ...[
+                    const SizedBox(height: 6),
+                    Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                    const SizedBox(height: 4),
+                    Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        onTap: () => _openLocationOnMap(lat, lng),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_on_outlined, size: 16, color: Colors.deepOrange.shade700),
+                              const SizedBox(width: 6),
+                              Text(
+                                'الإحداثيات المرصودة: ',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepOrange.shade800,
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.deepOrange.shade900,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: Colors.deepOrange.shade300,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.deepOrange.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.deepOrange.shade200),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.map_rounded, size: 12, color: Colors.deepOrange.shade800),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'عرض بالخريطة',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.deepOrange.shade800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (networkLocation.isNotEmpty || ipAddress.isNotEmpty || ipCity.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.wifi_tethering_rounded, size: 16, color: Colors.blue.shade700),
+                        const SizedBox(width: 6),
+                        Text(
+                          'اتصال الإنترنت الفعلي: ',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade800,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            networkLocation.isNotEmpty
+                                ? networkLocation
+                                : (ipCity.isNotEmpty ? '$ipCity ($ipIsp)' : 'IP: $ipAddress'),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (actionType.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.event_note_rounded, size: 16, color: Colors.indigo.shade700),
+                        const SizedBox(width: 6),
+                        Text(
+                          'نوع العملية: ',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.indigo.shade800,
+                          ),
+                        ),
+                        Text(
+                          actionType,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.indigo.shade900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
 
             // Action Buttons Bar
             Row(
@@ -770,12 +1691,30 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                   child: OutlinedButton.icon(
                     onPressed: () => _createPenaltyForDelegate(context, data),
                     icon: const Icon(Icons.gavel_rounded, size: 16),
-                    label: const Text('تطبيق غرامة', style: TextStyle(fontSize: 12)),
+                    label: const Text('تطبيق غرامة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.red.shade50,
                       foregroundColor: Colors.red.shade900,
                       side: BorderSide(color: Colors.red.shade300),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.phonelink_erase_rounded, size: 18),
+                  tooltip: 'فك ربط جهاز المندوب (إعادة تعيين الجهاز)',
+                  onPressed: () => _resetDelegateDevice(
+                    context,
+                    data['delegateUid']?.toString() ?? '',
+                    delegateName,
+                    orgId: data['organizationUID']?.toString(),
+                    compId: data['companyUID']?.toString(),
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.amber.shade50,
+                    foregroundColor: Colors.amber.shade900,
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -786,6 +1725,620 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabSwitcher(ColorScheme colorScheme, bool isArabic) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => setState(() => _currentTab = 'violations'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _currentTab == 'violations'
+                      ? Colors.red.shade800
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.security_rounded,
+                      size: 18,
+                      color: _currentTab == 'violations'
+                          ? Colors.white
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isArabic ? 'سجلات كشف التزييف' : 'Fraud Violations',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: _currentTab == 'violations'
+                            ? Colors.white
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => setState(() => _currentTab = 'devices'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _currentTab == 'devices'
+                      ? Colors.teal.shade800
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.phonelink_lock_rounded,
+                      size: 18,
+                      color: _currentTab == 'devices'
+                          ? Colors.white
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isArabic ? 'ربط أجهزة المناديب' : 'Device Binding',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: _currentTab == 'devices'
+                            ? Colors.white
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeviceBindingSection(ColorScheme colorScheme, bool isArabic) {
+    Query query = FirebaseFirestore.instance.collectionGroup('delegates');
+    if (widget.delegate.organizationUID.isNotEmpty) {
+      query = query.where('organizationUID', isEqualTo: widget.delegate.organizationUID);
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: query.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+        final delegatesList = docs.map((d) {
+          final data = d.data() as Map<String, dynamic>;
+          return {
+            'docId': d.id,
+            'docPath': d.reference.path,
+            ...data,
+          };
+        }).where((d) {
+          // Exclude suspended / non-delegates if necessary
+          final role = d['role']?.toString().toLowerCase() ?? '';
+          return role.isEmpty || role == 'delegate';
+        }).toList();
+
+        int lockedCount = 0;
+        int unboundCount = 0;
+        for (final item in delegatesList) {
+          final boundId = item['boundDeviceId']?.toString().trim() ?? '';
+          if (boundId.isNotEmpty) {
+            lockedCount++;
+          } else {
+            unboundCount++;
+          }
+        }
+
+        // Apply filters
+        final filteredDelegates = delegatesList.where((d) {
+          final boundId = d['boundDeviceId']?.toString().trim() ?? '';
+          if (_deviceStatusFilter == 'locked' && boundId.isEmpty) return false;
+          if (_deviceStatusFilter == 'unbound' && boundId.isNotEmpty) return false;
+
+          if (_deviceSearchQuery.isNotEmpty) {
+            final q = _deviceSearchQuery.toLowerCase();
+            final name = (d['fullName'] ?? d['firstName'] ?? '').toString().toLowerCase();
+            final phone = (d['phoneNumber'] ?? '').toString().toLowerCase();
+            final comp = (d['companyName'] ?? '').toString().toLowerCase();
+            final dev = (d['boundDeviceModel'] ?? '').toString().toLowerCase();
+
+            if (!name.contains(q) && !phone.contains(q) && !comp.contains(q) && !dev.contains(q)) {
+              return false;
+            }
+          }
+          return true;
+        }).toList();
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Device Binding Header Banner
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.teal.shade900, Colors.teal.shade800, Colors.cyan.shade900],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.teal.shade900.withValues(alpha: 0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.phonelink_lock_rounded, color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'منظومة قفل وربط أجهزة المناديب',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'حساب كل مندوب مقترن بهاتفه المعتمد لمنع تبادل الحسابات',
+                                style: TextStyle(color: Colors.white70, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        _buildStatBox(
+                          title: 'إجمالي المناديب',
+                          value: '${delegatesList.length}',
+                          icon: Icons.people_outline_rounded,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildStatBox(
+                          title: 'أجهزة مقترنة 🔒',
+                          value: '$lockedCount',
+                          icon: Icons.lock_rounded,
+                          isHighlight: lockedCount > 0,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildStatBox(
+                          title: 'متاح للربط 🔓',
+                          value: '$unboundCount',
+                          icon: Icons.lock_open_rounded,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // 2. Search Bar with Dedicated Search Action Button
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _deviceSearchController,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (val) {
+                        setState(() => _deviceSearchQuery = val.trim());
+                      },
+                      decoration: InputDecoration(
+                        hintText: isArabic
+                            ? 'بحث بالمندوب، الهاتف، الشركة، أو اسم الجهاز...'
+                            : 'Search delegate, phone, company, or device...',
+                        prefixIcon: IconButton(
+                          icon: const Icon(Icons.search_rounded),
+                          tooltip: isArabic ? 'تنفيذ البحث' : 'Search',
+                          onPressed: () {
+                            setState(() => _deviceSearchQuery = _deviceSearchController.text.trim());
+                            FocusScope.of(context).unfocus();
+                          },
+                        ),
+                        suffixIcon: _deviceSearchController.text.isNotEmpty || _deviceSearchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded),
+                                tooltip: isArabic ? 'مسح البحث' : 'Clear search',
+                                onPressed: () {
+                                  _deviceSearchController.clear();
+                                  setState(() => _deviceSearchQuery = '');
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () {
+                      setState(() => _deviceSearchQuery = _deviceSearchController.text.trim());
+                      FocusScope.of(context).unfocus();
+                    },
+                    icon: const Icon(Icons.search_rounded, size: 18),
+                    label: Text(
+                      isArabic ? 'بحث' : 'Search',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.teal.shade800,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ],
+              ),
+              if (_deviceSearchQuery.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.teal.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.filter_alt_rounded, size: 16, color: Colors.teal.shade800),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          isArabic
+                              ? 'نتائج البحث عن: "$_deviceSearchQuery" (${filteredDelegates.length} مندوب)'
+                              : 'Results for "$_deviceSearchQuery" (${filteredDelegates.length} delegates)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.teal.shade900,
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          _deviceSearchController.clear();
+                          setState(() => _deviceSearchQuery = '');
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              isArabic ? 'إلغاء' : 'Clear',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red.shade700,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Icon(Icons.close_rounded, size: 14, color: Colors.red.shade700),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 10),
+
+              // 3. Status Filters Chips
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDeviceFilterChip('all', 'الكل (${delegatesList.length})', colorScheme),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildDeviceFilterChip('locked', 'المقترنة ($lockedCount)', colorScheme),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildDeviceFilterChip('unbound', 'المتاحة ($unboundCount)', colorScheme),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // 4. Delegates List
+              Text(
+                'قائمة المناديب وحالة الأجهزة (${filteredDelegates.length})',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              if (filteredDelegates.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      children: [
+                        Icon(Icons.person_search_rounded, size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'لا يوجد مناديب مطابقين للبحث',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filteredDelegates.length,
+                  itemBuilder: (context, index) {
+                    final item = filteredDelegates[index];
+                    return _buildDelegateDeviceCard(context, colorScheme, item);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDeviceFilterChip(String key, String label, ColorScheme colorScheme) {
+    final isSelected = _deviceStatusFilter == key;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
+          setState(() => _deviceStatusFilter = key);
+        }
+      },
+      selectedColor: Colors.teal.shade100,
+      labelStyle: TextStyle(
+        fontSize: 11.5,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? Colors.teal.shade900 : colorScheme.onSurface,
+      ),
+    );
+  }
+
+  Widget _buildDelegateDeviceCard(
+    BuildContext context,
+    ColorScheme colorScheme,
+    Map<String, dynamic> delegateData,
+  ) {
+    final name = (delegateData['fullName'] ?? delegateData['firstName'] ?? 'مندوب').toString();
+    final phone = (delegateData['phoneNumber'] ?? '').toString();
+    final company = (delegateData['companyName'] ?? '').toString();
+    final boundDeviceModel = (delegateData['boundDeviceModel'] as String?)?.trim() ?? '';
+    final boundDeviceId = (delegateData['boundDeviceId'] as String?)?.trim() ?? '';
+    final isLocked = boundDeviceId.isNotEmpty;
+    final delegateUid = delegateData['docId']?.toString() ?? delegateData['uid']?.toString() ?? '';
+    final orgId = delegateData['organizationUID']?.toString();
+    final compId = delegateData['companyUID']?.toString();
+
+    DateTime? boundAt;
+    if (delegateData['deviceBoundAt'] is Timestamp) {
+      boundAt = (delegateData['deviceBoundAt'] as Timestamp).toDate();
+    } else if (delegateData['deviceBoundAt'] != null) {
+      boundAt = DateTime.tryParse(delegateData['deviceBoundAt'].toString());
+    }
+
+    final boundDateStr = boundAt != null ? DateFormat('yyyy-MM-dd hh:mm a').format(boundAt) : '';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 1.5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isLocked ? Colors.teal.shade200 : Colors.amber.shade200,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: isLocked ? Colors.teal.shade50 : Colors.amber.shade50,
+                  foregroundColor: isLocked ? Colors.teal.shade800 : Colors.amber.shade900,
+                  radius: 18,
+                  child: Icon(
+                    isLocked ? Icons.phonelink_lock_rounded : Icons.phonelink_setup_rounded,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (phone.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          phone,
+                          style: TextStyle(fontSize: 11.5, color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (company.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      company,
+                      style: TextStyle(fontSize: 11, color: colorScheme.onSurface),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+            const SizedBox(height: 8),
+            if (isLocked) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.teal.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.phone_android_rounded, size: 16, color: Colors.teal.shade800),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'الجهاز المقترن: $boundDeviceModel',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal.shade900,
+                            ),
+                          ),
+                          if (boundDateStr.isNotEmpty)
+                            Text(
+                              'تاريخ الاعتماد: $boundDateStr',
+                              style: TextStyle(fontSize: 10, color: Colors.teal.shade700),
+                            ),
+                        ],
+                      ),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _resetDelegateDevice(
+                        context,
+                        delegateUid,
+                        name,
+                        orgId: orgId,
+                        compId: compId,
+                      ),
+                      icon: const Icon(Icons.phonelink_erase_rounded, size: 16),
+                      label: const Text('فك الربط', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.amber.shade100,
+                        foregroundColor: Colors.amber.shade900,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_open_rounded, size: 16, color: Colors.amber.shade800),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'متاح للربط: سيتم اعتماد أول هاتف يسجل منه المندوب تلقائياً.',
+                        style: TextStyle(fontSize: 11.5, color: Colors.black87),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

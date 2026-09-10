@@ -8,6 +8,7 @@ abstract class NotificationLocalDataSource {
   Future<void> markAsReadInCache(String userKey, String notificationId);
   Future<void> markAllAsReadInCache(String userKey);
   Future<void> deleteNotificationInCache(String userKey, String notificationId);
+  Future<void> clearAllNotificationsInCache(String userKey);
 }
 
 class NotificationLocalDataSourceImpl implements NotificationLocalDataSource {
@@ -96,6 +97,13 @@ class NotificationLocalDataSourceImpl implements NotificationLocalDataSource {
       final cached = await getCachedNotifications(userKey);
       final updated = cached.where((n) => n.id != notificationId).toList();
       await cacheNotifications(userKey, updated);
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> clearAllNotificationsInCache(String userKey) async {
+    try {
+      await sharedPreferences.remove(_cacheKey(userKey));
     } catch (_) {}
   }
 }

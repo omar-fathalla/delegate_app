@@ -943,7 +943,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         if (!parentContext.mounted) return;
         AppSnackBar.showInfo(parentContext, 'Fetching location...');
 
-        final position = await _getCurrentLocation(parentContext);
+        final position = await _getCurrentLocation(
+          parentContext,
+          branchName: scannedBranch,
+          actionType: isCheckedIn ? 'تسجيل انصراف' : 'تسجيل حضور',
+        );
         if (position != null && parentContext.mounted) {
           if (isCheckedIn && activeAttendance != null) {
             final now = _getTrustedNow();
@@ -1019,7 +1023,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
   }
 
-  Future<Position?> _getCurrentLocation(BuildContext context) async {
+  Future<Position?> _getCurrentLocation(
+    BuildContext context, {
+    String? branchName,
+    String? actionType,
+  }) async {
     bool serviceEnabled;
     LocationPermission permission;
 
@@ -1056,7 +1064,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
       // --- Anti-Fraud: Fake GPS / Mock Location Detection ---
       if (position.isMocked) {
-        _logMockViolation(position);
+        _logMockViolation(
+          position,
+          branchName: branchName,
+          actionType: actionType,
+        );
         if (context.mounted) {
           AppSnackBar.showError(
             context,
@@ -1071,7 +1083,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final lastPosition = await Geolocator.getLastKnownPosition();
       if (lastPosition != null) {
         if (lastPosition.isMocked) {
-          _logMockViolation(lastPosition);
+          _logMockViolation(
+            lastPosition,
+            branchName: branchName,
+            actionType: actionType,
+          );
           if (context.mounted) {
             AppSnackBar.showError(
               context,
@@ -1111,12 +1127,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     return 'Unknown Device';
   }
 
-  void _logMockViolation(Position position) {
+  void _logMockViolation(
+    Position position, {
+    String? branchName,
+    String? actionType,
+  }) {
     _getDeviceInfo().then((device) {
       SecurityAuditService.logMockLocationViolation(
         delegate: widget.delegate,
         position: position,
         deviceModel: device,
+        branchName: branchName,
+        actionType: actionType,
       );
     }).catchError((_) {});
   }

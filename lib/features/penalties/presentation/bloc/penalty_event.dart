@@ -60,3 +60,17 @@ class DeletePenaltyEvent extends PenaltyEvent {
   @override
   List<Object?> get props => [penaltyId];
 }
+
+class UpdatePenaltyRequestedEvent extends PenaltyEvent {
+  final PenaltyEntity penalty;
+  final List<File> newEvidenceFilesToUpload;
+
+  const UpdatePenaltyRequestedEvent({
+    required this.penalty,
+    this.newEvidenceFilesToUpload = const [],
+  });
+
+  @override
+  List<Object?> get props => [penalty, newEvidenceFilesToUpload];
+}
+

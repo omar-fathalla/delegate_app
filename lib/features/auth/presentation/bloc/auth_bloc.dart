@@ -1,6 +1,7 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
+import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
@@ -53,8 +54,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         await cacheAllDelegatesUseCase(delegates);
 
         if (delegates.length == 1) {
-          // Single organization - proceed directly
-          emit(AuthAuthenticated(delegate: delegates.first));
+          final delegate = delegates.first;
+          // التحقق من بصمة الجهاز وقفل الحساب
+          final deviceCheck = await DeviceBindingService.verifyOrBindDevice(delegate: delegate);
+          if (deviceCheck.isMismatched) {
+            emit(
+              AuthDeviceMismatchState(
+                delegate: delegate,
+                boundDeviceModel: deviceCheck.boundDeviceModel,
+                currentDeviceModel: deviceCheck.currentDeviceModel,
+                message: deviceCheck.message ?? 'هذا الحساب مقترن بجهاز آخر',
+              ),
+            );
+            return;
+          }
+
+          emit(AuthAuthenticated(delegate: delegate));
         } else {
           // Multiple organizations - show selection
           emit(
@@ -81,6 +96,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       },
       (delegate) async {
         if (delegate != null) {
+          // فحص بصمة الجهاز للتسجيل التلقائي
+          final deviceCheck = await DeviceBindingService.verifyOrBindDevice(delegate: delegate);
+          if (deviceCheck.isMismatched) {
+            await logoutUseCase(NoParams());
+            emit(
+              AuthDeviceMismatchState(
+                delegate: delegate,
+                boundDeviceModel: deviceCheck.boundDeviceModel,
+                currentDeviceModel: deviceCheck.currentDeviceModel,
+                message: deviceCheck.message ?? 'هذا الحساب مقترن بجهاز آخر',
+              ),
+            );
+            return;
+          }
+
           emit(AuthAuthenticated(delegate: delegate));
         } else {
           emit(AuthUnauthenticated());
@@ -102,9 +132,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     OrganizationSelected event,
     Emitter<AuthState> emit,
   ) async {
-    if (event.rememberMe) {
-      await cacheDelegateUseCase(event.delegate);
+    final delegate = event.delegate;
+    // التحقق من بصمة الجهاز عند اختيار المنظمة
+    final deviceCheck = await DeviceBindingService.verifyOrBindDevice(delegate: delegate);
+    if (deviceCheck.isMismatched) {
+      emit(
+        AuthDeviceMismatchState(
+          delegate: delegate,
+          boundDeviceModel: deviceCheck.boundDeviceModel,
+          currentDeviceModel: deviceCheck.currentDeviceModel,
+          message: deviceCheck.message ?? 'هذا الحساب مقترن بجهاز آخر',
+        ),
+      );
+      return;
     }
-    emit(AuthAuthenticated(delegate: event.delegate));
+
+    if (event.rememberMe) {
+      await cacheDelegateUseCase(delegate);
+    }
+    emit(AuthAuthenticated(delegate: delegate));
   }
 }
+

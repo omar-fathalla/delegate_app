@@ -67,6 +67,8 @@ abstract class PhotoPermissionRepository {
   Future<Either<Failure, CapturedPhoto>> uploadPhoto({
     required String organizationUID,
     required String companyUID,
+    String companyName = '',
+    int? companyCode,
     required String permissionId,
     required String branchId,
     required String branchName,

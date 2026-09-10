@@ -7,17 +7,43 @@ import 'package:delegate_app/core/services/photo_cache_manager.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
 import '../../domain/entities/captured_photo.dart';
+import 'package:delegate_app/injection_container.dart' as di;
 
-class CapturedPhotosViewScreen extends StatefulWidget {
+class CapturedPhotosViewScreen extends StatelessWidget {
   final PhotoPermission photoPermission;
 
   const CapturedPhotosViewScreen({super.key, required this.photoPermission});
 
   @override
-  State<CapturedPhotosViewScreen> createState() => _CapturedPhotosViewScreenState();
+  Widget build(BuildContext context) {
+    PhotoPermissionBloc? existingBloc;
+    try {
+      existingBloc = context.read<PhotoPermissionBloc>();
+    } catch (_) {
+      existingBloc = null;
+    }
+
+    if (existingBloc != null) {
+      return _CapturedPhotosViewContent(photoPermission: photoPermission);
+    }
+
+    return BlocProvider<PhotoPermissionBloc>(
+      create: (_) => di.sl<PhotoPermissionBloc>(),
+      child: _CapturedPhotosViewContent(photoPermission: photoPermission),
+    );
+  }
 }
 
-class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
+class _CapturedPhotosViewContent extends StatefulWidget {
+  final PhotoPermission photoPermission;
+
+  const _CapturedPhotosViewContent({required this.photoPermission});
+
+  @override
+  State<_CapturedPhotosViewContent> createState() => _CapturedPhotosViewContentState();
+}
+
+class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> {
   String? _selectedBranchId;
   String? _selectedDelegateUID;
 
@@ -37,7 +63,7 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
         );
   }
 
-  Future<void> _confirmDeletePhoto(BuildContext context, CapturedPhoto photo) async {
+  Future<void> _confirmDeletePhoto(CapturedPhoto photo) async {
     final bloc = context.read<PhotoPermissionBloc>();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -401,7 +427,7 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                                               shape: const CircleBorder(),
                                               child: InkWell(
                                                 customBorder: const CircleBorder(),
-                                                onTap: () => _confirmDeletePhoto(context, photo),
+                                                onTap: () => _confirmDeletePhoto(photo),
                                                 child: const Padding(
                                                   padding: EdgeInsets.all(6),
                                                   child: Icon(
@@ -478,7 +504,7 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
         String? statusText;
 
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogContentContext, setDialogState) {
             return Dialog(
               backgroundColor: Colors.transparent,
               insetPadding: const EdgeInsets.all(16),
@@ -505,7 +531,7 @@ class _CapturedPhotosViewScreenState extends State<CapturedPhotosViewScreen> {
                       OutlinedButton.icon(
                         onPressed: () {
                           Navigator.pop(dialogContext);
-                          _confirmDeletePhoto(context, photo);
+                          _confirmDeletePhoto(photo);
                         },
                         icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
                         label: const Text(

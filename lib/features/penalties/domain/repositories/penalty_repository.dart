@@ -14,6 +14,7 @@ abstract class PenaltyRepository {
     String? reviewerName,
   });
   Future<Either<Failure, Unit>> deletePenalty(String penaltyId);
+  Future<Either<Failure, Unit>> updatePenalty(PenaltyEntity penalty);
   Future<Either<Failure, EvidenceFile>> uploadEvidenceFile({
     required File file,
     required String penaltyId,

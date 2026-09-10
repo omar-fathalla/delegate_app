@@ -108,6 +108,8 @@ class TogglePermissionRequested extends PhotoPermissionEvent {
 class UploadPhotoRequested extends PhotoPermissionEvent {
   final String organizationUID;
   final String companyUID;
+  final String companyName;
+  final int? companyCode;
   final String permissionId;
   final String branchId;
   final String branchName;
@@ -121,6 +123,8 @@ class UploadPhotoRequested extends PhotoPermissionEvent {
   const UploadPhotoRequested({
     required this.organizationUID,
     required this.companyUID,
+    this.companyName = '',
+    this.companyCode,
     required this.permissionId,
     required this.branchId,
     required this.branchName,
@@ -136,6 +140,8 @@ class UploadPhotoRequested extends PhotoPermissionEvent {
   List<Object?> get props => [
         organizationUID,
         companyUID,
+        companyName,
+        companyCode,
         permissionId,
         branchId,
         branchName,

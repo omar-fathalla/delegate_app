@@ -105,4 +105,25 @@ class NotificationRepositoryImpl implements NotificationRepository {
       return Left(ServerFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> deleteAllNotificationsForUser({
+    required List<String> notificationIds,
+    required String userUid,
+    String? phoneNumber,
+  }) async {
+    try {
+      if (localDataSource != null) {
+        await localDataSource!.clearAllNotificationsInCache(userUid);
+      }
+      await remoteDataSource.deleteAllNotificationsForUser(
+        notificationIds,
+        userUid,
+        phoneNumber: phoneNumber,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 }

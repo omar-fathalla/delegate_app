@@ -7,6 +7,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
+import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -73,7 +74,14 @@ class _LoginScreenState extends State<LoginScreen>
       backgroundColor: colorScheme.surface,
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
-          if (state is AuthError) {
+          if (state is AuthDeviceMismatchState) {
+            DeviceLockDialog.show(
+              context,
+              boundDeviceModel: state.boundDeviceModel,
+              currentDeviceModel: state.currentDeviceModel,
+              delegateName: state.delegate.fullName,
+            );
+          } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),

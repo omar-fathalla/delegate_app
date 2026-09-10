@@ -10,8 +10,13 @@ import '../../domain/entities/photo_permission.dart';
 
 class DelegateCameraCaptureScreen extends StatefulWidget {
   final Delegate delegate;
+  final PhotoPermission? initialPermission;
 
-  const DelegateCameraCaptureScreen({super.key, required this.delegate});
+  const DelegateCameraCaptureScreen({
+    super.key,
+    required this.delegate,
+    this.initialPermission,
+  });
 
   @override
   State<DelegateCameraCaptureScreen> createState() => _DelegateCameraCaptureScreenState();
@@ -28,6 +33,9 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
   @override
   void initState() {
     super.initState();
+    if (widget.initialPermission != null) {
+      _selectedPermission = widget.initialPermission;
+    }
     _loadOngoingPermissions();
   }
 
@@ -48,7 +56,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
   Future<void> _captureImage() async {
     final ImagePicker picker = ImagePicker();
     try {
-      // إجبار المندوب على الكاميرا فقط لمنع التلاعب
+      // إجبار المستخدم على الكاميرا فقط لمنع التلاعب
       final XFile? photo = await picker.pickImage(
         source: ImageSource.camera,
         imageQuality: 50, // ضغط الصورة بشكل أكبر
@@ -80,12 +88,13 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isSupervisor = widget.delegate.role == UserRole.admin;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'تصوير العروض الميدانية',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          isSupervisor ? 'تصوير العروض الميدانية (مشرف)' : 'تصوير العروض الميدانية',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       body: BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
@@ -143,16 +152,20 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
               (state is OngoingPermissionsLoaded ? state.permissions : null);
 
           if (permissionsToUse != null) {
-            // تصفية الأذونات لتظهر فقط الأذونات الممنوحة لشركة المندوب (بالـ UID، الكود، أو اسم الشركة)
+            // تصفية الأذونات لتظهر فقط الأذونات الممنوحة لشركة المندوب / المشرف (بالـ UID، الكود، أو اسم الشركة)
             final delegatePermissions = permissionsToUse.where((p) {
               final matchUID = widget.delegate.companyUID.isNotEmpty && p.companyUID == widget.delegate.companyUID;
               final matchName = p.companyName.trim().toLowerCase() == widget.delegate.companyName.trim().toLowerCase();
               return matchUID || matchName;
             }).toList();
 
-            if (delegatePermissions.isEmpty) {
+            if (delegatePermissions.isEmpty && widget.initialPermission == null) {
               return _buildNoPermissionsState(theme);
             }
+
+            final availablePermissions = delegatePermissions.isNotEmpty
+                ? delegatePermissions
+                : (widget.initialPermission != null ? [widget.initialPermission!] : <PhotoPermission>[]);
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -160,18 +173,51 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SyncStatusBanner(),
+                  // Multiple Permissions Selector (if more than 1 active permission exists)
+                  if (availablePermissions.length > 1) ...[
+                    DropdownButtonFormField<PhotoPermission>(
+                      initialValue: _selectedPermission ?? availablePermissions.first,
+                      decoration: InputDecoration(
+                        labelText: 'اختر إذن / حملة التصوير المعتمدة *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: const Icon(Icons.assignment_turned_in_rounded),
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      ),
+                      items: availablePermissions.map((p) {
+                        final dept = (p.department != null && p.department!.trim().isNotEmpty)
+                            ? ' (${p.department})'
+                            : '';
+                        return DropdownMenuItem<PhotoPermission>(
+                          value: p,
+                          child: Text('${p.companyName}$dept - ${p.branchNames.length} فرع'),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _selectedPermission = val;
+                            _selectedBranchId = null;
+                            _selectedBranchName = null;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
                   // Auto-selected permission/campaign info
                   ...(() {
-                    if (_selectedPermission == null && delegatePermissions.isNotEmpty) {
+                    if (_selectedPermission == null && availablePermissions.isNotEmpty) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (mounted) {
                           setState(() {
-                            _selectedPermission = delegatePermissions.first;
+                            _selectedPermission = availablePermissions.first;
                           });
                         }
                       });
                     }
-                    final activePermission = _selectedPermission ?? delegatePermissions.first;
+                    final activePermission = _selectedPermission ?? availablePermissions.first;
 
                     return [
                       Container(
@@ -208,6 +254,17 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 color: colorScheme.onSurfaceVariant,
                               ),
                             ),
+                            if (activePermission.department != null && activePermission.department!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'القسم: ${activePermission.department}',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 4),
                             Text(
                               'تاريخ الإذن: من ${activePermission.startDate.toString().split(' ').first} إلى ${activePermission.endDate.toString().split(' ').first}',
@@ -223,6 +280,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
 
                       // Branch selector dropdown
                       DropdownButtonFormField<String>(
+                        key: ValueKey('branch_dropdown_${activePermission.uid}'),
                         initialValue: _selectedBranchId,
                         decoration: InputDecoration(
                           labelText: 'اختر الفرع *',
@@ -366,23 +424,32 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             )
                           : ElevatedButton(
                               onPressed: () {
-                                final currentPerm = _selectedPermission ?? delegatePermissions.first;
+                                final currentPerm = _selectedPermission ?? availablePermissions.first;
                                 final orgUID = currentPerm.organizationUID.isNotEmpty
                                     ? currentPerm.organizationUID
                                     : widget.delegate.organizationUID;
                                 final compUID = currentPerm.companyUID.isNotEmpty
                                     ? currentPerm.companyUID
                                     : widget.delegate.companyUID;
+                                final compName = currentPerm.companyName.isNotEmpty
+                                    ? currentPerm.companyName
+                                    : widget.delegate.companyName;
+                                final compCode = currentPerm.companyCode;
+                                final uploaderName = widget.delegate.role == UserRole.admin
+                                    ? '${widget.delegate.fullName} (مشرف الشركة)'
+                                    : widget.delegate.fullName;
 
                                 context.read<PhotoPermissionBloc>().add(
                                       UploadPhotoRequested(
                                         organizationUID: orgUID,
                                         companyUID: compUID,
+                                        companyName: compName,
+                                        companyCode: compCode,
                                         permissionId: currentPerm.uid,
                                         branchId: _selectedBranchId!,
                                         branchName: _selectedBranchName!,
                                         delegateUID: widget.delegate.uid,
-                                        delegateName: widget.delegate.fullName,
+                                        delegateName: uploaderName,
                                         imageFile: _imageFile!,
                                         comment: _commentController.text,
                                         latitude: 0.0,

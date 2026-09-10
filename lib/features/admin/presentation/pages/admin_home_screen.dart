@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/delegate_camera_capture_screen.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
 
@@ -277,6 +278,47 @@ class _AdminHomeBody extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
+            if (adminDelegate.role != UserRole.organizationAdmin) ...[
+              Card(
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+                ),
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.photo_camera_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  title: const Text(
+                    'تصوير العروض الميدانية بالكاميرا',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: const Text('التقاط وتوثيق صور العروض الميدانية والمنتجات مباشرة لشركتكم'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => BlocProvider(
+                          create: (_) => sl<PhotoPermissionBloc>(),
+                          child: DelegateCameraCaptureScreen(delegate: adminDelegate),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             Card(
               clipBehavior: Clip.antiAlias,
               shape: RoundedRectangleBorder(

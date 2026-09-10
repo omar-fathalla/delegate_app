@@ -5,6 +5,8 @@ class CapturedPhoto extends Equatable {
   final String permissionId;
   final String organizationUID;
   final String companyUID;
+  final String companyName;
+  final int? companyCode;
   final String branchId;
   final String branchName;
   final String delegateUID;
@@ -20,6 +22,8 @@ class CapturedPhoto extends Equatable {
     required this.permissionId,
     required this.organizationUID,
     required this.companyUID,
+    this.companyName = '',
+    this.companyCode,
     required this.branchId,
     required this.branchName,
     required this.delegateUID,
@@ -37,6 +41,8 @@ class CapturedPhoto extends Equatable {
         permissionId,
         organizationUID,
         companyUID,
+        companyName,
+        companyCode,
         branchId,
         branchName,
         delegateUID,

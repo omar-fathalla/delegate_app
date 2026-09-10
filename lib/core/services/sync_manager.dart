@@ -110,6 +110,8 @@ class SyncManager {
           await remoteDataSource.uploadPhoto(
             organizationUID: photoData['organizationUID'],
             companyUID: photoData['companyUID'],
+            companyName: (photoData['companyName'] as String?) ?? '',
+            companyCode: photoData['companyCode'] as int?,
             permissionId: photoData['permissionId'],
             branchId: photoData['branchId'],
             branchName: photoData['branchName'],

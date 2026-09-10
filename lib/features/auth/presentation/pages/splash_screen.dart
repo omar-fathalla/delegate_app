@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -71,6 +72,18 @@ class _SplashScreenState extends State<SplashScreen>
           } else {
             context.go('/home', extra: delegate);
           }
+        } else if (state is AuthDeviceMismatchState) {
+          context.go('/login');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) {
+              DeviceLockDialog.show(
+                context,
+                boundDeviceModel: state.boundDeviceModel,
+                currentDeviceModel: state.currentDeviceModel,
+                delegateName: state.delegate.fullName,
+              );
+            }
+          });
         } else if (state is AuthUnauthenticated) {
           context.go('/login');
         }

@@ -28,4 +28,10 @@ abstract class NotificationRepository {
     String notificationId,
     String userUid,
   );
+
+  Future<Either<Failure, void>> deleteAllNotificationsForUser({
+    required List<String> notificationIds,
+    required String userUid,
+    String? phoneNumber,
+  });
 }

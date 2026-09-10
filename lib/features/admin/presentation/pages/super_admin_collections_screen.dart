@@ -37,6 +37,11 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
   double _receiptUnitPrice = 100.0;
   double _adCompanyUnitPrice = 20000.0;
   int _adCompanyCount = 7;
+  double _eventsAnalyticsUnitPrice = 0.0;
+  int _eventsAnalyticsCount = 1;
+  String _eventsAnalyticsTitle = 'Events Analytics Software Subscription';
+  double _settlementAmount = 0.0;
+  String _settlementTitle = 'Settlement & Additional Adjustments';
   double _tashilPercentage = 70.0;
   double _marketPercentage = 30.0;
 
@@ -69,6 +74,21 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         _receiptUnitPrice = prefs.getDouble('billing_receipt_unit_price') ?? 100.0;
         _adCompanyUnitPrice = prefs.getDouble('billing_ad_company_unit_price') ?? 20000.0;
         _adCompanyCount = prefs.getInt('billing_ad_company_count') ?? 7;
+        _eventsAnalyticsUnitPrice = prefs.getDouble('billing_events_analytics_unit_price_$_periodKey') ??
+            prefs.getDouble('billing_events_analytics_unit_price') ??
+            0.0;
+        _eventsAnalyticsCount = prefs.getInt('billing_events_analytics_count_$_periodKey') ??
+            prefs.getInt('billing_events_analytics_count') ??
+            1;
+        _eventsAnalyticsTitle = prefs.getString('billing_events_analytics_title_$_periodKey') ??
+            prefs.getString('billing_events_analytics_title') ??
+            'Events Analytics Software Subscription';
+        _settlementAmount = prefs.getDouble('billing_settlement_amount_$_periodKey') ??
+            prefs.getDouble('billing_settlement_amount') ??
+            0.0;
+        _settlementTitle = prefs.getString('billing_settlement_title_$_periodKey') ??
+            prefs.getString('billing_settlement_title') ??
+            'Settlement & Additional Adjustments';
         _tashilPercentage = prefs.getDouble('billing_tashil_percentage') ?? 70.0;
         _marketPercentage = prefs.getDouble('billing_market_percentage') ?? 30.0;
       });
@@ -81,8 +101,36 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
       await prefs.setDouble('billing_receipt_unit_price', _receiptUnitPrice);
       await prefs.setDouble('billing_ad_company_unit_price', _adCompanyUnitPrice);
       await prefs.setInt('billing_ad_company_count', _adCompanyCount);
+      await prefs.setDouble('billing_events_analytics_unit_price_$_periodKey', _eventsAnalyticsUnitPrice);
+      await prefs.setDouble('billing_events_analytics_unit_price', _eventsAnalyticsUnitPrice);
+      await prefs.setInt('billing_events_analytics_count_$_periodKey', _eventsAnalyticsCount);
+      await prefs.setInt('billing_events_analytics_count', _eventsAnalyticsCount);
+      await prefs.setString('billing_events_analytics_title_$_periodKey', _eventsAnalyticsTitle);
+      await prefs.setString('billing_events_analytics_title', _eventsAnalyticsTitle);
+      await prefs.setDouble('billing_settlement_amount_$_periodKey', _settlementAmount);
+      await prefs.setDouble('billing_settlement_amount', _settlementAmount);
+      await prefs.setString('billing_settlement_title_$_periodKey', _settlementTitle);
+      await prefs.setString('billing_settlement_title', _settlementTitle);
       await prefs.setDouble('billing_tashil_percentage', _tashilPercentage);
       await prefs.setDouble('billing_market_percentage', _marketPercentage);
+
+      // Persist to Firestore monthly_collections doc for sync across devices
+      await FirebaseFirestore.instance
+          .collection('monthly_collections')
+          .doc(_periodKey)
+          .set({
+        'receiptUnitPrice': _receiptUnitPrice,
+        'adCompanyUnitPrice': _adCompanyUnitPrice,
+        'adCompanyCount': _adCompanyCount,
+        'eventsAnalyticsUnitPrice': _eventsAnalyticsUnitPrice,
+        'eventsAnalyticsCount': _eventsAnalyticsCount,
+        'eventsAnalyticsTitle': _eventsAnalyticsTitle,
+        'settlementAmount': _settlementAmount,
+        'settlementTitle': _settlementTitle,
+        'tashilPercentage': _tashilPercentage,
+        'marketPercentage': _marketPercentage,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (_) {}
   }
 
@@ -148,7 +196,47 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         debugPrint('Delegates fetch notice: $e');
       }
 
-      // 2. Fetch recorded collection transactions for this specific month
+      // 2. Fetch monthly settings overrides from Firestore if available
+      try {
+        final monthDoc = await firestore.collection('monthly_collections').doc(_periodKey).get();
+        if (monthDoc.exists) {
+          final mData = monthDoc.data()!;
+          if (mData['settlementAmount'] != null) {
+            _settlementAmount = (mData['settlementAmount'] as num).toDouble();
+          }
+          if (mData['settlementTitle'] != null) {
+            _settlementTitle = mData['settlementTitle'].toString();
+          }
+          if (mData['receiptUnitPrice'] != null) {
+            _receiptUnitPrice = (mData['receiptUnitPrice'] as num).toDouble();
+          }
+          if (mData['adCompanyUnitPrice'] != null) {
+            _adCompanyUnitPrice = (mData['adCompanyUnitPrice'] as num).toDouble();
+          }
+          if (mData['adCompanyCount'] != null) {
+            _adCompanyCount = (mData['adCompanyCount'] as num).toInt();
+          }
+          if (mData['eventsAnalyticsUnitPrice'] != null) {
+            _eventsAnalyticsUnitPrice = (mData['eventsAnalyticsUnitPrice'] as num).toDouble();
+          }
+          if (mData['eventsAnalyticsCount'] != null) {
+            _eventsAnalyticsCount = (mData['eventsAnalyticsCount'] as num).toInt();
+          }
+          if (mData['eventsAnalyticsTitle'] != null) {
+            _eventsAnalyticsTitle = mData['eventsAnalyticsTitle'].toString();
+          }
+          if (mData['tashilPercentage'] != null) {
+            _tashilPercentage = (mData['tashilPercentage'] as num).toDouble();
+          }
+          if (mData['marketPercentage'] != null) {
+            _marketPercentage = (mData['marketPercentage'] as num).toDouble();
+          }
+        }
+      } catch (e) {
+        debugPrint('Month doc fetch notice: $e');
+      }
+
+      // 3. Fetch recorded collection transactions for this specific month
       List<Map<String, dynamic>> transactions = [];
       try {
         final transactionsSnapshot = await firestore
@@ -198,6 +286,30 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     return sum;
   }
 
+  int get _totalCollectedAdCompaniesCount {
+    int sum = 0;
+    for (final t in _collectionTransactions) {
+      sum += (t['adCompaniesCount'] as num? ?? 0).toInt();
+    }
+    return sum;
+  }
+
+  int get _totalCollectedEventsAnalyticsCount {
+    int sum = 0;
+    for (final t in _collectionTransactions) {
+      sum += (t['eventsAnalyticsCount'] as num? ?? 0).toInt();
+    }
+    return sum;
+  }
+
+  double get _totalCollectedSettlementAmount {
+    double sum = 0.0;
+    for (final t in _collectionTransactions) {
+      sum += (t['settlementAmount'] as num? ?? 0.0).toDouble();
+    }
+    return sum;
+  }
+
   double get _totalCollectedAmount {
     double sum = 0.0;
     for (final t in _collectionTransactions) {
@@ -206,10 +318,12 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     return sum;
   }
 
-  // Gross Total Due (الإجمالي المستحق الكلي)
+  // Gross Total Due (الإجمالي المستحق الكلي مع البنود الأربعة)
   double get _dueReceiptsTotalAmount => _totalDueReceiptsCount * _receiptUnitPrice;
   double get _adCompanyTotalAmount => _adCompanyCount * _adCompanyUnitPrice;
-  double get _grandTotalDue => _dueReceiptsTotalAmount + _adCompanyTotalAmount;
+  double get _eventsAnalyticsTotalAmount => _eventsAnalyticsCount * _eventsAnalyticsUnitPrice;
+  double get _grandTotalDue =>
+      _dueReceiptsTotalAmount + _adCompanyTotalAmount + _eventsAnalyticsTotalAmount + _settlementAmount;
 
   // Net Remaining (المتبقي الفعلي بعد الخصم)
   int get _remainingReceiptsCount =>
@@ -217,12 +331,32 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
   double get _remainingReceiptsAmount => _remainingReceiptsCount * _receiptUnitPrice;
 
+  int get _remainingAdCompaniesCount =>
+      (_adCompanyCount - _totalCollectedAdCompaniesCount).clamp(0, _adCompanyCount);
+
+  double get _remainingAdCompanyAmount => _remainingAdCompaniesCount * _adCompanyUnitPrice;
+
+  int get _remainingEventsAnalyticsCount =>
+      (_eventsAnalyticsCount - _totalCollectedEventsAnalyticsCount).clamp(0, _eventsAnalyticsCount);
+
+  double get _remainingEventsAnalyticsAmount => _remainingEventsAnalyticsCount * _eventsAnalyticsUnitPrice;
+
+  double get _remainingSettlementAmount =>
+      (_settlementAmount - _totalCollectedSettlementAmount).clamp(0.0, _settlementAmount);
+
   double get _remainingBalanceAmount =>
-      (_grandTotalDue - _totalCollectedAmount).clamp(0.0, _grandTotalDue);
+      (_remainingReceiptsAmount + _remainingAdCompanyAmount + _remainingEventsAnalyticsAmount + _remainingSettlementAmount)
+          .clamp(0.0, _grandTotalDue);
 
   // Active Invoice Displayed Values (بناءً على اختيار المتبقي أو الإجمالي)
   int get _invoiceReceiptsQty => _showRemainingInvoice ? _remainingReceiptsCount : _totalDueReceiptsCount;
   double get _invoiceReceiptsTotal => _showRemainingInvoice ? _remainingReceiptsAmount : _dueReceiptsTotalAmount;
+  int get _invoiceAdCompaniesQty => _showRemainingInvoice ? _remainingAdCompaniesCount : _adCompanyCount;
+  double get _invoiceAdCompaniesTotal => _showRemainingInvoice ? _remainingAdCompanyAmount : _adCompanyTotalAmount;
+  int get _invoiceEventsAnalyticsQty => _showRemainingInvoice ? _remainingEventsAnalyticsCount : _eventsAnalyticsCount;
+  double get _invoiceEventsAnalyticsTotal =>
+      _showRemainingInvoice ? _remainingEventsAnalyticsAmount : _eventsAnalyticsTotalAmount;
+  double get _invoiceSettlementTotal => _showRemainingInvoice ? _remainingSettlementAmount : _settlementAmount;
   double get _invoiceGrandTotal => _showRemainingInvoice ? _remainingBalanceAmount : _grandTotalDue;
 
   // Shares of Active Invoice
@@ -259,10 +393,15 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     return '${formatter.format(number.toInt())} Egyptian pounds only.';
   }
 
-  // --- Add New Collection Entry Dialog ---
+  // --- Add New Collection Entry Dialog (منظومة تسجيل التحصيل والخصم للمدخلات الأربعة) ---
   void _showAddCollectionDialog() {
     final receiptsCountController = TextEditingController();
-    final amountController = TextEditingController();
+    final receiptsAmountController = TextEditingController();
+    final adCountController = TextEditingController();
+    final adAmountController = TextEditingController();
+    final eventsCountController = TextEditingController();
+    final eventsAmountController = TextEditingController();
+    final settlementAmountController = TextEditingController();
     final notesController = TextEditingController();
     String selectedPaymentMethod = 'Cash';
 
@@ -272,128 +411,455 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         textDirection: TextDirection.ltr,
         child: StatefulBuilder(
           builder: (dialogContext, setDialogState) {
+            final rQty = int.tryParse(receiptsCountController.text) ?? 0;
+            final rAmt = double.tryParse(receiptsAmountController.text) ?? (rQty * _receiptUnitPrice);
+
+            final aQty = int.tryParse(adCountController.text) ?? 0;
+            final aAmt = double.tryParse(adAmountController.text) ?? (aQty * _adCompanyUnitPrice);
+
+            final evQty = int.tryParse(eventsCountController.text) ?? 0;
+            final evAmt = double.tryParse(eventsAmountController.text) ?? (evQty * _eventsAnalyticsUnitPrice);
+
+            final sAmt = double.tryParse(settlementAmountController.text) ?? 0.0;
+
+            final totalEntryAmount = (rAmt > 0 ? rAmt : (rQty * _receiptUnitPrice)) +
+                (aAmt > 0 ? aAmt : (aQty * _adCompanyUnitPrice)) +
+                (evAmt > 0 ? evAmt : (evQty * _eventsAnalyticsUnitPrice)) +
+                sAmt;
+
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              titlePadding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+              contentPadding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
               title: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
                       color: Colors.green.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.add_card_rounded, color: Colors.green, size: 22),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
                       'Record Collection & Deduction',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),
                 ],
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline_rounded, size: 16, color: Colors.blue),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'Remaining: $_remainingReceiptsCount Receipts (${_formatCurrency(_remainingBalanceAmount)})',
-                              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.blue),
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.9,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Overview of Outstanding Balances
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(Icons.account_balance_wallet_rounded, size: 14, color: Colors.blue),
+                                    SizedBox(width: 5),
+                                    Text(
+                                      'Current Outstanding Balance:',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  _formatCurrency(_remainingBalanceAmount),
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade900),
+                                ),
+                              ],
                             ),
-                          ),
+                            const SizedBox(height: 5),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  '• Receipts: $_remainingReceiptsCount (${_formatAmountOnly(_remainingReceiptsAmount)} EGP)',
+                                  style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                ),
+                                Text(
+                                  '• Ad Cos: $_remainingAdCompaniesCount (${_formatAmountOnly(_remainingAdCompanyAmount)} EGP)',
+                                  style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                ),
+                                if (_eventsAnalyticsTotalAmount > 0 || _eventsAnalyticsUnitPrice > 0)
+                                  Text(
+                                    '• Events Analytics: $_remainingEventsAnalyticsCount (${_formatAmountOnly(_remainingEventsAnalyticsAmount)} EGP)',
+                                    style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                  ),
+                                if (_settlementAmount > 0)
+                                  Text(
+                                    '• Settlement: ${_formatAmountOnly(_remainingSettlementAmount)} EGP',
+                                    style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Stream 1: Electronic Payment Receipts (إيصالات الدفع الإلكتروني)
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.receipt_long_rounded, size: 16, color: Colors.indigo),
+                                const SizedBox(width: 6),
+                                const Expanded(
+                                  child: Text(
+                                    '1. Electronic Payment Receipts',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.indigo),
+                                  ),
+                                ),
+                                Text(
+                                  'Rem: $_remainingReceiptsCount',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 5,
+                                  child: TextField(
+                                    controller: receiptsCountController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      labelText: 'Receipts Qty',
+                                      hintText: 'e.g. 385',
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onChanged: (val) {
+                                      final count = int.tryParse(val) ?? 0;
+                                      if (count > 0) {
+                                        receiptsAmountController.text = (count * _receiptUnitPrice).toStringAsFixed(0);
+                                      } else if (val.isEmpty) {
+                                        receiptsAmountController.text = '';
+                                      }
+                                      setDialogState(() {});
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 6,
+                                  child: TextField(
+                                    controller: receiptsAmountController,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: InputDecoration(
+                                      labelText: 'Amount (EGP)',
+                                      hintText: 'e.g. 38500',
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onChanged: (_) => setDialogState(() {}),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Stream 2: Advertising Company Subscription (تكويد واشتراك شركات الدعاية)
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.campaign_rounded, size: 16, color: Colors.deepOrange),
+                                const SizedBox(width: 6),
+                                const Expanded(
+                                  child: Text(
+                                    '2. Advertising Companies Subscription',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.deepOrange),
+                                  ),
+                                ),
+                                Text(
+                                  'Rem: $_remainingAdCompaniesCount',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 5,
+                                  child: TextField(
+                                    controller: adCountController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      labelText: 'Companies Qty',
+                                      hintText: 'e.g. 2',
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onChanged: (val) {
+                                      final count = int.tryParse(val) ?? 0;
+                                      if (count > 0) {
+                                        adAmountController.text = (count * _adCompanyUnitPrice).toStringAsFixed(0);
+                                      } else if (val.isEmpty) {
+                                        adAmountController.text = '';
+                                      }
+                                      setDialogState(() {});
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 6,
+                                  child: TextField(
+                                    controller: adAmountController,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: InputDecoration(
+                                      labelText: 'Amount (EGP)',
+                                      hintText: 'e.g. 40000',
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onChanged: (_) => setDialogState(() {}),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Stream 3: Events Analytics Software (برنامج تحليل الإيفنتات)
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.analytics_rounded, size: 16, color: Colors.purple),
+                                const SizedBox(width: 6),
+                                const Expanded(
+                                  child: Text(
+                                    '3. Events Analytics Software',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.purple),
+                                  ),
+                                ),
+                                Text(
+                                  'Rem: $_remainingEventsAnalyticsCount',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 5,
+                                  child: TextField(
+                                    controller: eventsCountController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      labelText: 'Programs Qty',
+                                      hintText: 'e.g. 1',
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onChanged: (val) {
+                                      final count = int.tryParse(val) ?? 0;
+                                      if (count > 0) {
+                                        eventsAmountController.text = (count * _eventsAnalyticsUnitPrice).toStringAsFixed(0);
+                                      } else if (val.isEmpty) {
+                                        eventsAmountController.text = '';
+                                      }
+                                      setDialogState(() {});
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 6,
+                                  child: TextField(
+                                    controller: eventsAmountController,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: InputDecoration(
+                                      labelText: 'Amount (EGP)',
+                                      hintText: 'e.g. 15000',
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onChanged: (_) => setDialogState(() {}),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Stream 4: Settlement & Additional Adjustments (التسويات والإيرادات الإضافية)
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.balance_rounded, size: 16, color: Colors.teal),
+                                const SizedBox(width: 6),
+                                const Expanded(
+                                  child: Text(
+                                    '4. Settlement & Adjustments',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.teal),
+                                  ),
+                                ),
+                                if (_settlementAmount > 0)
+                                  Text(
+                                    'Rem: ${_formatAmountOnly(_remainingSettlementAmount)}',
+                                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: settlementAmountController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: InputDecoration(
+                                labelText: 'Settlement Amount (EGP)',
+                                hintText: 'e.g. 10000',
+                                prefixIcon: const Icon(Icons.payments_outlined, size: 18),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onChanged: (_) => setDialogState(() {}),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Total Deduction Summary Banner
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade300),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total Collection Entry:',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.green),
+                            ),
+                            Text(
+                              _formatCurrency(totalEntryAmount),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Colors.green.shade900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Payment Method Dropdown
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedPaymentMethod,
+                        isDense: true,
+                        decoration: InputDecoration(
+                          labelText: 'Payment Method',
+                          prefixIcon: const Icon(Icons.account_balance_wallet_rounded, size: 18),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                          DropdownMenuItem(value: 'Bank Transfer', child: Text('Bank Transfer')),
+                          DropdownMenuItem(value: 'Cheque', child: Text('Cheque')),
+                          DropdownMenuItem(value: 'Online / Card', child: Text('Online / Card')),
+                          DropdownMenuItem(value: 'Deduction from Dues', child: Text('Deduction from Dues')),
                         ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedPaymentMethod = val);
+                          }
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 10),
 
-                    TextField(
-                      controller: receiptsCountController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Collected Receipts Count (Qty)',
-                        hintText: 'e.g. 385',
-                        prefixIcon: const Icon(Icons.receipt_long_rounded, size: 20),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      // Notes / Cheque No.
+                      TextField(
+                        controller: notesController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Notes / Cheque No.',
+                          hintText: 'Payment details or transaction reference...',
+                          prefixIcon: const Icon(Icons.edit_note_rounded, size: 18),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                       ),
-                      onChanged: (val) {
-                        final count = int.tryParse(val) ?? 0;
-                        if (count > 0) {
-                          final computedAmount = count * _receiptUnitPrice;
-                          amountController.text = computedAmount.toStringAsFixed(0);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
-
-                    TextField(
-                      controller: amountController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Collected Amount (EGP)',
-                        hintText: 'e.g. 38500',
-                        prefixIcon: const Icon(Icons.payments_rounded, size: 20),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedPaymentMethod,
-                      isDense: true,
-                      decoration: InputDecoration(
-                        labelText: 'Payment Method',
-                        prefixIcon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Cash', child: Text('Cash')),
-                        DropdownMenuItem(value: 'Bank Transfer', child: Text('Bank Transfer')),
-                        DropdownMenuItem(value: 'Cheque', child: Text('Cheque')),
-                        DropdownMenuItem(value: 'Online / Card', child: Text('Online / Card')),
-                        DropdownMenuItem(value: 'Deduction from Dues', child: Text('Deduction from Dues')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() => selectedPaymentMethod = val);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
-
-                    TextField(
-                      controller: notesController,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: 'Notes / Cheque No.',
-                        hintText: 'Payment details or transaction number...',
-                        prefixIcon: const Icon(Icons.edit_note_rounded, size: 20),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -405,17 +871,30 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade700,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: () async {
-                    final qty = int.tryParse(receiptsCountController.text) ?? 0;
-                    final amount = double.tryParse(amountController.text) ?? (qty * _receiptUnitPrice);
+                    final recQty = int.tryParse(receiptsCountController.text) ?? 0;
+                    final recAmt = double.tryParse(receiptsAmountController.text) ?? (recQty * _receiptUnitPrice);
 
-                    if (qty <= 0 && amount <= 0) {
+                    final adQty = int.tryParse(adCountController.text) ?? 0;
+                    final adAmt = double.tryParse(adAmountController.text) ?? (adQty * _adCompanyUnitPrice);
+
+                    final evQty = int.tryParse(eventsCountController.text) ?? 0;
+                    final evAmt = double.tryParse(eventsAmountController.text) ?? (evQty * _eventsAnalyticsUnitPrice);
+
+                    final setAmt = double.tryParse(settlementAmountController.text) ?? 0.0;
+
+                    final totalAmt = (recAmt > 0 ? recAmt : (recQty * _receiptUnitPrice)) +
+                        (adAmt > 0 ? adAmt : (adQty * _adCompanyUnitPrice)) +
+                        (evAmt > 0 ? evAmt : (evQty * _eventsAnalyticsUnitPrice)) +
+                        setAmt;
+
+                    if (recQty <= 0 && recAmt <= 0 && adQty <= 0 && adAmt <= 0 && evQty <= 0 && evAmt <= 0 && setAmt <= 0 && totalAmt <= 0) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Please enter the receipts count or collected amount.'),
+                          content: Text('Please enter at least one collection quantity or amount.'),
                           backgroundColor: Colors.red,
                         ),
                       );
@@ -435,9 +914,17 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
                       await docRef.set({
                         'id': docRef.id,
-                        'receiptsCount': qty,
+                        'receiptsCount': recQty,
+                        'receiptsAmount': recAmt,
+                        'adCompaniesCount': adQty,
+                        'adCompaniesAmount': adAmt,
+                        'eventsAnalyticsCount': evQty,
+                        'eventsAnalyticsAmount': evAmt,
+                        'settlementAmount': setAmt,
+                        'collectedAmount': totalAmt,
                         'unitPrice': _receiptUnitPrice,
-                        'collectedAmount': amount,
+                        'adUnitPrice': _adCompanyUnitPrice,
+                        'eventsAnalyticsUnitPrice': _eventsAnalyticsUnitPrice,
                         'paymentMethod': selectedPaymentMethod,
                         'notes': notesController.text.trim(),
                         'createdAt': FieldValue.serverTimestamp(),
@@ -449,7 +936,13 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         nav.pop();
                         messenger.showSnackBar(
                           SnackBar(
-                            content: Text('Successfully recorded collection of $qty receipts amounting to ${_formatCurrency(amount)}.'),
+                            content: Text(
+                              'Recorded collection of ${_formatCurrency(totalAmt)}'
+                              '${recQty > 0 ? ' ($recQty receipts)' : ''}'
+                              '${adQty > 0 ? ' ($adQty ad companies)' : ''}'
+                              '${evQty > 0 ? ' ($evQty events analytics)' : ''}'
+                              '${setAmt > 0 ? ' (settlement: ${_formatAmountOnly(setAmt)} EGP)' : ''}.',
+                            ),
                             backgroundColor: Colors.green,
                           ),
                         );
@@ -477,7 +970,17 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     );
   }
 
-  Future<void> _deleteCollectionTransaction(String docId, int qty, double amount) async {
+  Future<void> _deleteCollectionTransaction(
+    String docId, {
+    required int receiptsCount,
+    required double receiptsAmount,
+    required int adCompaniesCount,
+    required double adCompaniesAmount,
+    required int eventsAnalyticsCount,
+    required double eventsAnalyticsAmount,
+    required double settlementAmount,
+    required double totalAmount,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -491,9 +994,40 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
               Text('Confirm Deletion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ],
           ),
-          content: Text(
-            'Are you sure you want to delete this collection entry of $qty receipts amounting to ${_formatCurrency(amount)} and restore it to the due balance?',
-            style: const TextStyle(fontSize: 13),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to delete this collection entry amounting to ${_formatCurrency(totalAmount)}?',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'The following will be restored to due balance:',
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                    ),
+                    if (receiptsCount > 0 || receiptsAmount > 0)
+                      Text('• $receiptsCount Receipts (${_formatAmountOnly(receiptsAmount)} EGP)', style: const TextStyle(fontSize: 10)),
+                    if (adCompaniesCount > 0 || adCompaniesAmount > 0)
+                      Text('• $adCompaniesCount Ad Companies (${_formatAmountOnly(adCompaniesAmount)} EGP)', style: const TextStyle(fontSize: 10)),
+                    if (eventsAnalyticsCount > 0 || eventsAnalyticsAmount > 0)
+                      Text('• $eventsAnalyticsCount Events Analytics (${_formatAmountOnly(eventsAnalyticsAmount)} EGP)', style: const TextStyle(fontSize: 10)),
+                    if (settlementAmount > 0)
+                      Text('• Settlement: ${_formatAmountOnly(settlementAmount)} EGP', style: const TextStyle(fontSize: 10)),
+                  ],
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -522,7 +1056,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Collection entry deleted and balances updated.'),
+              content: Text('Collection entry deleted and balances restored.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -627,6 +1161,16 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         TextEditingController(text: _adCompanyUnitPrice.toStringAsFixed(0));
     final adCountController =
         TextEditingController(text: _adCompanyCount.toString());
+    final eventsPriceController =
+        TextEditingController(text: _eventsAnalyticsUnitPrice.toStringAsFixed(0));
+    final eventsCountController =
+        TextEditingController(text: _eventsAnalyticsCount.toString());
+    final eventsTitleController =
+        TextEditingController(text: _eventsAnalyticsTitle);
+    final settlementAmountController = TextEditingController(
+        text: _settlementAmount > 0 ? _settlementAmount.toStringAsFixed(0) : '');
+    final settlementTitleController =
+        TextEditingController(text: _settlementTitle);
     final tashilPercController =
         TextEditingController(text: _tashilPercentage.toStringAsFixed(0));
     final marketPercController =
@@ -686,6 +1230,70 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                     decoration: InputDecoration(
                       labelText: 'Ad Companies Count (Qty)',
                       prefixIcon: const Icon(Icons.numbers_rounded, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Events Analytics Software Field (بند برنامج تحليل الإيفنتات)
+                  TextField(
+                    controller: eventsPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Events Analytics Price (EGP)',
+                      prefixIcon: const Icon(Icons.analytics_rounded, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: eventsCountController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Events Analytics Count (Qty)',
+                      prefixIcon: const Icon(Icons.data_usage_rounded, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: eventsTitleController,
+                    decoration: InputDecoration(
+                      labelText: 'Events Analytics Label (Invoice)',
+                      hintText: 'Events Analytics Software Subscription',
+                      prefixIcon: const Icon(Icons.label_outline_rounded, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Settlement & Other Revenue Field (خانة التسويات والإيرادات الإضافية)
+                  TextField(
+                    controller: settlementAmountController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Settlement & Adjustments (EGP)',
+                      hintText: 'e.g. 15000',
+                      helperText: 'Additional revenue/settlement added to Grand Total',
+                      prefixIcon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: settlementTitleController,
+                    decoration: InputDecoration(
+                      labelText: 'Settlement Item Label (Invoice)',
+                      hintText: 'Settlement & Additional Adjustments',
+                      prefixIcon: const Icon(Icons.edit_note_rounded, size: 20),
                       isDense: true,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
@@ -751,6 +1359,15 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   final rPrice = double.tryParse(receiptPriceController.text) ?? 100.0;
                   final aPrice = double.tryParse(adPriceController.text) ?? 20000.0;
                   final aCount = int.tryParse(adCountController.text) ?? 7;
+                  final evPrice = double.tryParse(eventsPriceController.text) ?? 20000.0;
+                  final evCount = int.tryParse(eventsCountController.text) ?? 1;
+                  final evTitle = eventsTitleController.text.trim().isNotEmpty
+                      ? eventsTitleController.text.trim()
+                      : 'Events Analytics Software Subscription';
+                  final sAmount = double.tryParse(settlementAmountController.text) ?? 0.0;
+                  final sTitle = settlementTitleController.text.trim().isNotEmpty
+                      ? settlementTitleController.text.trim()
+                      : 'Settlement & Additional Adjustments';
                   final tPerc = double.tryParse(tashilPercController.text) ?? 70.0;
                   final mPerc = double.tryParse(marketPercController.text) ?? 30.0;
 
@@ -758,6 +1375,11 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                     _receiptUnitPrice = rPrice;
                     _adCompanyUnitPrice = aPrice;
                     _adCompanyCount = aCount;
+                    _eventsAnalyticsUnitPrice = evPrice;
+                    _eventsAnalyticsCount = evCount;
+                    _eventsAnalyticsTitle = evTitle;
+                    _settlementAmount = sAmount;
+                    _settlementTitle = sTitle;
                     _tashilPercentage = tPerc;
                     _marketPercentage = mPerc;
                   });
@@ -1115,40 +1737,124 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Total Due Collections (Grand Total)',
+                          style: TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _formatCurrency(_grandTotalDue),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (_eventsAnalyticsCount > 0 || _settlementAmount > 0) ...[
+                          const SizedBox(height: 5),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (_eventsAnalyticsCount > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.cyan.shade400.withValues(alpha: 0.25),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.cyan.shade300.withValues(alpha: 0.6)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.analytics_rounded, size: 12, color: Colors.cyanAccent),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '+${_formatAmountOnly(_eventsAnalyticsTotalAmount)} Events Soft.',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (_settlementAmount > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.shade400.withValues(alpha: 0.25),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.amber.shade300.withValues(alpha: 0.6)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.add_circle_outline_rounded, size: 12, color: Colors.amberAccent),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '+${_formatAmountOnly(_settlementAmount)} Settlement',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Wrap(
+                    direction: Axis.vertical,
+                    crossAxisAlignment: WrapCrossAlignment.end,
+                    spacing: 4,
                     children: [
-                      const Text(
-                        'Total Due Collections (Grand Total)',
-                        style: TextStyle(color: Colors.white70, fontSize: 11),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatCurrency(_grandTotalDue),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 19,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$_totalDueReceiptsCount Receipts',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
                         ),
                       ),
+                      if (_adCompanyCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$_adCompanyCount Ad Cos',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 9.5,
+                            ),
+                          ),
+                        ),
                     ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '$_totalDueReceiptsCount Receipts',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -1208,7 +1914,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                         Text(
-                          '$_totalCollectedReceiptsCount Receipts',
+                          '$_totalCollectedReceiptsCount Rec • $_totalCollectedAdCompaniesCount Ad${_totalCollectedEventsAnalyticsCount > 0 ? ' • $_totalCollectedEventsAnalyticsCount Ev' : ''}',
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 9.5),
                         ),
                       ],
@@ -1259,7 +1965,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                         Text(
-                          '$_remainingReceiptsCount Receipts',
+                          '$_remainingReceiptsCount Rec • $_remainingAdCompaniesCount Ad${_remainingEventsAnalyticsCount > 0 ? ' • $_remainingEventsAnalyticsCount Ev' : ''}',
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 9.5),
                         ),
                       ],
@@ -1493,83 +2199,207 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   ],
                 ),
 
-                // Item 1: Electronic Receipts (Shows Remaining Qty if _showRemainingInvoice is true)
-                TableRow(
-                  decoration: const BoxDecoration(color: Colors.white),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                      child: Text(
-                        _showRemainingInvoice
-                            ? 'Issuing official electronic payment receipts\n(Remaining Balance)'
-                            : 'Issuing official electronic payment receipts',
-                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                // Item 1: Electronic Receipts (Shown only if Qty > 0 or Total > 0)
+                if (_invoiceReceiptsQty > 0 || _invoiceReceiptsTotal > 0)
+                  TableRow(
+                    decoration: const BoxDecoration(color: Colors.white),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        child: Text(
+                          _showRemainingInvoice
+                              ? 'Issuing official electronic payment receipts\n(Remaining Balance)'
+                              : 'Issuing official electronic payment receipts',
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                      child: Text(
-                        NumberFormat('#,##0').format(_invoiceReceiptsQty),
-                        style: const TextStyle(fontSize: 10, color: Colors.black87),
-                        textAlign: TextAlign.center,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                        child: Text(
+                          NumberFormat('#,##0').format(_invoiceReceiptsQty),
+                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                      child: Text(
-                        _formatAmountOnly(_receiptUnitPrice),
-                        style: const TextStyle(fontSize: 10, color: Colors.black87),
-                        textAlign: TextAlign.center,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                        child: Text(
+                          _formatAmountOnly(_receiptUnitPrice),
+                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                      child: Text(
-                        _formatAmountOnly(_invoiceReceiptsTotal),
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
-                        textAlign: TextAlign.right,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        child: Text(
+                          _formatAmountOnly(_invoiceReceiptsTotal),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                          textAlign: TextAlign.right,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
 
-                // Item 2: Advertising Company Subscription
-                TableRow(
-                  decoration: const BoxDecoration(color: Color(0xFFFAFAFA)),
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                      child: Text(
-                        'Advertising Company Subscription',
-                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                // Item 2: Advertising Company Subscription (Shown only if Qty > 0 or Total > 0)
+                if (_invoiceAdCompaniesQty > 0 || _invoiceAdCompaniesTotal > 0)
+                  TableRow(
+                    decoration: const BoxDecoration(color: Color(0xFFFAFAFA)),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        child: Text(
+                          _showRemainingInvoice
+                              ? 'Advertising Company Subscription\n(Remaining Balance)'
+                              : 'Advertising Company Subscription',
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                      child: Text(
-                        '$_adCompanyCount',
-                        style: const TextStyle(fontSize: 10, color: Colors.black87),
-                        textAlign: TextAlign.center,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                        child: Text(
+                          '$_invoiceAdCompaniesQty',
+                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                      child: Text(
-                        _formatAmountOnly(_adCompanyUnitPrice),
-                        style: const TextStyle(fontSize: 10, color: Colors.black87),
-                        textAlign: TextAlign.center,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                        child: Text(
+                          _formatAmountOnly(_adCompanyUnitPrice),
+                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                      child: Text(
-                        _formatAmountOnly(_adCompanyTotalAmount),
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
-                        textAlign: TextAlign.right,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        child: Text(
+                          _formatAmountOnly(_invoiceAdCompaniesTotal),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                          textAlign: TextAlign.right,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+
+                // Item 3: Events Analytics Software Subscription (Shown only if Qty > 0 or Total > 0)
+                if (_invoiceEventsAnalyticsQty > 0 || _invoiceEventsAnalyticsTotal > 0)
+                  TableRow(
+                    decoration: const BoxDecoration(color: Colors.white),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        child: Text(
+                          _showRemainingInvoice
+                              ? (_eventsAnalyticsTitle.isNotEmpty
+                                  ? '$_eventsAnalyticsTitle\n(Remaining Balance)'
+                                  : 'Events Analytics Software Subscription\n(Remaining Balance)')
+                              : (_eventsAnalyticsTitle.isNotEmpty
+                                  ? _eventsAnalyticsTitle
+                                  : 'Events Analytics Software Subscription'),
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                        child: Text(
+                          '$_invoiceEventsAnalyticsQty',
+                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                        child: Text(
+                          _formatAmountOnly(_eventsAnalyticsUnitPrice),
+                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        child: Text(
+                          _formatAmountOnly(_invoiceEventsAnalyticsTotal),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                // Item 4: Settlement & Additional Adjustments (Shown only if Total > 0)
+                if (_invoiceSettlementTotal > 0)
+                  TableRow(
+                    decoration: const BoxDecoration(color: Color(0xFFFAFAFA)),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        child: Text(
+                          _showRemainingInvoice
+                              ? (_settlementTitle.isNotEmpty
+                                  ? '$_settlementTitle\n(Remaining Balance)'
+                                  : 'Settlement & Additional Adjustments\n(Remaining Balance)')
+                              : (_settlementTitle.isNotEmpty
+                                  ? _settlementTitle
+                                  : 'Settlement & Additional Adjustments'),
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                        child: Text(
+                          '1',
+                          style: TextStyle(fontSize: 10, color: Colors.black87),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                        child: Text(
+                          _formatAmountOnly(_invoiceSettlementTotal),
+                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        child: Text(
+                          _formatAmountOnly(_invoiceSettlementTotal),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                // Fallback row if all items are fully settled
+                if ((_invoiceReceiptsQty <= 0 && _invoiceReceiptsTotal <= 0) &&
+                    (_invoiceAdCompaniesQty <= 0 && _invoiceAdCompaniesTotal <= 0) &&
+                    (_invoiceEventsAnalyticsQty <= 0 && _invoiceEventsAnalyticsTotal <= 0) &&
+                    _invoiceSettlementTotal <= 0)
+                  TableRow(
+                    decoration: const BoxDecoration(color: Colors.white),
+                    children: const [
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                        child: Text(
+                          'All monthly dues are fully settled (0.00 EGP remaining)',
+                          style: TextStyle(fontSize: 9.5, fontStyle: FontStyle.italic, color: Colors.grey),
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                        child: Text('0', style: TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                        child: Text('0.00', style: TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                        child: Text('0.00', style: TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.right),
+                      ),
+                    ],
+                  ),
 
                 // Grand Total Row
                 TableRow(
@@ -1756,8 +2586,18 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     int index,
   ) {
     final docId = item['id']?.toString() ?? '';
-    final qty = (item['receiptsCount'] as num? ?? 0).toInt();
-    final amount = (item['collectedAmount'] as num? ?? 0.0).toDouble();
+    final recQty = (item['receiptsCount'] as num? ?? 0).toInt();
+    final recAmt = (item['receiptsAmount'] as num? ?? (recQty * _receiptUnitPrice)).toDouble();
+
+    final adQty = (item['adCompaniesCount'] as num? ?? 0).toInt();
+    final adAmt = (item['adCompaniesAmount'] as num? ?? (adQty * _adCompanyUnitPrice)).toDouble();
+
+    final evQty = (item['eventsAnalyticsCount'] as num? ?? 0).toInt();
+    final evAmt = (item['eventsAnalyticsAmount'] as num? ?? (evQty * _eventsAnalyticsUnitPrice)).toDouble();
+
+    final setAmt = (item['settlementAmount'] as num? ?? 0.0).toDouble();
+
+    final amount = (item['collectedAmount'] as num? ?? (recAmt + adAmt + evAmt + setAmt)).toDouble();
     final paymentMethodRaw = item['paymentMethod']?.toString() ?? 'Cash';
     final notes = item['notes']?.toString() ?? '';
     final createdBy = item['createdBy']?.toString() ?? '';
@@ -1776,6 +2616,14 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     } else if (paymentMethodRaw.contains('خصم') || paymentMethodRaw.toLowerCase().contains('deduction')) {
       paymentMethod = 'Deduction from Dues';
     }
+
+    // Compose a clear title
+    final List<String> entryParts = [];
+    if (recQty > 0) entryParts.add('$recQty Receipts');
+    if (adQty > 0) entryParts.add('$adQty Ad Cos');
+    if (evQty > 0) entryParts.add('$evQty Ev Soft');
+    if (setAmt > 0) entryParts.add('Settlement');
+    final entryTitle = entryParts.isNotEmpty ? 'Entry: ${entryParts.join(' + ')}' : 'Collection Entry';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1805,7 +2653,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Collection Entry: $qty Receipts',
+                          entryTitle,
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         Text(
@@ -1828,6 +2676,95 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
             ),
             const SizedBox(height: 8),
             Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+            const SizedBox(height: 6),
+
+            // Item Breakdown Chips
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (recQty > 0 || recAmt > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.indigo.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.receipt_long_rounded, size: 11, color: Colors.indigo),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Receipts: $recQty (${_formatAmountOnly(recAmt)} EGP)',
+                          style: TextStyle(fontSize: 9.5, color: Colors.indigo.shade900, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (adQty > 0 || adAmt > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.deepOrange.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.deepOrange.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.campaign_rounded, size: 11, color: Colors.deepOrange),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Ad Cos: $adQty (${_formatAmountOnly(adAmt)} EGP)',
+                          style: TextStyle(fontSize: 9.5, color: Colors.deepOrange.shade900, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (evQty > 0 || evAmt > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.cyan.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.cyan.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.analytics_rounded, size: 11, color: Colors.cyan),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Events Soft: $evQty (${_formatAmountOnly(evAmt)} EGP)',
+                          style: TextStyle(fontSize: 9.5, color: Colors.cyan.shade900, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (setAmt > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.teal.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.balance_rounded, size: 11, color: Colors.teal),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Settlement: ${_formatAmountOnly(setAmt)} EGP',
+                          style: TextStyle(fontSize: 9.5, color: Colors.teal.shade900, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 6),
 
             Row(
@@ -1855,7 +2792,17 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   tooltip: 'Delete Collection Entry',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  onPressed: () => _deleteCollectionTransaction(docId, qty, amount),
+                  onPressed: () => _deleteCollectionTransaction(
+                    docId,
+                    receiptsCount: recQty,
+                    receiptsAmount: recAmt,
+                    adCompaniesCount: adQty,
+                    adCompaniesAmount: adAmt,
+                    eventsAnalyticsCount: evQty,
+                    eventsAnalyticsAmount: evAmt,
+                    settlementAmount: setAmt,
+                    totalAmount: amount,
+                  ),
                 ),
               ],
             ),

@@ -19,8 +19,9 @@ class PhotoOfflineDataSource {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -30,6 +31,8 @@ class PhotoOfflineDataSource {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         organizationUID TEXT NOT NULL,
         companyUID TEXT NOT NULL,
+        companyName TEXT,
+        companyCode INTEGER,
         permissionId TEXT NOT NULL,
         branchId TEXT NOT NULL,
         branchName TEXT NOT NULL,
@@ -42,6 +45,17 @@ class PhotoOfflineDataSource {
         timestamp INTEGER NOT NULL
       )
     ''');
+  }
+
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      try {
+        await db.execute('ALTER TABLE $tableName ADD COLUMN companyName TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE $tableName ADD COLUMN companyCode INTEGER');
+      } catch (_) {}
+    }
   }
 
   /// Copies temporary image file to persistent App Documents Directory

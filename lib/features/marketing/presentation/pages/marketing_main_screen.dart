@@ -54,9 +54,12 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
       case 'photo_report':
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => MonthlyPhotoReportScreen(
-              delegate: delegate,
-              showAppBar: true,
+            builder: (_) => BlocProvider(
+              create: (_) => di.sl<PhotoPermissionBloc>(),
+              child: MonthlyPhotoReportScreen(
+                delegate: delegate,
+                showAppBar: true,
+              ),
             ),
           ),
         );

@@ -71,6 +71,8 @@ abstract class PhotoPermissionRemoteDataSource {
   Future<CapturedPhotoModel> uploadPhoto({
     required String organizationUID,
     required String companyUID,
+    String companyName = '',
+    int? companyCode,
     required String permissionId,
     required String branchId,
     required String branchName,
@@ -345,6 +347,8 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
   Future<CapturedPhotoModel> uploadPhoto({
     required String organizationUID,
     required String companyUID,
+    String companyName = '',
+    int? companyCode,
     required String permissionId,
     required String branchId,
     required String branchName,
@@ -379,6 +383,8 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         permissionId: permissionId,
         organizationUID: organizationUID,
         companyUID: companyUID,
+        companyName: companyName,
+        companyCode: companyCode,
         branchId: branchId,
         branchName: branchName,
         delegateUID: delegateUID,

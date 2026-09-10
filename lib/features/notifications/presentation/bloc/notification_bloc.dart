@@ -4,6 +4,7 @@ import 'package:bloc/bloc.dart';
 import 'package:delegate_app/features/notifications/domain/entities/notification_entity.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/get_cached_notifications.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/delete_notification_for_user.dart';
+import 'package:delegate_app/features/notifications/domain/usecases/delete_all_notifications_for_user.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/get_notifications.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/get_unread_count.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/mark_all_notifications_read.dart';
@@ -20,6 +21,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final MarkNotificationRead markNotificationRead;
   final MarkAllNotificationsRead markAllNotificationsRead;
   final DeleteNotificationForUser deleteNotificationForUser;
+  final DeleteAllNotificationsForUser deleteAllNotificationsForUser;
 
   StreamSubscription<int>? _unreadCountSubscription;
   int _currentUnreadCount = 0;
@@ -31,6 +33,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     required this.markNotificationRead,
     required this.markAllNotificationsRead,
     required this.deleteNotificationForUser,
+    required this.deleteAllNotificationsForUser,
   }) : super(NotificationInitial()) {
     on<LoadNotifications>(_onLoadNotifications);
     on<SubscribeToUnreadCount>(_onSubscribeToUnreadCount);
@@ -38,6 +41,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     on<MarkAsRead>(_onMarkAsRead);
     on<MarkAllAsRead>(_onMarkAllAsRead);
     on<DeleteNotificationRequested>(_onDeleteNotification);
+    on<DeleteAllNotificationsRequested>(_onDeleteAllNotifications);
   }
 
   Future<void> _onLoadNotifications(
@@ -181,6 +185,24 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       DeleteNotificationForUserParams(
         notificationId: event.notificationId,
         userUid: event.delegateUid,
+      ),
+    );
+  }
+
+  Future<void> _onDeleteAllNotifications(
+    DeleteAllNotificationsRequested event,
+    Emitter<NotificationState> emit,
+  ) async {
+    // 1. Instant Optimistic UI Clear (0 ms)
+    _currentUnreadCount = 0;
+    emit(const NotificationLoaded(notifications: [], unreadCount: 0));
+
+    // 2. Perform Firestore soft-deletion
+    await deleteAllNotificationsForUser(
+      DeleteAllNotificationsForUserParams(
+        notificationIds: event.notificationIds,
+        userUid: event.delegateUid,
+        phoneNumber: event.phoneNumber,
       ),
     );
   }

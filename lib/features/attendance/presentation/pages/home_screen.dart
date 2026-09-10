@@ -15,6 +15,7 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/security_audit_service.dart';
 import 'package:delegate_app/features/tasks/data/models/task_model.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -191,9 +192,28 @@ class _HomeScreenState extends State<HomeScreen> {
       return null;
     }
 
-    return await Geolocator.getCurrentPosition(
+    final position = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
+
+    if (position.isMocked) {
+      final device = await _getDeviceInfo();
+      SecurityAuditService.logMockLocationViolation(
+        delegate: widget.delegate,
+        position: position,
+        deviceModel: device,
+        actionType: 'تسجيل حضور/انصراف',
+      );
+      if (context.mounted) {
+        AppSnackBar.showError(
+          context,
+          'تم اكتشاف استخدام برنامج لتزييف الموقع الجغرافي (Fake GPS). يرجى إيقاف التطبيق لتسجيل الحضور والانصراف.',
+        );
+      }
+      return null;
+    }
+
+    return position;
   }
 }
 

@@ -695,29 +695,43 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
 
                       // List of cards
                       Expanded(
-                        child: filteredList.isEmpty
-                            ? _buildEmptyState(theme, colorScheme)
-                            : ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(14, 8, 14, 85),
-                                itemCount: filteredList.length,
-                                itemBuilder: (context, index) {
-                                  final p = filteredList[index];
-                                  return _AdminPenaltyCard(
-                                    penalty: p,
-                                    currentDelegate: widget.adminDelegate,
-                                    isReadOnly: widget.adminDelegate.role == UserRole.admin,
-                                    onStatusChanged: (newStatus) {
-                                      context.read<PenaltyBloc>().add(
-                                            UpdatePenaltyStatusEvent(
-                                              penaltyId: p.penaltyId,
-                                              status: newStatus,
-                                            ),
-                                          );
-                                    },
-                                    onDelete: () => _confirmAndDeletePenalty(context, p),
-                                  );
-                                },
-                              ),
+                        child: RefreshIndicator(
+                          onRefresh: () async {
+                            _loadData();
+                            await _loadBranchesAndPinned();
+                          },
+                          child: filteredList.isEmpty
+                              ? SingleChildScrollView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  child: Container(
+                                    height: MediaQuery.of(context).size.height * 0.45,
+                                    alignment: Alignment.center,
+                                    child: _buildEmptyState(theme, colorScheme),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 85),
+                                  itemCount: filteredList.length,
+                                  itemBuilder: (context, index) {
+                                    final p = filteredList[index];
+                                    return _AdminPenaltyCard(
+                                      penalty: p,
+                                      currentDelegate: widget.adminDelegate,
+                                      isReadOnly: widget.adminDelegate.role == UserRole.admin,
+                                      onStatusChanged: (newStatus) {
+                                        context.read<PenaltyBloc>().add(
+                                              UpdatePenaltyStatusEvent(
+                                                penaltyId: p.penaltyId,
+                                                status: newStatus,
+                                              ),
+                                            );
+                                      },
+                                      onDelete: () => _confirmAndDeletePenalty(context, p),
+                                    );
+                                  },
+                                ),
+                        ),
                       ),
                     ],
                   );
@@ -853,6 +867,36 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                   color: isPinned ? Colors.teal.shade700 : null,
                 ),
                 onPressed: _togglePinCurrentBranches,
+              ),
+              const SizedBox(width: 8),
+              // Refresh Button (زرار التحديث السريع للغرامات)
+              IconButton.filledTonal(
+                tooltip: 'تحديث بيانات وسجلات الغرامات',
+                style: IconButton.styleFrom(
+                  backgroundColor: colorScheme.surfaceContainerHigh,
+                  foregroundColor: colorScheme.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  size: 20,
+                ),
+                onPressed: () {
+                  _loadData();
+                  _loadBranchesAndPinned();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('تم تحديث بيانات وسجلات الغرامات بنجاح 🔄'),
+                      duration: Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -1174,6 +1218,29 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
 
   Future<void> _callCreator(BuildContext context, PenaltyEntity penalty) async {
     await PenaltyCreatorHelper.callCreator(context, penalty);
+  }
+
+  Future<void> _editPenalty(BuildContext context, PenaltyEntity penalty) async {
+    final res = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<PenaltyBloc>(),
+          child: AdminCreatePenaltyPage(
+            adminDelegate: widget.currentDelegate,
+            penaltyToEdit: penalty,
+          ),
+        ),
+      ),
+    );
+    if (res == true) {
+      if (context.mounted) {
+        if (widget.currentDelegate.role == UserRole.admin) {
+          context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(widget.currentDelegate.companyUID));
+        } else {
+          context.read<PenaltyBloc>().add(const LoadAllPenaltiesEvent());
+        }
+      }
+    }
   }
 
   @override
@@ -1737,6 +1804,24 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                       tooltip: 'اتصال بمحرر المخالفة (${widget.penalty.createdByName})',
                       onPressed: () => _callCreator(context, widget.penalty),
                     ),
+
+                    if (!widget.isReadOnly &&
+                        (widget.currentDelegate.role == UserRole.superAdmin ||
+                            widget.currentDelegate.role == UserRole.organizationAdmin ||
+                            widget.currentDelegate.role == UserRole.branchesMarketingManager ||
+                            widget.penalty.createdById == widget.currentDelegate.uid)) ...[
+                      const SizedBox(width: 4),
+                      IconButton(
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                          foregroundColor: Colors.blue.shade700,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        icon: const Icon(Icons.edit_note_rounded, size: 20),
+                        tooltip: 'تعديل بيانات ومستندات الغرامة',
+                        onPressed: () => _editPenalty(context, widget.penalty),
+                      ),
+                    ],
 
                     if (!widget.isReadOnly && widget.onDelete != null) ...[
                       const SizedBox(width: 4),

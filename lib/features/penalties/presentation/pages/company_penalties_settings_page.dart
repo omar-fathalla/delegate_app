@@ -611,73 +611,106 @@ class _CompanyPenaltiesSettingsPageState
               branchLabel = 'قطاع محدد: ($selectedCount فروع)';
             }
 
-            return CustomScrollView(
-              slivers: [
-                // 0. Multi-Branch Selector & Pin Bar
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isPinned
-                              ? Colors.teal.shade600
-                              : colorScheme.outlineVariant.withValues(alpha: 0.5),
+            return RefreshIndicator(
+              onRefresh: () async {
+                _loadData();
+                await _loadBranchesAndPinned();
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  // 0. Multi-Branch Selector & Pin Bar
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isPinned
+                                ? Colors.teal.shade600
+                                : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                          ),
                         ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.storefront_rounded,
-                                color: isPinned ? Colors.teal.shade700 : colorScheme.primary,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'عرض مخالفات الفرع / القطاع:',
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.storefront_rounded,
+                                  color: isPinned ? Colors.teal.shade700 : colorScheme.primary,
+                                  size: 20,
                                 ),
-                              ),
-                              const Spacer(),
-                              IconButton.filledTonal(
-                                tooltip: isPinned
-                                    ? 'إلغاء تثبيت القطاع الافتراضي'
-                                    : 'تثبيت الفروع المحددة كقطاع افتراضي',
-                                style: IconButton.styleFrom(
-                                  backgroundColor: isPinned
-                                      ? Colors.teal.shade100
-                                      : colorScheme.surface,
-                                  foregroundColor: isPinned
-                                      ? Colors.teal.shade900
-                                      : colorScheme.onSurfaceVariant,
-                                  visualDensity: VisualDensity.compact,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    side: BorderSide(
-                                      color: isPinned
-                                          ? Colors.teal.shade600
-                                          : colorScheme.outlineVariant,
-                                    ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'عرض مخالفات الفرع / القطاع:',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface,
                                   ),
                                 ),
-                                icon: Icon(
-                                  isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-                                  size: 16,
-                                  color: isPinned ? Colors.teal.shade700 : null,
+                                const Spacer(),
+                                IconButton.filledTonal(
+                                  tooltip: isPinned
+                                      ? 'إلغاء تثبيت القطاع الافتراضي'
+                                      : 'تثبيت الفروع المحددة كقطاع افتراضي',
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: isPinned
+                                        ? Colors.teal.shade100
+                                        : colorScheme.surface,
+                                    foregroundColor: isPinned
+                                        ? Colors.teal.shade900
+                                        : colorScheme.onSurfaceVariant,
+                                    visualDensity: VisualDensity.compact,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(
+                                        color: isPinned
+                                            ? Colors.teal.shade600
+                                            : colorScheme.outlineVariant,
+                                      ),
+                                    ),
+                                  ),
+                                  icon: Icon(
+                                    isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                                    size: 16,
+                                    color: isPinned ? Colors.teal.shade700 : null,
+                                  ),
+                                  onPressed: _togglePinCurrentBranches,
                                 ),
-                                onPressed: _togglePinCurrentBranches,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
+                                const SizedBox(width: 6),
+                                IconButton.filledTonal(
+                                  tooltip: 'تحديث بيانات الغرامات',
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: colorScheme.surface,
+                                    foregroundColor: colorScheme.primary,
+                                    visualDensity: VisualDensity.compact,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(
+                                        color: colorScheme.outlineVariant,
+                                      ),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                                  onPressed: () {
+                                    _loadData();
+                                    _loadBranchesAndPinned();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('تم تحديث بيانات وسجلات الغرامات بنجاح 🔄'),
+                                        duration: Duration(seconds: 1),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
                           _isLoadingBranches
                               ? const LinearProgressIndicator()
                               : InkWell(
@@ -1056,8 +1089,9 @@ class _CompanyPenaltiesSettingsPageState
                     ),
                   ),
               ],
-            );
-          }
+            ),
+          );
+        }
 
           return const SizedBox.shrink();
         },

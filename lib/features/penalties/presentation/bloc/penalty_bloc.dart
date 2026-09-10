@@ -4,6 +4,7 @@ import 'package:delegate_app/features/penalties/domain/repositories/penalty_repo
 import 'package:delegate_app/features/penalties/domain/usecases/create_penalty_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/get_all_penalties_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/get_company_penalties_usecase.dart';
+import 'package:delegate_app/features/penalties/domain/usecases/update_penalty_usecase.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
 
@@ -11,17 +12,20 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
   final CreatePenaltyUseCase createPenaltyUseCase;
   final GetCompanyPenaltiesUseCase getCompanyPenaltiesUseCase;
   final GetAllPenaltiesUseCase getAllPenaltiesUseCase;
+  final UpdatePenaltyUseCase? updatePenaltyUseCase;
   final PenaltyRepository repository;
 
   PenaltyBloc({
     required this.createPenaltyUseCase,
     required this.getCompanyPenaltiesUseCase,
     required this.getAllPenaltiesUseCase,
+    this.updatePenaltyUseCase,
     required this.repository,
   }) : super(PenaltyInitialState()) {
     on<LoadCompanyPenaltiesEvent>(_onLoadCompanyPenalties);
     on<LoadAllPenaltiesEvent>(_onLoadAllPenalties);
     on<CreatePenaltyRequestedEvent>(_onCreatePenaltyRequested);
+    on<UpdatePenaltyRequestedEvent>(_onUpdatePenaltyRequested);
     on<UpdatePenaltyStatusEvent>(_onUpdatePenaltyStatus);
     on<DeletePenaltyEvent>(_onDeletePenalty);
   }
@@ -138,6 +142,67 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
       );
     } catch (e) {
       emit(PenaltyErrorState('فشل في تسجيل المخالفة: $e'));
+    }
+  }
+
+  Future<void> _onUpdatePenaltyRequested(
+    UpdatePenaltyRequestedEvent event,
+    Emitter<PenaltyState> emit,
+  ) async {
+    emit(PenaltyLoadingState());
+
+    try {
+      final List<EvidenceFile> updatedEvidences = [...event.penalty.evidenceFiles];
+
+      for (var file in event.newEvidenceFilesToUpload) {
+        final uploadRes = await repository.uploadEvidenceFile(
+          file: file,
+          penaltyId: event.penalty.penaltyId,
+        );
+        uploadRes.fold(
+          (_) {},
+          (ev) => updatedEvidences.add(ev),
+        );
+      }
+
+      final penaltyWithFiles = PenaltyEntity(
+        penaltyId: event.penalty.penaltyId,
+        companyId: event.penalty.companyId,
+        companyName: event.penalty.companyName,
+        branchId: event.penalty.branchId,
+        branchName: event.penalty.branchName,
+        createdById: event.penalty.createdById,
+        createdByName: event.penalty.createdByName,
+        createdByPhone: event.penalty.createdByPhone,
+        title: event.penalty.title,
+        category: event.penalty.category,
+        incidentDescription: event.penalty.incidentDescription,
+        fineAmount: event.penalty.fineAmount,
+        currency: event.penalty.currency,
+        status: event.penalty.status,
+        evidenceFiles: updatedEvidences,
+        branchesMarketingApprovedBy: event.penalty.branchesMarketingApprovedBy,
+        branchesMarketingApprovedAt: event.penalty.branchesMarketingApprovedAt,
+        generalManagerApprovedBy: event.penalty.generalManagerApprovedBy,
+        generalManagerApprovedAt: event.penalty.generalManagerApprovedAt,
+        rejectionReason: event.penalty.rejectionReason,
+        targetDelegateId: event.penalty.targetDelegateId,
+        targetDelegateName: event.penalty.targetDelegateName,
+        isRepeated: event.penalty.isRepeated,
+        createdAt: event.penalty.createdAt,
+        updatedAt: DateTime.now(),
+      );
+
+      final result = updatePenaltyUseCase != null
+          ? await updatePenaltyUseCase!(penaltyWithFiles)
+          : await repository.updatePenalty(penaltyWithFiles);
+
+      result.fold(
+        (failure) => emit(PenaltyErrorState(failure.message)),
+        (_) => emit(const PenaltyActionSuccessState('تم حفظ وتعديل بيانات ومستندات المخالفة بنجاح.')),
+      );
+    } catch (e) {
+      emit(PenaltyErrorState('فشل في تعديل المخالفة: $e'));
     }
   }
 

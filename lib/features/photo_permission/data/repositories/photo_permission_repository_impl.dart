@@ -177,6 +177,8 @@ class PhotoPermissionRepositoryImpl implements PhotoPermissionRepository {
   Future<Either<Failure, CapturedPhoto>> uploadPhoto({
     required String organizationUID,
     required String companyUID,
+    String companyName = '',
+    int? companyCode,
     required String permissionId,
     required String branchId,
     required String branchName,
@@ -191,6 +193,8 @@ class PhotoPermissionRepositoryImpl implements PhotoPermissionRepository {
       final result = await remoteDataSource.uploadPhoto(
         organizationUID: organizationUID,
         companyUID: companyUID,
+        companyName: companyName,
+        companyCode: companyCode,
         permissionId: permissionId,
         branchId: branchId,
         branchName: branchName,

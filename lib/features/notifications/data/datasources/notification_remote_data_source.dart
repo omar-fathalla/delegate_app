@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/notifications/data/models/notification_model.dart';
 
@@ -19,6 +20,12 @@ abstract class NotificationRemoteDataSource {
   Future<void> markAllAsRead(String delegateUid, String organizationId);
 
   Future<void> deleteNotificationForUser(String notificationId, String userUid);
+
+  Future<void> deleteAllNotificationsForUser(
+    List<String> notificationIds,
+    String userUid, {
+    String? phoneNumber,
+  });
 }
 
 class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
@@ -46,143 +53,101 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       }
     }
 
-    // 1. Direct UID matching
-    final userSnap = await _collection
-        .where('delegateUid', isEqualTo: delegateUid)
-        .limit(50)
-        .get();
-    addDocs(userSnap.docs);
+    try {
+      // 1. Initial parallel queries (UID, broadcast 'all', phone tag)
+      final initialQueries = await Future.wait([
+        _collection.where('delegateUid', isEqualTo: delegateUid).limit(50).get(),
+        _collection.where('delegateUid', isEqualTo: 'all').limit(30).get(),
+        _collection.where('delegateUid', isEqualTo: 'phone_$delegateUid').limit(30).get(),
+      ]);
 
-    // 2. Broadcast matching
-    final broadcastSnap = await _collection
-        .where('delegateUid', isEqualTo: 'all')
-        .limit(30)
-        .get();
-    addDocs(broadcastSnap.docs);
+      for (final snap in initialQueries) {
+        addDocs(snap.docs);
+      }
 
-    // 3. Direct delegateUid as phone_...
-    final phoneTagSnap = await _collection
-        .where('delegateUid', isEqualTo: 'phone_$delegateUid')
-        .limit(30)
-        .get();
-    addDocs(phoneTagSnap.docs);
+      final phonesToCheck = <String>{
+        if (phoneNumber != null && phoneNumber.isNotEmpty) phoneNumber,
+        if (RegExp(r'^\+?[0-9]{8,15}$').hasMatch(delegateUid)) delegateUid,
+      };
 
-    final phonesToCheck = <String>{
-      if (phoneNumber != null && phoneNumber.isNotEmpty) phoneNumber,
-      if (RegExp(r'^\+?[0-9]{8,15}$').hasMatch(delegateUid)) delegateUid,
-    };
-
-    // 4. If super-admin, also fetch notifications for all super-admin users
-    if (delegateUid == 'super-admin-login' ||
-        delegateUid.toLowerCase().contains('super')) {
-      try {
-        final adminDocs = await firestore
-            .collection('users')
-            .where('role', isEqualTo: 'super-admin')
-            .get();
-        for (final doc in adminDocs.docs) {
-          final uSnap = await _collection
-              .where('delegateUid', isEqualTo: doc.id)
-              .limit(30)
+      // 2. Super admin matching
+      if (delegateUid == 'super-admin-login' ||
+          delegateUid.toLowerCase().contains('super')) {
+        try {
+          final adminDocs = await firestore
+              .collection('users')
+              .where('role', isEqualTo: 'super-admin')
               .get();
-          addDocs(uSnap.docs);
-          final data = doc.data();
-          final p = (data['phoneNumber'] ??
-                  data['phone'] ??
-                  data['mobileNumber'] ??
-                  data['mobile']) as String?;
+          final adminQueries = <Future<QuerySnapshot>>[];
+          for (final doc in adminDocs.docs) {
+            adminQueries.add(
+              _collection.where('delegateUid', isEqualTo: doc.id).limit(30).get(),
+            );
+            final data = doc.data();
+            final p = (data['phoneNumber'] ??
+                    data['phone'] ??
+                    data['mobileNumber'] ??
+                    data['mobile']) as String?;
+            if (p != null && p.isNotEmpty) phonesToCheck.add(p);
+          }
+          final adminSnaps = await Future.wait(adminQueries);
+          for (final snap in adminSnaps) {
+            addDocs(snap.docs);
+          }
+        } catch (_) {}
+      }
+
+      // 3. User profile lookup for companyId & role
+      String? userCompanyId;
+      String? userRole;
+      try {
+        final userDoc = await firestore.collection('users').doc(delegateUid).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          final p = (userData?['phoneNumber'] ??
+                  userData?['phone'] ??
+                  userData?['mobileNumber']) as String?;
+          userCompanyId = (userData?['companyUID'] ?? userData?['companyId']) as String?;
+          userRole = userData?['role']?.toString();
           if (p != null && p.isNotEmpty) phonesToCheck.add(p);
         }
       } catch (_) {}
-    }
 
-    // 5. Try getting user phone number, companyId, and role from users/delegates
-    try {
-      String? phone;
-      String? userCompanyId;
-      String? userRole;
-
-      final userDoc = await firestore.collection('users').doc(delegateUid).get();
-      if (userDoc.exists) {
-        final userData = userDoc.data();
-        phone = (userData?['phoneNumber'] ??
-                userData?['phone'] ??
-                userData?['mobileNumber']) as String?;
-        userCompanyId = (userData?['companyUID'] ?? userData?['companyId']) as String?;
-        userRole = userData?['role']?.toString();
-      }
-      if (phone == null || phone.isEmpty) {
-        final userQuery = await firestore
-            .collection('users')
-            .where('uid', isEqualTo: delegateUid)
-            .limit(1)
-            .get();
-        if (userQuery.docs.isNotEmpty) {
-          final userData = userQuery.docs.first.data();
-          phone = (userData['phoneNumber'] ??
-                  userData['phone'] ??
-                  userData['mobileNumber']) as String?;
-          userCompanyId ??= (userData['companyUID'] ?? userData['companyId']) as String?;
-          userRole ??= userData['role']?.toString();
-        }
-      }
-      if (phone == null || phone.isEmpty) {
-        final delQuery = await firestore
-            .collectionGroup('delegates')
-            .where('uid', isEqualTo: delegateUid)
-            .limit(1)
-            .get();
-        if (delQuery.docs.isNotEmpty) {
-          final delData = delQuery.docs.first.data();
-          phone = (delData['phoneNumber'] ??
-                  delData['phone'] ??
-                  delData['mobileNumber']) as String?;
-          userCompanyId ??= (delData['companyUID'] ?? delData['companyId']) as String?;
-          userRole ??= delData['role']?.toString();
-        }
-      }
-
-      // Company-level & Supervisor notifications
+      // 4. Parallel Company and Role broadcast queries
+      final roleQueries = <Future<QuerySnapshot>>[];
       if (userCompanyId != null && userCompanyId.isNotEmpty) {
-        final compSnap1 = await _collection
-            .where('delegateUid', isEqualTo: 'company_$userCompanyId')
-            .limit(30)
-            .get();
-        addDocs(compSnap1.docs);
-
-        final compSnap2 = await _collection
-            .where('delegateUid', isEqualTo: 'supervisor_$userCompanyId')
-            .limit(30)
-            .get();
-        addDocs(compSnap2.docs);
-
-        final compSnap3 = await _collection
-            .where('companyId', isEqualTo: userCompanyId)
-            .where('delegateUid', isEqualTo: 'all_company_supervisors')
-            .limit(30)
-            .get();
-        addDocs(compSnap3.docs);
+        roleQueries.add(
+          _collection.where('delegateUid', isEqualTo: 'company_$userCompanyId').limit(30).get(),
+        );
+        roleQueries.add(
+          _collection.where('delegateUid', isEqualTo: 'supervisor_$userCompanyId').limit(30).get(),
+        );
+        roleQueries.add(
+          _collection.where('companyId', isEqualTo: userCompanyId).where('delegateUid', isEqualTo: 'all_company_supervisors').limit(30).get(),
+        );
       }
 
-      // Role-specific broadcasts
       final normalizedRole = userRole?.toLowerCase() ?? '';
       if (normalizedRole.contains('marketing') || normalizedRole.contains('branches')) {
         for (final r in ['branchesMarketingManager', 'branches_marketing', 'marketing']) {
-          final rSnap = await _collection.where('delegateUid', isEqualTo: r).limit(30).get();
-          addDocs(rSnap.docs);
+          roleQueries.add(_collection.where('delegateUid', isEqualTo: r).limit(30).get());
         }
       }
       if (normalizedRole.contains('org') || normalizedRole.contains('organization')) {
         for (final r in ['organizationAdmin', 'organization_admin']) {
-          final rSnap = await _collection.where('delegateUid', isEqualTo: r).limit(30).get();
-          addDocs(rSnap.docs);
+          roleQueries.add(_collection.where('delegateUid', isEqualTo: r).limit(30).get());
         }
       }
 
-      if (phone != null && phone.isNotEmpty) {
-        phonesToCheck.add(phone);
+      if (roleQueries.isNotEmpty) {
+        final roleSnaps = await Future.wait(roleQueries);
+        for (final snap in roleSnaps) {
+          addDocs(snap.docs);
+        }
       }
 
+      // 5. Parallel phone variation queries
+      final phoneQueries = <Future<QuerySnapshot>>[];
       for (final rawP in phonesToCheck) {
         final cleanPhone = rawP.replaceAll(RegExp(r'\s+'), '').trim();
         final variations = <String>{
@@ -191,32 +156,19 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           if (!cleanPhone.startsWith('+')) '+20$cleanPhone',
           if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('0'))
             '+20${cleanPhone.substring(1)}',
-          if (!cleanPhone.startsWith('+')) '+971$cleanPhone',
         };
 
         for (final p in variations) {
-          // Check users collection by phone to get their Firestore UIDs
-          try {
-            final uSnap = await firestore
-                .collection('users')
-                .where('phoneNumber', isEqualTo: p)
-                .limit(5)
-                .get();
-            for (final uDoc in uSnap.docs) {
-              final notifByUid = await _collection
-                  .where('delegateUid', isEqualTo: uDoc.id)
-                  .limit(30)
-                  .get();
-              addDocs(notifByUid.docs);
-            }
-          } catch (_) {}
+          phoneQueries.add(_collection.where('phoneNumber', isEqualTo: p).limit(30).get());
+          phoneQueries.add(_collection.where('delegateUid', isEqualTo: 'phone_$p').limit(30).get());
+          phoneQueries.add(_collection.where('delegateUid', isEqualTo: p).limit(30).get());
+        }
+      }
 
-          final pSnap1 = await _collection.where('phoneNumber', isEqualTo: p).limit(30).get();
-          addDocs(pSnap1.docs);
-          final pSnap2 = await _collection.where('delegateUid', isEqualTo: 'phone_$p').limit(30).get();
-          addDocs(pSnap2.docs);
-          final pSnap3 = await _collection.where('delegateUid', isEqualTo: p).limit(30).get();
-          addDocs(pSnap3.docs);
+      if (phoneQueries.isNotEmpty) {
+        final phoneSnaps = await Future.wait(phoneQueries);
+        for (final snap in phoneSnaps) {
+          addDocs(snap.docs);
         }
       }
     } catch (_) {}
@@ -232,7 +184,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       return true;
     }).toList();
 
-    // Sort in memory instead of in Firestore (Newest First)
+    // Sort in memory (Newest First)
     filteredDocs.sort((a, b) {
       final aData = a.data() as Map<String, dynamic>?;
       final bData = b.data() as Map<String, dynamic>?;
@@ -240,10 +192,39 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           (aData?['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
       final bTime =
           (bData?['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
-      return bTime.compareTo(aTime); // descending
+      return bTime.compareTo(aTime);
     });
 
-    return filteredDocs.map((doc) => NotificationModel.fromFirestore(doc)).toList();
+    // Auto-pruning: Keep latest 100 notifications, prune excess older ones in background
+    List<QueryDocumentSnapshot> activeDocs = filteredDocs;
+    if (filteredDocs.length > 100) {
+      activeDocs = filteredDocs.take(100).toList();
+      final excessDocs = filteredDocs.skip(100).toList();
+      final excessIds = excessDocs.map((d) => d.id).toList();
+      unawaited(
+        _pruneOlderNotificationsInBackground(
+          excessIds,
+          delegateUid,
+          phoneNumber: phoneNumber,
+        ),
+      );
+    }
+
+    return activeDocs.map((doc) => NotificationModel.fromFirestore(doc)).toList();
+  }
+
+  Future<void> _pruneOlderNotificationsInBackground(
+    List<String> notificationIds,
+    String userUid, {
+    String? phoneNumber,
+  }) async {
+    try {
+      await deleteAllNotificationsForUser(
+        notificationIds,
+        userUid,
+        phoneNumber: phoneNumber,
+      );
+    } catch (_) {}
   }
 
   @override
@@ -263,28 +244,32 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
 
   @override
   Future<void> markAsRead(String notificationId) async {
-    await _collection.doc(notificationId).update({
-      'isRead': true,
-      'readAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _collection.doc(notificationId).update({
+        'isRead': true,
+        'readAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
   }
 
   @override
   Future<void> markAllAsRead(String delegateUid, String organizationId) async {
-    final snapshot = await _collection
-        .where('delegateUid', isEqualTo: delegateUid)
-        .where('organizationId', isEqualTo: organizationId)
-        .where('isRead', isEqualTo: false)
-        .get();
+    try {
+      final snapshot = await _collection
+          .where('delegateUid', isEqualTo: delegateUid)
+          .where('organizationId', isEqualTo: organizationId)
+          .where('isRead', isEqualTo: false)
+          .get();
 
-    final batch = firestore.batch();
-    for (final doc in snapshot.docs) {
-      batch.update(doc.reference, {
-        'isRead': true,
-        'readAt': FieldValue.serverTimestamp(),
-      });
-    }
-    await batch.commit();
+      final batch = firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.update(doc.reference, {
+          'isRead': true,
+          'readAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+    } catch (_) {}
   }
 
   @override
@@ -292,8 +277,44 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     String notificationId,
     String userUid,
   ) async {
-    await _collection.doc(notificationId).update({
-      'deletedBy': FieldValue.arrayUnion([userUid]),
-    });
+    try {
+      await _collection.doc(notificationId).set({
+        'deletedBy': FieldValue.arrayUnion([userUid]),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> deleteAllNotificationsForUser(
+    List<String> notificationIds,
+    String userUid, {
+    String? phoneNumber,
+  }) async {
+    if (notificationIds.isEmpty) return;
+
+    final identifiers = <String>{
+      userUid,
+      if (phoneNumber != null && phoneNumber.isNotEmpty) phoneNumber,
+    }.toList();
+
+    const int chunkSize = 100;
+    for (var i = 0; i < notificationIds.length; i += chunkSize) {
+      final end = (i + chunkSize < notificationIds.length)
+          ? i + chunkSize
+          : notificationIds.length;
+      final chunk = notificationIds.sublist(i, end);
+
+      try {
+        final batch = firestore.batch();
+        for (final id in chunk) {
+          batch.set(
+            _collection.doc(id),
+            {'deletedBy': FieldValue.arrayUnion(identifiers)},
+            SetOptions(merge: true),
+          );
+        }
+        await batch.commit();
+      } catch (_) {}
+    }
   }
 }

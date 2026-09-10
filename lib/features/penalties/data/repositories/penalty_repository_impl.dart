@@ -86,6 +86,19 @@ class PenaltyRepositoryImpl implements PenaltyRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> updatePenalty(PenaltyEntity penalty) async {
+    try {
+      final model = PenaltyModel.fromEntity(penalty);
+      await remoteDataSource.updatePenalty(model);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ غير متوقع عند تعديل المخالفة.'));
+    }
+  }
+
+  @override
   Future<Either<Failure, EvidenceFile>> uploadEvidenceFile({
     required File file,
     required String penaltyId,

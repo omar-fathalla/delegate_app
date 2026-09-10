@@ -10,6 +10,8 @@ import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
 import '../../domain/entities/photo_permission_departments.dart';
 import 'captured_photos_view_screen.dart';
+import 'monthly_photo_report_screen.dart';
+import 'delegate_camera_capture_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 class SupervisorPermissionsScreen extends StatefulWidget {
@@ -139,6 +141,24 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
               ),
               actions: [
                 IconButton(
+                  icon: const Icon(Icons.photo_library_rounded),
+                  tooltip: 'الأرشيف الشهري لصور الشركة',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BlocProvider(
+                          create: (_) => di.sl<PhotoPermissionBloc>(),
+                          child: MonthlyPhotoReportScreen(
+                            delegate: widget.supervisorDelegate,
+                            showAppBar: true,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
                   icon: const Icon(Icons.refresh_rounded),
                   onPressed: _loadData,
                 ),
@@ -226,6 +246,146 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
 
             return Column(
               children: [
+                // Quick Action: Supervisor Photo Actions Banner (Camera Capture + Monthly Archive)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.primaryContainer,
+                        colorScheme.primaryContainer.withValues(alpha: 0.6),
+                      ],
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: colorScheme.primary.withValues(alpha: 0.25)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.primary.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.camera_enhance_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'منظومة تصوير العروض والتقارير',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onPrimaryContainer,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'توثيق العروض الميدانية للمشرف ومتابعة تقارير المناديب',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          if (widget.supervisorDelegate.role != UserRole.organizationAdmin) ...[
+                            Expanded(
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: colorScheme.primary,
+                                  foregroundColor: colorScheme.onPrimary,
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => BlocProvider(
+                                        create: (_) => di.sl<PhotoPermissionBloc>(),
+                                        child: DelegateCameraCaptureScreen(
+                                          delegate: widget.supervisorDelegate,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                                label: const Text(
+                                  'التقاط صورة',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: colorScheme.surface,
+                                foregroundColor: colorScheme.primary,
+                                side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.4)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => BlocProvider(
+                                      create: (_) => di.sl<PhotoPermissionBloc>(),
+                                      child: MonthlyPhotoReportScreen(
+                                        delegate: widget.supervisorDelegate,
+                                        showAppBar: true,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.photo_library_rounded, size: 18),
+                              label: const Text(
+                                'الأرشيف الشهري',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
                 // Filter Bar
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -590,28 +750,69 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
                     )
                   else
                     Text(
-                      'متابعة المناديب وتقارير الصور:',
+                      'إجراءات الإذن:',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   if (isApproved)
-                    TextButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (routeContext) => BlocProvider(
-                              create: (_) => di.sl<PhotoPermissionBloc>(),
-                              child: CapturedPhotosViewScreen(
-                                photoPermission: permission,
+                    Expanded(
+                      child: Wrap(
+                        alignment: WrapAlignment.end,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          if (widget.supervisorDelegate.role == UserRole.admin ||
+                              widget.supervisorDelegate.role == UserRole.delegate)
+                            FilledButton.tonalIcon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => DelegateCameraCaptureScreen(
+                                      delegate: widget.supervisorDelegate,
+                                      initialPermission: permission,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.photo_camera_rounded, size: 16),
+                              label: const Text(
+                                'التقاط صورة',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              style: FilledButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                               ),
                             ),
+                          TextButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (routeContext) => BlocProvider(
+                                    create: (_) => di.sl<PhotoPermissionBloc>(),
+                                    child: CapturedPhotosViewScreen(
+                                      photoPermission: permission,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.collections_rounded, size: 16),
+                            label: const Text(
+                              'عرض الصور',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                            ),
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.collections_rounded, size: 18),
-                      label: const Text('عرض الصور الميدانية'),
+                        ],
+                      ),
                     ),
                 ],
               ),

@@ -8,15 +8,17 @@ import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import '../widgets/sync_status_banner.dart';
+import '../widgets/company_name_with_code.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/captured_photo.dart';
 
 enum GroupMode {
   byDate,
   byBranch,
+  byDelegate,
 }
 
-class MonthlyPhotoReportScreen extends StatefulWidget {
+class MonthlyPhotoReportScreen extends StatelessWidget {
   final Delegate delegate;
   final bool showAppBar;
 
@@ -27,12 +29,48 @@ class MonthlyPhotoReportScreen extends StatefulWidget {
   });
 
   @override
-  State<MonthlyPhotoReportScreen> createState() => _MonthlyPhotoReportScreenState();
+  Widget build(BuildContext context) {
+    PhotoPermissionBloc? existingBloc;
+    try {
+      existingBloc = context.read<PhotoPermissionBloc>();
+    } catch (_) {
+      existingBloc = null;
+    }
+
+    if (existingBloc != null) {
+      return _MonthlyPhotoReportContent(
+        delegate: delegate,
+        showAppBar: showAppBar,
+      );
+    }
+
+    return BlocProvider<PhotoPermissionBloc>(
+      create: (_) => di.sl<PhotoPermissionBloc>(),
+      child: _MonthlyPhotoReportContent(
+        delegate: delegate,
+        showAppBar: showAppBar,
+      ),
+    );
+  }
 }
 
-class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
+class _MonthlyPhotoReportContent extends StatefulWidget {
+  final Delegate delegate;
+  final bool showAppBar;
+
+  const _MonthlyPhotoReportContent({
+    required this.delegate,
+    required this.showAppBar,
+  });
+
+  @override
+  State<_MonthlyPhotoReportContent> createState() => _MonthlyPhotoReportContentState();
+}
+
+class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> {
   late DateTime _selectedMonth;
   GroupMode _currentGroupMode = GroupMode.byDate;
+  int _slideDirection = 0; // -1 for previous (left to right), +1 for next (right to left)
 
   DateTime get _now {
     try {
@@ -90,7 +128,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
     }
   }
 
-  Future<void> _confirmDeletePhoto(BuildContext context, CapturedPhoto photo) async {
+  Future<void> _confirmDeletePhoto(CapturedPhoto photo) async {
     final bloc = context.read<PhotoPermissionBloc>();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -113,7 +151,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'هل أنت متأكد من حذف هذه الصورة المرسلة من المندوب "${photo.delegateName}" بفرع "${photo.branchName}"؟',
+              'هل أنت متأكد من حذف هذه الصورة المرسلة من "${photo.delegateName}" بفرع "${photo.branchName}"؟',
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -177,6 +215,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
 
   void _previousMonth() {
     setState(() {
+      _slideDirection = -1;
       _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
     });
   }
@@ -187,14 +226,168 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
       return;
     }
     setState(() {
+      _slideDirection = 1;
       _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
     });
   }
 
-  void _resetToCurrentMonth() {
+  void _selectMonth(DateTime month) {
     setState(() {
-      _selectedMonth = _now;
+      _slideDirection = month.isAfter(_selectedMonth) ? 1 : -1;
+      _selectedMonth = DateTime(month.year, month.month);
     });
+  }
+
+  void _resetToCurrentMonth() {
+    final now = _now;
+    setState(() {
+      _slideDirection = 1;
+      _selectedMonth = DateTime(now.year, now.month);
+    });
+  }
+
+  void _showMonthPickerSheet(BuildContext context, List<CapturedPhoto> allPhotos) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final now = _now;
+
+    // Aggregate all historical months from allPhotos
+    final Map<String, int> monthCounts = {};
+    for (var photo in allPhotos) {
+      final key = '${photo.capturedAt.year}-${photo.capturedAt.month.toString().padLeft(2, '0')}';
+      monthCounts[key] = (monthCounts[key] ?? 0) + 1;
+    }
+
+    // Ensure current month is represented
+    final currentKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    monthCounts.putIfAbsent(currentKey, () => 0);
+
+    final sortedKeys = monthCounts.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_month_rounded, color: colorScheme.primary, size: 22),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'أرشيف الشهور المسجلة',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.pop(sheetContext),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: sortedKeys.length,
+                  itemBuilder: (context, index) {
+                    final key = sortedKeys[index];
+                    final parts = key.split('-');
+                    final year = int.parse(parts[0]);
+                    final month = int.parse(parts[1]);
+                    final date = DateTime(year, month);
+                    final isSelected = _selectedMonth.year == year && _selectedMonth.month == month;
+                    final isCurrent = now.year == year && now.month == month;
+                    final count = monthCounts[key] ?? 0;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? colorScheme.primaryContainer.withValues(alpha: 0.5)
+                            : colorScheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? colorScheme.primary
+                              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: ListTile(
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          _selectMonth(date);
+                        },
+                        leading: Icon(
+                          isSelected ? Icons.check_circle_rounded : Icons.folder_rounded,
+                          color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                        ),
+                        title: Text(
+                          _getMonthNameArabic(date),
+                          style: TextStyle(
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                            color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                          ),
+                        ),
+                        subtitle: isCurrent
+                            ? Text(
+                                'الشهر الحالي',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colorScheme.secondary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: count > 0
+                                ? colorScheme.primary.withValues(alpha: 0.12)
+                                : colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '$count صورة',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: count > 0 ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -208,7 +401,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
       appBar: widget.showAppBar
           ? AppBar(
               title: const Text(
-                'تقارير الصور الشهرية',
+                'الأرشيف الشهري لصور الشركة',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
@@ -218,6 +411,13 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
               centerTitle: true,
               elevation: 0,
               scrolledUnderElevation: 1,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  tooltip: 'تحديث الصور',
+                  onPressed: _loadPhotos,
+                ),
+              ],
             )
           : null,
       backgroundColor: colorScheme.surfaceContainerLowest,
@@ -247,14 +447,16 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             return const Center(
               child: AppLoadingIndicator(
                 style: AppLoadingStyle.threeArchedCircle,
-                label: 'جاري تحميل تقارير الصور...',
+                label: 'جاري تحميل أرشيف الصور...',
               ),
             );
           }
 
           if (state is CapturedPhotosLoaded) {
+            final allPhotos = state.photos;
+
             // Filter photos for the selected month
-            final filteredPhotos = state.photos.where((photo) {
+            final filteredPhotos = allPhotos.where((photo) {
               return photo.capturedAt.year == _selectedMonth.year &&
                   photo.capturedAt.month == _selectedMonth.month;
             }).toList();
@@ -267,12 +469,15 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             // Statistics calculation
             final totalPhotos = filteredPhotos.length;
             final uniqueBranches = filteredPhotos.map((p) => p.branchId).toSet().length;
+            final uniqueDelegates = filteredPhotos.map((p) => p.delegateUID.isNotEmpty ? p.delegateUID : p.delegateName).toSet().length;
 
-            final today = now;
-            final photosToday = filteredPhotos.where((p) =>
-                p.capturedAt.year == today.year &&
-                p.capturedAt.month == today.month &&
-                p.capturedAt.day == today.day).length;
+            // Extract historical months that have photos
+            final Map<String, int> availableMonthsMap = {};
+            for (var p in allPhotos) {
+              final k = '${p.capturedAt.year}-${p.capturedAt.month.toString().padLeft(2, '0')}';
+              availableMonthsMap[k] = (availableMonthsMap[k] ?? 0) + 1;
+            }
+            final sortedAvailableKeys = availableMonthsMap.keys.toList()..sort((a, b) => b.compareTo(a));
 
             return RefreshIndicator(
               onRefresh: () async {
@@ -286,10 +491,70 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                     child: SyncStatusBanner(),
                   ),
 
-                  // Modern M3 Month Selector Navigator
+                  // Company Identity Header
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.business_rounded,
+                                color: colorScheme.primary,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CompanyNameWithCode(
+                                    organizationUID: widget.delegate.organizationUID,
+                                    companyUID: widget.delegate.companyUID,
+                                    companyName: widget.delegate.companyName,
+                                    companyCode: null,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'جميع الصور محفوظة ومؤرشفة للشركة ومستقلة عن حسابات المناديب',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Animated Month Navigator Bar
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                         decoration: BoxDecoration(
@@ -302,56 +567,101 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            // Previous Month Button (Unlimited historical cycling)
                             IconButton.filledTonal(
                               style: IconButton.styleFrom(
                                 backgroundColor: colorScheme.surface,
                                 foregroundColor: colorScheme.primary,
                                 padding: const EdgeInsets.all(8),
-                                minimumSize: const Size(36, 36),
+                                minimumSize: const Size(38, 38),
                               ),
-                              icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                              icon: const Icon(Icons.chevron_right_rounded, size: 22),
                               onPressed: _previousMonth,
-                              tooltip: 'الشهر السابق',
+                              tooltip: 'الشهر السابق (أرشيف)',
                             ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _getMonthNameArabic(_selectedMonth),
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.primary,
-                                  ),
-                                ),
-                                if (!isCurrentMonth) ...[
-                                  const SizedBox(height: 2),
-                                  InkWell(
-                                    onTap: _resetToCurrentMonth,
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                      child: Text(
-                                        'الشهر الحالي ↩',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: colorScheme.secondary,
+
+                            // Animated Month Title + Picker trigger
+                            InkWell(
+                              onTap: () => _showMonthPickerSheet(context, allPhotos),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    AnimatedSwitcher(
+                                      duration: const Duration(milliseconds: 300),
+                                      transitionBuilder: (child, animation) {
+                                        final offsetAnimation = Tween<Offset>(
+                                          begin: Offset(_slideDirection * 0.4, 0.0),
+                                          end: Offset.zero,
+                                        ).animate(CurvedAnimation(
+                                          parent: animation,
+                                          curve: Curves.easeOutCubic,
+                                        ));
+                                        return FadeTransition(
+                                          opacity: animation,
+                                          child: SlideTransition(
+                                            position: offsetAnimation,
+                                            child: child,
+                                          ),
+                                        );
+                                      },
+                                      child: KeyedSubtree(
+                                        key: ValueKey('${_selectedMonth.year}-${_selectedMonth.month}'),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              _getMonthNameArabic(_selectedMonth),
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: colorScheme.primary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Icon(
+                                              Icons.arrow_drop_down_rounded,
+                                              color: colorScheme.primary,
+                                              size: 20,
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ],
+                                    if (!isCurrentMonth) ...[
+                                      const SizedBox(height: 2),
+                                      InkWell(
+                                        onTap: _resetToCurrentMonth,
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                          child: Text(
+                                            'العودة للشهر الحالي ↩',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: colorScheme.secondary,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
                             ),
+
+                            // Next Month Button
                             IconButton.filledTonal(
                               style: IconButton.styleFrom(
                                 backgroundColor: colorScheme.surface,
                                 foregroundColor: isCurrentMonth ? colorScheme.outline : colorScheme.primary,
                                 padding: const EdgeInsets.all(8),
-                                minimumSize: const Size(36, 36),
+                                minimumSize: const Size(38, 38),
                               ),
-                              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                              icon: const Icon(Icons.chevron_left_rounded, size: 22),
                               onPressed: isCurrentMonth ? null : _nextMonth,
                               tooltip: 'الشهر التالي',
                             ),
@@ -361,7 +671,72 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                     ),
                   ),
 
-                  // M3 Summary Metrics Cards
+                  // Quick Historical Months Chips (if more than 1 month has data)
+                  if (sortedAvailableKeys.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Container(
+                        height: 38,
+                        margin: const EdgeInsets.only(top: 2, bottom: 6),
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: sortedAvailableKeys.length,
+                          itemBuilder: (context, index) {
+                            final k = sortedAvailableKeys[index];
+                            final parts = k.split('-');
+                            final y = int.parse(parts[0]);
+                            final m = int.parse(parts[1]);
+                            final chipDate = DateTime(y, m);
+                            final isSelected = _selectedMonth.year == y && _selectedMonth.month == m;
+                            final count = availableMonthsMap[k] ?? 0;
+
+                            return Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: ChoiceChip(
+                                label: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(_getMonthNameArabic(chipDate)),
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? colorScheme.onPrimary.withValues(alpha: 0.2)
+                                            : colorScheme.primary.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '$count',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected ? colorScheme.onPrimary : colorScheme.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                selected: isSelected,
+                                selectedColor: colorScheme.primary,
+                                labelStyle: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+                                ),
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    _selectMonth(chipDate);
+                                  }
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+
+                  // Summary Metrics Cards (Photos, Branches, Delegates)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -387,9 +762,9 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: _buildMetricCard(
-                              title: 'التقاطات اليوم',
-                              value: '$photosToday',
-                              icon: Icons.today_rounded,
+                              title: 'المناديب النشطين',
+                              value: '$uniqueDelegates',
+                              icon: Icons.group_rounded,
                               theme: theme,
                             ),
                           ),
@@ -398,7 +773,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                     ),
                   ),
 
-                  // M3 Refined Filter Toggle (By Date vs By Branch)
+                  // 3 Grouping Segment Modes: By Date / By Branch / By Delegate
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
@@ -429,13 +804,22 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                                 colorScheme: colorScheme,
                               ),
                             ),
+                            Expanded(
+                              child: _buildSegmentButton(
+                                title: 'حسب المندوب',
+                                icon: Icons.person_rounded,
+                                isSelected: _currentGroupMode == GroupMode.byDelegate,
+                                onTap: () => setState(() => _currentGroupMode = GroupMode.byDelegate),
+                                colorScheme: colorScheme,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
 
-                  // Photos list or Empty state
+                  // Photos list or Empty state with smooth animated transition
                   if (filteredPhotos.isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
@@ -522,14 +906,14 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             children: [
               Icon(
                 icon,
-                size: 16,
+                size: 15,
                 color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
                 ),
@@ -619,7 +1003,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
           childCount: sortedKeys.length,
         ),
       );
-    } else {
+    } else if (_currentGroupMode == GroupMode.byBranch) {
       final Map<String, List<CapturedPhoto>> grouped = {};
       for (var photo in photos) {
         grouped.putIfAbsent(photo.branchName, () => []).add(photo);
@@ -636,6 +1020,32 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             return _buildGroupSection(
               title: key,
               icon: Icons.storefront_rounded,
+              photos: groupPhotos,
+              theme: theme,
+            );
+          },
+          childCount: sortedKeys.length,
+        ),
+      );
+    } else {
+      // GroupMode.byDelegate
+      final Map<String, List<CapturedPhoto>> grouped = {};
+      for (var photo in photos) {
+        final delName = photo.delegateName.trim().isNotEmpty ? photo.delegateName.trim() : 'مندوب غير محدد';
+        grouped.putIfAbsent(delName, () => []).add(photo);
+      }
+
+      final sortedKeys = grouped.keys.toList()..sort();
+
+      return SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final key = sortedKeys[index];
+            final groupPhotos = grouped[key]!;
+
+            return _buildGroupSection(
+              title: key,
+              icon: Icons.person_rounded,
               photos: groupPhotos,
               theme: theme,
             );
@@ -738,34 +1148,56 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(
               children: [
-                // Thumbnail 52x52
+                // Thumbnail 54x54
                 AppPhotoImage(
                   photoUrl: photo.photoUrl,
-                  width: 52,
-                  height: 52,
+                  width: 54,
+                  height: 54,
                   isThumbnail: true,
                   borderRadius: BorderRadius.circular(10),
                   fit: BoxFit.cover,
                 ),
                 const SizedBox(width: 12),
 
-                // Info: Branch name + Date & time + status chip
+                // Info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        photo.branchName,
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _currentGroupMode == GroupMode.byDelegate
+                                  ? photo.branchName
+                                  : photo.delegateName.isNotEmpty
+                                      ? photo.delegateName
+                                      : photo.branchName,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (_currentGroupMode == GroupMode.byDelegate) ...[
+                            Text(
+                              photo.delegateName,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        dateStr,
+                        _currentGroupMode == GroupMode.byDate
+                            ? '${photo.branchName} • $dateStr'
+                            : dateStr,
                         style: TextStyle(
                           fontSize: 11,
                           color: colorScheme.onSurfaceVariant,
@@ -880,7 +1312,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'لا توجد صور ملتقطة في هذا الشهر',
+              'لا توجد صور ملتقطة في ${_getMonthNameArabic(_selectedMonth)}',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -889,7 +1321,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'صور العروض الميدانية الملتقطة خلال هذا الشهر ستظهر هنا تلقائياً.',
+              'يمكنك التنقل بين الشهور السابقة باستخدام الأسهم بالأعلى لتصفح الأرشيف الكامل للشركة.',
               style: TextStyle(
                 fontSize: 12,
                 color: colorScheme.onSurfaceVariant,
@@ -927,7 +1359,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
               initialChildSize: 0.85,
               minChildSize: 0.5,
               maxChildSize: 0.95,
-              builder: (context, scrollController) {
+              builder: (scrollContext, scrollController) {
                 return Container(
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
@@ -968,7 +1400,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                                     icon: Icon(Icons.delete_outline_rounded, size: 22, color: Colors.red.shade700),
                                     onPressed: () {
                                       Navigator.pop(modalContext);
-                                      _confirmDeletePhoto(context, photo);
+                                      _confirmDeletePhoto(photo);
                                     },
                                   ),
                                 IconButton(
@@ -1021,7 +1453,7 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                                   OutlinedButton.icon(
                                     onPressed: () {
                                       Navigator.pop(modalContext);
-                                      _confirmDeletePhoto(context, photo);
+                                      _confirmDeletePhoto(photo);
                                     },
                                     icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
                                     label: const Text(
@@ -1136,63 +1568,72 @@ class _MonthlyPhotoReportScreenState extends State<MonthlyPhotoReportScreen> {
                             ],
                             const SizedBox(height: 16),
 
-                        // Report details card
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildDetailItem(
-                                icon: Icons.storefront_rounded,
-                                title: 'الفرع المعتمد:',
-                                value: photo.branchName,
-                                theme: theme,
+                            // Report details card
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                               ),
-                              const Divider(height: 18),
-                              _buildDetailItem(
-                                icon: Icons.calendar_today_rounded,
-                                title: 'وقت وتاريخ الالتقاط:',
-                                value: formattedDate,
-                                theme: theme,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildDetailItem(
+                                    icon: Icons.business_rounded,
+                                    title: 'الشركة التابعة:',
+                                    value: photo.companyName.isNotEmpty
+                                        ? photo.companyName
+                                        : widget.delegate.companyName,
+                                    theme: theme,
+                                  ),
+                                  const Divider(height: 18),
+                                  _buildDetailItem(
+                                    icon: Icons.storefront_rounded,
+                                    title: 'الفرع المعتمد:',
+                                    value: photo.branchName,
+                                    theme: theme,
+                                  ),
+                                  const Divider(height: 18),
+                                  _buildDetailItem(
+                                    icon: Icons.calendar_today_rounded,
+                                    title: 'وقت وتاريخ الالتقاط:',
+                                    value: formattedDate,
+                                    theme: theme,
+                                  ),
+                                  const Divider(height: 18),
+                                  _buildDetailItem(
+                                    icon: Icons.person_rounded,
+                                    title: 'بواسطة المندوب:',
+                                    value: photo.delegateName,
+                                    theme: theme,
+                                  ),
+                                  if (photo.comment.trim().isNotEmpty) ...[
+                                    const Divider(height: 18),
+                                    _buildDetailItem(
+                                      icon: Icons.comment_rounded,
+                                      title: 'تعليق المندوب:',
+                                      value: photo.comment,
+                                      theme: theme,
+                                      isComment: true,
+                                    ),
+                                  ],
+                                ],
                               ),
-                              const Divider(height: 18),
-                              _buildDetailItem(
-                                icon: Icons.person_rounded,
-                                title: 'بواسطة المندوب:',
-                                value: photo.delegateName,
-                                theme: theme,
-                              ),
-                              if (photo.comment.trim().isNotEmpty) ...[
-                                const Divider(height: 18),
-                                _buildDetailItem(
-                                  icon: Icons.comment_rounded,
-                                  title: 'تعليق المندوب:',
-                                  value: photo.comment,
-                                  theme: theme,
-                                  isComment: true,
-                                ),
-                              ],
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             );
           },
         );
       },
     );
-  },
-);
-}
+  }
 
   Widget _buildDetailItem({
     required IconData icon,

@@ -85,6 +85,7 @@ import 'package:delegate_app/features/penalties/domain/usecases/create_penalty_u
 import 'package:delegate_app/features/penalties/domain/usecases/get_all_penalties_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/get_company_penalties_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/update_penalty_status_usecase.dart';
+import 'package:delegate_app/features/penalties/domain/usecases/update_penalty_usecase.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/tasks/data/datasources/task_remote_data_source.dart';
 import 'package:delegate_app/features/tasks/data/repositories/task_repository_impl.dart';
@@ -108,6 +109,7 @@ import 'package:delegate_app/features/notifications/domain/usecases/get_unread_c
 import 'package:delegate_app/features/notifications/domain/usecases/mark_all_notifications_read.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/mark_notification_read.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/delete_notification_for_user.dart';
+import 'package:delegate_app/features/notifications/domain/usecases/delete_all_notifications_for_user.dart';
 import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -404,6 +406,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       markNotificationRead: sl(),
       markAllNotificationsRead: sl(),
       deleteNotificationForUser: sl(),
+      deleteAllNotificationsForUser: sl(),
     ),
   );
 
@@ -414,6 +417,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => MarkNotificationRead(sl()));
   sl.registerLazySingleton(() => MarkAllNotificationsRead(sl()));
   sl.registerLazySingleton(() => DeleteNotificationForUser(sl()));
+  sl.registerLazySingleton(() => DeleteAllNotificationsForUser(sl()));
 
   // Repository
   sl.registerLazySingleton<NotificationRepository>(
@@ -484,6 +488,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       createPenaltyUseCase: sl(),
       getCompanyPenaltiesUseCase: sl(),
       getAllPenaltiesUseCase: sl(),
+      updatePenaltyUseCase: sl(),
       repository: sl(),
     ),
   );
@@ -492,6 +497,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => GetCompanyPenaltiesUseCase(sl()));
   sl.registerLazySingleton(() => GetAllPenaltiesUseCase(sl()));
   sl.registerLazySingleton(() => UpdatePenaltyStatusUseCase(sl()));
+  sl.registerLazySingleton(() => UpdatePenaltyUseCase(sl()));
 
   sl.registerLazySingleton<PenaltyRepository>(
     () => PenaltyRepositoryImpl(remoteDataSource: sl()),

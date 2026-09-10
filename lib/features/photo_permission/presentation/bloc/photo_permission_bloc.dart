@@ -210,6 +210,8 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
           UploadCapturedPhotoParams(
             organizationUID: event.organizationUID,
             companyUID: event.companyUID,
+            companyName: event.companyName,
+            companyCode: event.companyCode,
             permissionId: event.permissionId,
             branchId: event.branchId,
             branchName: event.branchName,
@@ -241,6 +243,8 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
       await offlineDataSource.savePendingPhoto({
         'organizationUID': event.organizationUID,
         'companyUID': event.companyUID,
+        'companyName': event.companyName,
+        'companyCode': event.companyCode,
         'permissionId': event.permissionId,
         'branchId': event.branchId,
         'branchName': event.branchName,
@@ -258,6 +262,8 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
         permissionId: event.permissionId,
         organizationUID: event.organizationUID,
         companyUID: event.companyUID,
+        companyName: event.companyName,
+        companyCode: event.companyCode,
         branchId: event.branchId,
         branchName: event.branchName,
         delegateUID: event.delegateUID,
