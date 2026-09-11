@@ -70,13 +70,28 @@ echo ""
 
 START_TIME=$(date +%s)
 
-# ======== الخطوة 1: تحديث Build Number ========
-echo -e "${CYAN}${BOLD}━━━ 📦 الخطوة 1/6: تحديث Build Number ━━━${NC}"
+# ======== الخطوة 0: مزامنة أحدث كود من GitHub ========
+echo -e "${CYAN}${BOLD}━━━ 🔄 الخطوة 1/7: مزامنة أحدث كود من GitHub ━━━${NC}"
+cd "$PROJECT_DIR"
+git fetch origin main 2>/dev/null || true
+git pull --rebase origin main 2>/dev/null || true
+echo -e "  ${GREEN}✅ المزامنة مع GitHub تمت${NC}"
+echo ""
+
+# ======== الخطوة 1: تحديث Build Number والإصدار ========
+echo -e "${CYAN}${BOLD}━━━ 📦 الخطوة 2/7: تحديث الإصدار و Build Number ━━━${NC}"
 
 CURRENT_VERSION=$(grep "^version:" "$PUBSPEC" | sed 's/version: //')
-VERSION_NAME=$(echo "$CURRENT_VERSION" | cut -d'+' -f1)
+CURRENT_VERSION_NAME=$(echo "$CURRENT_VERSION" | cut -d'+' -f1)
 CURRENT_BUILD=$(echo "$CURRENT_VERSION" | cut -d'+' -f2)
-NEW_BUILD=$((CURRENT_BUILD + 1))
+
+# إمكانية تحديد رقم الإصدار أو البناء يدوياً كـ parameters
+VERSION_NAME="${1:-$CURRENT_VERSION_NAME}"
+if [ -n "$2" ]; then
+  NEW_BUILD="$2"
+else
+  NEW_BUILD=$((CURRENT_BUILD + 1))
+fi
 NEW_VERSION="${VERSION_NAME}+${NEW_BUILD}"
 
 sed -i '' "s/^version: .*/version: ${NEW_VERSION}/" "$PUBSPEC"
@@ -87,7 +102,7 @@ echo -e "  ${GREEN}✅ تم التحديث${NC}"
 echo ""
 
 # ======== الخطوة 2: تنظيف وتحضير ========
-echo -e "${CYAN}${BOLD}━━━ 🧹 الخطوة 2/6: تنظيف المشروع ━━━${NC}"
+echo -e "${CYAN}${BOLD}━━━ 🧹 الخطوة 3/7: تنظيف المشروع ━━━${NC}"
 cd "$PROJECT_DIR"
 flutter clean 2>&1 | tail -5
 flutter pub get 2>&1 | tail -3
@@ -95,7 +110,7 @@ echo -e "  ${GREEN}✅ التنظيف والتحضير تم${NC}"
 echo ""
 
 # ======== الخطوة 3: بناء iOS Release ========
-echo -e "${CYAN}${BOLD}━━━ 🔨 الخطوة 3/6: بناء iOS Release ━━━${NC}"
+echo -e "${CYAN}${BOLD}━━━ 🔨 الخطوة 4/7: بناء iOS Release ━━━${NC}"
 flutter build ios --release --no-codesign \
   --build-number="$NEW_BUILD" \
   --build-name="$VERSION_NAME" 2>&1 | tail -5
@@ -103,7 +118,7 @@ echo -e "  ${GREEN}✅ بناء iOS Release تم${NC}"
 echo ""
 
 # ======== الخطوة 4: Archive مع التوقيع ========
-echo -e "${CYAN}${BOLD}━━━ 📁 الخطوة 4/6: Xcode Archive + Signing ━━━${NC}"
+echo -e "${CYAN}${BOLD}━━━ 📁 الخطوة 5/7: Xcode Archive + Signing ━━━${NC}"
 run_xcodebuild "archive" \
   -workspace ios/Runner.xcworkspace \
   -scheme Runner -sdk iphoneos \
@@ -119,7 +134,7 @@ echo -e "  ${GREEN}✅ Archive تم بنجاح${NC}"
 echo ""
 
 # ======== الخطوة 5: تصدير IPA ========
-echo -e "${CYAN}${BOLD}━━━ 📲 الخطوة 5/6: تصدير IPA ━━━${NC}"
+echo -e "${CYAN}${BOLD}━━━ 📲 الخطوة 6/7: تصدير IPA ━━━${NC}"
 rm -rf "$IPA_DIR"
 run_xcodebuild "export" \
   -exportArchive \
@@ -134,15 +149,23 @@ echo -e "  ${DIM}حجم:${NC} ${IPA_SIZE}"
 echo -e "  ${GREEN}✅ IPA تم تصديره${NC}"
 echo ""
 
-# ======== الخطوة 6: رفع على Firebase (اختياري) ========
-echo -e "${CYAN}${BOLD}━━━ ☁️  الخطوة 6/6: Firebase App Distribution ━━━${NC}"
+# ======== الخطوة 6: رفع على Firebase ومزامنة GitHub ========
+echo -e "${CYAN}${BOLD}━━━ 🚀 الخطوة 7/7: التوزيع والمزامنة ━━━${NC}"
 if firebase appdistribution:distribute "$IPA_FILE" \
   --app "$FIREBASE_APP_ID" \
   --release-notes "iOS v${VERSION_NAME} (Build ${NEW_BUILD})" \
   --project "$FIREBASE_PROJECT" 2>&1 | grep -E "✔|✗|⚠|Error"; then
   echo -e "  ${GREEN}✅ تم الرفع على Firebase App Distribution${NC}"
 else
-  echo -e "  ${YELLOW}⚠️ تم تخطي / تعذر الرفع على Firebase، ولكن ملف IPA جاهز تماماً للاستخدام في Transporter!${NC}"
+  echo -e "  ${YELLOW}⚠️ تم تخطي / تعذر الرفع على Firebase، وملف IPA جاهز تماماً للاستخدام في Transporter!${NC}"
+fi
+
+# مزامنة رقم الإصدار الجديد تلقائياً مع GitHub لمنع ظهور أي تعارضات مزامنة
+if ! git diff --quiet "$PUBSPEC"; then
+  git add "$PUBSPEC"
+  git commit -m "chore: auto-increment iOS version to ${NEW_VERSION} [skip ci]" 2>/dev/null || true
+  git push origin main 2>/dev/null || true
+  echo -e "  ${GREEN}✅ تمت مزامنة رقم الإصدار ${NEW_VERSION} تلقائياً مع GitHub${NC}"
 fi
 echo ""
 
