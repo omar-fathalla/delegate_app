@@ -1,12 +1,27 @@
 import 'dart:io';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 abstract class PenaltyEvent extends Equatable {
   const PenaltyEvent();
 
   @override
   List<Object?> get props => [];
+}
+
+class LoadDelegatePenaltiesEvent extends PenaltyEvent {
+  final Delegate delegate;
+
+  const LoadDelegatePenaltiesEvent(this.delegate);
+
+  @override
+  List<Object?> get props => [
+        delegate.uid,
+        delegate.companyUID,
+        delegate.phoneNumber,
+        delegate.fullName,
+      ];
 }
 
 class LoadCompanyPenaltiesEvent extends PenaltyEvent {

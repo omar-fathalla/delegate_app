@@ -1188,7 +1188,8 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
     final requiresAction = (widget.currentDelegate.role == UserRole.branchesMarketingManager &&
             widget.penalty.status == PenaltyStatus.pendingBranchesMarketing) ||
         ((widget.currentDelegate.role == UserRole.organizationAdmin ||
-                widget.currentDelegate.role == UserRole.superAdmin) &&
+                widget.currentDelegate.role == UserRole.superAdmin ||
+                widget.currentDelegate.role == UserRole.technicalSupport) &&
             widget.penalty.status == PenaltyStatus.pendingGeneralManager);
     _isExpanded = requiresAction;
   }
@@ -1747,6 +1748,7 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                   children: [
                     if (!widget.isReadOnly &&
                         (widget.currentDelegate.role == UserRole.superAdmin ||
+                            widget.currentDelegate.role == UserRole.technicalSupport ||
                             widget.currentDelegate.role == UserRole.organizationAdmin))
                       Flexible(
                         child: PopupMenuButton<PenaltyStatus>(
@@ -1807,6 +1809,7 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
 
                     if (!widget.isReadOnly &&
                         (widget.currentDelegate.role == UserRole.superAdmin ||
+                            widget.currentDelegate.role == UserRole.technicalSupport ||
                             widget.currentDelegate.role == UserRole.organizationAdmin ||
                             widget.currentDelegate.role == UserRole.branchesMarketingManager ||
                             widget.penalty.createdById == widget.currentDelegate.uid)) ...[
@@ -1906,13 +1909,11 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                                   : Icons.arrow_forward_rounded,
                               size: 16,
                             ),
-                            label: Text(
-                              widget.penalty.fineAmount <= 1000.0
-                                  ? 'اعتماد فوري (≤ 1000 ج.م)'
-                                  : 'تمرير للمدير العام (> 1000 ج.م)',
-                              style: const TextStyle(
+                            label: const Text(
+                              'اعتماد',
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                                fontSize: 13,
                               ),
                             ),
                           ),
@@ -1935,10 +1936,10 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                             ),
                             icon: const Icon(Icons.cancel_rounded, size: 16),
                             label: const Text(
-                              'رفض المخالفة',
+                              'رفض',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                                fontSize: 13,
                               ),
                             ),
                           ),

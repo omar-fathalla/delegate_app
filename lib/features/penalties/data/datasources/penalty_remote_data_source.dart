@@ -8,6 +8,12 @@ import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.d
 abstract class PenaltyRemoteDataSource {
   Future<void> createPenalty(PenaltyModel penalty);
   Future<List<PenaltyModel>> getCompanyPenalties(String companyId);
+  Future<List<PenaltyModel>> getDelegatePenalties({
+    required String delegateId,
+    String? companyId,
+    String? phoneNumber,
+    String? fullName,
+  });
   Future<List<PenaltyModel>> getAllPenalties();
   Future<void> updatePenaltyStatus({
     required String penaltyId,
@@ -369,6 +375,88 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
     } catch (_) {
       return [];
     }
+  }
+
+  @override
+  Future<List<PenaltyModel>> getDelegatePenalties({
+    required String delegateId,
+    String? companyId,
+    String? phoneNumber,
+    String? fullName,
+  }) async {
+    try {
+      final Map<String, PenaltyModel> results = {};
+
+      // 1. Direct query by targetDelegateId == delegateId
+      try {
+        final snap = await _penaltiesRef
+            .where('targetDelegateId', isEqualTo: delegateId)
+            .get();
+        for (var doc in snap.docs) {
+          results[doc.id] = PenaltyModel.fromFirestore(doc);
+        }
+      } catch (_) {}
+
+      // 2. Query company's penalties and match personal identifiers
+      if (companyId != null && companyId.isNotEmpty) {
+        try {
+          final compSnap = await _penaltiesRef
+              .where('companyId', isEqualTo: companyId)
+              .get();
+          for (var doc in compSnap.docs) {
+            final model = PenaltyModel.fromFirestore(doc);
+            if (_isPenaltyMatchingDelegate(
+              model,
+              delegateId: delegateId,
+              phoneNumber: phoneNumber,
+              fullName: fullName,
+            )) {
+              results[doc.id] = model;
+            }
+          }
+        } catch (_) {}
+      }
+
+      final list = results.values.toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    } on FirebaseException catch (e) {
+      throw ServerException(e.message ?? 'فشل في جلب مخالفات المندوب.');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  bool _isPenaltyMatchingDelegate(
+    PenaltyModel p, {
+    required String delegateId,
+    String? phoneNumber,
+    String? fullName,
+  }) {
+    if (p.targetDelegateId != null && p.targetDelegateId!.trim().isNotEmpty) {
+      final tid = p.targetDelegateId!.trim();
+      if (tid == delegateId) return true;
+      if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+        final cleanTid = tid.replaceAll(RegExp(r'\D'), '');
+        final cleanPhone = phoneNumber.replaceAll(RegExp(r'\D'), '');
+        if (cleanTid.isNotEmpty && cleanPhone.isNotEmpty) {
+          if (cleanTid == cleanPhone ||
+              cleanTid.endsWith(cleanPhone) ||
+              cleanPhone.endsWith(cleanTid)) {
+            return true;
+          }
+        }
+      }
+    }
+
+    if (fullName != null && fullName.trim().isNotEmpty &&
+        p.targetDelegateName != null && p.targetDelegateName!.trim().isNotEmpty) {
+      final tName = p.targetDelegateName!.trim().toLowerCase();
+      final fName = fullName.trim().toLowerCase();
+      if (tName == fName) return true;
+    }
+
+    return false;
   }
 
   @override

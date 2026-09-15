@@ -40,6 +40,28 @@ class PenaltyRepositoryImpl implements PenaltyRepository {
   }
 
   @override
+  Future<Either<Failure, List<PenaltyEntity>>> getDelegatePenalties({
+    required String delegateId,
+    String? companyId,
+    String? phoneNumber,
+    String? fullName,
+  }) async {
+    try {
+      final list = await remoteDataSource.getDelegatePenalties(
+        delegateId: delegateId,
+        companyId: companyId,
+        phoneNumber: phoneNumber,
+        fullName: fullName,
+      );
+      return Right(list);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ أثناء جلب مخالفات المندوب.'));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<PenaltyEntity>>> getAllPenalties() async {
     try {
       final list = await remoteDataSource.getAllPenalties();

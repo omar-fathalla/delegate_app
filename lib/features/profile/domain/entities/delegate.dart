@@ -157,6 +157,19 @@ class Delegate extends Equatable {
     deviceBoundAt,
     isDeviceLocked,
   ];
+
+  String? get personalPhotoUrl {
+    try {
+      final doc = documents.firstWhere(
+        (d) =>
+            d.documentKey == DocumentKey.personalPhoto &&
+            d.documentURL.isNotEmpty,
+      );
+      return doc.documentURL;
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 class DelegateDocument extends Equatable {

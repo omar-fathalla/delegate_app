@@ -16,31 +16,35 @@ class NotificationsPage extends StatelessWidget {
   void _confirmDeleteAll(BuildContext context, List<NotificationEntity> notifications) {
     final bloc = context.read<NotificationBloc>();
     final messenger = ScaffoldMessenger.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
 
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
           children: [
-            Icon(Icons.delete_sweep_rounded, color: Colors.red),
-            SizedBox(width: 8),
-            Text('حذف جميع الإشعارات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Icon(Icons.delete_sweep_rounded, color: colorScheme.error),
+            const SizedBox(width: 8),
+            Text(
+              'حذف جميع الإشعارات',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+            ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'هل أنت متأكد من حذف جميع الإشعارات من قائمتك؟\n(لن تظهر هذه الإشعارات في حسابك مرة أخرى، مع بقائها في السجل المركزي للنظام).',
-          style: TextStyle(fontSize: 14),
+          style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('إلغاء'),
+            child: Text('إلغاء', style: TextStyle(color: colorScheme.primary)),
           ),
           FilledButton.tonal(
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade50,
-              foregroundColor: Colors.red.shade700,
+              backgroundColor: colorScheme.errorContainer,
+              foregroundColor: colorScheme.onErrorContainer,
             ),
             onPressed: () {
               Navigator.of(dialogCtx).pop();
@@ -54,9 +58,12 @@ class NotificationsPage extends StatelessWidget {
                 ),
               );
               messenger.showSnackBar(
-                const SnackBar(
-                  content: Text('تم حذف جميع الإشعارات من قائمتك'),
-                  duration: Duration(seconds: 2),
+                SnackBar(
+                  content: const Text('تم حذف جميع الإشعارات من قائمتك'),
+                  backgroundColor: colorScheme.inverseSurface,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  duration: const Duration(seconds: 2),
                 ),
               );
             },
@@ -71,6 +78,7 @@ class NotificationsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final canSendNotification = delegate.role == UserRole.technicalSupport ||
         delegate.role == UserRole.superAdmin;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return BlocProvider(
       create: (_) => di.sl<NotificationBloc>()
@@ -122,10 +130,10 @@ class NotificationsPage extends StatelessWidget {
                               ),
                             );
                           },
-                          icon: const Icon(Icons.done_all, size: 18),
+                          icon: Icon(Icons.done_all, size: 18, color: colorScheme.primary),
                           label: Text(
                             AppLocalizations.of(context)!.markAllRead,
-                            style: const TextStyle(fontSize: 12),
+                            style: TextStyle(fontSize: 12, color: colorScheme.primary, fontWeight: FontWeight.w600),
                           ),
                           style: TextButton.styleFrom(
                             visualDensity: VisualDensity.compact,
@@ -134,7 +142,7 @@ class NotificationsPage extends StatelessWidget {
                         ),
                       IconButton(
                         tooltip: 'حذف جميع الإشعارات',
-                        icon: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
+                        icon: Icon(Icons.delete_sweep_outlined, color: colorScheme.error),
                         onPressed: () => _confirmDeleteAll(context, state.notifications),
                       ),
                     ],

@@ -866,22 +866,21 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           itemCount: docs.length,
           itemBuilder: (context, index) {
-            final data = docs[index].data() as Map<String, dynamic>;
-            final id = docs[index].id;
+            final doc = docs[index];
+            final data = doc.data() as Map<String, dynamic>;
             return _SentNotificationCard(
-              docId: id,
+              docId: doc.id,
               data: data,
-              onResend: (title, body, audience, phone) {
-                _titleController.text = title;
-                _bodyController.text = body;
-                _phoneController.text = phone;
-                setState(() {
-                  _targetAudience = audience;
-                });
+              onResend: (t, b, aud, ph) {
+                _titleController.text = t;
+                _bodyController.text = b;
+                _targetAudience = aud;
+                _phoneController.text = ph;
                 _tabController.animateTo(0);
+                setState(() {});
               },
             );
           },
@@ -923,268 +922,325 @@ class _SentNotificationCard extends StatelessWidget {
     final timestamp = data['createdAt'] as Timestamp?;
     final dateStr =
         timestamp != null
-            ? DateFormat('dd/MM/yyyy - hh:mm a').format(timestamp.toDate())
+            ? DateFormat('dd/MM/yyyy • hh:mm a').format(timestamp.toDate())
             : 'الآن';
 
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Row: Sender, Target & Delivery Badge
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _getAudienceIcon(targetAudience),
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        targetName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        'المرسل: $senderName • $dateStr',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.shade200),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.done_all_rounded,
-                        color: Colors.green.shade700,
-                        size: 14,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'تم التوصيل',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green.shade800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    return StreamBuilder<QuerySnapshot>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('notifications')
+              .where('broadcastId', isEqualTo: docId)
+              .snapshots(),
+      builder: (context, notifSnap) {
+        int readCount = 0;
+        int actualCount = totalSent;
+        DateTime? latestReadTime;
+
+        if (notifSnap.hasData && notifSnap.data!.docs.isNotEmpty) {
+          final docs = notifSnap.data!.docs;
+          actualCount = docs.length;
+          for (final d in docs) {
+            final m = d.data() as Map<String, dynamic>;
+            if (m['isRead'] == true) {
+              readCount++;
+              final rTime = (m['readAt'] as Timestamp?)?.toDate();
+              if (rTime != null &&
+                  (latestReadTime == null || rTime.isAfter(latestReadTime))) {
+                latestReadTime = rTime;
+              }
+            }
+          }
+        }
+
+        final bool isAllRead = actualCount > 0 && readCount == actualCount;
+        final bool isSingleUser = targetAudience == 'user';
+        final bool isUserRead = isSingleUser && readCount > 0;
+
+        return Card(
+          elevation: 0.5,
+          margin: const EdgeInsets.only(bottom: 8),
+          color: colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(
+              color: isUserRead || isAllRead
+                  ? Colors.blue.withValues(alpha: 0.3)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.4),
             ),
-            const Divider(height: 20),
-
-            // Message Title & Body
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => _showNotificationDetails(
+              context,
+              dateStr,
+              readCount: readCount,
+              actualCount: actualCount,
+              latestReadTime: latestReadTime,
             ),
-            const SizedBox(height: 6),
-            Text(
-              body,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 16),
-
-            // Realtime Read Status Stream for this Notification / Broadcast
-            StreamBuilder<QuerySnapshot>(
-              stream:
-                  FirebaseFirestore.instance
-                      .collection('notifications')
-                      .where('broadcastId', isEqualTo: docId)
-                      .snapshots(),
-              builder: (context, notifSnap) {
-                int readCount = 0;
-                int actualCount = totalSent;
-                DateTime? latestReadTime;
-
-                if (notifSnap.hasData && notifSnap.data!.docs.isNotEmpty) {
-                  final docs = notifSnap.data!.docs;
-                  actualCount = docs.length;
-                  for (final d in docs) {
-                    final m = d.data() as Map<String, dynamic>;
-                    if (m['isRead'] == true) {
-                      readCount++;
-                      final rTime = (m['readAt'] as Timestamp?)?.toDate();
-                      if (rTime != null &&
-                          (latestReadTime == null ||
-                              rTime.isAfter(latestReadTime))) {
-                        latestReadTime = rTime;
-                      }
-                    }
-                  }
-                }
-
-                final double readPercent =
-                    actualCount > 0 ? (readCount / actualCount) : 0.0;
-                final bool isAllRead =
-                    actualCount > 0 && readCount == actualCount;
-
-                return Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color:
-                        isAllRead
-                            ? Colors.blue.shade50
-                            : colorScheme.surfaceContainerHighest.withValues(
-                              alpha: 0.4,
-                            ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color:
-                          isAllRead
-                              ? Colors.blue.shade200
-                              : Colors.transparent,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  // 1. Audience / User Avatar
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: isUserRead || isAllRead
+                          ? Colors.blue.shade50
+                          : colorScheme.primaryContainer.withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        _getAudienceIcon(targetAudience),
+                        color: isUserRead || isAllRead
+                            ? Colors.blue.shade700
+                            : colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                isAllRead
-                                    ? Icons.done_all_rounded
-                                    : Icons.remove_red_eye_outlined,
-                                size: 18,
-                                color:
-                                    isAllRead
-                                        ? Colors.blue.shade700
-                                        : colorScheme.primary,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                targetAudience == 'user'
-                                    ? (readCount > 0
-                                        ? 'تمت القراءة بنجاح ✅'
-                                        : 'لم تتم القراءة بعد ⏳')
-                                    : 'حالة القراءة: $readCount من $actualCount مستخدم',
-                                style: TextStyle(
-                                  fontSize: 12,
+                  const SizedBox(width: 10),
+
+                  // 2. Middle Details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Row 1: Target Name + Compact Read Status Chip
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                targetName,
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color:
-                                      readCount > 0
-                                          ? Colors.blue.shade800
-                                          : colorScheme.onSurface,
+                                  fontSize: 13.5,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            _buildCompactReadBadge(
+                              isSingleUser: isSingleUser,
+                              isUserRead: isUserRead,
+                              readCount: readCount,
+                              actualCount: actualCount,
+                              isAllRead: isAllRead,
+                              latestReadTime: latestReadTime,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+
+                        // Row 2: Title and preview of message
+                        Text(
+                          body.isNotEmpty ? '$title: $body' : title,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+
+                        // Row 3: Timestamp & Sender
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.schedule_rounded,
+                              size: 11,
+                              color: colorScheme.outline,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              dateStr,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: colorScheme.outline,
+                              ),
+                            ),
+                            if (senderName.isNotEmpty) ...[
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  '• $senderName',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: colorScheme.outline,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
-                          ),
-                          Text(
-                            targetAudience == 'user'
-                                ? (readCount > 0 && latestReadTime != null
-                                    ? DateFormat(
-                                      'hh:mm a',
-                                    ).format(latestReadTime)
-                                    : 'في الانتظار')
-                                : '${(readPercent * 100).toStringAsFixed(0)}% تم الفتح',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color:
-                                  readPercent > 0
-                                      ? Colors.blue.shade700
-                                      : Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (targetAudience != 'user') ...[
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: LinearProgressIndicator(
-                            value: readPercent,
-                            minHeight: 6,
-                            backgroundColor: Colors.grey.shade300,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              readPercent >= 0.8
-                                  ? Colors.green
-                                  : Colors.blue.shade700,
-                            ),
-                          ),
+                          ],
                         ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // 3. Trailing Action Icons Only
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Resend Icon Button
+                      IconButton(
+                        constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                        style: IconButton.styleFrom(
+                          backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.35),
+                          foregroundColor: colorScheme.primary,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                        ),
+                        icon: const Icon(Icons.repeat_rounded, size: 17),
+                        tooltip: 'إعادة إرسال',
+                        onPressed: () {
+                          final targetAudience =
+                              data['targetAudience'] as String? ?? 'all';
+                          final targetName = data['targetName'] as String? ?? '';
+                          String phone = '';
+                          if (targetAudience == 'user') {
+                            final match = RegExp(
+                              r'(\+?\d{10,14})',
+                            ).firstMatch(targetName);
+                            if (match != null) phone = match.group(0) ?? '';
+                          }
+                          onResend(title, body, targetAudience, phone);
+                        },
+                      ),
+                      const SizedBox(width: 4),
+
+                      // Details Icon Button
+                      IconButton(
+                        constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                        style: IconButton.styleFrom(
+                          backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                          foregroundColor: colorScheme.onSurfaceVariant,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                        ),
+                        icon: const Icon(Icons.visibility_outlined, size: 17),
+                        tooltip: 'عرض التفاصيل',
+                        onPressed: () => _showNotificationDetails(
+                          context,
+                          dateStr,
+                          readCount: readCount,
+                          actualCount: actualCount,
+                          latestReadTime: latestReadTime,
+                        ),
+                      ),
                     ],
                   ),
-                );
-              },
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
+          ),
+        );
+      },
+    );
+  }
 
-            // Actions Row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: () {
-                    final targetAudience =
-                        data['targetAudience'] as String? ?? 'all';
-                    final targetName = data['targetName'] as String? ?? '';
-                    String phone = '';
-                    if (targetAudience == 'user') {
-                      final match = RegExp(
-                        r'(\+?\d{10,14})',
-                      ).firstMatch(targetName);
-                      if (match != null) phone = match.group(0) ?? '';
-                    }
-                    onResend(title, body, targetAudience, phone);
-                  },
-                  icon: const Icon(Icons.repeat_rounded, size: 18),
-                  label: const Text('إعادة إرسال'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.tonalIcon(
-                  onPressed: () => _showNotificationDetails(context, dateStr),
-                  icon: const Icon(Icons.visibility_outlined, size: 18),
-                  label: const Text('عرض التفاصيل'),
+  Widget _buildCompactReadBadge({
+    required bool isSingleUser,
+    required bool isUserRead,
+    required int readCount,
+    required int actualCount,
+    required bool isAllRead,
+    required DateTime? latestReadTime,
+  }) {
+    if (isSingleUser) {
+      if (isUserRead) {
+        final timeStr =
+            latestReadTime != null
+                ? DateFormat('hh:mm a').format(latestReadTime)
+                : '';
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.blue.shade200, width: 0.7),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.done_all_rounded, size: 12, color: Colors.blue.shade700),
+              if (timeStr.isNotEmpty) ...[
+                const SizedBox(width: 2),
+                Text(
+                  timeStr,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade800,
+                  ),
                 ),
               ],
+            ],
+          ),
+        );
+      } else {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.orange.shade200, width: 0.7),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.hourglass_empty_rounded, size: 11, color: Colors.orange.shade800),
+              const SizedBox(width: 2),
+              Text(
+                'في الانتظار',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange.shade900,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    } else {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+        decoration: BoxDecoration(
+          color: isAllRead ? Colors.green.shade50 : Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isAllRead ? Colors.green.shade200 : Colors.blue.shade200,
+            width: 0.7,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isAllRead ? Icons.done_all_rounded : Icons.people_outline_rounded,
+              size: 11,
+              color: isAllRead ? Colors.green.shade700 : Colors.blue.shade700,
+            ),
+            const SizedBox(width: 2),
+            Text(
+              '$readCount / $actualCount',
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.bold,
+                color: isAllRead ? Colors.green.shade800 : Colors.blue.shade800,
+              ),
             ),
           ],
         ),
-      ),
-    );
+      );
+    }
   }
 
   IconData _getAudienceIcon(String audience) {
@@ -1198,7 +1254,22 @@ class _SentNotificationCard extends StatelessWidget {
     }
   }
 
-  void _showNotificationDetails(BuildContext context, String dateStr) {
+  void _showNotificationDetails(
+    BuildContext context,
+    String dateStr, {
+    int readCount = 0,
+    int actualCount = 1,
+    DateTime? latestReadTime,
+  }) {
+    final targetAudience = data['targetAudience'] as String? ?? 'all';
+    final isSingleUser = targetAudience == 'user';
+    final readStatusText =
+        isSingleUser
+            ? (readCount > 0
+                ? 'تمت القراءة بنجاح ${latestReadTime != null ? "(${DateFormat('hh:mm a').format(latestReadTime)})" : ""}'
+                : 'لم تتم القراءة بعد (في الانتظار)')
+            : '$readCount من أصل $actualCount مستخدم قاموا بالقراءة';
+
     showDialog(
       context: context,
       builder: (ctx) {
@@ -1232,11 +1303,15 @@ class _SentNotificationCard extends StatelessWidget {
                 const Divider(),
                 _buildDetailRow(
                   'المستهدف',
-                  (data['targetDetails'] as String? ?? data['targetName'] as String? ?? '')
+                  (data['targetDetails'] as String? ??
+                          data['targetName'] as String? ??
+                          '')
                       .replaceAll(RegExp(r'\s*•?\s*رقم الهاتف:?\s*\+?\d+'), '')
                       .replaceAll(RegExp(r'\s*\(\+?\d+\)\s*'), '')
                       .trim(),
                 ),
+                const Divider(),
+                _buildDetailRow('حالة القراءة', readStatusText),
                 const Divider(),
                 _buildDetailRow('المرسل', data['senderName'] ?? ''),
                 const Divider(),
@@ -1284,3 +1359,4 @@ class _SentNotificationCard extends StatelessWidget {
     );
   }
 }
+

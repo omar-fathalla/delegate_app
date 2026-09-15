@@ -382,7 +382,7 @@ export const onNotificationCreated = functions.firestore
   .document("notifications/{notificationId}")
   .onCreate(async (snap, context) => {
     const notification = snap.data();
-    const { delegateUid, title, body, organizationId, companyId, type } = notification;
+    const { delegateUid, title, body, organizationId, companyId, type, phoneNumber } = notification;
 
     if (!title || !body) return null;
 
@@ -392,6 +392,22 @@ export const onNotificationCreated = functions.firestore
         await admin.messaging().send({
           topic: "app_updates",
           notification: { title, body },
+          android: {
+            priority: "high",
+            notification: {
+              channelId: "task_notifications",
+              sound: "default",
+              clickAction: "FLUTTER_NOTIFICATION_CLICK",
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "default",
+                badge: 1,
+              },
+            },
+          },
           data: {
             type: type || "support_broadcast",
             organizationId: organizationId || "",
@@ -400,16 +416,68 @@ export const onNotificationCreated = functions.firestore
         });
         console.log("Successfully sent broadcast push notification to FCM topic 'app_updates'");
       } else if (delegateUid) {
-        // Fetch recipient's FCM token from fcm_tokens collection
-        const tokenDoc = await admin.firestore()
+        let recipientUid = delegateUid;
+
+        // Try direct token lookup
+        let tokenDoc = await admin.firestore()
           .collection("fcm_tokens")
-          .doc(delegateUid)
+          .doc(recipientUid)
           .get();
+
+        // If not found and phone number is provided or delegateUid is phone-based, resolve user
+        if ((!tokenDoc.exists || !tokenDoc.data()?.token) && (phoneNumber || recipientUid.startsWith("phone_"))) {
+          const rawPhone = phoneNumber || recipientUid.replace("phone_", "");
+          const cleanPhone = rawPhone.replace(/\D/g, "");
+
+          const usersSnap = await admin.firestore()
+            .collection("users")
+            .where("phone", "==", rawPhone)
+            .limit(1)
+            .get();
+
+          if (!usersSnap.empty) {
+            recipientUid = usersSnap.docs[0].id;
+            tokenDoc = await admin.firestore()
+              .collection("fcm_tokens")
+              .doc(recipientUid)
+              .get();
+          } else if (cleanPhone.length >= 9) {
+            const delegatesSnap = await admin.firestore()
+              .collectionGroup("delegates")
+              .where("phone", "==", rawPhone)
+              .limit(1)
+              .get();
+
+            if (!delegatesSnap.empty) {
+              recipientUid = delegatesSnap.docs[0].data().uid || delegatesSnap.docs[0].id;
+              tokenDoc = await admin.firestore()
+                .collection("fcm_tokens")
+                .doc(recipientUid)
+                .get();
+            }
+          }
+        }
 
         if (tokenDoc.exists && tokenDoc.data()?.token) {
           const fcmToken = tokenDoc.data()!.token;
           await admin.messaging().send({
             notification: { title, body },
+            android: {
+              priority: "high",
+              notification: {
+                channelId: "task_notifications",
+                sound: "default",
+                clickAction: "FLUTTER_NOTIFICATION_CLICK",
+              },
+            },
+            apns: {
+              payload: {
+                aps: {
+                  sound: "default",
+                  badge: 1,
+                },
+              },
+            },
             data: {
               type: type || "support_alert",
               organizationId: organizationId || "",
@@ -417,9 +485,9 @@ export const onNotificationCreated = functions.firestore
             },
             token: fcmToken,
           });
-          console.log(`Successfully sent FCM push notification to delegate ${delegateUid}`);
+          console.log(`Successfully sent FCM push notification to delegate ${recipientUid}`);
         } else {
-          console.log(`No active FCM token found for delegate ${delegateUid}`);
+          console.log(`No active FCM token found for recipient ${recipientUid}`);
         }
       }
       return null;

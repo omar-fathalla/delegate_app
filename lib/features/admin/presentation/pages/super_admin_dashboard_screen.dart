@@ -11,6 +11,8 @@ import 'package:delegate_app/features/feedback/presentation/bloc/admin_feedback_
 import 'package:delegate_app/features/feedback/presentation/pages/admin_feedbacks_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/manage_marketing_screen.dart';
 import 'package:delegate_app/features/notifications/presentation/pages/send_notification_screen.dart';
+import 'anti_fraud_audit_screen.dart';
+import 'delegate_subscription_requests_page.dart';
 import 'super_admin_payment_receipts_report_screen.dart';
 import '../../../photo_permission/presentation/pages/super_admin_permissions_report_screen.dart';
 import '../../../photo_permission/presentation/bloc/photo_permission_bloc.dart';
@@ -21,6 +23,7 @@ class SuperAdminDashboardScreen extends StatefulWidget {
   final VoidCallback? onNavigateToAddBranch;
   final VoidCallback? onNavigateToCreateAdmin;
   final VoidCallback? onNavigateToSendNotification;
+  final VoidCallback? onNavigateToAntiFraud;
 
   const SuperAdminDashboardScreen({
     super.key,
@@ -29,6 +32,7 @@ class SuperAdminDashboardScreen extends StatefulWidget {
     this.onNavigateToAddBranch,
     this.onNavigateToCreateAdmin,
     this.onNavigateToSendNotification,
+    this.onNavigateToAntiFraud,
   });
 
   @override
@@ -53,6 +57,8 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
   int _totalDelegatesCount = 0;
 
   StreamSubscription<QuerySnapshot>? _delegatesSubscription;
+  StreamSubscription<QuerySnapshot>? _delegateRequestsSubscription;
+  int _pendingDelegateRequestsCount = 0;
 
   // Technical Support Suggestions / Feedbacks Stats
   int _totalFeedbacksCount = 0;
@@ -67,12 +73,31 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     _applyCachedDataIfAvailable();
     _loadStats();
     _startRealtimeDelegatesListener();
+    _startRealtimeDelegateRequestsListener();
   }
 
   @override
   void dispose() {
     _delegatesSubscription?.cancel();
+    _delegateRequestsSubscription?.cancel();
     super.dispose();
+  }
+
+  void _startRealtimeDelegateRequestsListener() {
+    _delegateRequestsSubscription?.cancel();
+    _delegateRequestsSubscription = FirebaseFirestore.instance
+        .collection('delegate_requests')
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          _pendingDelegateRequestsCount = snapshot.docs.length;
+        });
+      }
+    }, onError: (e) {
+      debugPrint('Error in delegate requests realtime stream: $e');
+    });
   }
 
   void _startRealtimeDelegatesListener() {
@@ -614,6 +639,21 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
             childAspectRatio: 2.2,
             children: [
               _buildActionButton(
+                label: 'طلبات اشتراك المناديب',
+                icon: Icons.how_to_reg_rounded,
+                color: Colors.indigo.shade800,
+                badgeCount: _pendingDelegateRequestsCount,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => DelegateSubscriptionRequestsPage(
+                        currentAdmin: widget.delegate,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              _buildActionButton(
                 label: 'تقرير الإيصالات',
                 icon: Icons.receipt_long_rounded,
                 color: Colors.orange.shade800,
@@ -815,10 +855,40 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
             childAspectRatio: 2.2,
             children: [
               _buildActionButton(
+                label: 'طلبات اشتراك المناديب',
+                icon: Icons.how_to_reg_rounded,
+                color: Colors.indigo.shade800,
+                badgeCount: _pendingDelegateRequestsCount,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => DelegateSubscriptionRequestsPage(
+                        currentAdmin: widget.delegate,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              _buildActionButton(
                 label: 'إدارة المقترحات',
                 icon: Icons.feedback_rounded,
                 color: Colors.deepPurple.shade700,
                 onTap: () => _openAdminFeedbacks(context),
+              ),
+              _buildActionButton(
+                label: 'كشف التزييف والأجهزة',
+                icon: Icons.security_rounded,
+                color: Colors.red.shade900,
+                onTap: widget.onNavigateToAntiFraud ?? () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AntiFraudAuditScreen(
+                        delegate: widget.delegate,
+                        showAppBar: true,
+                      ),
+                    ),
+                  );
+                },
               ),
               _buildActionButton(
                 label: 'إرسال إشعار جديد',
@@ -831,6 +901,12 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                     ),
                   );
                 },
+              ),
+              _buildActionButton(
+                label: 'إنشاء أدمن جديد',
+                icon: Icons.admin_panel_settings_rounded,
+                color: Colors.purple.shade800,
+                onTap: widget.onNavigateToCreateAdmin,
               ),
               _buildActionButton(
                 label: 'إدارة التسويق',
@@ -849,12 +925,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 icon: Icons.add_location_alt_rounded,
                 color: Colors.teal.shade800,
                 onTap: widget.onNavigateToAddBranch,
-              ),
-              _buildActionButton(
-                label: 'إنشاء أدمن جديد',
-                icon: Icons.admin_panel_settings_rounded,
-                color: Colors.purple.shade800,
-                onTap: widget.onNavigateToCreateAdmin,
               ),
             ],
           ),
@@ -1075,6 +1145,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     required IconData icon,
     required Color color,
     required VoidCallback? onTap,
+    int? badgeCount,
   }) {
     return Card(
       elevation: 0,
@@ -1090,10 +1161,15 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: color.withValues(alpha: 0.1),
-                child: Icon(icon, color: color, size: 20),
+              Badge(
+                isLabelVisible: (badgeCount != null && badgeCount > 0),
+                label: Text('$badgeCount'),
+                backgroundColor: Colors.red.shade700,
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: color.withValues(alpha: 0.1),
+                  child: Icon(icon, color: color, size: 20),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(

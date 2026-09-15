@@ -15,6 +15,8 @@ import 'package:delegate_app/features/notifications/presentation/bloc/notificati
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
+import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
+import 'package:delegate_app/features/admin/presentation/pages/manage_organizations_page.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
@@ -143,12 +145,26 @@ class _MainScreenState extends State<MainScreen> {
                             MaterialPageRoute(
                               builder: (_) => BlocProvider(
                                 create: (_) => di.sl<PenaltyBloc>()
-                                  ..add(LoadCompanyPenaltiesEvent(delegate.companyUID)),
+                                  ..add(LoadDelegatePenaltiesEvent(delegate)),
                                 child: CompanyPenaltiesSettingsPage(
                                   delegate: delegate,
                                   showAppBar: true,
                                 ),
                               ),
+                            ),
+                          );
+                        } else if (value == 'delegate_subscriptions') {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DelegateSubscriptionRequestsPage(
+                                currentAdmin: delegate,
+                              ),
+                            ),
+                          );
+                        } else if (value == 'manage_organizations') {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ManageOrganizationsPage(),
                             ),
                           );
                         } else if (value == 'org_switch') {
@@ -176,6 +192,32 @@ class _MainScreenState extends State<MainScreen> {
                             ],
                           ),
                         ),
+                        if (delegate.role == UserRole.superAdmin) ...[
+                          const PopupMenuItem<String>(
+                            value: 'manage_organizations',
+                            child: Row(
+                              children: [
+                                Icon(Icons.corporate_fare_rounded, color: Colors.indigo),
+                                SizedBox(width: 12),
+                                Text('إدارة المنظمات والسلاسل'),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (delegate.role == UserRole.superAdmin ||
+                            delegate.role == UserRole.technicalSupport ||
+                            delegate.role == UserRole.organizationAdmin) ...[
+                          PopupMenuItem<String>(
+                            value: 'delegate_subscriptions',
+                            child: Row(
+                              children: [
+                                Icon(Icons.how_to_reg_rounded, color: Colors.amber.shade800),
+                                const SizedBox(width: 12),
+                                const Text('اشتراكات واعتماد المناديب'),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (_allDelegates.length > 1) ...[
                           const PopupMenuDivider(),
                           PopupMenuItem<String>(
@@ -242,7 +284,15 @@ class _MainScreenState extends State<MainScreen> {
       index: _currentIndex,
       children: [
         // Tab 0: Home (always initialized)
-        DelegateHomeScreen(delegate: delegate),
+        DelegateHomeScreen(
+          delegate: delegate,
+          onNavigateToAttendance: () {
+            setState(() {
+              _currentIndex = 1;
+              _initializedTabs.add(1);
+            });
+          },
+        ),
 
         // Tab 1: Attendance
         if (_initializedTabs.contains(1))

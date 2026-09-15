@@ -1,7 +1,13 @@
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:delegate_app/core/widgets/app_snack_bar.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -118,12 +124,25 @@ class _ProfileBody extends StatelessWidget {
       );
     }
 
+    final isFathalla = _isFathallaDelegate(delegate);
+
     return Scaffold(
       appBar: showBackButton
           ? AppBar(
               title: Text(delegate.fullName),
               backgroundColor: colorScheme.surface,
               scrolledUnderElevation: 0,
+              actions: [
+                if (!isFathalla)
+                  IconButton(
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      color: colorScheme.error,
+                    ),
+                    tooltip: l10n.delete,
+                    onPressed: () => _confirmAndDeleteDelegate(context, l10n),
+                  ),
+              ],
             )
           : null,
       backgroundColor: colorScheme.surface,
@@ -366,14 +385,353 @@ class _ProfileBody extends StatelessWidget {
             ),
           ],
         ),
+        if (!_isFathallaDelegate(delegate)) ...[
+          const SizedBox(height: 20),
+          _buildDeleteDelegateSection(context, l10n),
+        ],
+        const SizedBox(height: 24),
       ],
     );
+  }
+
+  bool _isFathallaDelegate(Delegate delegate) {
+    final orgName = delegate.organizationName.toLowerCase().trim();
+    final orgUid = delegate.organizationUID.toLowerCase().trim();
+    return orgName.contains('fathalla') ||
+        orgName.contains('فتح الله') ||
+        orgName.contains('فتح_الله') ||
+        orgUid.contains('fathalla') ||
+        orgUid.contains('فتح الله') ||
+        orgUid.contains('فتح_الله');
+  }
+
+  Widget _buildDeleteDelegateSection(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) {
+    final theme = Theme.of(context);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final buttonLabel = isArabic ? 'حذف المندوب' : 'Delete Delegate';
+
+    return Card(
+      elevation: 0,
+      color: Colors.red.withValues(alpha: 0.04),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: Colors.red.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.delete_forever_rounded,
+                    color: Colors.red,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        buttonLabel,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isArabic
+                            ? 'حذف هذا المندوب وبياناته نهائياً من المنظومة'
+                            : 'Permanently delete this delegate from the system',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => _confirmAndDeleteDelegate(context, l10n),
+              icon: const Icon(Icons.delete_outline_rounded, size: 20),
+              label: Text(
+                buttonLabel,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmAndDeleteDelegate(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) async {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.red,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                isArabic ? 'حذف المندوب' : 'Delete Delegate',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isArabic
+                  ? 'هل أنت متأكد من رغبتك في حذف المندوب "${delegate.fullName}"؟'
+                  : 'Are you sure you want to permanently delete delegate "${delegate.fullName}"?',
+              style: const TextStyle(
+                fontSize: 14.5,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              isArabic
+                  ? '⚠️ سيتم حذف ملف المندوب ومستنداته نهائياً من قاعدة البيانات ولا يمكن التراجع عن هذه العملية.'
+                  : '⚠️ This will permanently delete the delegate and all associated documents from the database. This action cannot be undone.',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: Theme.of(ctx).colorScheme.error,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(isArabic ? 'إلغاء' : 'Cancel'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete_forever_rounded, size: 18),
+            label: Text(isArabic ? 'تأكيد الحذف' : 'Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+
+    // Show loading progress dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Center(
+        child: Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Colors.red),
+                const SizedBox(height: 18),
+                Text(
+                  isArabic ? 'جاري حذف المندوب...' : 'Deleting delegate...',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+
+      // 1. Delete from organizations subcollection
+      if (delegate.companyUID.isNotEmpty) {
+        final orgsSnap = await firestore.collection('organizations').get();
+        for (final orgDoc in orgsSnap.docs) {
+          final delRef = firestore
+              .collection('organizations')
+              .doc(orgDoc.id)
+              .collection('companies')
+              .doc(delegate.companyUID)
+              .collection('delegates')
+              .doc(delegate.uid);
+          final check = await delRef.get();
+          if (check.exists) {
+            await delRef.delete();
+          }
+        }
+      }
+
+      // 2. CollectionGroup query deletion to ensure no orphan doc exists
+      try {
+        final groupQuery = await firestore
+            .collectionGroup('delegates')
+            .where('uid', isEqualTo: delegate.uid)
+            .get();
+        for (final doc in groupQuery.docs) {
+          await doc.reference.delete();
+        }
+      } catch (_) {}
+
+      // 3. Delete from delegate_requests if exists
+      try {
+        final reqRef =
+            firestore.collection('delegate_requests').doc(delegate.uid);
+        final reqSnap = await reqRef.get();
+        if (reqSnap.exists) {
+          await reqRef.delete();
+        }
+        if (delegate.nationalityID.isNotEmpty) {
+          final reqById = await firestore
+              .collection('delegate_requests')
+              .where('nationalId', isEqualTo: delegate.nationalityID.trim())
+              .get();
+          for (final doc in reqById.docs) {
+            await doc.reference.delete();
+          }
+        }
+        if (delegate.phoneNumber.isNotEmpty) {
+          final cleanPhone =
+              delegate.phoneNumber.replaceAll(RegExp(r'\s+'), '').trim();
+          final reqByPhone = await firestore
+              .collection('delegate_requests')
+              .where('phoneNumber', isEqualTo: cleanPhone)
+              .get();
+          for (final doc in reqByPhone.docs) {
+            await doc.reference.delete();
+          }
+        }
+      } catch (_) {}
+
+      // 4. Delete associated notifications
+      try {
+        final notifs = await firestore
+            .collection('notifications')
+            .where('requestId', isEqualTo: delegate.uid)
+            .get();
+        for (final n in notifs.docs) {
+          await n.reference.delete();
+        }
+      } catch (_) {}
+
+      // 5. Delete from users collection if role is delegate/promoter
+      try {
+        final userDoc = firestore.collection('users').doc(delegate.uid);
+        final uSnap = await userDoc.get();
+        if (uSnap.exists) {
+          final role = uSnap.data()?['role']?.toString().toLowerCase();
+          if (role == 'delegate' || role == 'promoter' || role == null) {
+            await userDoc.delete();
+          }
+        }
+      } catch (_) {}
+
+      // 6. Delete storage assets if any
+      try {
+        final storage = FirebaseStorage.instance;
+        final folderRef = storage.ref('delegate_documents/${delegate.uid}');
+        final listRes = await folderRef.listAll();
+        for (final item in listRes.items) {
+          await item.delete();
+        }
+      } catch (_) {}
+
+      // 7. Clear delegates cache
+      AdminDelegatesBloc.clearCache();
+
+      if (context.mounted) {
+        Navigator.pop(context); // Dismiss progress dialog
+        AppSnackBar.showSuccess(
+          context,
+          isArabic ? '✅ تم حذف المندوب بنجاح' : '✅ Delegate deleted successfully',
+        );
+        Navigator.pop(context, true); // Return to previous screen with true
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Dismiss progress dialog
+        AppSnackBar.showError(
+          context,
+          isArabic ? 'فشل حذف المندوب: $e' : 'Failed to delete delegate: $e',
+        );
+      }
+    }
   }
 
   // ─── Tab 2: Documents ───────────────────────────────────────────
   Widget _buildDocumentsTab(BuildContext context, AppLocalizations l10n) {
     final colorScheme = Theme.of(context).colorScheme;
-    if (delegate.documents.isEmpty) {
+    final displayDocs = _getDisplayDocuments(l10n);
+
+    if (displayDocs.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -403,13 +761,313 @@ class _ProfileBody extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 14,
         crossAxisSpacing: 14,
-        childAspectRatio: 0.72,
+        childAspectRatio: 0.58,
       ),
-      itemCount: delegate.documents.length,
+      itemCount: displayDocs.length,
       itemBuilder: (context, index) {
-        return _DocumentCard(document: delegate.documents[index], l10n: l10n);
+        final item = displayDocs[index];
+        return _DocumentCard(
+          item: item,
+          l10n: l10n,
+          onEdit: () => _handleEditDocument(context, item),
+        );
       },
     );
+  }
+
+  List<_DisplayDocument> _getDisplayDocuments(AppLocalizations l10n) {
+    final List<_DisplayDocument> list = [];
+
+    for (final doc in delegate.documents) {
+      if (doc.documentKey == DocumentKey.personalPhoto) {
+        list.add(
+          _DisplayDocument(
+            id: 'personalPhoto',
+            title: l10n.personalPhoto,
+            imageUrl: doc.documentURL,
+            status: doc.documentStatus,
+            docType: 'personalPhoto',
+            uploadedAt: doc.uploadedAt,
+            rejectionReason: doc.rejectionReason,
+            defaultIcon: Icons.photo_camera_outlined,
+          ),
+        );
+      } else if (doc.documentKey == DocumentKey.nationalityId) {
+        list.add(
+          _DisplayDocument(
+            id: 'nationalIdFront',
+            title: 'بطاقة الرقم القومي (الوجه)',
+            imageUrl: doc.documentURL,
+            status: doc.documentStatus,
+            docType: 'nationalIdFront',
+            uploadedAt: doc.uploadedAt,
+            rejectionReason: doc.rejectionReason,
+            defaultIcon: Icons.credit_card_outlined,
+          ),
+        );
+        if (doc.secondaryURL != null && doc.secondaryURL!.isNotEmpty) {
+          list.add(
+            _DisplayDocument(
+              id: 'nationalIdBack',
+              title: 'بطاقة الرقم القومي (الظهر)',
+              imageUrl: doc.secondaryURL!,
+              status: doc.documentStatus,
+              docType: 'nationalIdBack',
+              uploadedAt: doc.uploadedAt,
+              rejectionReason: doc.rejectionReason,
+              defaultIcon: Icons.credit_card_outlined,
+            ),
+          );
+        }
+      } else {
+        list.add(
+          _DisplayDocument(
+            id: doc.documentKey.name,
+            title: _getDocumentTitleHelper(doc.documentKey, l10n),
+            imageUrl: doc.documentURL,
+            status: doc.documentStatus,
+            docType: doc.documentKey.name,
+            uploadedAt: doc.uploadedAt,
+            rejectionReason: doc.rejectionReason,
+            defaultIcon: _getDocumentIconHelper(doc.documentKey),
+          ),
+        );
+      }
+    }
+    return list;
+  }
+
+  Future<void> _handleEditDocument(
+    BuildContext context,
+    _DisplayDocument item,
+  ) async {
+    final picker = ImagePicker();
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'تحديث ${item.title}',
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx).colorScheme.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.camera_alt_rounded,
+                    color: Theme.of(ctx).colorScheme.primary,
+                  ),
+                ),
+                title: const Text('التقاط صورة بالكاميرا'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx).colorScheme.secondaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.photo_library_rounded,
+                    color: Theme.of(ctx).colorScheme.secondary,
+                  ),
+                ),
+                title: const Text('اختيار صورة من المعرض'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('جاري رفع وتحديث المستند...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final file = File(picked.path);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final storageRef = FirebaseStorage.instance.ref(
+        'delegate_documents/${delegate.uid}/${item.docType}_$timestamp.jpg',
+      );
+      final uploadTask = await storageRef.putFile(file);
+      final newUrl = await uploadTask.ref.getDownloadURL();
+
+      final firestore = FirebaseFirestore.instance;
+
+      final Map<String, dynamic> updateFields = {
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (item.docType == 'personalPhoto') {
+        updateFields['profileImageUrl'] = newUrl;
+        updateFields['personalPhotoURL'] = newUrl;
+      } else if (item.docType == 'nationalIdFront') {
+        updateFields['nationalIdFrontUrl'] = newUrl;
+      } else if (item.docType == 'nationalIdBack') {
+        updateFields['nationalIdBackUrl'] = newUrl;
+      } else if (item.docType == 'paymentReceipt') {
+        updateFields['receiptImageUrl'] = newUrl;
+      }
+
+      final List<Map<String, dynamic>> updatedDocs = [];
+      bool foundMatchingDoc = false;
+      for (final doc in delegate.documents) {
+        if (item.docType == 'personalPhoto' &&
+            doc.documentKey == DocumentKey.personalPhoto) {
+          foundMatchingDoc = true;
+          updatedDocs.add({
+            'documentKey': 'personalPhoto',
+            'documentStatus': 'approved',
+            'documentURL': newUrl,
+            'uploadedAt': DateTime.now().toIso8601String(),
+          });
+        } else if ((item.docType == 'nationalIdFront' ||
+                item.docType == 'nationalIdBack') &&
+            doc.documentKey == DocumentKey.nationalityId) {
+          foundMatchingDoc = true;
+          final front =
+              item.docType == 'nationalIdFront' ? newUrl : doc.documentURL;
+          final back = item.docType == 'nationalIdBack'
+              ? newUrl
+              : (doc.secondaryURL ?? '');
+          updatedDocs.add({
+            'documentKey': 'nationalityId',
+            'documentStatus': 'approved',
+            'documentURL': front,
+            'secondaryURL': back,
+            'uploadedAt': DateTime.now().toIso8601String(),
+          });
+        } else {
+          updatedDocs.add({
+            'documentKey': doc.documentKey.name,
+            'documentStatus': doc.documentStatus.name,
+            'documentURL': doc.documentURL,
+            if (doc.secondaryURL != null) 'secondaryURL': doc.secondaryURL,
+            'uploadedAt': doc.uploadedAt?.toIso8601String() ??
+                DateTime.now().toIso8601String(),
+          });
+        }
+      }
+
+      if (!foundMatchingDoc) {
+        if (item.docType == 'personalPhoto') {
+          updatedDocs.add({
+            'documentKey': 'personalPhoto',
+            'documentStatus': 'approved',
+            'documentURL': newUrl,
+            'uploadedAt': DateTime.now().toIso8601String(),
+          });
+        } else if (item.docType == 'nationalIdFront' ||
+            item.docType == 'nationalIdBack') {
+          updatedDocs.add({
+            'documentKey': 'nationalityId',
+            'documentStatus': 'approved',
+            'documentURL': item.docType == 'nationalIdFront' ? newUrl : '',
+            'secondaryURL': item.docType == 'nationalIdBack' ? newUrl : '',
+            'uploadedAt': DateTime.now().toIso8601String(),
+          });
+        }
+      }
+
+      updateFields['documents'] = updatedDocs;
+
+      // Update in all organizations where this company & delegate reside
+      if (delegate.companyUID.isNotEmpty) {
+        final orgsSnap = await firestore.collection('organizations').get();
+        for (final orgDoc in orgsSnap.docs) {
+          final delRef = firestore
+              .collection('organizations')
+              .doc(orgDoc.id)
+              .collection('companies')
+              .doc(delegate.companyUID)
+              .collection('delegates')
+              .doc(delegate.uid);
+          final check = await delRef.get();
+          if (check.exists) {
+            await delRef.set(updateFields, SetOptions(merge: true));
+          }
+        }
+      }
+
+      if (item.docType == 'personalPhoto') {
+        try {
+          await firestore.collection('users').doc(delegate.uid).set({
+            'photoURL': newUrl,
+            'profileImageUrl': newUrl,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } catch (_) {}
+      }
+
+      try {
+        final reqRef =
+            firestore.collection('delegate_requests').doc(delegate.uid);
+        final reqSnap = await reqRef.get();
+        if (reqSnap.exists) {
+          await reqRef.set(updateFields, SetOptions(merge: true));
+        }
+      } catch (_) {}
+
+      if (context.mounted) {
+        Navigator.pop(context); // dismiss progress dialog
+        AppSnackBar.showSuccess(context, 'تم تحديث ${item.title} بنجاح!');
+        context.read<ProfileBloc>().add(
+          LoadProfile(
+            uid: delegate.uid,
+            organizationUID: delegate.organizationUID,
+            companyUID: delegate.companyUID,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // dismiss progress dialog
+        AppSnackBar.showError(context, 'فشل تحديث المستند: $e');
+      }
+    }
   }
 
   // ─── Tab 3: Request History ─────────────────────────────────────
@@ -556,232 +1214,334 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
+class _DisplayDocument {
+  final String id;
+  final String title;
+  final String imageUrl;
+  final DocumentStatus status;
+  final String docType;
+  final DateTime? uploadedAt;
+  final String? rejectionReason;
+  final IconData defaultIcon;
+
+  const _DisplayDocument({
+    required this.id,
+    required this.title,
+    required this.imageUrl,
+    required this.status,
+    required this.docType,
+    this.uploadedAt,
+    this.rejectionReason,
+    this.defaultIcon = Icons.description_outlined,
+  });
+}
+
+String _getDocumentTitleHelper(DocumentKey key, AppLocalizations l10n) {
+  switch (key) {
+    case DocumentKey.personalPhoto:
+      return l10n.personalPhoto;
+    case DocumentKey.nationalityId:
+      return l10n.nationalId;
+    case DocumentKey.authorizationLetter:
+      return l10n.authorizationLetter;
+    case DocumentKey.insuranceLetter:
+      return l10n.insuranceLetter;
+    case DocumentKey.healthCertificate:
+      return l10n.healthCertificate;
+    case DocumentKey.paymentReceipt:
+      return l10n.paymentReceipt;
+    case DocumentKey.electronicPaymentReceipt:
+      return l10n.electronicPaymentReceipt;
+  }
+}
+
+IconData _getDocumentIconHelper(DocumentKey key) {
+  switch (key) {
+    case DocumentKey.personalPhoto:
+      return Icons.photo_camera_outlined;
+    case DocumentKey.nationalityId:
+      return Icons.credit_card_outlined;
+    case DocumentKey.authorizationLetter:
+      return Icons.description_outlined;
+    case DocumentKey.insuranceLetter:
+      return Icons.shield_outlined;
+    case DocumentKey.healthCertificate:
+      return Icons.local_hospital_outlined;
+    case DocumentKey.paymentReceipt:
+      return Icons.receipt_long_outlined;
+    case DocumentKey.electronicPaymentReceipt:
+      return Icons.receipt_long_rounded;
+  }
+}
+
+Color _getStatusColorHelper(DocumentStatus status, ColorScheme colorScheme) {
+  switch (status) {
+    case DocumentStatus.approved:
+      return colorScheme.tertiary;
+    case DocumentStatus.rejected:
+      return colorScheme.error;
+    case DocumentStatus.pending:
+      return colorScheme.secondary;
+    case DocumentStatus.notProvided:
+      return colorScheme.outline;
+  }
+}
+
+IconData _getStatusIconHelper(DocumentStatus status) {
+  switch (status) {
+    case DocumentStatus.approved:
+      return Icons.check_circle;
+    case DocumentStatus.rejected:
+      return Icons.cancel;
+    case DocumentStatus.pending:
+      return Icons.schedule;
+    case DocumentStatus.notProvided:
+      return Icons.remove_circle_outline;
+  }
+}
+
+String _getStatusTextHelper(DocumentStatus status, AppLocalizations l10n) {
+  switch (status) {
+    case DocumentStatus.approved:
+      return l10n.approvedStatus;
+    case DocumentStatus.rejected:
+      return l10n.rejectedStatus;
+    case DocumentStatus.pending:
+      return l10n.pendingStatus;
+    case DocumentStatus.notProvided:
+      return l10n.notProvidedStatus;
+  }
+}
+
 // ─── Document Card Widget ─────────────────────────────────────────
 class _DocumentCard extends StatelessWidget {
-  final DelegateDocument document;
+  final _DisplayDocument item;
   final AppLocalizations l10n;
+  final VoidCallback onEdit;
 
-  const _DocumentCard({required this.document, required this.l10n});
+  const _DocumentCard({
+    required this.item,
+    required this.l10n,
+    required this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final String title = _getDocumentTitle(document.documentKey, l10n);
-    final Color statusColor = _getStatusColor(
-      document.documentStatus,
-      colorScheme,
-    );
-    final IconData statusIcon = _getStatusIcon(document.documentStatus);
-    final String statusText = _getStatusText(document.documentStatus, l10n);
-    final bool hasImage = document.documentURL.isNotEmpty;
+    final Color statusColor = _getStatusColorHelper(item.status, colorScheme);
+    final IconData statusIcon = _getStatusIconHelper(item.status);
+    final String statusText = _getStatusTextHelper(item.status, l10n);
+    final bool hasImage = item.imageUrl.isNotEmpty;
 
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withValues(alpha: 0.06),
-            blurRadius: 12,
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Material(
-        color: colorScheme.surface.withValues(alpha: 0),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            if (!hasImage) return;
-            _showFullScreenImage(context, title);
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Image Thumbnail ──
-              Expanded(
-                flex: 3,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Image or placeholder
-                    hasImage
-                        ? CachedNetworkImage(
-                            imageUrl: document.documentURL,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: colorScheme.surfaceContainerHighest,
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                  ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Image Thumbnail with Fullscreen Tap ──
+          Expanded(
+            flex: 3,
+            child: InkWell(
+              onTap: hasImage
+                  ? () =>
+                      _showFullScreenImage(context, item.title, item.imageUrl)
+                  : null,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  hasImage
+                      ? CachedNetworkImage(
+                          imageUrl: item.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: colorScheme.surfaceContainerHighest,
+                            child: const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
                                 ),
                               ),
                             ),
-                            errorWidget: (context, url, error) => Container(
-                              color: colorScheme.surfaceContainerHighest,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.broken_image_outlined,
-                                    size: 32,
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: colorScheme.surfaceContainerHighest,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 32,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'فشل التحميل',
+                                  style: TextStyle(
+                                    fontSize: 10,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'فشل التحميل',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : Container(
-                            color: colorScheme.surfaceContainerHighest,
-                            child: Icon(
-                              _getDocumentIcon(document.documentKey),
-                              size: 40,
-                              color: colorScheme.onSurfaceVariant,
+                                ),
+                              ],
                             ),
                           ),
-                    // Status badge overlay
+                        )
+                      : Container(
+                          color: colorScheme.surfaceContainerHighest,
+                          child: Icon(
+                            item.defaultIcon,
+                            size: 40,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                  // Status badge overlay
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: statusColor.withValues(alpha: 0.4),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, size: 10, color: Colors.white),
+                          const SizedBox(width: 3),
+                          Text(
+                            statusText,
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Zoom icon overlay
+                  if (hasImage)
                     Positioned(
-                      top: 8,
-                      left: 8,
+                      bottom: 8,
+                      right: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: statusColor,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: statusColor.withValues(alpha: 0.4),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+                          color: Colors.black.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              statusIcon,
-                              size: 10,
-                              color: colorScheme.surface,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              statusText,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: colorScheme.surface,
-                              ),
-                            ),
-                          ],
+                        child: const Icon(
+                          Icons.zoom_in_rounded,
+                          size: 16,
+                          color: Colors.white,
                         ),
                       ),
                     ),
-                    // Zoom icon overlay
-                    if (hasImage)
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: colorScheme.shadow.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.zoom_in_rounded,
-                            size: 16,
-                            color: colorScheme.surface,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                ],
               ),
-              // ── Bottom Info ──
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
+            ),
+          ),
+
+          // ── Bottom Info & Edit Button ──
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    item.title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (item.uploadedAt != null)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time,
+                          size: 10,
+                          color: colorScheme.onSurfaceVariant,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const Spacer(),
-                      if (document.rejectionReason != null &&
-                          document.documentStatus ==
-                              DocumentStatus.rejected) ...[
-                        Text(
-                          document.rejectionReason!,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: colorScheme.error,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ] else if (document.uploadedAt != null) ...[
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.access_time,
-                              size: 11,
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            DateFormat('yyyy/MM/dd').format(item.uploadedAt!),
+                            style: TextStyle(
+                              fontSize: 9,
                               color: colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                DateFormat(
-                                  'yyyy/MM/dd',
-                                ).format(document.uploadedAt!),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
-                    ],
+                    ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 28,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_rounded, size: 13),
+                      label: const Text(
+                        'تعديل / استبدال',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  void _showFullScreenImage(BuildContext context, String title) {
+  void _showFullScreenImage(BuildContext context, String title, String url) {
     Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
@@ -790,93 +1550,13 @@ class _DocumentCard extends StatelessWidget {
           context,
         ).colorScheme.inverseSurface.withValues(alpha: 0.87),
         pageBuilder: (context, animation, secondaryAnimation) {
-          return _FullScreenImageViewer(
-            imageUrl: document.documentURL,
-            title: title,
-          );
+          return _FullScreenImageViewer(imageUrl: url, title: title);
         },
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
       ),
     );
-  }
-
-  String _getDocumentTitle(DocumentKey key, AppLocalizations l10n) {
-    switch (key) {
-      case DocumentKey.personalPhoto:
-        return l10n.personalPhoto;
-      case DocumentKey.nationalityId:
-        return l10n.nationalId;
-      case DocumentKey.authorizationLetter:
-        return l10n.authorizationLetter;
-      case DocumentKey.insuranceLetter:
-        return l10n.insuranceLetter;
-      case DocumentKey.healthCertificate:
-        return l10n.healthCertificate;
-      case DocumentKey.paymentReceipt:
-        return l10n.paymentReceipt;
-      case DocumentKey.electronicPaymentReceipt:
-        return l10n.electronicPaymentReceipt;
-    }
-  }
-
-  IconData _getDocumentIcon(DocumentKey key) {
-    switch (key) {
-      case DocumentKey.personalPhoto:
-        return Icons.photo_camera_outlined;
-      case DocumentKey.nationalityId:
-        return Icons.credit_card_outlined;
-      case DocumentKey.authorizationLetter:
-        return Icons.description_outlined;
-      case DocumentKey.insuranceLetter:
-        return Icons.shield_outlined;
-      case DocumentKey.healthCertificate:
-        return Icons.local_hospital_outlined;
-      case DocumentKey.paymentReceipt:
-        return Icons.receipt_long_outlined;
-      case DocumentKey.electronicPaymentReceipt:
-        return Icons.receipt_long_rounded;
-    }
-  }
-
-  Color _getStatusColor(DocumentStatus status, ColorScheme colorScheme) {
-    switch (status) {
-      case DocumentStatus.approved:
-        return colorScheme.tertiary;
-      case DocumentStatus.rejected:
-        return colorScheme.error;
-      case DocumentStatus.pending:
-        return colorScheme.secondary;
-      case DocumentStatus.notProvided:
-        return colorScheme.outline;
-    }
-  }
-
-  IconData _getStatusIcon(DocumentStatus status) {
-    switch (status) {
-      case DocumentStatus.approved:
-        return Icons.check_circle;
-      case DocumentStatus.rejected:
-        return Icons.cancel;
-      case DocumentStatus.pending:
-        return Icons.schedule;
-      case DocumentStatus.notProvided:
-        return Icons.remove_circle_outline;
-    }
-  }
-
-  String _getStatusText(DocumentStatus status, AppLocalizations l10n) {
-    switch (status) {
-      case DocumentStatus.approved:
-        return l10n.approvedStatus;
-      case DocumentStatus.rejected:
-        return l10n.rejectedStatus;
-      case DocumentStatus.pending:
-        return l10n.pendingStatus;
-      case DocumentStatus.notProvided:
-        return l10n.notProvidedStatus;
-    }
   }
 }
 

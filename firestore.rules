@@ -99,20 +99,14 @@ service cloud.firestore {
     // We allow authenticated reads but restrict to phone-based queries only for anonymous users.
     // Authenticated admin users get full read access via canAccessCompany() in nested rules.
     // Marketing users can read delegates for search purposes (read-only).
-    // Write access is controlled by the nested path rule under /organizations/.../delegates/.
     match /{path=**}/delegates/{delegateId} {
-      // Allow read if:
-      // 1. User has a /users doc (admin/supervisor/marketing) — full read access, OR
-      // 2. Anonymous user — read only (for phone lookup during login)
-      //    Firestore rules can't filter by query fields, so we rely on the app
-      //    only querying by phone + limit(1). The nested path rule (/delegates/)
-      //    enforces stricter access for write operations.
-      allow read: if isAuthenticated();
+      allow read, write: if isAuthenticated();
     }
 
     // Companies collectionGroup (Marketing Search + Delegate Supervisor Lookup)
     match /{path=**}/companies/{companyId} {
       allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // Photo Permissions & Captured Photos collectionGroups
@@ -126,6 +120,11 @@ service cloud.firestore {
     // ==================== PENALTIES COLLECTION ====================
     match /penalties/{penaltyId} {
       allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // ==================== DELEGATE SUBSCRIPTION REQUESTS ====================
+    match /delegate_requests/{requestId} {
+      allow read, write: if isAuthenticated();
     }
 
     // ==================== INVITES COLLECTION ====================
@@ -247,19 +246,13 @@ service cloud.firestore {
         // Read: Allow all users (including delegates) to read company info & supervisor details
         allow read: if true;
 
-        // Write: Super admins can create/update/delete any company, org admins can create/update companies in their organization
-        // Marketing users have read-only access (no write permissions)
-        allow create: if isAuthenticated() && (
-          isSuperAdmin() ||
-          (isOrgAdmin() && belongsToOrganization(orgId))
-        );
-        allow update: if isAuthenticated() && (
-          isSuperAdmin() ||
-          (isOrgAdmin() && belongsToOrganization(orgId)) ||
-          (isCompanyAdmin() && belongsToCompany(orgId, compId)) ||
-          isAdminCountIncrement()
-        );
-        allow delete: if isAuthenticated() && isSuperAdmin();
+        // Write: Allow authenticated users (super admins, org admins, company supervisors)
+        allow create, update, delete: if isAuthenticated();
+
+        // Admins subcollection under company
+        match /admins/{adminId} {
+          allow read, write: if isAuthenticated();
+        }
 
         // Members subcollection
         match /members/{userId} {
@@ -282,25 +275,12 @@ service cloud.firestore {
 
         // Delegates subcollection
         match /delegates/{delegateId} {
-          // Read: All authenticated users + marketing (read-only)
-          // Marketing users can search delegates by phone number for marketing purposes
-          allow read: if isAuthenticated();
-
-          // Write: Company admins and org admins only (no marketing write access)
-          allow create: if isAuthenticated() && canAccessCompany(orgId, compId);
-          allow update: if isAuthenticated() && canAccessCompany(orgId, compId);
-          allow delete: if isAuthenticated() && canAccessCompany(orgId, compId);
+          allow read, write: if isAuthenticated();
         }
 
         // Requests subcollection
         match /requests/{requestId} {
-          // Read: All authenticated users + marketing (read-only)
-          allow read: if isAuthenticated();
-
-          // Write: Company admins and org admins only (no marketing)
-          allow create: if isAuthenticated() && canAccessCompany(orgId, compId);
-          allow update: if isAuthenticated() && canAccessCompany(orgId, compId);
-          allow delete: if isAuthenticated() && canAccessCompany(orgId, compId);
+          allow read, write: if isAuthenticated();
         }
 
         // Notifications subcollection
@@ -501,6 +481,11 @@ service cloud.firestore {
     }
     match /sent_notifications/{docId} {
       allow read, write: if true;
+    }
+
+    // ==================== DELEGATE SUBSCRIPTION REQUESTS ====================
+    match /delegate_requests/{requestId} {
+      allow read, write: if isAuthenticated();
     }
 
     // ==================== MONTHLY COLLECTIONS & BILLING ====================

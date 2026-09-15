@@ -43,6 +43,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   }) async {
     final Set<String> docIds = {};
     final List<QueryDocumentSnapshot> docs = [];
+    String normalizedRole = '';
 
     void addDocs(List<QueryDocumentSnapshot> newDocs) {
       for (final doc in newDocs) {
@@ -109,6 +110,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
                   userData?['mobileNumber']) as String?;
           userCompanyId = (userData?['companyUID'] ?? userData?['companyId']) as String?;
           userRole = userData?['role']?.toString();
+          normalizedRole = userRole?.toLowerCase() ?? '';
           if (p != null && p.isNotEmpty) phonesToCheck.add(p);
         }
       } catch (_) {}
@@ -127,7 +129,6 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
         );
       }
 
-      final normalizedRole = userRole?.toLowerCase() ?? '';
       if (normalizedRole.contains('marketing') || normalizedRole.contains('branches')) {
         for (final r in ['branchesMarketingManager', 'branches_marketing', 'marketing']) {
           roleQueries.add(_collection.where('delegateUid', isEqualTo: r).limit(30).get());
@@ -135,6 +136,20 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       }
       if (normalizedRole.contains('org') || normalizedRole.contains('organization')) {
         for (final r in ['organizationAdmin', 'organization_admin']) {
+          roleQueries.add(_collection.where('delegateUid', isEqualTo: r).limit(30).get());
+        }
+      }
+      if (normalizedRole.contains('super') ||
+          delegateUid == 'super-admin-login' ||
+          delegateUid.toLowerCase().contains('super')) {
+        for (final r in ['super-admin', 'superAdmin', 'role_super_admin']) {
+          roleQueries.add(_collection.where('delegateUid', isEqualTo: r).limit(30).get());
+        }
+      }
+      if (normalizedRole.contains('technical') ||
+          normalizedRole.contains('support') ||
+          delegateUid.toLowerCase().contains('support')) {
+        for (final r in ['technicalSupport', 'technical-support', 'role_technical_support']) {
           roleQueries.add(_collection.where('delegateUid', isEqualTo: r).limit(30).get());
         }
       }
@@ -173,9 +188,22 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       }
     } catch (_) {}
 
-    // Filter out notifications deleted by this user (Soft Delete)
+    // Filter out notifications deleted by this user (Soft Delete) and role-restricted notifications
     final filteredDocs = docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>?;
+
+      // Delegate subscription requests are strictly restricted ONLY to Super Admin and Technical Support
+      final type = data?['type']?.toString();
+      if (type == 'delegate_subscription_request') {
+        final isPrivileged = normalizedRole.contains('super') ||
+            normalizedRole.contains('technical') ||
+            normalizedRole.contains('support') ||
+            delegateUid == 'super-admin-login' ||
+            delegateUid.toLowerCase().contains('super') ||
+            delegateUid.toLowerCase().contains('support');
+        if (!isPrivileged) return false;
+      }
+
       final deletedBy = data?['deletedBy'];
       if (deletedBy is List) {
         if (deletedBy.contains(delegateUid)) return false;

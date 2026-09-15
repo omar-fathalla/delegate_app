@@ -81,14 +81,23 @@ class AppTheme {
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
         elevation: 0,
+        scrolledUnderElevation: 2,
         centerTitle: false,
       ),
 
+      // Scaffold Background
+      scaffoldBackgroundColor: colorScheme.surface,
+
       // Dialogs & Cards
       cardTheme: CardThemeData(
-        color: colorScheme.surfaceContainer,
+        color: colorScheme.surfaceContainerLow,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
         clipBehavior: Clip.antiAlias,
       ),
       dialogTheme: DialogThemeData(

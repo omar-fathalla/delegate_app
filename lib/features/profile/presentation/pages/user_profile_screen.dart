@@ -1,14 +1,19 @@
+import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 import '../../../../l10n/app_localizations.dart';
 
 /// صفحة الملف الشخصي للمستخدم
-/// User Profile Screen with ability to change password
+/// User Profile Screen with ability to change password and photo
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
 
@@ -20,6 +25,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   final _auth = FirebaseAuth.instance;
   User? _currentUser;
   bool _isLoading = true;
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
@@ -117,6 +123,267 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+  Future<void> _pickAndUploadImage(ImageSource source, Delegate? delegate) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        imageQuality: 70, // تقليل الجودة لتوفير المساحة وسرعة التحميل
+        maxWidth: 800,
+        maxHeight: 800,
+      );
+
+      if (picked == null) return;
+
+      setState(() => _isUploadingPhoto = true);
+
+      final file = File(picked.path);
+      final uid = delegate?.uid ?? _currentUser?.uid;
+      if (uid == null) {
+        throw Exception('لم يتم العثور على معرّف المستخدم');
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final storageRef = FirebaseStorage.instance.ref(
+        'delegate_documents/$uid/personalPhoto_$timestamp.jpg',
+      );
+      final uploadTask = await storageRef.putFile(file);
+      final downloadUrl = await uploadTask.ref.getDownloadURL();
+
+      final firestore = FirebaseFirestore.instance;
+
+      // 1. تحديث وثيقة المستخدم في users
+      await firestore.collection('users').doc(uid).set({
+        'photoURL': downloadUrl,
+        'profileImageUrl': downloadUrl,
+        'personalPhotoURL': downloadUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      final userQuery = await firestore
+          .collection('users')
+          .where('uid', isEqualTo: uid)
+          .get();
+      for (final doc in userQuery.docs) {
+        await doc.reference.set({
+          'photoURL': downloadUrl,
+          'profileImageUrl': downloadUrl,
+          'personalPhotoURL': downloadUrl,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      // 2. تحديث وثيقة المندوب/المشرف في الشركات والمنظمات
+      if (delegate != null && delegate.companyUID.isNotEmpty) {
+        final orgsSnap = await firestore.collection('organizations').get();
+        for (final orgDoc in orgsSnap.docs) {
+          final delRef = firestore
+              .collection('organizations')
+              .doc(orgDoc.id)
+              .collection('companies')
+              .doc(delegate.companyUID)
+              .collection('delegates')
+              .doc(delegate.uid);
+          final check = await delRef.get();
+          if (check.exists) {
+            final currentDocs = (check.data()?['documents'] as List<dynamic>?) ?? [];
+            final updatedDocs = <Map<String, dynamic>>[];
+            bool found = false;
+            for (final d in currentDocs) {
+              if (d is Map && d['documentKey'] == 'personalPhoto') {
+                found = true;
+                updatedDocs.add({
+                  ...Map<String, dynamic>.from(d),
+                  'documentURL': downloadUrl,
+                  'documentStatus': 'approved',
+                  'uploadedAt': DateTime.now().toIso8601String(),
+                });
+              } else if (d is Map) {
+                updatedDocs.add(Map<String, dynamic>.from(d));
+              }
+            }
+            if (!found) {
+              updatedDocs.add({
+                'documentKey': 'personalPhoto',
+                'documentStatus': 'approved',
+                'documentURL': downloadUrl,
+                'uploadedAt': DateTime.now().toIso8601String(),
+              });
+            }
+
+            await delRef.set({
+              'profileImageUrl': downloadUrl,
+              'personalPhotoURL': downloadUrl,
+              'photoURL': downloadUrl,
+              'documents': updatedDocs,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+          }
+        }
+      }
+
+      // 3. تحديث delegate_requests إن وجد
+      try {
+        final reqRef = firestore.collection('delegate_requests').doc(uid);
+        final reqSnap = await reqRef.get();
+        if (reqSnap.exists) {
+          await reqRef.set({
+            'profileImageUrl': downloadUrl,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+      } catch (_) {}
+
+      // 4. تحديث حساب Firebase Auth
+      try {
+        await _currentUser?.updatePhotoURL(downloadUrl);
+        await _currentUser?.reload();
+        _currentUser = _auth.currentUser;
+      } catch (_) {}
+
+      if (mounted) {
+        context.read<AuthBloc>().add(CheckAutoLoginRequested());
+        AppSnackBar.showSuccess(context, '✅ تم تحديث الصورة الشخصية بنجاح');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'فشل رفع الصورة: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingPhoto = false);
+      }
+    }
+  }
+
+  Future<void> _removePhoto(Delegate? delegate) async {
+    try {
+      setState(() => _isUploadingPhoto = true);
+      final uid = delegate?.uid ?? _currentUser?.uid;
+      if (uid == null) return;
+
+      final firestore = FirebaseFirestore.instance;
+      await firestore.collection('users').doc(uid).set({
+        'photoURL': FieldValue.delete(),
+        'profileImageUrl': FieldValue.delete(),
+        'personalPhotoURL': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (delegate != null && delegate.companyUID.isNotEmpty) {
+        final orgsSnap = await firestore.collection('organizations').get();
+        for (final orgDoc in orgsSnap.docs) {
+          final delRef = firestore
+              .collection('organizations')
+              .doc(orgDoc.id)
+              .collection('companies')
+              .doc(delegate.companyUID)
+              .collection('delegates')
+              .doc(delegate.uid);
+          final check = await delRef.get();
+          if (check.exists) {
+            final currentDocs = (check.data()?['documents'] as List<dynamic>?) ?? [];
+            final updatedDocs = currentDocs.where((d) => d is Map && d['documentKey'] != 'personalPhoto').toList();
+            await delRef.set({
+              'profileImageUrl': FieldValue.delete(),
+              'personalPhotoURL': FieldValue.delete(),
+              'photoURL': FieldValue.delete(),
+              'documents': updatedDocs,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+          }
+        }
+      }
+
+      try {
+        await _currentUser?.updatePhotoURL(null);
+        await _currentUser?.reload();
+        _currentUser = _auth.currentUser;
+      } catch (_) {}
+
+      if (mounted) {
+        context.read<AuthBloc>().add(CheckAutoLoginRequested());
+        AppSnackBar.showSuccess(context, 'تم حذف الصورة الشخصية');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'فشل حذف الصورة: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingPhoto = false);
+      }
+    }
+  }
+
+  void _showPhotoOptionsSheet(BuildContext context, Delegate? delegate) {
+    final photoUrl = delegate?.personalPhotoUrl ??
+        (delegate?.documents
+            .where((d) =>
+                d.documentKey == DocumentKey.personalPhoto &&
+                d.documentURL.isNotEmpty)
+            .firstOrNull
+            ?.documentURL) ??
+        _currentUser?.photoURL;
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'الصورة الشخصية',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded, color: Colors.blue),
+                title: const Text('التقاط صورة بالكاميرا'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadImage(ImageSource.camera, delegate);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: Colors.purple),
+                title: const Text('اختيار من معرض الصور'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadImage(ImageSource.gallery, delegate);
+                },
+              ),
+              if (hasPhoto)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                  title: const Text('حذف الصورة الحالية', style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _removePhoto(delegate);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ─── Profile Header ─────────────────────────────────────────────
   Widget _buildProfileHeader(
     ColorScheme colorScheme,
@@ -125,6 +392,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   ) {
     final displayName = delegate?.fullName ?? _currentUser?.displayName ?? 'مستخدم';
     final email = delegate?.email ?? _currentUser?.email ?? '';
+    final photoUrl = delegate?.personalPhotoUrl ??
+        (delegate?.documents
+            .where((d) =>
+                d.documentKey == DocumentKey.personalPhoto &&
+                d.documentURL.isNotEmpty)
+            .firstOrNull
+            ?.documentURL) ??
+        _currentUser?.photoURL;
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
     return Card(
       elevation: 0,
@@ -134,24 +410,107 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // Avatar
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: colorScheme.primary, width: 3),
-              ),
-              child: CircleAvatar(
-                radius: 48,
-                backgroundColor: colorScheme.primaryContainer,
-                child: Text(
-                  displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
-                  style: theme.textTheme.headlineLarge?.copyWith(
-                    color: colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.bold,
+            // Avatar with edit/camera button
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: colorScheme.primary, width: 3),
+                  ),
+                  child: hasPhoto
+                      ? ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: photoUrl,
+                            width: 96,
+                            height: 96,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              width: 96,
+                              height: 96,
+                              color: colorScheme.surfaceContainerHighest,
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => CircleAvatar(
+                              radius: 48,
+                              backgroundColor: colorScheme.primaryContainer,
+                              child: Text(
+                                displayName.isNotEmpty
+                                    ? displayName[0].toUpperCase()
+                                    : 'U',
+                                style: theme.textTheme.headlineLarge?.copyWith(
+                                  color: colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : CircleAvatar(
+                          radius: 48,
+                          backgroundColor: colorScheme.primaryContainer,
+                          child: Text(
+                            displayName.isNotEmpty
+                                ? displayName[0].toUpperCase()
+                                : 'U',
+                            style: theme.textTheme.headlineLarge?.copyWith(
+                              color: colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                ),
+                if (_isUploadingPhoto)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                PositionedDirectional(
+                  bottom: 0,
+                  end: 0,
+                  child: Material(
+                    color: colorScheme.primary,
+                    shape: const CircleBorder(),
+                    elevation: 3,
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _isUploadingPhoto
+                          ? null
+                          : () => _showPhotoOptionsSheet(context, delegate),
+                      child: const Padding(
+                        padding: EdgeInsets.all(7),
+                        child: Icon(
+                          Icons.camera_alt_rounded,
+                          size: 17,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
 
             const SizedBox(height: 16),
@@ -236,6 +595,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               value: delegate?.fullName ?? _currentUser?.displayName ?? 'غير محدد',
               colorScheme: colorScheme,
               theme: theme,
+              onEdit: () => _showEditInfoSheet(
+                context,
+                fieldType: 'name',
+                initialValue: delegate?.fullName ?? _currentUser?.displayName ?? '',
+                delegate: delegate,
+              ),
             ),
 
             // Email
@@ -492,6 +857,7 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
 
     try {
       final newValue = _controller.text.trim();
+      final isName = widget.fieldType == 'name';
       final isEmail = widget.fieldType == 'email';
 
       // 1. Update Firestore 'users' collection
@@ -513,7 +879,7 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
               .where('phoneNumber', isEqualTo: widget.delegate!.phoneNumber)
               .limit(1)
               .get();
-        } else if (!isEmail &&
+        } else if (!isEmail && !isName &&
             widget.delegate!.email != null &&
             widget.delegate!.email!.isNotEmpty) {
           snapshot = await db
@@ -526,8 +892,16 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
 
       if (snapshot.docs.isNotEmpty) {
         final doc = snapshot.docs.first;
-        final fieldName = isEmail ? 'email' : 'phoneNumber';
-        await doc.reference.update({fieldName: newValue});
+        if (isName) {
+          await doc.reference.update({
+            'fullName': newValue,
+            'name': newValue,
+            'displayName': newValue,
+          });
+        } else {
+          final fieldName = isEmail ? 'email' : 'phoneNumber';
+          await doc.reference.update({fieldName: newValue});
+        }
       }
 
       // Also update delegates collection if applicable
@@ -537,16 +911,37 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
             .where('phoneNumber', isEqualTo: widget.delegate!.phoneNumber)
             .get();
         for (final dDoc in delegateQuery.docs) {
-          final fieldName = isEmail ? 'email' : 'phoneNumber';
-          await dDoc.reference.update({fieldName: newValue});
+          if (isName) {
+            final names = newValue.split(RegExp(r'\s+'));
+            final firstName = names.isNotEmpty ? names.first : newValue;
+            final lastName = names.length > 1 ? names.last : '';
+            final secondName = names.length > 2 ? names[1] : '';
+            final thirdName = names.length > 3 ? names[2] : '';
+            await dDoc.reference.update({
+              'fullName': newValue,
+              'firstName': firstName,
+              'secondName': secondName,
+              'thirdName': thirdName,
+              'lastName': lastName,
+            });
+          } else {
+            final fieldName = isEmail ? 'email' : 'phoneNumber';
+            await dDoc.reference.update({fieldName: newValue});
+          }
         }
       }
 
-      // Update Firebase Auth email if applicable
-      if (fbUser != null && isEmail) {
-        try {
-          await fbUser.verifyBeforeUpdateEmail(newValue);
-        } catch (_) {}
+      // Update Firebase Auth if applicable
+      if (fbUser != null) {
+        if (isName) {
+          try {
+            await fbUser.updateDisplayName(newValue);
+          } catch (_) {}
+        } else if (isEmail) {
+          try {
+            await fbUser.verifyBeforeUpdateEmail(newValue);
+          } catch (_) {}
+        }
       }
 
       if (mounted) {
@@ -554,9 +949,11 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              isEmail
-                  ? '✅ تم تحديث البريد الإلكتروني بنجاح'
-                  : '✅ تم تحديث رقم الموبايل بنجاح',
+              isName
+                  ? '✅ تم تحديث الاسم بنجاح'
+                  : (isEmail
+                      ? '✅ تم تحديث البريد الإلكتروني بنجاح'
+                      : '✅ تم تحديث رقم الموبايل بنجاح'),
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
@@ -588,10 +985,17 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isName = widget.fieldType == 'name';
     final isEmail = widget.fieldType == 'email';
-    final title = isEmail ? 'تعديل البريد الإلكتروني' : 'تعديل رقم الموبايل';
-    final label = isEmail ? 'البريد الإلكتروني الجديد' : 'رقم الموبايل الجديد';
-    final icon = isEmail ? Icons.email_outlined : Icons.phone_outlined;
+    final title = isName
+        ? 'تعديل الاسم'
+        : (isEmail ? 'تعديل البريد الإلكتروني' : 'تعديل رقم الموبايل');
+    final label = isName
+        ? 'الاسم بالكامل'
+        : (isEmail ? 'البريد الإلكتروني الجديد' : 'رقم الموبايل الجديد');
+    final icon = isName
+        ? Icons.badge_outlined
+        : (isEmail ? Icons.email_outlined : Icons.phone_outlined);
 
     return Container(
       decoration: BoxDecoration(
@@ -634,7 +1038,9 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
               const SizedBox(height: 32),
               TextFormField(
                 controller: _controller,
-                keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.phone,
+                keyboardType: isName
+                    ? TextInputType.name
+                    : (isEmail ? TextInputType.emailAddress : TextInputType.phone),
                 decoration: InputDecoration(
                   labelText: label,
                   filled: true,
@@ -655,12 +1061,16 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
+                    if (isName) return 'يرجى إدخال الاسم';
                     return isEmail ? 'يرجى إدخال البريد الإلكتروني' : 'يرجى إدخال رقم الموبايل';
+                  }
+                  if (isName && value.trim().length < 3) {
+                    return 'يجب أن يتكون الاسم من 3 أحرف على الأقل';
                   }
                   if (isEmail && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
                     return 'يرجى إدخال بريد إلكتروني صحيح';
                   }
-                  if (!isEmail && value.trim().length < 10) {
+                  if (!isEmail && !isName && value.trim().length < 10) {
                     return 'يرجى إدخال رقم موبايل صحيح';
                   }
                   return null;

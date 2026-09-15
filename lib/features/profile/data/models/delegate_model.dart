@@ -163,12 +163,95 @@ class DelegateModel extends Delegate {
       updatedAt: DateTimeUtils.parseNullableDate(json['updatedAt']),
       updatedBy: json['updatedBy'],
       version: json['version'] ?? 1,
-      documents: (json['documents'] as List? ?? [])
-          .map(
-            (doc) =>
-                DelegateDocumentModel.fromJson(doc as Map<String, dynamic>),
-          )
-          .toList(),
+      documents: () {
+        final List<DelegateDocumentModel> parsedDocs =
+            (json['documents'] as List? ?? [])
+                .map(
+                  (doc) => DelegateDocumentModel.fromJson(
+                    doc as Map<String, dynamic>,
+                  ),
+                )
+                .toList();
+
+        final bool hasPersonalPhoto = parsedDocs.any(
+          (d) =>
+              d.documentKey == DocumentKey.personalPhoto &&
+              d.documentURL.isNotEmpty,
+        );
+        if (!hasPersonalPhoto) {
+          final photoUrl = json['profileImageUrl'] ??
+              json['profileImage'] ??
+              json['personalPhotoURL'] ??
+              json['personalPhotoUrl'] ??
+              json['photoURL'] ??
+              json['photoUrl'] ??
+              json['avatarUrl'];
+          if (photoUrl is String && photoUrl.trim().isNotEmpty) {
+            parsedDocs.add(
+              DelegateDocumentModel(
+                documentKey: DocumentKey.personalPhoto,
+                documentStatus: DocumentStatus.approved,
+                documentURL: photoUrl.trim(),
+                uploadedAt:
+                    DateTimeUtils.parseNullableDate(json['createdAt']) ??
+                        DateTime.now(),
+              ),
+            );
+          }
+        }
+
+        final bool hasNationalId = parsedDocs.any(
+          (d) =>
+              d.documentKey == DocumentKey.nationalityId &&
+              d.documentURL.isNotEmpty,
+        );
+        if (!hasNationalId) {
+          final frontUrl = json['nationalIdFrontUrl'] ??
+              json['nationalIdFrontURL'] ??
+              json['nationalIdUrl'];
+          final backUrl =
+              json['nationalIdBackUrl'] ?? json['nationalIdBackURL'];
+          if (frontUrl is String && frontUrl.trim().isNotEmpty) {
+            parsedDocs.add(
+              DelegateDocumentModel(
+                documentKey: DocumentKey.nationalityId,
+                documentStatus: DocumentStatus.approved,
+                documentURL: frontUrl.trim(),
+                secondaryURL: backUrl is String && backUrl.trim().isNotEmpty
+                    ? backUrl.trim()
+                    : null,
+                uploadedAt:
+                    DateTimeUtils.parseNullableDate(json['createdAt']) ??
+                        DateTime.now(),
+              ),
+            );
+          }
+        }
+
+        final bool hasReceipt = parsedDocs.any(
+          (d) =>
+              d.documentKey == DocumentKey.paymentReceipt &&
+              d.documentURL.isNotEmpty,
+        );
+        if (!hasReceipt) {
+          final receiptUrl = json['receiptImageUrl'] ?? json['receiptUrl'];
+          if (receiptUrl is String && receiptUrl.trim().isNotEmpty) {
+            parsedDocs.add(
+              DelegateDocumentModel(
+                documentKey: DocumentKey.paymentReceipt,
+                documentStatus: DocumentStatus.approved,
+                documentURL: receiptUrl.trim(),
+                receiptCode: json['receiptCode']?.toString(),
+                uploadedAt:
+                    DateTimeUtils.parseNullableDate(json['createdAt']) ??
+                        DateTime.now(),
+              ),
+            );
+          }
+        }
+
+        return parsedDocs;
+      }(),
       role: parseRole(json['role']),
       email: json['email'],
       boundDeviceId: json['boundDeviceId'],

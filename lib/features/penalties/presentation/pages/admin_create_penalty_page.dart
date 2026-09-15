@@ -572,24 +572,18 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
     _titleController.text = violation.title;
 
     if (repeated) {
+      if (violation.repeatedFine != null && violation.repeatedFine! > 0) {
+        _fineAmountController.text = violation.repeatedFine!.toStringAsFixed(0);
+      } else if (violation.defaultFine > 0) {
+        _fineAmountController.text = violation.defaultFine.toStringAsFixed(0);
+      } else {
+        _fineAmountController.text = '0';
+      }
+
       if (violation.action2 != null && violation.action2!.isNotEmpty) {
         _descriptionController.text = violation.action2!;
-        if (violation.id == 8) {
-          _fineAmountController.text = '5000';
-        } else if (violation.id == 9) {
-          _fineAmountController.text = '3000';
-        } else if (violation.id == 23 || violation.id == 24) {
-          _fineAmountController.text = '100';
-        } else {
-          _fineAmountController.text = violation.defaultFine > 0
-              ? violation.defaultFine.toStringAsFixed(0)
-              : '0';
-        }
       } else {
         _descriptionController.text = '${violation.action1} (مخالفة مكررة)';
-        _fineAmountController.text = violation.defaultFine > 0
-            ? violation.defaultFine.toStringAsFixed(0)
-            : '0';
       }
     } else {
       _fineAmountController.text = violation.defaultFine > 0

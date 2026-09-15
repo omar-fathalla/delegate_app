@@ -43,6 +43,15 @@ service firebase.storage {
       allow read, write: if isAuthenticated();
     }
 
+    // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================
+    match /delegate_documents/{fileName} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /delegate_subscription_receipts/{fileName} {
+      allow read, write: if isAuthenticated();
+    }
+
     // ==================== PUBLIC FILES ====================
     match /public/{allPaths=**} {
       allow read: if true;

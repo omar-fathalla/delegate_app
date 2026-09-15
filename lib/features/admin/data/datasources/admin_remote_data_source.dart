@@ -265,29 +265,115 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     try {
       final List<DelegateModel> delegatesList = [];
 
-      QuerySnapshot<Map<String, dynamic>> snapshot;
-      if (organizationUID.isEmpty) {
-        snapshot = await firestore.collectionGroup('delegates').limit(1000).get();
-      } else if (companyUID.isEmpty) {
-        snapshot = await firestore
-            .collectionGroup('delegates')
-            .where('organizationUID', isEqualTo: organizationUID)
-            .limit(1000)
-            .get();
-      } else {
-        snapshot = await firestore
+      if (companyUID.isNotEmpty) {
+        if (organizationUID.isNotEmpty && organizationUID != 'all') {
+          // Direct path query for the specified organization - instant and never requires collectionGroup index!
+          final orgDoc = await firestore
+              .collection('organizations')
+              .doc(organizationUID)
+              .get();
+          final orgName = orgDoc.data()?['name']?.toString() ?? '';
+          final snap = await firestore
+              .collection('organizations')
+              .doc(organizationUID)
+              .collection('companies')
+              .doc(companyUID)
+              .collection('delegates')
+              .limit(1000)
+              .get();
+          for (final doc in snap.docs) {
+            final data = Map<String, dynamic>.from(doc.data());
+            if ((data['organizationUID'] as String?)?.isEmpty ?? true) {
+              data['organizationUID'] = organizationUID;
+            }
+            if ((data['organizationName'] as String?)?.isEmpty ?? true) {
+              data['organizationName'] = orgName;
+            }
+            delegatesList.add(DelegateModel.fromJson(data, doc.id));
+          }
+        } else {
+          // Query all active organizations in parallel via direct paths (no collectionGroup index required)
+          final orgsSnap = await firestore.collection('organizations').get();
+          final futures = orgsSnap.docs.map((orgDoc) async {
+            final orgName = orgDoc.data()['name']?.toString() ?? '';
+            final snap = await firestore
+                .collection('organizations')
+                .doc(orgDoc.id)
+                .collection('companies')
+                .doc(companyUID)
+                .collection('delegates')
+                .limit(1000)
+                .get();
+            return snap.docs.map((doc) {
+              final data = Map<String, dynamic>.from(doc.data());
+              if ((data['organizationUID'] as String?)?.isEmpty ?? true) {
+                data['organizationUID'] = orgDoc.id;
+              }
+              if ((data['organizationName'] as String?)?.isEmpty ?? true) {
+                data['organizationName'] = orgName;
+              }
+              return DelegateModel.fromJson(data, doc.id);
+            }).toList();
+          });
+          final results = await Future.wait(futures);
+          final Map<String, DelegateModel> unique = {};
+          for (final list in results) {
+            for (final model in list) {
+              unique[model.uid] = model;
+            }
+          }
+          delegatesList.addAll(unique.values);
+        }
+      } else if (organizationUID.isNotEmpty && organizationUID != 'all') {
+        final compSnap = await firestore
             .collection('organizations')
             .doc(organizationUID)
             .collection('companies')
-            .doc(companyUID)
+            .get();
+        final futures = compSnap.docs.map((cDoc) => firestore
+            .collection('organizations')
+            .doc(organizationUID)
+            .collection('companies')
+            .doc(cDoc.id)
             .collection('delegates')
             .limit(1000)
-            .get();
+            .get());
+        final results = await Future.wait(futures);
+        final Map<String, DelegateModel> unique = {};
+        for (final res in results) {
+          for (final doc in res.docs) {
+            final model = DelegateModel.fromJson(doc.data(), doc.id);
+            unique[model.uid] = model;
+          }
+        }
+        delegatesList.addAll(unique.values);
+      } else {
+        final orgsSnap = await firestore.collection('organizations').get();
+        final Map<String, DelegateModel> unique = {};
+        for (final orgDoc in orgsSnap.docs) {
+          final compSnap = await firestore
+              .collection('organizations')
+              .doc(orgDoc.id)
+              .collection('companies')
+              .get();
+          final futures = compSnap.docs.map((cDoc) => firestore
+              .collection('organizations')
+              .doc(orgDoc.id)
+              .collection('companies')
+              .doc(cDoc.id)
+              .collection('delegates')
+              .limit(1000)
+              .get());
+          final results = await Future.wait(futures);
+          for (final res in results) {
+            for (final doc in res.docs) {
+              final model = DelegateModel.fromJson(doc.data(), doc.id);
+              unique[model.uid] = model;
+            }
+          }
+        }
+        delegatesList.addAll(unique.values);
       }
-
-      delegatesList.addAll(
-        snapshot.docs.map((doc) => DelegateModel.fromJson(doc.data(), doc.id)),
-      );
 
       // Fetch marketing staff from /users for Organization or General Manager assignment
       // Only fetch marketing staff if this is an organization-wide query (no specific company)

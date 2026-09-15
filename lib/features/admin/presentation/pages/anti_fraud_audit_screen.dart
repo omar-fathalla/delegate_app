@@ -17,11 +17,13 @@ import 'package:delegate_app/features/penalties/presentation/pages/admin_create_
 class AntiFraudAuditScreen extends StatefulWidget {
   final Delegate delegate;
   final bool showAppBar;
+  final String initialTab;
 
   const AntiFraudAuditScreen({
     super.key,
     required this.delegate,
     this.showAppBar = false,
+    this.initialTab = 'violations',
   });
 
   @override
@@ -35,7 +37,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   String _deviceSearchQuery = '';
   String _timeFilter = 'all'; // all, today
   String _selectedBranchFilter = 'all'; // all, or specific detected branch name
-  String _currentTab = 'violations'; // violations, devices
+  late String _currentTab; // violations, devices
   String _deviceStatusFilter = 'all'; // all, locked, unbound
   List<Map<String, dynamic>> _branchesList = [];
   Map<String, String> _companiesMap = {};
@@ -44,6 +46,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   @override
   void initState() {
     super.initState();
+    _currentTab = widget.initialTab;
     _loadBranches();
     _loadCompanies();
   }
@@ -1828,7 +1831,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
 
   Widget _buildDeviceBindingSection(ColorScheme colorScheme, bool isArabic) {
     Query query = FirebaseFirestore.instance.collectionGroup('delegates');
-    if (widget.delegate.organizationUID.isNotEmpty) {
+    if (widget.delegate.organizationUID.isNotEmpty &&
+        widget.delegate.role != UserRole.technicalSupport &&
+        widget.delegate.role != UserRole.superAdmin) {
       query = query.where('organizationUID', isEqualTo: widget.delegate.organizationUID);
     }
 

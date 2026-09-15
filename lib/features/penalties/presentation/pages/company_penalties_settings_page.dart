@@ -436,10 +436,44 @@ class _CompanyPenaltiesSettingsPageState
     );
   }
 
+  bool _isPenaltyForDelegate(PenaltyEntity p, Delegate delegate) {
+    if (p.targetDelegateId != null && p.targetDelegateId!.trim().isNotEmpty) {
+      final tid = p.targetDelegateId!.trim();
+      if (tid == delegate.uid) return true;
+      if (delegate.delegatePublicId.isNotEmpty && tid == delegate.delegatePublicId) return true;
+
+      final cleanTid = tid.replaceAll(RegExp(r'\D'), '');
+      final cleanDelPhone = delegate.phoneNumber.replaceAll(RegExp(r'\D'), '');
+      if (cleanTid.isNotEmpty && cleanDelPhone.isNotEmpty) {
+        if (cleanTid == cleanDelPhone ||
+            cleanTid.endsWith(cleanDelPhone) ||
+            cleanDelPhone.endsWith(cleanTid)) {
+          return true;
+        }
+      }
+    }
+
+    if (p.targetDelegateName != null && p.targetDelegateName!.trim().isNotEmpty) {
+      final tName = p.targetDelegateName!.trim().toLowerCase();
+      final delName = delegate.fullName.trim().toLowerCase();
+      if (tName == delName) return true;
+
+      final combined = '${delegate.firstName} ${delegate.lastName}'.trim().toLowerCase();
+      if (combined.isNotEmpty && tName == combined) return true;
+    }
+
+    return false;
+  }
+
   void _loadData() {
     if (widget.delegate.role == UserRole.marketingPromotion) return;
+    if (widget.delegate.role == UserRole.delegate) {
+      context.read<PenaltyBloc>().add(LoadDelegatePenaltiesEvent(widget.delegate));
+      return;
+    }
     final canViewAll = widget.delegate.role == UserRole.organizationAdmin ||
         widget.delegate.role == UserRole.superAdmin ||
+        widget.delegate.role == UserRole.technicalSupport ||
         widget.delegate.role == UserRole.branchesMarketingManager ||
         widget.delegate.role == UserRole.marketing;
     if (canViewAll) {
@@ -474,18 +508,23 @@ class _CompanyPenaltiesSettingsPageState
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDelegate = widget.delegate.role == UserRole.delegate;
     final canCreatePenalty = widget.delegate.role == UserRole.organizationAdmin ||
         widget.delegate.role == UserRole.superAdmin ||
+        widget.delegate.role == UserRole.technicalSupport ||
         widget.delegate.role == UserRole.marketing;
     final isOrgAdmin = widget.delegate.role == UserRole.organizationAdmin ||
-        widget.delegate.role == UserRole.superAdmin;
+        widget.delegate.role == UserRole.superAdmin ||
+        widget.delegate.role == UserRole.technicalSupport;
 
     return Scaffold(
       appBar: widget.showAppBar
           ? AppBar(
-              title: const Text(
-                'سجل المخالفات والغرامات',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              title: Text(
+                isDelegate
+                    ? 'سجل مخالفاتي وغراماتي'
+                    : 'سجل المخالفات والغرامات',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               leading: Navigator.canPop(context)
                   ? IconButton(
@@ -561,6 +600,13 @@ class _CompanyPenaltiesSettingsPageState
           if (state is PenaltyLoadedState) {
             var penalties = state.penalties;
 
+            // Strict personal isolation for delegate role
+            if (isDelegate) {
+              penalties = penalties
+                  .where((p) => _isPenaltyForDelegate(p, widget.delegate))
+                  .toList();
+            }
+
             // Multi-Branch Filter
             if (_selectedBranchIds.isNotEmpty && !_selectedBranchIds.contains('all')) {
               penalties = penalties.where((p) =>
@@ -619,8 +665,9 @@ class _CompanyPenaltiesSettingsPageState
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  // 0. Multi-Branch Selector & Pin Bar
-                  SliverToBoxAdapter(
+                  // 0. Multi-Branch Selector & Pin Bar (Reserved for Supervisors & Admins)
+                  if (!isDelegate)
+                    SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                       child: Container(
@@ -847,18 +894,28 @@ class _CompanyPenaltiesSettingsPageState
                           Row(
                             children: [
                               Icon(
-                                Icons.warning_amber_rounded,
-                                color: colorScheme.error,
+                                isDelegate
+                                    ? (filteredTotalFines > 0
+                                        ? Icons.warning_amber_rounded
+                                        : Icons.verified_user_rounded)
+                                    : Icons.warning_amber_rounded,
+                                color: isDelegate
+                                    ? (filteredTotalFines > 0
+                                        ? colorScheme.error
+                                        : Colors.teal.shade700)
+                                    : colorScheme.error,
                                 size: 28,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  _selectedBranchIds.isNotEmpty
-                                      ? 'ملخص الغرامات ($branchLabel)'
-                                      : (isOrgAdmin
-                                          ? 'ملخص غرامات ومخالفات الشركات'
-                                          : 'ملخص الغرامات والمخالفات'),
+                                  isDelegate
+                                      ? 'ملخص مخالفاتي وغراماتي الشخصية'
+                                      : (_selectedBranchIds.isNotEmpty
+                                          ? 'ملخص الغرامات ($branchLabel)'
+                                          : (isOrgAdmin
+                                              ? 'ملخص غرامات ومخالفات الشركات'
+                                              : 'ملخص الغرامات والمخالفات')),
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.onErrorContainer,
@@ -877,7 +934,7 @@ class _CompanyPenaltiesSettingsPageState
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'إجمالي الغرامات',
+                                      isDelegate ? 'إجمالي غراماتي' : 'إجمالي الغرامات',
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                       ),
@@ -887,7 +944,9 @@ class _CompanyPenaltiesSettingsPageState
                                       filteredTotalFines.toStringAsFixed(2),
                                       style: theme.textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
-                                        color: colorScheme.error,
+                                        color: filteredTotalFines > 0
+                                            ? colorScheme.error
+                                            : Colors.teal.shade700,
                                       ),
                                     ),
                                   ],
@@ -904,7 +963,7 @@ class _CompanyPenaltiesSettingsPageState
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'المخصوم',
+                                      isDelegate ? 'المخصوم مني' : 'المخصوم',
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                       ),
@@ -920,7 +979,35 @@ class _CompanyPenaltiesSettingsPageState
                                   ],
                                 ),
                               ),
-                              if (isOrgAdmin) ...[
+                              if (isDelegate) ...[
+                                Container(
+                                  width: 1,
+                                  height: 40,
+                                  color: colorScheme.outlineVariant,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'عدد المخالفات',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${penalties.length}',
+                                        style: theme.textTheme.titleLarge?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: colorScheme.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ] else if (isOrgAdmin) ...[
                                 Container(
                                   width: 1,
                                   height: 40,
@@ -1046,28 +1133,73 @@ class _CompanyPenaltiesSettingsPageState
                     ),
                   ),
 
-                // 3. Company Breakdown Cards or Empty State
+                // 3. Company Breakdown Cards, Direct Delegate List, or Empty State
                 if (penalties.isEmpty)
                   SliverFillRemaining(
+                    hasScrollBody: false,
                     child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.verified_user_outlined,
-                            size: 64,
-                            color: colorScheme.primary.withValues(alpha: 0.6),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            isOrgAdmin
-                                ? 'لا توجد مخالفات مسجلة على أية شركة بعد'
-                                : 'لا توجد مخالفات مسجلة على هذه الشركة',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: (isDelegate ? Colors.teal : colorScheme.primary)
+                                    .withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                isDelegate
+                                    ? Icons.verified_user_rounded
+                                    : Icons.verified_user_outlined,
+                                size: 56,
+                                color: isDelegate
+                                    ? Colors.teal.shade700
+                                    : colorScheme.primary,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 16),
+                            Text(
+                              isDelegate
+                                  ? 'سجلك نظيف ومتميز! 👏'
+                                  : (isOrgAdmin
+                                      ? 'لا توجد مخالفات مسجلة على أية شركة بعد'
+                                      : 'لا توجد مخالفات مسجلة على هذه الشركة'),
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            if (isDelegate) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'لا توجد أي مخالفات أو غرامات مسجلة بحقك حتى الآن.',
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else if (isDelegate)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          return _PenaltyCard(
+                            penalty: penalties[index],
+                            currentDelegate: widget.delegate,
+                          );
+                        },
+                        childCount: penalties.length,
                       ),
                     ),
                   )
@@ -1122,7 +1254,8 @@ class _PenaltyCardState extends State<_PenaltyCard> {
     final requiresAction = (widget.currentDelegate?.role == UserRole.branchesMarketingManager &&
             widget.penalty.status == PenaltyStatus.pendingBranchesMarketing) ||
         ((widget.currentDelegate?.role == UserRole.organizationAdmin ||
-                widget.currentDelegate?.role == UserRole.superAdmin) &&
+                widget.currentDelegate?.role == UserRole.superAdmin ||
+                widget.currentDelegate?.role == UserRole.technicalSupport) &&
             widget.penalty.status == PenaltyStatus.pendingGeneralManager);
     _isExpanded = requiresAction;
   }
@@ -1742,11 +1875,9 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                     : Icons.arrow_forward_rounded,
                                 size: 18,
                               ),
-                              label: Text(
-                                widget.penalty.fineAmount <= 1000.0
-                                    ? 'اعتماد وإصدار فوري (≤ 1000 ج.م)'
-                                    : 'موافقة وتمرير للمدير العام (> 1000 ج.م)',
-                                style: const TextStyle(
+                              label: const Text(
+                                'اعتماد',
+                                style: TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 13),
                               ),
                             ),
@@ -1769,7 +1900,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                               ),
                               icon: const Icon(Icons.cancel_rounded, size: 18),
                               label: const Text(
-                                'رفض المخالفة',
+                                'رفض',
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 13),
                               ),
@@ -1782,7 +1913,8 @@ class _PenaltyCardState extends State<_PenaltyCard> {
 
                   // Phase 2: General Manager / Super Admin Approval
                   if ((widget.currentDelegate!.role == UserRole.organizationAdmin ||
-                          widget.currentDelegate!.role == UserRole.superAdmin) &&
+                          widget.currentDelegate!.role == UserRole.superAdmin ||
+                          widget.currentDelegate!.role == UserRole.technicalSupport) &&
                       (widget.penalty.status == PenaltyStatus.pendingGeneralManager ||
                           widget.penalty.status == PenaltyStatus.pendingBranchesMarketing)) ...[
                     Container(
@@ -1819,7 +1951,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                               },
                               icon: const Icon(Icons.verified_rounded, size: 18),
                               label: const Text(
-                                'اعتماد وإصدار',
+                                'اعتماد',
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 13),
                               ),
@@ -1843,7 +1975,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                               ),
                               icon: const Icon(Icons.cancel_rounded, size: 18),
                               label: const Text(
-                                'رفض المخالفة',
+                                'رفض',
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 13),
                               ),
@@ -1895,7 +2027,8 @@ class _CompanyPenaltiesGroupCardState
         return p.status == PenaltyStatus.pendingBranchesMarketing;
       }
       if (widget.currentDelegate?.role == UserRole.organizationAdmin ||
-          widget.currentDelegate?.role == UserRole.superAdmin) {
+          widget.currentDelegate?.role == UserRole.superAdmin ||
+          widget.currentDelegate?.role == UserRole.technicalSupport) {
         return p.status == PenaltyStatus.pendingGeneralManager ||
             p.status == PenaltyStatus.pendingBranchesMarketing;
       }

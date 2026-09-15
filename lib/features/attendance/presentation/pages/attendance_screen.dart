@@ -35,6 +35,7 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen>
     with AutomaticKeepAliveClientMixin {
   late DateTime _selectedMonth;
+  late final AttendanceBloc _attendanceBloc;
 
   // --- Performance: Cache connectivity state instead of StreamBuilder ---
   bool _isOffline = false;
@@ -53,6 +54,22 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   @override
   void initState() {
     super.initState();
+    _attendanceBloc = sl<AttendanceBloc>();
+    _attendanceBloc.add(
+      HistoryRequested(
+        userId: widget.delegate.uid,
+        organizationId: widget.delegate.organizationUID,
+        nationalityID: widget.delegate.nationalityID,
+        phoneNumber: widget.delegate.phoneNumber,
+      ),
+    );
+    // Delay sync request to allow history to load first
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!_attendanceBloc.isClosed) {
+        _attendanceBloc.add(const SyncRequested());
+      }
+    }).ignore();
+
     try {
       _selectedMonth = sl.isRegistered<TrustedTimeService>()
           ? sl<TrustedTimeService>().now
@@ -72,16 +89,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     _scrollController.addListener(_onScroll);
   }
 
-
-
   void _onScroll() {
     if (_isBottom) {
-      final bloc = context.read<AttendanceBloc>();
-      final state = bloc.state;
+      final state = _attendanceBloc.state;
       if (state is AttendanceHistoryLoaded &&
           !state.isLoadingMore &&
           !state.hasReachedMax) {
-        bloc.add(
+        _attendanceBloc.add(
           LoadMoreHistoryRequested(
             userId: widget.delegate.uid,
             organizationId: widget.delegate.organizationUID,
@@ -96,6 +110,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   bool get _isBottom {
     if (!_scrollController.hasClients) return false;
     final maxScroll = _scrollController.position.maxScrollExtent;
+    if (maxScroll <= 0) return false;
     final currentScroll = _scrollController.offset;
     return currentScroll >= (maxScroll * 0.9);
   }
@@ -104,6 +119,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   void dispose() {
     _connectivitySub.cancel();
     _scrollController.dispose();
+    _attendanceBloc.close();
     super.dispose();
   }
 
@@ -117,6 +133,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _groupedByDay.clear();
         _dayKeys.clear();
       });
+      _attendanceBloc.add(
+        HistoryRequested(
+          userId: widget.delegate.uid,
+          organizationId: widget.delegate.organizationUID,
+          nationalityID: widget.delegate.nationalityID,
+          phoneNumber: widget.delegate.phoneNumber,
+        ),
+      );
     }
   }
 
@@ -141,26 +165,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     final l10n = AppLocalizations.of(context)!;
-    return BlocProvider(
-      key: ValueKey(widget.delegate.organizationUID),
-      create: (context) {
-        final bloc = sl<AttendanceBloc>();
-        bloc.add(
-          HistoryRequested(
-            userId: widget.delegate.uid,
-            organizationId: widget.delegate.organizationUID,
-            nationalityID: widget.delegate.nationalityID,
-            phoneNumber: widget.delegate.phoneNumber,
-          ),
-        );
-        // Delay sync request to allow history to load first
-        Future.delayed(const Duration(seconds: 2), () {
-          if (!bloc.isClosed) {
-            bloc.add(const SyncRequested());
-          }
-        }).ignore();
-        return bloc;
-      },
+    return BlocProvider.value(
+      value: _attendanceBloc,
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
@@ -432,18 +438,43 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   Widget _buildMonthlyStatsBanner(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final totalDays = _dayKeys.length;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final totalDaysInMonth = DateUtils.getDaysInMonth(
+      _selectedMonth.year,
+      _selectedMonth.month,
+    );
+    final trustedNow = _getTrustedNow();
+    final isCurrentMonth = _selectedMonth.year == trustedNow.year &&
+        _selectedMonth.month == trustedNow.month;
+    final isPastMonth = _selectedMonth.isBefore(
+      DateTime(trustedNow.year, trustedNow.month, 1),
+    );
+    final isFutureMonth = _selectedMonth.isAfter(
+      DateTime(trustedNow.year, trustedNow.month, 1),
+    );
 
-    int totalMinutes = 0;
-    for (final item in _filteredHistory) {
-      if (item.checkOutTime != null) {
-        totalMinutes +=
-            item.checkOutTime!.difference(item.checkInTime).inMinutes;
+    final attendedDays = _dayKeys.length;
+    int absentDays = 0;
+
+    if (isPastMonth) {
+      // For a completed past month, 26 work days standard (4 off days excluded)
+      absentDays = (26 - attendedDays).clamp(0, 26);
+    } else if (isCurrentMonth) {
+      final currentDay = trustedNow.day;
+      int activeDays = currentDay;
+      if (widget.delegate.createdAt.year == _selectedMonth.year &&
+          widget.delegate.createdAt.month == _selectedMonth.month &&
+          widget.delegate.createdAt.day > 1) {
+        activeDays = (currentDay - widget.delegate.createdAt.day + 1)
+            .clamp(1, totalDaysInMonth);
       }
+      // 4 off days per month (~1 off day every 7 days)
+      final offDaysSoFar = (activeDays / 7).floor().clamp(0, 4);
+      final elapsedWorkDays = (activeDays - offDaysSoFar).clamp(0, 26);
+      absentDays = (elapsedWorkDays - attendedDays).clamp(0, 26);
+    } else if (isFutureMonth) {
+      absentDays = 0;
     }
-    final hours = totalMinutes ~/ 60;
-    final mins = totalMinutes % 60;
-    final totalHoursStr = '$hours س ${mins > 0 ? '$mins د' : ''}';
 
     return Container(
       margin: const EdgeInsets.only(top: 12, bottom: 4),
@@ -455,83 +486,120 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           color: colorScheme.outlineVariant.withValues(alpha: 0.5),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.calendar_month_rounded,
-                  size: 18,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              // 1. أيام الحضور
+              Row(
                 children: [
-                  Text(
-                    'أيام الحضور',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: colorScheme.onSurfaceVariant,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.calendar_month_rounded,
+                      size: 18,
+                      color: colorScheme.primary,
                     ),
                   ),
-                  Text(
-                    '$totalDays يوم',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isArabic ? 'أيام الحضور' : 'Attendance Days',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        isArabic ? '$attendedDays يوم' : '$attendedDays days',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(width: 1, height: 28, color: colorScheme.outlineVariant),
+              // 2. أيام الغياب
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.errorContainer,
+                      shape: BoxShape.circle,
                     ),
+                    child: Icon(
+                      Icons.event_busy_rounded,
+                      size: 18,
+                      color: colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isArabic ? 'أيام الغياب' : 'Absence Days',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        isArabic ? '$absentDays يوم' : '$absentDays days',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: absentDays > 0
+                              ? colorScheme.error
+                              : colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
-          Container(width: 1, height: 28, color: colorScheme.outlineVariant),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colorScheme.tertiaryContainer,
-                  shape: BoxShape.circle,
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 13,
+                  color: colorScheme.onSurfaceVariant,
                 ),
-                child: Icon(
-                  Icons.access_time_filled_rounded,
-                  size: 18,
-                  color: colorScheme.onTertiaryContainer,
+                const SizedBox(width: 5),
+                Text(
+                  isArabic
+                      ? 'نظام 26 يوم عمل شهرياً • 4 أيام إجازة مستبعدة من الغياب'
+                      : '26 work days/month • 4 off days excluded from absence',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'إجمالي الساعات',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    totalHoursStr,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -597,10 +665,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () {
-                context.read<AttendanceBloc>().add(
+                _attendanceBloc.add(
                   HistoryRequested(
                     userId: widget.delegate.uid,
                     organizationId: widget.delegate.organizationUID,
+                    nationalityID: widget.delegate.nationalityID,
+                    phoneNumber: widget.delegate.phoneNumber,
                   ),
                 );
               },
@@ -679,8 +749,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
       return RefreshIndicator(
         onRefresh: () async {
-          context.read<AttendanceBloc>().add(const SyncRequested());
-          context.read<AttendanceBloc>().add(
+          _attendanceBloc.add(const SyncRequested());
+          _attendanceBloc.add(
             HistoryRequested(
               userId: widget.delegate.uid,
               organizationId: widget.delegate.organizationUID,
@@ -929,7 +999,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     Attendance? activeAttendance,
   ) {
     final l10n = AppLocalizations.of(context)!;
-    final attendanceBloc = BlocProvider.of<AttendanceBloc>(context);
+    final attendanceBloc = _attendanceBloc;
     final parentContext = context;
     final action = isCheckedIn ? l10n.checkOut : l10n.checkIn;
 

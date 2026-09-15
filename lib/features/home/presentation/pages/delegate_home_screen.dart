@@ -4,11 +4,22 @@ import 'package:delegate_app/features/photo_permission/presentation/widgets/sync
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart' hide TextDirection;
+import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
+import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
+import 'package:delegate_app/core/services/trusted_time_service.dart';
 
 class DelegateHomeScreen extends StatefulWidget {
   final Delegate delegate;
+  final VoidCallback? onNavigateToAttendance;
 
-  const DelegateHomeScreen({super.key, required this.delegate});
+  const DelegateHomeScreen({
+    super.key,
+    required this.delegate,
+    this.onNavigateToAttendance,
+  });
 
   @override
   State<DelegateHomeScreen> createState() => _DelegateHomeScreenState();
@@ -23,6 +34,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   bool _loadingSupervisor = false;
   String? _supervisorError;
 
+  int _attendedDays = 0;
+  int _absentDays = 0;
+  int _offDaysSoFar = 0;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -34,6 +49,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       _supervisorsData = List.from(_supervisorsCache[cacheKey]!);
     }
     _fetchSupervisors();
+    _loadAttendanceData();
   }
 
   Future<void> _fetchSupervisors({bool forceRefresh = false}) async {
@@ -54,74 +70,197 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     try {
       final List<Map<String, dynamic>> fetchedSupervisors = [];
+      String companyPhone = '';
+      String companyEmail = '';
+      String companySupervisorName = '';
+      String companyName = widget.delegate.companyName;
 
-      // 1. First attempt: Get supervisor info directly from the company document
-      final compDoc = await FirebaseFirestore.instance
-          .collection('organizations')
-          .doc(orgId)
-          .collection('companies')
-          .doc(compId)
-          .get();
+      // 1. First attempt: Get company info & contact phone
+      try {
+        final compDoc = await FirebaseFirestore.instance
+            .collection('organizations')
+            .doc(orgId)
+            .collection('companies')
+            .doc(compId)
+            .get();
 
-      if (compDoc.exists) {
-        final compData = compDoc.data();
-        if (compData != null) {
-          final companyPhone =
-              compData['phone'] as String? ??
-              compData['phoneNumber'] as String? ??
-              '';
-          final companyEmail =
-              compData['email'] as String? ??
-              compData['emailAddress'] as String? ??
-              '';
-          final companySupervisorName =
-              compData['supervisorName'] as String? ??
-              compData['contactName'] as String? ??
-              compData['adminName'] as String? ??
-              compData['managerName'] as String? ??
-              compData['displayName'] as String? ??
-              '';
+        if (compDoc.exists) {
+          final compData = compDoc.data();
+          if (compData != null) {
+            companyPhone =
+                (compData['phone'] as String?)?.trim() ??
+                (compData['phoneNumber'] as String?)?.trim() ??
+                '';
+            companyEmail =
+                (compData['email'] as String?)?.trim() ??
+                (compData['emailAddress'] as String?)?.trim() ??
+                '';
+            final cName =
+                (compData['name'] as String?)?.trim() ??
+                (compData['displayName'] as String?)?.trim() ??
+                '';
+            if (cName.isNotEmpty) {
+              companyName = cName;
+            }
 
-          if (companyPhone.isNotEmpty ||
-              companyEmail.isNotEmpty ||
-              companySupervisorName.isNotEmpty) {
-            fetchedSupervisors.add({
-              'displayName':
-                  companySupervisorName.isNotEmpty
-                      ? companySupervisorName
-                      : 'مشرف الشركة',
-              'phoneNumber': companyPhone,
-              'email': companyEmail,
-              'isCompanyDoc': true,
-            });
-          }
-        }
-      }
+            // Look for explicit person supervisor name (must not be company name)
+            final rawSupervisor =
+                (compData['supervisorName'] as String?)?.trim() ??
+                (compData['supervisor_name'] as String?)?.trim() ??
+                (compData['contactName'] as String?)?.trim() ??
+                (compData['contact_name'] as String?)?.trim() ??
+                (compData['adminName'] as String?)?.trim() ??
+                (compData['managerName'] as String?)?.trim() ??
+                '';
 
-      // 2. Query the users collection for all company admins
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('organizationUID', isEqualTo: orgId)
-          .where('companyUID', isEqualTo: compId)
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        for (final doc in snapshot.docs) {
-          final role = doc.data()['role'] as String? ?? '';
-          if (role == 'company-admin' || role == 'Supervisor') {
-            final adminData = doc.data();
-
-            // Avoid adding duplicates
-            final phone = adminData['phoneNumber'] as String? ?? '';
-            final exists = fetchedSupervisors.any(
-              (s) => (s['phoneNumber'] as String? ?? '') == phone,
-            );
-
-            if (!exists) {
-              fetchedSupervisors.add(adminData);
+            if (rawSupervisor.isNotEmpty &&
+                rawSupervisor.toLowerCase() != companyName.toLowerCase()) {
+              companySupervisorName = rawSupervisor;
             }
           }
         }
+      } catch (_) {}
+
+      // 2. Query the users collection for company admins/supervisors
+      try {
+        final userRoles = [
+          'company-admin',
+          'company_admin',
+          'supervisor',
+          'company_supervisor',
+          'company-supervisor',
+          'admin',
+        ];
+
+        final snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .where('organizationUID', isEqualTo: orgId)
+            .where('companyUID', isEqualTo: compId)
+            .get();
+
+        if (snapshot.docs.isNotEmpty) {
+          for (final doc in snapshot.docs) {
+            final adminData = doc.data();
+            final role = (adminData['role'] as String?)?.trim().toLowerCase() ?? '';
+            if (userRoles.any((r) => r.toLowerCase() == role)) {
+              final phone = (adminData['phoneNumber'] as String?)?.trim() ?? '';
+              final name = _extractPersonName(adminData, companyName);
+
+              final exists = fetchedSupervisors.any(
+                (s) =>
+                    (s['phoneNumber'] as String? ?? '') == phone &&
+                    phone.isNotEmpty,
+              );
+
+              if (!exists) {
+                fetchedSupervisors.add({
+                  ...adminData,
+                  'displayName':
+                      name.isNotEmpty ? name : companySupervisorName,
+                  'phoneNumber': phone.isNotEmpty ? phone : companyPhone,
+                  'email':
+                      (adminData['email'] as String?)?.trim() ?? companyEmail,
+                  'companyName': companyName,
+                });
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 3. Query delegates subcollection for supervisors
+      if (fetchedSupervisors.isEmpty ||
+          fetchedSupervisors.every(
+            (s) => (s['displayName'] as String? ?? '').isEmpty,
+          )) {
+        try {
+          final delSnapshot = await FirebaseFirestore.instance
+              .collection('organizations')
+              .doc(orgId)
+              .collection('companies')
+              .doc(compId)
+              .collection('delegates')
+              .where('position', whereIn: ['supervisor', 'Supervisor', 'مشرف'])
+              .get();
+
+          for (final doc in delSnapshot.docs) {
+            final delData = doc.data();
+            final phone = (delData['phoneNumber'] as String?)?.trim() ?? '';
+            final name = _extractPersonName(delData, companyName);
+
+            final exists = fetchedSupervisors.any(
+              (s) =>
+                  (s['phoneNumber'] as String? ?? '') == phone &&
+                  phone.isNotEmpty,
+            );
+
+            if (!exists) {
+              fetchedSupervisors.add({
+                ...delData,
+                'displayName':
+                    name.isNotEmpty ? name : companySupervisorName,
+                'phoneNumber': phone.isNotEmpty ? phone : companyPhone,
+                'email': (delData['email'] as String?)?.trim() ?? companyEmail,
+                'companyName': companyName,
+              });
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 4. If companyPhone exists, also try lookup in users collection by phoneNumber
+      if (companyPhone.isNotEmpty &&
+          (fetchedSupervisors.isEmpty ||
+              fetchedSupervisors.every(
+                (s) => (s['displayName'] as String? ?? '').isEmpty,
+              ))) {
+        try {
+          final cleanPhone = companyPhone.replaceAll(RegExp(r'[^\d+]'), '');
+          var phoneSnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .where('phoneNumber', isEqualTo: cleanPhone)
+              .get();
+
+          if (phoneSnapshot.docs.isEmpty && cleanPhone.startsWith('0')) {
+            final altPhone = cleanPhone.substring(1);
+            phoneSnapshot = await FirebaseFirestore.instance
+                .collection('users')
+                .where('phoneNumber', isEqualTo: altPhone)
+                .get();
+          }
+
+          if (phoneSnapshot.docs.isNotEmpty) {
+            final uData = phoneSnapshot.docs.first.data();
+            final name = _extractPersonName(uData, companyName);
+            if (name.isNotEmpty) {
+              fetchedSupervisors.removeWhere(
+                (s) => (s['phoneNumber'] as String? ?? '') == companyPhone,
+              );
+              fetchedSupervisors.insert(0, {
+                ...uData,
+                'displayName': name,
+                'phoneNumber': companyPhone,
+                'email': (uData['email'] as String?)?.trim() ?? companyEmail,
+                'companyName': companyName,
+              });
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 5. Fallback from company document
+      if (fetchedSupervisors.isEmpty &&
+          (companyPhone.isNotEmpty || companySupervisorName.isNotEmpty)) {
+        fetchedSupervisors.add({
+          'displayName':
+              companySupervisorName.isNotEmpty
+                  ? companySupervisorName
+                  : 'مشرف الشركة',
+          'phoneNumber': companyPhone,
+          'email': companyEmail,
+          'companyName': companyName,
+          'isCompanyDoc': true,
+        });
       }
 
       _supervisorsCache[cacheKey] = fetchedSupervisors;
@@ -141,6 +280,39 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         });
       }
     }
+  }
+
+  String _extractPersonName(Map<String, dynamic> data, [String companyName = '']) {
+    final fullName = (data['fullName'] as String?)?.trim();
+    if (fullName != null && fullName.isNotEmpty) {
+      return fullName;
+    }
+
+    final displayName = (data['displayName'] as String?)?.trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+
+    final name = (data['name'] as String?)?.trim();
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+
+    final first = (data['firstName'] as String?)?.trim() ?? '';
+    final last = (data['lastName'] as String?)?.trim() ?? '';
+    final combined = '$first $last'.trim();
+    if (combined.isNotEmpty) {
+      return combined;
+    }
+
+    final userName = (data['userName'] as String?)?.trim() ??
+        (data['username'] as String?)?.trim() ??
+        '';
+    if (userName.isNotEmpty) {
+      return userName;
+    }
+
+    return '';
   }
 
   Future<void> _callNumber(String phone) async {
@@ -172,7 +344,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         onRefresh: () async {
-          await _fetchSupervisors(forceRefresh: true);
+          await Future.wait([
+            _fetchSupervisors(forceRefresh: true),
+            _loadAttendanceData(forceRefresh: true),
+          ]);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -182,6 +357,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             children: [
               const SyncStatusBanner(),
               _buildWelcomeHeroCard(context),
+              const SizedBox(height: 16),
+              _buildMonthlyAttendanceSummaryCard(context),
               const SizedBox(height: 16),
               ..._buildSupervisorsList(context),
               const SizedBox(height: 12),
@@ -433,8 +610,24 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     Map<String, dynamic> supervisorData,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
-    final name = supervisorData['displayName'] as String? ?? 'مشرف الشركة';
-    final phone = supervisorData['phoneNumber'] as String? ?? '';
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final rawName = (supervisorData['displayName'] as String?)?.trim() ??
+        (supervisorData['fullName'] as String?)?.trim() ??
+        (supervisorData['name'] as String?)?.trim() ??
+        '';
+    final companyName =
+        supervisorData['companyName'] as String? ?? widget.delegate.companyName;
+    final phone = (supervisorData['phoneNumber'] as String?)?.trim() ?? '';
+
+    final displayName = rawName.isNotEmpty
+        ? rawName
+        : (isArabic ? 'مشرف الشركة' : 'Company Supervisor');
+
+    final subtitleText = companyName.isNotEmpty
+        ? (isArabic
+            ? 'مشرف شركة $companyName'
+            : 'Supervisor - $companyName')
+        : (isArabic ? 'مشرف الشركة المنتدبة' : 'Assigned Company Supervisor');
 
     return Card(
       elevation: 0,
@@ -459,20 +652,20 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'مشرف الشركة (الشركة المنتدبة)',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    name,
+                    displayName,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitleText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   if (phone.isNotEmpty) ...[
@@ -651,6 +844,306 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // --- Monthly Attendance Summary Logic & UI ---
+
+  DateTime _getTrustedNow() {
+    try {
+      if (sl.isRegistered<TrustedTimeService>()) {
+        return sl<TrustedTimeService>().now;
+      }
+    } catch (_) {}
+    return DateTime.now();
+  }
+
+  Future<void> _loadAttendanceData({bool forceRefresh = false}) async {
+    // 1. Cache-first: read immediately from local persistent cache (0 ms)
+    try {
+      if (sl.isRegistered<AttendanceLocalDataSource>()) {
+        final localDataSource = sl<AttendanceLocalDataSource>();
+        final cached = await localDataSource.getLastAttendanceHistory();
+        if (cached.isNotEmpty) {
+          _computeStats(cached);
+        }
+      }
+    } catch (_) {}
+
+    // 2. Remote fetch in background
+    try {
+      if (sl.isRegistered<GetHistory>()) {
+        final getHistory = sl<GetHistory>();
+        final result = await getHistory(
+          GetHistoryParams(
+            userId: widget.delegate.uid,
+            organizationId: widget.delegate.organizationUID,
+          ),
+        );
+        result.fold(
+          (_) {},
+          (history) {
+            _computeStats(history);
+          },
+        );
+      }
+    } catch (_) {}
+  }
+
+  void _computeStats(List<Attendance> history) {
+    final trustedNow = _getTrustedNow();
+    final currentMonth = trustedNow.month;
+    final currentYear = trustedNow.year;
+    final currentDay = trustedNow.day;
+    final totalDaysInMonth = DateUtils.getDaysInMonth(currentYear, currentMonth);
+
+    // Filter unique days attended in current month
+    final daySet = <String>{};
+    for (final item in history) {
+      if (item.checkInTime.month == currentMonth &&
+          item.checkInTime.year == currentYear &&
+          item.userId == widget.delegate.uid) {
+        final dayKey =
+            '${item.checkInTime.year}-${item.checkInTime.month}-${item.checkInTime.day}';
+        daySet.add(dayKey);
+      }
+    }
+    final attended = daySet.length;
+
+    // Active days for new delegates (if joined this month)
+    int activeDays = currentDay;
+    if (widget.delegate.createdAt.year == currentYear &&
+        widget.delegate.createdAt.month == currentMonth &&
+        widget.delegate.createdAt.day > 1) {
+      activeDays = (currentDay - widget.delegate.createdAt.day + 1)
+          .clamp(1, totalDaysInMonth);
+    }
+
+    // 4 off days per month (~1 every 7 days)
+    final offSoFar = (activeDays / 7).floor().clamp(0, 4);
+    final elapsedWorkDays = (activeDays - offSoFar).clamp(0, 26);
+    final absent = (elapsedWorkDays - attended).clamp(0, 26);
+
+    if (mounted) {
+      setState(() {
+        _attendedDays = attended;
+        _absentDays = absent;
+        _offDaysSoFar = offSoFar;
+      });
+    }
+  }
+
+  Widget _buildMonthlyAttendanceSummaryCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final trustedNow = _getTrustedNow();
+    final monthName =
+        DateFormat('MMMM yyyy', isArabic ? 'ar' : 'en').format(trustedNow);
+
+    return InkWell(
+      onTap: widget.onNavigateToAttendance,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header Row: Title & Link to Attendance Tab
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.insights_rounded,
+                      size: 20,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isArabic
+                          ? 'ملخص الحضور والغياب ($monthName)'
+                          : 'Attendance Summary ($monthName)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                if (widget.onNavigateToAttendance != null)
+                  Row(
+                    children: [
+                      Text(
+                        isArabic ? 'التفاصيل' : 'Details',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Icon(
+                        isArabic
+                            ? Icons.chevron_left_rounded
+                            : Icons.chevron_right_rounded,
+                        size: 20,
+                        color: colorScheme.primary,
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // 3 Stat Badges: Attendance, Absence, Off Days
+            Row(
+              children: [
+                // 1. أيام الحضور
+                Expanded(
+                  child: _buildAttendanceStatPill(
+                    context,
+                    title: isArabic ? 'أيام الحضور' : 'Attended',
+                    value: isArabic ? '$_attendedDays يوم' : '$_attendedDays d',
+                    icon: Icons.check_circle_rounded,
+                    containerColor: colorScheme.primaryContainer,
+                    iconColor: colorScheme.primary,
+                    textColor: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 2. أيام الغياب
+                Expanded(
+                  child: _buildAttendanceStatPill(
+                    context,
+                    title: isArabic ? 'أيام الغياب' : 'Absent',
+                    value: isArabic ? '$_absentDays يوم' : '$_absentDays d',
+                    icon: Icons.cancel_rounded,
+                    containerColor: colorScheme.errorContainer,
+                    iconColor: colorScheme.onErrorContainer,
+                    textColor: _absentDays > 0
+                        ? colorScheme.error
+                        : colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 3. أيام الإجازة
+                Expanded(
+                  child: _buildAttendanceStatPill(
+                    context,
+                    title: isArabic ? 'أيام الإجازة' : 'Days Off',
+                    value: isArabic ? '$_offDaysSoFar من 4 أيام' : '$_offDaysSoFar of 4 days',
+                    icon: Icons.weekend_rounded,
+                    containerColor: colorScheme.tertiaryContainer,
+                    iconColor: colorScheme.onTertiaryContainer,
+                    textColor: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // Clarification Note
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 13,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      isArabic
+                          ? 'نظام 26 يوم عمل شهرياً • 4 أيام إجازة مستبعدة من الغياب'
+                          : '26 work days/month • 4 off days excluded from absence',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendanceStatPill(
+    BuildContext context, {
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color containerColor,
+    required Color iconColor,
+    required Color textColor,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: containerColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 16, color: iconColor),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

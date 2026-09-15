@@ -20,7 +20,9 @@ import 'package:delegate_app/features/admin/domain/usecases/get_marketing_employ
 import 'package:delegate_app/features/admin/domain/usecases/search_companies_by_code.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_companies.dart';
 import 'package:delegate_app/features/admin/domain/repositories/company_repository.dart';
+import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/admin/data/repositories/company_repository_impl.dart';
+import 'package:delegate_app/features/admin/data/repositories/delegate_subscription_repository_impl.dart';
 import 'package:delegate_app/features/admin/data/datasources/company_remote_datasource.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_bloc.dart';
@@ -84,6 +86,7 @@ import 'package:delegate_app/features/penalties/domain/repositories/penalty_repo
 import 'package:delegate_app/features/penalties/domain/usecases/create_penalty_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/get_all_penalties_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/get_company_penalties_usecase.dart';
+import 'package:delegate_app/features/penalties/domain/usecases/get_delegate_penalties_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/update_penalty_status_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/update_penalty_usecase.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
@@ -321,6 +324,11 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
     () => CompanyRepositoryImpl(remoteDataSource: sl()),
   );
 
+  // Delegate Subscription Repository
+  sl.registerLazySingleton<DelegateSubscriptionRepository>(
+    () => DelegateSubscriptionRepositoryImpl(),
+  );
+
   // Data source
   sl.registerLazySingleton<AdminRemoteDataSource>(
     () => AdminRemoteDataSourceImpl(firestore: sl()),
@@ -488,6 +496,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       createPenaltyUseCase: sl(),
       getCompanyPenaltiesUseCase: sl(),
       getAllPenaltiesUseCase: sl(),
+      getDelegatePenaltiesUseCase: sl(),
       updatePenaltyUseCase: sl(),
       repository: sl(),
     ),
@@ -495,6 +504,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   sl.registerLazySingleton(() => CreatePenaltyUseCase(sl()));
   sl.registerLazySingleton(() => GetCompanyPenaltiesUseCase(sl()));
+  sl.registerLazySingleton(() => GetDelegatePenaltiesUseCase(sl()));
   sl.registerLazySingleton(() => GetAllPenaltiesUseCase(sl()));
   sl.registerLazySingleton(() => UpdatePenaltyStatusUseCase(sl()));
   sl.registerLazySingleton(() => UpdatePenaltyUseCase(sl()));

@@ -4,6 +4,7 @@ import 'package:delegate_app/features/penalties/domain/repositories/penalty_repo
 import 'package:delegate_app/features/penalties/domain/usecases/create_penalty_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/get_all_penalties_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/get_company_penalties_usecase.dart';
+import 'package:delegate_app/features/penalties/domain/usecases/get_delegate_penalties_usecase.dart';
 import 'package:delegate_app/features/penalties/domain/usecases/update_penalty_usecase.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
@@ -12,6 +13,7 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
   final CreatePenaltyUseCase createPenaltyUseCase;
   final GetCompanyPenaltiesUseCase getCompanyPenaltiesUseCase;
   final GetAllPenaltiesUseCase getAllPenaltiesUseCase;
+  final GetDelegatePenaltiesUseCase? getDelegatePenaltiesUseCase;
   final UpdatePenaltyUseCase? updatePenaltyUseCase;
   final PenaltyRepository repository;
 
@@ -19,15 +21,60 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
     required this.createPenaltyUseCase,
     required this.getCompanyPenaltiesUseCase,
     required this.getAllPenaltiesUseCase,
+    this.getDelegatePenaltiesUseCase,
     this.updatePenaltyUseCase,
     required this.repository,
   }) : super(PenaltyInitialState()) {
+    on<LoadDelegatePenaltiesEvent>(_onLoadDelegatePenalties);
     on<LoadCompanyPenaltiesEvent>(_onLoadCompanyPenalties);
     on<LoadAllPenaltiesEvent>(_onLoadAllPenalties);
     on<CreatePenaltyRequestedEvent>(_onCreatePenaltyRequested);
     on<UpdatePenaltyRequestedEvent>(_onUpdatePenaltyRequested);
     on<UpdatePenaltyStatusEvent>(_onUpdatePenaltyStatus);
     on<DeletePenaltyEvent>(_onDeletePenalty);
+  }
+
+  Future<void> _onLoadDelegatePenalties(
+    LoadDelegatePenaltiesEvent event,
+    Emitter<PenaltyState> emit,
+  ) async {
+    emit(PenaltyLoadingState());
+    final result = getDelegatePenaltiesUseCase != null
+        ? await getDelegatePenaltiesUseCase!(
+            delegateId: event.delegate.uid,
+            companyId: event.delegate.companyUID,
+            phoneNumber: event.delegate.phoneNumber,
+            fullName: event.delegate.fullName,
+          )
+        : await repository.getDelegatePenalties(
+            delegateId: event.delegate.uid,
+            companyId: event.delegate.companyUID,
+            phoneNumber: event.delegate.phoneNumber,
+            fullName: event.delegate.fullName,
+          );
+
+    result.fold(
+      (failure) => emit(PenaltyErrorState(failure.message)),
+      (penalties) {
+        double totalFine = 0.0;
+        double deductedFine = 0.0;
+        for (var p in penalties) {
+          if (p.status != PenaltyStatus.cancelled) {
+            totalFine += p.fineAmount;
+          }
+          if (p.status == PenaltyStatus.deducted) {
+            deductedFine += p.fineAmount;
+          }
+        }
+        emit(
+          PenaltyLoadedState(
+            penalties: penalties,
+            totalFineAmount: totalFine,
+            deductedAmount: deductedFine,
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _onLoadCompanyPenalties(

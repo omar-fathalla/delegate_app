@@ -6,6 +6,12 @@ import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.d
 abstract class PenaltyRepository {
   Future<Either<Failure, Unit>> createPenalty(PenaltyEntity penalty);
   Future<Either<Failure, List<PenaltyEntity>>> getCompanyPenalties(String companyId);
+  Future<Either<Failure, List<PenaltyEntity>>> getDelegatePenalties({
+    required String delegateId,
+    String? companyId,
+    String? phoneNumber,
+    String? fullName,
+  });
   Future<Either<Failure, List<PenaltyEntity>>> getAllPenalties();
   Future<Either<Failure, Unit>> updatePenaltyStatus({
     required String penaltyId,

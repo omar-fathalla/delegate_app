@@ -16,6 +16,9 @@ import 'package:delegate_app/features/photo_permission/presentation/pages/monthl
 import 'package:delegate_app/features/photo_permission/presentation/pages/delegate_camera_capture_screen.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
+import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
+import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
+import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -28,7 +31,9 @@ class AdminHomeScreen extends StatelessWidget {
       create: (_) => sl<AdminDashboardBloc>()
         ..add(
           LoadDashboard(
-            organizationUID: adminDelegate.organizationUID,
+            organizationUID: adminDelegate.companyUID.isNotEmpty
+                ? ''
+                : adminDelegate.organizationUID,
             companyUID: adminDelegate.companyUID,
           ),
         ),
@@ -64,9 +69,12 @@ class _AdminHomeBody extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
+        AdminDashboardBloc.clearCache();
         context.read<AdminDashboardBloc>().add(
           LoadDashboard(
-            organizationUID: adminDelegate.organizationUID,
+            organizationUID: adminDelegate.companyUID.isNotEmpty
+                ? ''
+                : adminDelegate.organizationUID,
             companyUID: adminDelegate.companyUID,
           ),
         );
@@ -139,9 +147,12 @@ class _AdminHomeBody extends StatelessWidget {
                         const SizedBox(height: 16),
                         FilledButton.icon(
                           onPressed: () {
+                            AdminDashboardBloc.clearCache();
                             context.read<AdminDashboardBloc>().add(
                               LoadDashboard(
-                                organizationUID: adminDelegate.organizationUID,
+                                organizationUID: adminDelegate.companyUID.isNotEmpty
+                                    ? ''
+                                    : adminDelegate.organizationUID,
                                 companyUID: adminDelegate.companyUID,
                               ),
                             );
@@ -278,6 +289,133 @@ class _AdminHomeBody extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
+            // ── 1. Delegate Subscription & Approval Requests (شاشة الاعتمادات وطلبات المناديب) ──
+            Card(
+              elevation: 0,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.45),
+                  width: 1.2,
+                ),
+              ),
+              color: theme.brightness == Brightness.dark
+                  ? const Color(0xFF2B2108)
+                  : const Color(0xFFFFFDF5),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => DelegateSubscriptionRequestsPage(
+                        currentAdmin: adminDelegate,
+                      ),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFB8860B), Color(0xFF8B6508)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFB8860B).withValues(alpha: 0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.how_to_reg_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    'شاشة الاعتمادات وطلبات المناديب',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14.5,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                StreamBuilder<List<DelegateSubscriptionRequest>>(
+                                  stream: sl<DelegateSubscriptionRepository>().getSubscriptionRequestsStream(
+                                    statusFilter: SubscriptionRequestStatus.pending,
+                                    companyUID: adminDelegate.role == UserRole.admin ? adminDelegate.companyUID : null,
+                                    organizationUID: adminDelegate.role == UserRole.organizationAdmin ? adminDelegate.organizationUID : null,
+                                  ),
+                                  builder: (context, snapshot) {
+                                    final count = snapshot.data?.length ?? 0;
+                                    if (count == 0) return const SizedBox.shrink();
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFD97706),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '$count معلقة',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              adminDelegate.role == UserRole.admin
+                                  ? 'متابعة حالة طلبات المناديب: تم الاعتماد، قيد الانتظار، والمرفوضة'
+                                  : 'مراجعة واعتماد طلبات تسجيل واشتراكات المناديب الجديدة',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurfaceVariant,
+                                height: 1.25,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: theme.colorScheme.outline,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // ── 2. Camera Field Capture ──
             if (adminDelegate.role != UserRole.organizationAdmin) ...[
               Card(
                 clipBehavior: Clip.antiAlias,
@@ -319,6 +457,7 @@ class _AdminHomeBody extends StatelessWidget {
               ),
               const SizedBox(height: 10),
             ],
+            const SizedBox(height: 10),
             Card(
               clipBehavior: Clip.antiAlias,
               shape: RoundedRectangleBorder(
@@ -943,25 +1082,54 @@ class _AttendanceDetailsBottomSheetState
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     try {
-      // 1. Fetch delegates for the company
-      final delegatesSnapshot = await firestore
-          .collection('organizations')
-          .doc(widget.adminDelegate.organizationUID)
-          .collection('companies')
-          .doc(widget.adminDelegate.companyUID)
-          .collection('delegates')
-          .get();
-
-      final delegates = delegatesSnapshot.docs
-          .map((doc) => DelegateModel.fromJson(doc.data(), doc.id))
-          .toList();
+      // 1. Fetch delegates for the company across organizations
+      final List<DelegateModel> delegates = [];
+      if (widget.adminDelegate.companyUID.isNotEmpty) {
+        final orgsSnap = await firestore.collection('organizations').get();
+        final futures = orgsSnap.docs.map((orgDoc) => firestore
+            .collection('organizations')
+            .doc(orgDoc.id)
+            .collection('companies')
+            .doc(widget.adminDelegate.companyUID)
+            .collection('delegates')
+            .get());
+        final results = await Future.wait(futures);
+        final Map<String, DelegateModel> unique = {};
+        for (final res in results) {
+          for (final doc in res.docs) {
+            unique[doc.id] = DelegateModel.fromJson(doc.data(), doc.id);
+          }
+        }
+        delegates.addAll(unique.values);
+      } else {
+        final delegatesSnapshot = await firestore
+            .collection('organizations')
+            .doc(widget.adminDelegate.organizationUID)
+            .collection('companies')
+            .doc(widget.adminDelegate.companyUID)
+            .collection('delegates')
+            .get();
+        delegates.addAll(
+          delegatesSnapshot.docs
+              .map((doc) => DelegateModel.fromJson(doc.data(), doc.id)),
+        );
+      }
 
       // 2. Fetch today's attendance logs
-      final attendanceSnapshot = await firestore
-          .collection(kAttendanceCollection)
-          .where('organizationId', isEqualTo: widget.adminDelegate.organizationUID)
-          .where('companyId', isEqualTo: widget.adminDelegate.companyUID)
-          .get();
+      Query<Map<String, dynamic>> attendanceQuery =
+          firestore.collection(kAttendanceCollection);
+      if (widget.adminDelegate.companyUID.isNotEmpty) {
+        attendanceQuery = attendanceQuery.where(
+          'companyId',
+          isEqualTo: widget.adminDelegate.companyUID,
+        );
+      } else if (widget.adminDelegate.organizationUID.isNotEmpty) {
+        attendanceQuery = attendanceQuery.where(
+          'organizationId',
+          isEqualTo: widget.adminDelegate.organizationUID,
+        );
+      }
+      final attendanceSnapshot = await attendanceQuery.get();
 
       final Map<String, List<Map<String, dynamic>>> logsByDelegate = {};
       for (var doc in attendanceSnapshot.docs) {

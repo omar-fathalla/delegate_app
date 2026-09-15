@@ -44,30 +44,39 @@ class _NotificationListItemState extends State<NotificationListItem> {
   }
 
   void _confirmDelete() {
+    final colorScheme = Theme.of(context).colorScheme;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
           children: [
-            Icon(Icons.delete_outline_rounded, color: Colors.red),
-            SizedBox(width: 8),
-            Text('حذف الإشعار', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Icon(Icons.delete_outline_rounded, color: colorScheme.error),
+            const SizedBox(width: 8),
+            Text(
+              'حذف الإشعار',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'هل تريد حذف هذا الإشعار من قائمة إشعاراتك؟\n(سيظل مسجلاً في سجل النظام العام).',
-          style: TextStyle(fontSize: 14),
+          style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('إلغاء'),
+            child: Text('إلغاء', style: TextStyle(color: colorScheme.primary)),
           ),
           FilledButton.tonal(
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade50,
-              foregroundColor: Colors.red.shade700,
+              backgroundColor: colorScheme.errorContainer,
+              foregroundColor: colorScheme.onErrorContainer,
             ),
             onPressed: () {
               Navigator.of(ctx).pop();
@@ -79,9 +88,12 @@ class _NotificationListItemState extends State<NotificationListItem> {
                 ),
               );
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('تم حذف الإشعار من قائمتك'),
-                  duration: Duration(seconds: 2),
+                SnackBar(
+                  content: const Text('تم حذف الإشعار من قائمتك'),
+                  backgroundColor: colorScheme.inverseSurface,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  duration: const Duration(seconds: 2),
                 ),
               );
             },
@@ -107,25 +119,31 @@ class _NotificationListItemState extends State<NotificationListItem> {
       background: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
         decoration: BoxDecoration(
-          color: Colors.red.shade600,
-          borderRadius: BorderRadius.circular(14),
+          color: colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(16),
         ),
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 20),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.delete_outline_rounded, color: Colors.white, size: 26),
-            SizedBox(width: 8),
-            Text('حذف', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            Icon(Icons.delete_outline_rounded, color: colorScheme.onErrorContainer, size: 26),
+            const SizedBox(width: 8),
+            Text(
+              'حذف',
+              style: TextStyle(
+                color: colorScheme.onErrorContainer,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
       ),
       child: Card(
-        elevation: isUnread ? 2 : 0.8,
+        elevation: 0,
         margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(
             color: isUnread
                 ? colorScheme.primary.withValues(alpha: 0.35)
@@ -134,10 +152,10 @@ class _NotificationListItemState extends State<NotificationListItem> {
           ),
         ),
         color: isUnread
-            ? colorScheme.primaryContainer.withValues(alpha: 0.15)
-            : colorScheme.surface,
+            ? colorScheme.surfaceContainerHigh
+            : colorScheme.surfaceContainerLow,
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           onTap: () {
             setState(() {
               _isExpanded = !_isExpanded;
@@ -159,7 +177,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: _getIconBackgroundColor(widget.notification.type, colorScheme),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         _getIcon(widget.notification.type),
@@ -211,7 +229,11 @@ class _NotificationListItemState extends State<NotificationListItem> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Colors.grey),
+                      icon: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 20,
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      ),
                       tooltip: 'حذف الإشعار',
                       onPressed: _confirmDelete,
                       visualDensity: VisualDensity.compact,
@@ -238,7 +260,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                 // Expanded Action Buttons
                 if (_isExpanded) ...[
                   const SizedBox(height: 10),
-                  const Divider(height: 1),
+                  Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                   const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -252,8 +274,15 @@ class _NotificationListItemState extends State<NotificationListItem> {
                           if (isUnread)
                             TextButton.icon(
                               onPressed: _markAsRead,
-                              icon: const Icon(Icons.done_all_rounded, size: 16),
-                              label: const Text('تعليم كمقروء', style: TextStyle(fontSize: 12)),
+                              icon: Icon(Icons.done_all_rounded, size: 16, color: colorScheme.primary),
+                              label: Text(
+                                'تعليم كمقروء',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               style: TextButton.styleFrom(
                                 visualDensity: VisualDensity.compact,
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -300,6 +329,12 @@ class _NotificationListItemState extends State<NotificationListItem> {
       case 'photo_permission':
       case 'permission':
         return Icons.camera_alt_rounded;
+      case 'delegate_subscription_request':
+        return Icons.person_add_alt_1_rounded;
+      case 'subscription_approved':
+        return Icons.how_to_reg_rounded;
+      case 'subscription_rejected':
+        return Icons.person_off_rounded;
       case 'task':
         return Icons.task_alt_rounded;
       case 'support_alert':
@@ -317,50 +352,55 @@ class _NotificationListItemState extends State<NotificationListItem> {
   Color _getIconColor(String type, ColorScheme colorScheme) {
     switch (type) {
       case 'attendance_check_in':
-        return Colors.green.shade700;
+        return colorScheme.primary;
       case 'attendance_check_out':
-        return Colors.blueGrey.shade700;
+        return colorScheme.secondary;
       case 'penalty':
-        return Colors.red.shade700;
+      case 'subscription_rejected':
+        return colorScheme.error;
       case 'photo_permission':
       case 'permission':
-        return Colors.amber.shade800;
+        return colorScheme.tertiary;
+      case 'delegate_subscription_request':
+      case 'subscription_approved':
       case 'task':
-        return Colors.teal.shade700;
+        return colorScheme.primary;
       case 'support_alert':
       case 'support_direct':
-        return Colors.blue.shade700;
+        return colorScheme.secondary;
       case 'update':
-        return Colors.orange.shade700;
       case 'announcement':
-        return Colors.purple.shade700;
+        return colorScheme.tertiary;
       default:
-        return colorScheme.primary;
+        return colorScheme.onSurfaceVariant;
     }
   }
 
   Color _getIconBackgroundColor(String type, ColorScheme colorScheme) {
     switch (type) {
       case 'attendance_check_in':
-        return Colors.green.shade50;
+        return colorScheme.primaryContainer;
       case 'attendance_check_out':
-        return Colors.blueGrey.shade50;
+        return colorScheme.secondaryContainer;
       case 'penalty':
-        return Colors.red.shade50;
+      case 'subscription_rejected':
+        return colorScheme.errorContainer;
       case 'photo_permission':
       case 'permission':
-        return Colors.amber.shade50;
+        return colorScheme.tertiaryContainer;
+      case 'delegate_subscription_request':
+      case 'subscription_approved':
+        return colorScheme.primaryContainer;
       case 'task':
-        return Colors.teal.shade50;
+        return colorScheme.primaryContainer.withValues(alpha: 0.6);
       case 'support_alert':
       case 'support_direct':
-        return Colors.blue.shade50;
+        return colorScheme.secondaryContainer;
       case 'update':
-        return Colors.orange.shade50;
       case 'announcement':
-        return Colors.purple.shade50;
+        return colorScheme.tertiaryContainer;
       default:
-        return colorScheme.primaryContainer.withValues(alpha: 0.5);
+        return colorScheme.surfaceContainerHighest;
     }
   }
 

@@ -1,3 +1,4 @@
+import 'package:delegate_app/config/theme/color_schemes.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,7 +27,7 @@ class ThemeCubit extends Cubit<ThemeState> {
     }
 
     final savedColor = _prefs.getInt(_kSeedColorKey);
-    Color color = const Color.fromARGB(255, 209, 169, 50);
+    Color color = AppColorSchemes.seedColors[0];
     if (savedColor != null) {
       color = Color(savedColor);
     }

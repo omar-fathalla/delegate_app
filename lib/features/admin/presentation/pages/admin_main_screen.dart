@@ -33,6 +33,7 @@ import 'package:delegate_app/features/notifications/presentation/pages/send_noti
 import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branches_marketing_home_screen.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
+import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 
 class AdminMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -92,10 +93,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           onNavigateToAddBranch: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const AddBranchScreen(showAppBar: true)),
           ),
-          onNavigateToCreateAdmin: () => setState(() => _currentIndex = 2),
-          onNavigateToSendNotification: () => setState(() => _currentIndex = 1),
+          onNavigateToCreateAdmin: () => setState(() => _currentIndex = 3),
+          onNavigateToSendNotification: () => setState(() => _currentIndex = 2),
+          onNavigateToAntiFraud: () => setState(() => _currentIndex = 1),
         ),
+        // 1. كشف التزييف وسجل الأمان وربط الأجهزة
+        AntiFraudAuditScreen(delegate: delegate),
+        // 2. إرسال إشعار
         SendNotificationScreen(senderDelegate: delegate, showAppBar: false),
+        // 3. إنشاء أدمن
         CreateAdminScreen(
           organizationUID: delegate.organizationUID,
           currentDelegate: delegate,
@@ -162,6 +168,20 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
 
   void _onMenuSelected(String value) {
     switch (value) {
+      case 'anti_fraud':
+        if (isSuperAdmin || isTechnicalSupport) {
+          setState(() => _currentIndex = 1);
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => AntiFraudAuditScreen(
+                delegate: widget.delegate,
+                showAppBar: true,
+              ),
+            ),
+          );
+        }
+        break;
       case 'branches':
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AdminBranchesScreen(showAppBar: true)),
@@ -179,6 +199,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               organizationUID: widget.delegate.organizationUID,
               currentDelegate: widget.delegate,
               currentUserRole: widget.delegate.role,
+            ),
+          ),
+        );
+        break;
+      case 'delegate_subscriptions':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => DelegateSubscriptionRequestsPage(
+              currentAdmin: widget.delegate,
             ),
           ),
         );
@@ -321,6 +350,8 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         ? (_currentIndex == 0
               ? l10n.home
               : _currentIndex == 1
+              ? (isArabic ? 'كشف التزييف وسجل الأمان' : 'Anti-Fraud & Security Audit')
+              : _currentIndex == 2
               ? (isArabic ? 'إرسال إشعار' : 'Send Notification')
               : l10n.createAdmin)
         : isOrganizationAdmin
@@ -393,7 +424,30 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               contentPadding: EdgeInsets.zero,
             ),
           ),
+          if (isSuperAdmin ||
+              isTechnicalSupport ||
+              widget.delegate.role == UserRole.admin ||
+              isOrganizationAdmin) ...[
+            const PopupMenuItem(
+              value: 'delegate_subscriptions',
+              child: ListTile(
+                leading: Icon(Icons.how_to_reg_rounded),
+                title: Text('طلبات اشتراك واعتماد المناديب'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
           if (isSuperAdmin || isTechnicalSupport) ...[
+            const PopupMenuItem(
+              value: 'anti_fraud',
+              child: ListTile(
+                leading: Icon(Icons.security_rounded),
+                title: Text('كشف التزييف وربط الأجهزة'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
             const PopupMenuItem(
               value: 'branches',
               child: ListTile(
@@ -595,6 +649,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   icon: const Icon(Icons.home_outlined),
                   selectedIcon: const Icon(Icons.home_rounded),
                   label: l10n.home,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.security_outlined),
+                  selectedIcon: const Icon(Icons.security_rounded),
+                  label: isArabic ? 'كشف التزييف' : 'Anti-Fraud',
                 ),
                 NavigationDestination(
                   icon: const Icon(Icons.campaign_outlined),
