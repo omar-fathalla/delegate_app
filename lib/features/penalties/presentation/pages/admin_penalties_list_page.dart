@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -715,19 +716,22 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                                   itemCount: filteredList.length,
                                   itemBuilder: (context, index) {
                                     final p = filteredList[index];
-                                    return _AdminPenaltyCard(
-                                      penalty: p,
-                                      currentDelegate: widget.adminDelegate,
-                                      isReadOnly: widget.adminDelegate.role == UserRole.admin,
-                                      onStatusChanged: (newStatus) {
-                                        context.read<PenaltyBloc>().add(
-                                              UpdatePenaltyStatusEvent(
-                                                penaltyId: p.penaltyId,
-                                                status: newStatus,
-                                              ),
-                                            );
-                                      },
-                                      onDelete: () => _confirmAndDeletePenalty(context, p),
+                                    return M3StaggeredItem(
+                                      index: index,
+                                      child: _AdminPenaltyCard(
+                                        penalty: p,
+                                        currentDelegate: widget.adminDelegate,
+                                        isReadOnly: widget.adminDelegate.role == UserRole.admin,
+                                        onStatusChanged: (newStatus) {
+                                          context.read<PenaltyBloc>().add(
+                                                UpdatePenaltyStatusEvent(
+                                                  penaltyId: p.penaltyId,
+                                                  status: newStatus,
+                                                ),
+                                              );
+                                        },
+                                        onDelete: () => _confirmAndDeletePenalty(context, p),
+                                      ),
                                     );
                                   },
                                 ),

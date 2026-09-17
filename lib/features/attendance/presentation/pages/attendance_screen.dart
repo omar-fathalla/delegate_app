@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -1221,7 +1222,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     AttendanceBloc bloc,
     AppLocalizations l10n,
   ) {
-    showDialog(
+    showM3Dialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -1267,7 +1268,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     AttendanceBloc bloc,
     AppLocalizations l10n,
   ) {
-    showDialog(
+    showM3Dialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(

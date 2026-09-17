@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -25,13 +26,21 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: AppMotionDurations.extraLong4, // 1000ms M3 Token
     );
-    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: AppMotionCurves.standardDecelerate,
+    );
     _scaleAnimation = Tween<double>(
       begin: 0.8,
       end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: AppMotionCurves.expressiveDefaultSpatial,
+      ),
+    );
 
     // Start animation after first frame renders (prevents jank)
     WidgetsBinding.instance.addPostFrameCallback((_) {

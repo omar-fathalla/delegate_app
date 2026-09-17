@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_bloc.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_event.dart';
@@ -665,7 +666,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   void _confirmDelete(BuildContext context) {
-    showDialog(
+    showM3Dialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.deleteTask),

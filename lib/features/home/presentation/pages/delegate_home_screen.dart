@@ -879,6 +879,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           GetHistoryParams(
             userId: widget.delegate.uid,
             organizationId: widget.delegate.organizationUID,
+            nationalityID: widget.delegate.nationalityID,
+            phoneNumber: widget.delegate.phoneNumber,
           ),
         );
         result.fold(

@@ -231,3 +231,15 @@ In all App Bars / Header Menus / `PopupMenuButton` widgets across all 9 user rol
 1. **Top Items**: Profile (`profile` / الملف الشخصي), followed by role-specific tools (Search, Tasks, Penalties, Admin tools, Org Switch).
 2. **Bottom-Most Item**: **Settings (`settings` / الإعدادات) MUST ALWAYS BE THE LAST ITEM** in the menu list. Any future menu options added to the app bar popup menu must be inserted before `settings`.
 
+---
+
+## 9. Material Design 3 Motion System Integration
+
+All animations, route navigations, modal reveals, and state changes MUST follow the Material Design 3 Motion standard:
+- **Reference**: See [.agent/skills/material_design_3_motion/SKILL.md](file:///Users/fathalla/Development/SwitchPoint/delegate_app/.agent/skills/material_design_3_motion/SKILL.md) for full token matrices, physics equations, and transition patterns.
+- **Motion Schemes**: Use **Expressive** for hero transitions and FABs (damping < 1.0); use **Standard** for utility workflows, dense lists, and admin screens.
+- **Separation of Concerns**: Never apply overshoot or spring bounce to opacity or color changes.
+- **Exit < Enter Principle**: Outgoing/exit animations must be ~50% faster than incoming/enter animations.
+- **Tokens**: Always consume tokens from `AppMotionCurves` and `AppMotionDurations` in `lib/config/theme/app_motion.dart`. Never use `Curves.linear` or arbitrary millisecond values.
+- **RTL Support**: In Arabic mode, Shared Axis X animations must invert the horizontal direction vector.
+

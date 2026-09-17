@@ -19,6 +19,8 @@ import 'package:delegate_app/features/penalties/presentation/pages/company_penal
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/features/admin/presentation/pages/add_delegate_form_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -84,6 +86,12 @@ class _AdminHomeBody extends StatelessWidget {
         children: [
           // 1. الكارت الترحيبي والتعريفي الرئيسي بمسؤوليات مشرف الشركة / المدير
           _buildRoleWelcomeBanner(context, theme.colorScheme, isArabic),
+
+          // 2. كارت ميزة إضافة مناديب السلاسل والمنظمات الأخرى لمشرفي الشركات
+          if (_isCompanySupervisor) ...[
+            const SizedBox(height: 16),
+            _buildMultiOrgDelegatesBanner(context, theme.colorScheme, isArabic),
+          ],
 
           const SizedBox(height: 20),
 
@@ -901,6 +909,429 @@ class _AdminHomeBody extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  bool get _isCompanySupervisor {
+    final isOrgAdmin = adminDelegate.role == UserRole.organizationAdmin;
+    final isSuperAdmin = adminDelegate.role == UserRole.superAdmin;
+    final isMarketing = adminDelegate.role == UserRole.marketing;
+    return !isOrgAdmin && !isSuperAdmin && !isMarketing;
+  }
+
+  /// كارت ميزة إضافة مناديب السلاسل والمنظمات التجارية الأخرى للشركات
+  Widget _buildMultiOrgDelegatesBanner(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isArabic,
+  ) {
+    return M3StaggeredItem(
+      index: 1,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: colorScheme.primary.withValues(alpha: 0.2),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // الشارة الترويجية (Badge) - ميزة حصرية للشركات بأيقونة جوجل
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.business_rounded,
+                        size: 14,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isArabic ? 'ميزة حصرية للشركات' : 'Exclusive for Companies',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // عنوان الكارت بأيقونة جوجل ماتيريال (بدون إيموجي)
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.hub_rounded,
+                    color: colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isArabic
+                        ? 'متابعة مناديبك في كافة السلاسل من مكان واحد'
+                        : 'Track Your Delegates Across All Retail Chains',
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // نص الوصف
+            Text(
+              isArabic
+                  ? 'الآن يمكن لشركتك إضافة ومتابعة حضور وانصراف مناديبها المتواجدين في فروع السلاسل التجارية والمنظمات الأخرى، مع تقارير انضباط ميداني موحدة ولحظية.'
+                  : 'Your company can now add and track delegate attendance across partner retail chains and organizations in real time from this dashboard.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.5,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // عنوان فرعي للسلاسل المدعومة بأيقونة جوجل ماتيريال
+            Row(
+              children: [
+                Icon(
+                  Icons.storefront_rounded,
+                  size: 16,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isArabic ? 'السلاسل والمنظمات المتاحة للربط:' : 'Supported Chains & Organizations:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // قائمة الـ Chips للسلاسل المدعومة بأيقونات جوجل فقط (بدون أي إيموجي)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildM3ChainChip(
+                  context,
+                  colorScheme,
+                  label: 'زهران ماركت',
+                  icon: Icons.storefront_rounded,
+                ),
+                _buildM3ChainChip(
+                  context,
+                  colorScheme,
+                  label: 'جملة ماركت',
+                  icon: Icons.storefront_rounded,
+                ),
+                _buildM3ChainChip(
+                  context,
+                  colorScheme,
+                  label: 'كارفور',
+                  icon: Icons.storefront_rounded,
+                ),
+                _buildM3ChainChip(
+                  context,
+                  colorScheme,
+                  label: 'بيت الجملة',
+                  icon: Icons.storefront_rounded,
+                ),
+                _buildM3ChainChip(
+                  context,
+                  colorScheme,
+                  label: isArabic ? 'سلاسل أخرى قريباً' : 'More chains soon',
+                  icon: Icons.schedule_rounded,
+                  isMuted: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // أزرار الإجراء السريع (CTA) بمواصفات Material 3
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddDelegateFormScreen(
+                            supervisor: adminDelegate,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                    label: Text(
+                      isArabic ? 'إضافة مندوب في فرع' : 'Add Delegate',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: FilledButton.styleFrom(
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () => _showHowItWorksDialog(context, colorScheme, isArabic),
+                  icon: const Icon(Icons.info_outline_rounded, size: 18),
+                  label: Text(
+                    isArabic ? 'كيفية الربط' : 'Guide',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    shape: const StadiumBorder(),
+                    side: BorderSide(
+                      color: colorScheme.outline.withValues(alpha: 0.5),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// رقاقة عرض السلسلة التجارية وفق معايير Material 3 وبأيقونات جوجل
+  Widget _buildM3ChainChip(
+    BuildContext context,
+    ColorScheme colorScheme, {
+    required String label,
+    required IconData icon,
+    bool isMuted = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isMuted
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.4)
+            : colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isMuted
+              ? colorScheme.outlineVariant.withValues(alpha: 0.3)
+              : colorScheme.outlineVariant.withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: isMuted
+                ? colorScheme.onSurfaceVariant.withValues(alpha: 0.7)
+                : colorScheme.primary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isMuted ? FontWeight.normal : FontWeight.w600,
+              color: isMuted
+                  ? colorScheme.onSurfaceVariant.withValues(alpha: 0.75)
+                  : colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHowItWorksDialog(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isArabic,
+  ) {
+    showM3Dialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Row(
+            children: [
+              Icon(Icons.hub_rounded, color: colorScheme.primary),
+              const SizedBox(width: 10),
+              Text(
+                isArabic ? 'كيفية ربط مناديبك بالسلاسل' : 'How Multi-Org Linking Works',
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isArabic
+                      ? 'خطوات بسيطة لمتابعة مناديبك في أي سلسلة تجارية:'
+                      : 'Follow these steps to connect your delegates in other chains:',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _buildStepItem(
+                  colorScheme,
+                  '1',
+                  isArabic ? 'الضغط على زر إضافة مندوب' : 'Tap Add Delegate',
+                  isArabic
+                      ? 'افتح نموذج إضافة المندوب من هذا الكارت أو من تبويب المناديب.'
+                      : 'Open the delegate form from this card or the delegates tab.',
+                ),
+                const SizedBox(height: 10),
+                _buildStepItem(
+                  colorScheme,
+                  '2',
+                  isArabic ? 'اختيار المنظمة أو السلسلة' : 'Select Chain / Organization',
+                  isArabic
+                      ? 'اختر السلسلة التي يعمل بها المندوب (مثل: زهران، جملة ماركت، كارفور، بيت الجملة).'
+                      : 'Pick the retail chain where the delegate works (e.g. Zahran, Gomla, Carrefour, Beit El-Gomla).',
+                ),
+                const SizedBox(height: 10),
+                _buildStepItem(
+                  colorScheme,
+                  '3',
+                  isArabic ? 'تحديد الفرع والبيانات' : 'Set Branch & Details',
+                  isArabic
+                      ? 'حدد اسم الفرع ورقم هاتف المندوب وبياناته الشخصية لإتمام التسجيل.'
+                      : 'Specify the branch name and delegate contact info.',
+                ),
+                const SizedBox(height: 10),
+                _buildStepItem(
+                  colorScheme,
+                  '4',
+                  isArabic ? 'متابعة لحظية وموحدة' : 'Instant Real-time Tracking',
+                  isArabic
+                      ? 'بمجرد تسجيل حضور المندوب في الفرع، ستظهر بياناته وسجل حضوره وانصرافه فوراً في تقاريرك.'
+                      : 'Once the delegate checks in at the store, their attendance appears directly on your dashboard.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddDelegateFormScreen(
+                      supervisor: adminDelegate,
+                    ),
+                  ),
+                );
+              },
+              child: Text(isArabic ? 'ابدأ الإضافة الآن' : 'Start Adding Now'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(isArabic ? 'إغلاق' : 'Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStepItem(
+    ColorScheme colorScheme,
+    String number,
+    String title,
+    String desc,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 12,
+          backgroundColor: colorScheme.primaryContainer,
+          child: Text(
+            number,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onPrimaryContainer,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                desc,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

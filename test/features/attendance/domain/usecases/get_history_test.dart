@@ -45,7 +45,12 @@ void main() {
   test('should return attendance history from repository', () async {
     // arrange
     when(
-      () => mockRepository.getHistory(any(), any()),
+      () => mockRepository.getHistory(
+        any(),
+        any(),
+        nationalityID: any(named: 'nationalityID'),
+        phoneNumber: any(named: 'phoneNumber'),
+      ),
     ).thenAnswer((_) async => Right(tAttendanceList));
 
     // act
@@ -55,13 +60,25 @@ void main() {
 
     // assert
     expect(result, Right(tAttendanceList));
-    verify(() => mockRepository.getHistory(tUserId, tOrganizationId)).called(1);
+    verify(
+      () => mockRepository.getHistory(
+        tUserId,
+        tOrganizationId,
+        nationalityID: null,
+        phoneNumber: null,
+      ),
+    ).called(1);
   });
 
   test('should return empty list when no history', () async {
     // arrange
     when(
-      () => mockRepository.getHistory(any(), any()),
+      () => mockRepository.getHistory(
+        any(),
+        any(),
+        nationalityID: any(named: 'nationalityID'),
+        phoneNumber: any(named: 'phoneNumber'),
+      ),
     ).thenAnswer((_) async => const Right([]));
 
     // act
@@ -77,7 +94,12 @@ void main() {
     // arrange
     const tFailure = ServerFailure('فشل جلب السجل');
     when(
-      () => mockRepository.getHistory(any(), any()),
+      () => mockRepository.getHistory(
+        any(),
+        any(),
+        nationalityID: any(named: 'nationalityID'),
+        phoneNumber: any(named: 'phoneNumber'),
+      ),
     ).thenAnswer((_) async => const Left(tFailure));
 
     // act
@@ -89,11 +111,11 @@ void main() {
     expect(result, const Left(tFailure));
   });
 
-  test('GetHistoryParams props should contain userId and organizationId', () {
+  test('GetHistoryParams props should contain userId, organizationId, nationalityID, and phoneNumber', () {
     const params = GetHistoryParams(
       userId: tUserId,
       organizationId: tOrganizationId,
     );
-    expect(params.props, [tUserId, tOrganizationId]);
+    expect(params.props, [tUserId, tOrganizationId, null, null]);
   });
 }

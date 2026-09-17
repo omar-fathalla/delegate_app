@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/home/presentation/pages/delegate_home_screen.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
@@ -278,9 +279,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   /// Lazy-builds tabs: only creates a tab widget when it's first visited,
-  /// then keeps it alive via IndexedStack so it isn't destroyed on tab switch.
+  /// then keeps it alive via M3FadeThroughIndexedStack with smooth M3 transition.
   Widget _buildBody(Delegate delegate) {
-    return IndexedStack(
+    return M3FadeThroughIndexedStack(
       index: _currentIndex,
       children: [
         // Tab 0: Home (always initialized)
@@ -342,7 +343,7 @@ class _MainScreenState extends State<MainScreen> {
     final isArabic = localeProvider.isArabic;
     final currentDelegate = widget.delegate;
 
-    showDialog(
+    showM3Dialog(
       context: context,
       builder: (dialogContext) {
         return SimpleDialog(

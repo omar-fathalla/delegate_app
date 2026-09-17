@@ -107,6 +107,15 @@ class AppTheme {
         elevation: 3,
         backgroundColor: colorScheme.surfaceContainer,
       ),
+
+      // Material Design 3 Motion Page Transitions
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
     );
   }
 

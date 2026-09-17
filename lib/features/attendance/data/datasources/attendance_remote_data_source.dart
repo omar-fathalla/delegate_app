@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/failures.dart';
@@ -221,6 +222,30 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     return response.items;
   }
 
+  String _normalizePhone(String phone) {
+    const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+    String normalized = phone.trim();
+    normalized = normalized.replaceAll(RegExp(r'[^\d+٠-٩]'), '');
+
+    for (int i = 0; i < arabic.length; i++) {
+      normalized = normalized.replaceAll(arabic[i], english[i]);
+    }
+
+    if (normalized.startsWith('+20')) {
+      normalized = '0${normalized.substring(3)}';
+    } else if (normalized.startsWith('+2')) {
+      normalized = normalized.substring(2);
+    } else if (normalized.startsWith('0020')) {
+      normalized = '0${normalized.substring(4)}';
+    } else if (normalized.startsWith('002')) {
+      normalized = normalized.substring(3);
+    }
+
+    return normalized;
+  }
+
   @override
   Future<PaginationResponse<AttendanceModel>> getHistoryPaginated(
     String userId,
@@ -231,16 +256,52 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     DocumentSnapshot? startAfter,
   }) async {
     try {
-      final List<String> identifiers = [userId];
-      if (nationalityID != null && nationalityID.isNotEmpty) {
-        identifiers.add(nationalityID);
-      }
-      if (phoneNumber != null && phoneNumber.isNotEmpty) {
-        identifiers.add(phoneNumber);
+      final Set<String> identifiers = {userId};
+
+      if (nationalityID != null && nationalityID.trim().isNotEmpty) {
+        final cleanNat = nationalityID.trim();
+        identifiers.add(cleanNat);
+
+        // Resolve any other delegate UIDs registered under this National ID
+        try {
+          final natSnap = await firestore
+              .collectionGroup('delegates')
+              .where('nationalityID', isEqualTo: cleanNat)
+              .limit(10)
+              .get()
+              .timeout(const Duration(seconds: 4));
+          for (final doc in natSnap.docs) {
+            identifiers.add(doc.id);
+          }
+        } catch (_) {}
       }
 
+      if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+        final cleanPhone = phoneNumber.trim();
+        final normalizedPhone = _normalizePhone(cleanPhone);
+        identifiers.add(cleanPhone);
+        if (normalizedPhone.isNotEmpty) {
+          identifiers.add(normalizedPhone);
+        }
+
+        // Resolve any other delegate UIDs registered under this phone number
+        try {
+          final phoneSnap = await firestore
+              .collectionGroup('delegates')
+              .where('phoneNumber', isEqualTo: normalizedPhone)
+              .limit(10)
+              .get()
+              .timeout(const Duration(seconds: 4));
+          for (final doc in phoneSnap.docs) {
+            identifiers.add(doc.id);
+          }
+        } catch (_) {}
+      }
+
+      final queryList = identifiers.where((id) => id.isNotEmpty).take(30).toList();
+
       Query<Map<String, dynamic>> query = _attendanceCollection(organizationId)
-          .where('delegateId', whereIn: identifiers)
+          .where('delegateId', whereIn: queryList)
           .orderBy('timestamp', descending: true)
           .limit(limit * 2);
 
@@ -271,7 +332,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         lastDoc: querySnapshot.docs.last,
         hasReachedMax: querySnapshot.docs.length < (limit * 2),
       );
-    } catch (_) {
+    } catch (e, stack) {
+      debugPrint('Error in getHistoryPaginated: $e\n$stack');
       return PaginationResponse(items: [], lastDoc: null, hasReachedMax: true);
     }
   }

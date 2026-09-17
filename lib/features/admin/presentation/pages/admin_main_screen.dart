@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
@@ -604,7 +605,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         ],
         onMenuSelected: _onMenuSelected,
       ),
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: M3FadeThroughIndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: isSuperAdmin
           ? NavigationBar(
               selectedIndex: _currentIndex,

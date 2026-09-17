@@ -32,164 +32,234 @@ import 'package:delegate_app/features/photo_permission/presentation/pages/superv
 import 'package:delegate_app/features/photo_permission/presentation/pages/marketing_permissions_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/delegate_camera_capture_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
   routes: [
-    GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
-    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+    GoRoute(
+      path: '/',
+      pageBuilder: (context, state) => AppMotionPage.fade(
+        state: state,
+        child: const SplashScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/login',
+      pageBuilder: (context, state) => AppMotionPage.fadeThrough(
+        state: state,
+        child: const LoginScreen(),
+      ),
+    ),
     GoRoute(
       path: '/home',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final delegate = state.extra as Delegate;
-        return MainScreen(delegate: delegate);
+        return AppMotionPage.fadeThrough(
+          state: state,
+          child: MainScreen(delegate: delegate),
+        );
       },
     ),
     GoRoute(
       path: '/admin/home',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final delegate = state.extra as Delegate;
-        return AdminMainScreen(delegate: delegate);
+        return AppMotionPage.fadeThrough(
+          state: state,
+          child: AdminMainScreen(delegate: delegate),
+        );
       },
     ),
     GoRoute(
       path: '/marketing/home',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final delegate = state.extra as Delegate;
-        return MarketingMainScreen(delegate: delegate);
+        return AppMotionPage.fadeThrough(
+          state: state,
+          child: MarketingMainScreen(delegate: delegate),
+        );
       },
     ),
     GoRoute(
       path: '/admin/branch-details',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final branch = state.extra as BranchModel;
-        return BranchDetailsScreen(branch: branch);
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: BranchDetailsScreen(branch: branch),
+        );
       },
     ),
     GoRoute(
       path: '/task-details',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final extras = state.extra as Map<String, dynamic>;
-        return TaskDetailsScreen(
-          task: extras['task'] as TaskEntity,
-          isAdmin: extras['isAdmin'] as bool,
-          organizationId: extras['organizationId'] as String,
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: TaskDetailsScreen(
+            task: extras['task'] as TaskEntity,
+            isAdmin: extras['isAdmin'] as bool,
+            organizationId: extras['organizationId'] as String,
+          ),
         );
       },
     ),
     GoRoute(
       path: '/privacy-policy',
-      builder: (context, state) => const PrivacyPolicyScreen(),
+      pageBuilder: (context, state) => AppMotionPage.sharedAxis(
+        state: state,
+        child: const PrivacyPolicyScreen(),
+      ),
     ),
     GoRoute(
       path: '/changelog',
-      builder: (context, state) => const ChangelogScreen(),
+      pageBuilder: (context, state) => AppMotionPage.sharedAxis(
+        state: state,
+        child: const ChangelogScreen(),
+      ),
     ),
     GoRoute(
       path: '/notifications',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final delegate = state.extra as Delegate;
-        return NotificationsPage(delegate: delegate);
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: NotificationsPage(delegate: delegate),
+        );
       },
     ),
     GoRoute(
       path: '/submit-feedback',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final delegate = state.extra as Delegate;
-        return BlocProvider(
-          create: (_) => di.sl<FeedbackBloc>(),
-          child: SubmitFeedbackScreen(delegate: delegate),
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: BlocProvider(
+            create: (_) => di.sl<FeedbackBloc>(),
+            child: SubmitFeedbackScreen(delegate: delegate),
+          ),
         );
       },
     ),
     GoRoute(
       path: '/my-feedbacks',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final delegate = state.extra as Delegate;
-        return BlocProvider(
-          create: (_) => di.sl<FeedbackBloc>(),
-          child: MyFeedbacksScreen(delegate: delegate),
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: BlocProvider(
+            create: (_) => di.sl<FeedbackBloc>(),
+            child: MyFeedbacksScreen(delegate: delegate),
+          ),
         );
       },
     ),
     GoRoute(
       path: '/admin/feedbacks',
-      builder: (context, state) {
-        return BlocProvider(
-          create: (_) => di.sl<AdminFeedbackBloc>(),
-          child: const AdminFeedbacksScreen(),
+      pageBuilder: (context, state) {
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: BlocProvider(
+            create: (_) => di.sl<AdminFeedbackBloc>(),
+            child: const AdminFeedbacksScreen(),
+          ),
         );
       },
     ),
     GoRoute(
       path: '/admin/company-search',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final organizationUID = state.extra as String?;
-        return CompanySearchScreen(organizationUID: organizationUID);
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: CompanySearchScreen(organizationUID: organizationUID),
+        );
       },
     ),
     GoRoute(
       path: '/marketing/search',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final organizationUID = state.extra as String?;
-        return MarketingSearchScreen(organizationUID: organizationUID);
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: MarketingSearchScreen(organizationUID: organizationUID),
+        );
       },
     ),
     GoRoute(
       path: '/user-profile',
-      builder: (context, state) => const UserProfileScreen(),
+      pageBuilder: (context, state) => AppMotionPage.sharedAxis(
+        state: state,
+        child: const UserProfileScreen(),
+      ),
     ),
     GoRoute(
       path: '/profile',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final delegate = state.extra as Delegate;
-        return BlocProvider(
-          create: (_) => di.sl<ProfileBloc>(),
-          child: ProfileScreen(
-            delegate: delegate,
-            showBackButton: true,
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: BlocProvider(
+            create: (_) => di.sl<ProfileBloc>(),
+            child: ProfileScreen(
+              delegate: delegate,
+              showBackButton: true,
+            ),
           ),
         );
       },
     ),
     GoRoute(
       path: '/admin/company-details',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final company = state.extra as Company;
-        return CompanyDetailsScreen(company: company);
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: CompanyDetailsScreen(company: company),
+        );
       },
     ),
     GoRoute(
       path: '/photo-permissions/supervisor',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final delegate = state.extra as Delegate;
-        return MultiBlocProvider(
-          providers: [
-            BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
-            BlocProvider(create: (_) => di.sl<BranchBloc>()),
-          ],
-          child: SupervisorPermissionsScreen(supervisorDelegate: delegate),
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: MultiBlocProvider(
+            providers: [
+              BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
+              BlocProvider(create: (_) => di.sl<BranchBloc>()),
+            ],
+            child: SupervisorPermissionsScreen(supervisorDelegate: delegate),
+          ),
         );
       },
     ),
     GoRoute(
       path: '/photo-permissions/marketing',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final delegate = state.extra as Delegate;
-        return BlocProvider(
-          create: (_) => di.sl<PhotoPermissionBloc>(),
-          child: MarketingPermissionsScreen(marketingDelegate: delegate),
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: BlocProvider(
+            create: (_) => di.sl<PhotoPermissionBloc>(),
+            child: MarketingPermissionsScreen(marketingDelegate: delegate),
+          ),
         );
       },
     ),
     GoRoute(
       path: '/photo-permissions/delegate',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final delegate = state.extra as Delegate;
-        return BlocProvider(
-          create: (_) => di.sl<PhotoPermissionBloc>(),
-          child: DelegateCameraCaptureScreen(delegate: delegate),
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: BlocProvider(
+            create: (_) => di.sl<PhotoPermissionBloc>(),
+            child: DelegateCameraCaptureScreen(delegate: delegate),
+          ),
         );
       },
     ),

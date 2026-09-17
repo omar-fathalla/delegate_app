@@ -20,3 +20,10 @@
   - Revalidate and synchronize new or updated documents in the background (Stale-While-Revalidate pattern).
   - Attendance check-in and anti-fraud geo-verification must remain strictly verified with live server time.
 
+## Material Design 3 (M3) Motion System Standard
+- All animations, transitions, and micro-interactions across the entire app must strictly comply with `.agent/skills/material_design_3_motion/SKILL.md`:
+  - **No Arbitrary Durations or Curves**: Use ONLY tokens from `AppMotionDurations` and `AppMotionCurves`. `Curves.linear` is strictly prohibited for visible UI animations.
+  - **Exit < Enter Ratio**: Exiting/dismissing transitions must be ~50% faster than entering transitions.
+  - **Zero Overshoot for Effects**: Opacity, surface tint, and color transitions must be strictly monotonic (no bounce/overshoot). Overshoot is reserved exclusively for spatial movements in the Expressive scheme.
+  - **RTL-Aware Shared Axis**: In Arabic mode (`TextDirection.rtl`), horizontal directional motion (Shared Axis X) must be dynamically inverted.
+

@@ -240,6 +240,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       final response = await remoteDataSource.getHistoryPaginated(
         userId,
         organizationId,
+        nationalityID: nationalityID,
+        phoneNumber: phoneNumber,
         limit: limit,
         startAfter: lastDoc as DocumentSnapshot?,
       );

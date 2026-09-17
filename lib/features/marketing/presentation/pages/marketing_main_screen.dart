@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/marketing_home_screen.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/marketing_promotion_home_screen.dart';
@@ -310,7 +311,7 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
           ),
         ],
       ),
-      body: IndexedStack(index: _currentIndex, children: screens),
+      body: M3FadeThroughIndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),

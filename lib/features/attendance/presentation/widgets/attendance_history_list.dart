@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
@@ -16,8 +17,10 @@ class AttendanceHistoryList extends StatelessWidget {
       itemCount: history.length,
       itemBuilder: (context, index) {
         final item = history[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
+        return M3StaggeredItem(
+          index: index,
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
             leading: Container(
               padding: const EdgeInsets.all(8),
@@ -47,9 +50,10 @@ class AttendanceHistoryList extends StatelessWidget {
                     color: theme.colorScheme.outlineVariant,
                     size: 16,
                   ),
+            ),
           ),
         );
       },
-    );
+      );
   }
 }

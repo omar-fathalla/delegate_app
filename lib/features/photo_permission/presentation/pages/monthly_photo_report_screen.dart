@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
 import 'package:delegate_app/core/widgets/app_photo_image.dart';
 import 'package:delegate_app/core/services/photo_cache_manager.dart';
@@ -590,14 +591,14 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     AnimatedSwitcher(
-                                      duration: const Duration(milliseconds: 300),
+                                      duration: AppMotionDurations.medium2,
                                       transitionBuilder: (child, animation) {
                                         final offsetAnimation = Tween<Offset>(
                                           begin: Offset(_slideDirection * 0.4, 0.0),
                                           end: Offset.zero,
                                         ).animate(CurvedAnimation(
                                           parent: animation,
-                                          curve: Curves.easeOutCubic,
+                                          curve: AppMotionCurves.emphasizedDecelerate,
                                         ));
                                         return FadeTransition(
                                           opacity: animation,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -33,13 +34,13 @@ class _LoginScreenState extends State<LoginScreen>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: AppMotionDurations.extraLong4, // 1000ms M3 Token
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+        curve: const Interval(0.0, 0.6, curve: AppMotionCurves.standardDecelerate),
       ),
     );
 
@@ -47,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen>
         Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero).animate(
           CurvedAnimation(
             parent: _animationController,
-            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+            curve: const Interval(0.2, 1.0, curve: AppMotionCurves.emphasizedDecelerate),
           ),
         );
 

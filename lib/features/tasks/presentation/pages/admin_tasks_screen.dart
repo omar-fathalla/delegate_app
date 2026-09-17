@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_bloc.dart';
@@ -124,21 +125,27 @@ class _AdminTasksScreenState extends State<AdminTasksScreen> {
                           !_isSameDay(task.createdAt, prevTask.createdAt);
 
                       if (showHeader) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _DateHeader(date: task.createdAt),
-                            _TaskCard(
-                              task: task,
-                              adminDelegate: widget.adminDelegate,
-                            ),
-                          ],
+                        return M3StaggeredItem(
+                          index: index,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _DateHeader(date: task.createdAt),
+                              _TaskCard(
+                                task: task,
+                                adminDelegate: widget.adminDelegate,
+                              ),
+                            ],
+                          ),
                         );
                       }
 
-                      return _TaskCard(
-                        task: task,
-                        adminDelegate: widget.adminDelegate,
+                      return M3StaggeredItem(
+                        index: index,
+                        child: _TaskCard(
+                          task: task,
+                          adminDelegate: widget.adminDelegate,
+                        ),
                       );
                     },
                   );
