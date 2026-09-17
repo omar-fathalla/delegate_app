@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
@@ -36,6 +38,12 @@ class _AddBranchViewState extends State<_AddBranchView> {
   final _nameController = TextEditingController();
   final _radiusController = TextEditingController(text: '100');
 
+  String? _selectedOrgUID;
+  String? _selectedOrgName;
+  List<Map<String, dynamic>> _organizations = [];
+  bool _isLoadingOrgs = true;
+  StreamSubscription<QuerySnapshot>? _orgsSubscription;
+
   LatLng? _selectedActionPoint;
   bool _isLocating = false;
 
@@ -51,10 +59,58 @@ class _AddBranchViewState extends State<_AddBranchView> {
   void initState() {
     super.initState();
     _fetchInitialLocation();
+    _subscribeToOrganizations();
+  }
+
+  void _subscribeToOrganizations() {
+    _orgsSubscription = FirebaseFirestore.instance
+        .collection('organizations')
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      final orgs = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final name = data['name'] as String? ??
+            data['title'] as String? ??
+            data['orgName'] as String? ??
+            doc.id;
+        return {
+          'uid': doc.id,
+          'name': name,
+        };
+      }).toList();
+
+      orgs.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
+
+      setState(() {
+        _organizations = orgs;
+        _isLoadingOrgs = false;
+
+        if (_selectedOrgUID != null) {
+          final found = _organizations.firstWhere(
+            (o) => o['uid'] == _selectedOrgUID,
+            orElse: () => {},
+          );
+          if (found.isNotEmpty) {
+            _selectedOrgName = found['name'] as String?;
+          } else {
+            _selectedOrgUID = null;
+            _selectedOrgName = null;
+          }
+        }
+      });
+    }, onError: (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingOrgs = false;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _orgsSubscription?.cancel();
     _nameController.dispose();
     _radiusController.dispose();
     _searchController.dispose();
@@ -217,6 +273,15 @@ class _AddBranchViewState extends State<_AddBranchView> {
   void _saveBranch() {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_selectedOrgUID == null || _selectedOrgUID!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى اختيار المنظمة أولاً'),
+        ),
+      );
+      return;
+    }
+
     if (_selectedActionPoint == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -232,6 +297,8 @@ class _AddBranchViewState extends State<_AddBranchView> {
       latitude: _selectedActionPoint!.latitude,
       longitude: _selectedActionPoint!.longitude,
       geofenceRadius: double.tryParse(_radiusController.text) ?? 100.0,
+      organizationUID: _selectedOrgUID,
+      organizationName: _selectedOrgName,
     );
 
     context.read<BranchBloc>().add(BranchAddRequested(branch: newBranch));
@@ -279,6 +346,78 @@ class _AddBranchViewState extends State<_AddBranchView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Organization Dropdown Field
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedOrgUID,
+                      isExpanded: true,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: colorScheme.onSurface,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'المنظمة',
+                        labelStyle: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.corporate_fare_rounded,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest,
+                        border: UnderlineInputBorder(
+                          borderSide: BorderSide(color: colorScheme.outline),
+                        ),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: colorScheme.outline),
+                        ),
+                        focusedBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: colorScheme.primary),
+                        ),
+                      ),
+                      hint: _isLoadingOrgs
+                          ? Text(
+                              'جاري تحميل المنظمات...',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            )
+                          : Text(
+                              'اختر المنظمة التابع لها الفرع',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                      items: _organizations.map((org) {
+                        return DropdownMenuItem<String>(
+                          value: org['uid'] as String,
+                          child: Text(
+                            org['name'] as String,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      validator: (val) {
+                        if (val == null || val.isEmpty) {
+                          return 'يرجى اختيار المنظمة';
+                        }
+                        return null;
+                      },
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedOrgUID = val;
+                          final org = _organizations.firstWhere(
+                            (o) => o['uid'] == val,
+                            orElse: () => {'name': ''},
+                          );
+                          _selectedOrgName = org['name'] as String?;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
                     // Branch Name Field
                     TextFormField(
                       controller: _nameController,

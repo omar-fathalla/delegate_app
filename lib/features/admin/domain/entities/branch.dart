@@ -6,6 +6,8 @@ class Branch extends Equatable {
   final double latitude;
   final double longitude;
   final double geofenceRadius;
+  final String? organizationUID;
+  final String? organizationName;
 
   const Branch({
     required this.id,
@@ -13,6 +15,8 @@ class Branch extends Equatable {
     required this.latitude,
     required this.longitude,
     required this.geofenceRadius,
+    this.organizationUID,
+    this.organizationName,
   });
 
   @override
@@ -22,5 +26,7 @@ class Branch extends Equatable {
     latitude,
     longitude,
     geofenceRadius,
+    organizationUID,
+    organizationName,
   ];
 }

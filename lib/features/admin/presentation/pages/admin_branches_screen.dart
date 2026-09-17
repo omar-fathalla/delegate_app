@@ -108,8 +108,36 @@ class _AdminBranchesView extends StatelessWidget {
                         branch.branchName,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      subtitle: Text(
-                        '${branch.latitude.toStringAsFixed(4)}, ${branch.longitude.toStringAsFixed(4)}\nRadius: ${branch.geofenceRadius}m',
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (branch.organizationName != null &&
+                              branch.organizationName!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 2.0),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.corporate_fare_rounded,
+                                    size: 14,
+                                    color: colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    branch.organizationName!,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.primary,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          Text(
+                            '${branch.latitude.toStringAsFixed(4)}, ${branch.longitude.toStringAsFixed(4)} • نطاق: ${branch.geofenceRadius}m',
+                          ),
+                        ],
                       ),
                       isThreeLine: true,
                       trailing: Icon(

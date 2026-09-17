@@ -81,6 +81,8 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
         latitude: _branch.latitude,
         longitude: _branch.longitude,
         geofenceRadius: _branch.geofenceRadius,
+        organizationUID: _branch.organizationUID,
+        organizationName: _branch.organizationName,
       );
       if (mounted) {
         context.read<BranchBloc>().add(BranchUpdateRequested(branch: updated));
@@ -266,6 +268,39 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
                                   color: theme.colorScheme.onSurface,
                                 ),
                               ),
+                              if (_branch.organizationName != null &&
+                                  _branch.organizationName!.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.corporate_fare_rounded,
+                                        size: 16,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _branch.organizationName!,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.colorScheme.onPrimaryContainer,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 32),
                               Container(
                                 padding: const EdgeInsets.all(12),

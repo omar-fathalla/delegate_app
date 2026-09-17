@@ -81,12 +81,27 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   Future<BranchModel> addBranch(BranchModel branch) async {
     try {
       final ref = await _branches.add(branch.toMap());
+
+      // If the branch is assigned to an organization, link/sync it under the organization's subcollection
+      if (branch.organizationUID != null && branch.organizationUID!.isNotEmpty) {
+        try {
+          await firestore
+              .collection('organizations')
+              .doc(branch.organizationUID)
+              .collection('branches')
+              .doc(ref.id)
+              .set(branch.toMap(), SetOptions(merge: true));
+        } catch (_) {}
+      }
+
       return BranchModel(
         id: ref.id,
         branchName: branch.branchName,
         latitude: branch.latitude,
         longitude: branch.longitude,
         geofenceRadius: branch.geofenceRadius,
+        organizationUID: branch.organizationUID,
+        organizationName: branch.organizationName,
       );
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في إضافة الفرع.');
@@ -97,6 +112,18 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   Future<BranchModel> updateBranch(BranchModel branch) async {
     try {
       await _branches.doc(branch.id).update(branch.toMap());
+
+      if (branch.organizationUID != null && branch.organizationUID!.isNotEmpty) {
+        try {
+          await firestore
+              .collection('organizations')
+              .doc(branch.organizationUID)
+              .collection('branches')
+              .doc(branch.id)
+              .set(branch.toMap(), SetOptions(merge: true));
+        } catch (_) {}
+      }
+
       return branch;
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في تحديث بيانات الفرع.');
@@ -106,6 +133,20 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   @override
   Future<void> deleteBranch(String branchId) async {
     try {
+      // Check if branch belongs to an organization to clean up subcollection
+      try {
+        final doc = await _branches.doc(branchId).get();
+        final orgUID = (doc.data() as Map<String, dynamic>?)?['organizationUID'] as String?;
+        if (orgUID != null && orgUID.isNotEmpty) {
+          await firestore
+              .collection('organizations')
+              .doc(orgUID)
+              .collection('branches')
+              .doc(branchId)
+              .delete();
+        }
+      } catch (_) {}
+
       await _branches.doc(branchId).delete();
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في حذف الفرع.');

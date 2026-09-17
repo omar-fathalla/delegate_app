@@ -8,6 +8,8 @@ class BranchModel extends Branch {
     required super.latitude,
     required super.longitude,
     required super.geofenceRadius,
+    super.organizationUID,
+    super.organizationName,
   });
 
   factory BranchModel.fromFirestore(DocumentSnapshot doc) {
@@ -47,12 +49,22 @@ class BranchModel extends Branch {
         (data['geofence_radius'] as num?)?.toDouble() ??
         100.0;
 
+    final orgUID = data['organizationUID'] as String? ??
+        data['organizationId'] as String? ??
+        data['orgId'] as String? ??
+        data['organization_uid'] as String?;
+    final orgName = data['organizationName'] as String? ??
+        data['orgName'] as String? ??
+        data['organization_name'] as String?;
+
     return BranchModel(
       id: doc.id,
       branchName: name,
       latitude: lat,
       longitude: lng,
       geofenceRadius: radius,
+      organizationUID: orgUID,
+      organizationName: orgName,
     );
   }
 
@@ -95,12 +107,22 @@ class BranchModel extends Branch {
         (map['geofence_radius'] as num?)?.toDouble() ??
         100.0;
 
+    final orgUID = map['organizationUID'] as String? ??
+        map['organizationId'] as String? ??
+        map['orgId'] as String? ??
+        map['organization_uid'] as String?;
+    final orgName = map['organizationName'] as String? ??
+        map['orgName'] as String? ??
+        map['organization_name'] as String?;
+
     return BranchModel(
       id: id,
       branchName: name,
       latitude: lat,
       longitude: lng,
       geofenceRadius: radius,
+      organizationUID: orgUID,
+      organizationName: orgName,
     );
   }
 
@@ -109,6 +131,10 @@ class BranchModel extends Branch {
       'branchName': branchName,
       'location': {'latitude': latitude, 'longitude': longitude},
       'geofenceRadius': geofenceRadius,
+      if (organizationUID != null && organizationUID!.isNotEmpty)
+        'organizationUID': organizationUID,
+      if (organizationName != null && organizationName!.isNotEmpty)
+        'organizationName': organizationName,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
