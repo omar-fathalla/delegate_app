@@ -5,6 +5,10 @@
 - Only run build commands when the user explicitly and directly asks to build the APK/app.
 - For all code changes, validations, and tests, use only `flutter analyze` and `flutter test`.
 
+## Git & Version Control Policy
+- **Do NOT run `git push` (or push commits to GitHub / remote repositories) automatically or proactively.**
+- Only push to GitHub when the user explicitly and directly asks to push (e.g. "ارفع على جيت هب" أو "push on github").
+
 ## Header & App Bar Popup Menu Ordering (Across all 9 User Roles)
 - In all App Bars / Header Menus / `PopupMenuButton`s across all user roles (Delegate, Promoter, Supervisor, Admin, Super Admin, Organization Admin, Technical Support, Marketing, Branches Marketing Manager):
   - The **Profile (`profile`)** and role-specific feature options (e.g. Search, Tasks, Penalties, Admin tools, Org Switch) must always appear at the top.

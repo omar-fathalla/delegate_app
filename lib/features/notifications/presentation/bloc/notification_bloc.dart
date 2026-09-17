@@ -25,6 +25,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
 
   StreamSubscription<int>? _unreadCountSubscription;
   int _currentUnreadCount = 0;
+  String? _currentUserRole;
+  DateTime? _currentAccountCreatedAt;
 
   NotificationBloc({
     required this.getNotifications,
@@ -48,20 +50,48 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     LoadNotifications event,
     Emitter<NotificationState> emit,
   ) async {
+    if (event.userRole != null) _currentUserRole = event.userRole;
+    if (event.accountCreatedAt != null) {
+      _currentAccountCreatedAt = event.accountCreatedAt;
+    }
+
+    final role = event.userRole ?? _currentUserRole;
+    final isDelegate = role != null &&
+        role.toLowerCase().contains('delegate') &&
+        !role.toLowerCase().contains('supervisor') &&
+        !role.toLowerCase().contains('admin');
+    final createdAt = event.accountCreatedAt ?? _currentAccountCreatedAt;
+
     // 1. Instant Cache-First Load (0 ms)
     List<NotificationEntity> cachedList = [];
     if (getCachedNotifications != null) {
       try {
         cachedList = await getCachedNotifications!(event.delegateUid);
         if (cachedList.isNotEmpty) {
-          emit(
-            NotificationLoaded(
-              notifications: cachedList,
-              unreadCount: _currentUnreadCount > 0
-                  ? _currentUnreadCount
-                  : cachedList.where((n) => !n.isRead).length,
-            ),
-          );
+          if (isDelegate) {
+            cachedList = cachedList.where((n) {
+              final isAttendance = n.type == 'attendance_check_in' ||
+                  n.type == 'attendance_check_out';
+              return !isAttendance;
+            }).toList();
+          }
+          if (createdAt != null) {
+            final cutoff = createdAt.subtract(const Duration(minutes: 5));
+            cachedList = cachedList
+                .where((n) => !n.createdAt.isBefore(cutoff))
+                .toList();
+          }
+
+          if (cachedList.isNotEmpty) {
+            emit(
+              NotificationLoaded(
+                notifications: cachedList,
+                unreadCount: _currentUnreadCount > 0
+                    ? _currentUnreadCount
+                    : cachedList.where((n) => !n.isRead).length,
+              ),
+            );
+          }
         }
       } catch (_) {}
     }
@@ -76,6 +106,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         delegateUid: event.delegateUid,
         organizationId: event.organizationId,
         phoneNumber: event.phoneNumber,
+        userRole: role,
+        accountCreatedAt: createdAt,
       ),
     );
 
@@ -100,6 +132,11 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     SubscribeToUnreadCount event,
     Emitter<NotificationState> emit,
   ) async {
+    if (event.userRole != null) _currentUserRole = event.userRole;
+    if (event.accountCreatedAt != null) {
+      _currentAccountCreatedAt = event.accountCreatedAt;
+    }
+
     await _unreadCountSubscription?.cancel();
 
     _unreadCountSubscription =
@@ -108,6 +145,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
             delegateUid: event.delegateUid,
             organizationId: event.organizationId,
             phoneNumber: event.phoneNumber,
+            userRole: event.userRole ?? _currentUserRole,
+            accountCreatedAt: event.accountCreatedAt ?? _currentAccountCreatedAt,
           ),
         ).listen((count) {
           add(UnreadCountUpdated(count));
@@ -140,6 +179,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         delegateUid: event.delegateUid,
         organizationId: event.organizationId,
         phoneNumber: event.phoneNumber,
+        userRole: _currentUserRole,
+        accountCreatedAt: _currentAccountCreatedAt,
       ),
     );
   }
@@ -161,6 +202,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         delegateUid: event.delegateUid,
         organizationId: event.organizationId,
         phoneNumber: event.phoneNumber,
+        userRole: _currentUserRole,
+        accountCreatedAt: _currentAccountCreatedAt,
       ),
     );
   }

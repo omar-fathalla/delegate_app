@@ -44,6 +44,9 @@ class DelegateModel extends Delegate {
     super.boundDeviceModel,
     super.deviceBoundAt,
     super.isDeviceLocked = false,
+    super.supervisorName,
+    super.supervisorPhone,
+    super.supervisorUid,
   });
 
   factory DelegateModel.fromJson(Map<String, dynamic> json, String uid) {
@@ -258,6 +261,9 @@ class DelegateModel extends Delegate {
       boundDeviceModel: json['boundDeviceModel'],
       deviceBoundAt: DateTimeUtils.parseNullableDate(json['deviceBoundAt']),
       isDeviceLocked: json['isDeviceLocked'] ?? false,
+      supervisorName: (json['supervisorName'] as String?)?.trim() ?? (json['supervisor_name'] as String?)?.trim(),
+      supervisorPhone: (json['supervisorPhone'] as String?)?.trim() ?? (json['supervisor_phone'] as String?)?.trim(),
+      supervisorUid: (json['supervisorUid'] as String?)?.trim() ?? (json['supervisor_uid'] as String?)?.trim(),
     );
   }
 
@@ -351,6 +357,9 @@ class DelegateModel extends Delegate {
       'boundDeviceModel': boundDeviceModel,
       'deviceBoundAt': deviceBoundAt != null ? Timestamp.fromDate(deviceBoundAt!) : null,
       'isDeviceLocked': isDeviceLocked,
+      if (supervisorName != null) 'supervisorName': supervisorName,
+      if (supervisorPhone != null) 'supervisorPhone': supervisorPhone,
+      if (supervisorUid != null) 'supervisorUid': supervisorUid,
     };
   }
 
@@ -424,6 +433,9 @@ class DelegateModel extends Delegate {
       'boundDeviceModel': boundDeviceModel,
       'deviceBoundAt': deviceBoundAt?.toIso8601String(),
       'isDeviceLocked': isDeviceLocked,
+      if (supervisorName != null) 'supervisorName': supervisorName,
+      if (supervisorPhone != null) 'supervisorPhone': supervisorPhone,
+      if (supervisorUid != null) 'supervisorUid': supervisorUid,
     };
   }
 }

@@ -87,6 +87,8 @@ class NotificationsPage extends StatelessWidget {
             delegateUid: delegate.uid,
             organizationId: delegate.organizationUID,
             phoneNumber: delegate.phoneNumber,
+            userRole: delegate.role.name,
+            accountCreatedAt: delegate.createdAt,
           ),
         )
         ..add(
@@ -94,6 +96,8 @@ class NotificationsPage extends StatelessWidget {
             delegateUid: delegate.uid,
             organizationId: delegate.organizationUID,
             phoneNumber: delegate.phoneNumber,
+            userRole: delegate.role.name,
+            accountCreatedAt: delegate.createdAt,
           ),
         ),
       child: Scaffold(
@@ -208,6 +212,8 @@ class NotificationsPage extends StatelessWidget {
                       delegateUid: delegate.uid,
                       organizationId: delegate.organizationUID,
                       phoneNumber: delegate.phoneNumber,
+                      userRole: delegate.role.name,
+                      accountCreatedAt: delegate.createdAt,
                     ),
                   );
                 },

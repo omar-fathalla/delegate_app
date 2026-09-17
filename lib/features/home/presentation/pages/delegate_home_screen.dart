@@ -70,10 +70,66 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     try {
       final List<Map<String, dynamic>> fetchedSupervisors = [];
-      String companyPhone = '';
+      String companyPhone = widget.delegate.supervisorPhone ?? '';
       String companyEmail = '';
-      String companySupervisorName = '';
+      String companySupervisorName = widget.delegate.supervisorName ?? '';
       String companyName = widget.delegate.companyName;
+
+      // 0. Direct lookup by delegate's assigned supervisor UID if present
+      final directSupervisorUid = widget.delegate.supervisorUid;
+      if (directSupervisorUid != null && directSupervisorUid.isNotEmpty) {
+        try {
+          final supDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(directSupervisorUid)
+              .get();
+          if (supDoc.exists) {
+            final sData = supDoc.data()!;
+            final name = _extractPersonName(sData, companyName);
+            final phone = (sData['phoneNumber'] as String?)?.trim() ??
+                (widget.delegate.supervisorPhone ?? '');
+            fetchedSupervisors.add({
+              ...sData,
+              'displayName': name.isNotEmpty
+                  ? name
+                  : (companySupervisorName.isNotEmpty
+                      ? companySupervisorName
+                      : 'مشرف الشركة'),
+              'phoneNumber': phone,
+              'email': (sData['email'] as String?)?.trim() ?? '',
+              'companyName': companyName,
+            });
+          }
+        } catch (_) {}
+      }
+
+      // Also check supervisor from delegate's supervisorPhone if UID lookup didn't yield a supervisor
+      if (fetchedSupervisors.isEmpty &&
+          widget.delegate.supervisorPhone != null &&
+          widget.delegate.supervisorPhone!.trim().isNotEmpty) {
+        try {
+          final cleanPhone = widget.delegate.supervisorPhone!.replaceAll(RegExp(r'[^\d+]'), '');
+          final phoneSnap = await FirebaseFirestore.instance
+              .collection('users')
+              .where('phoneNumber', isEqualTo: cleanPhone)
+              .get();
+          if (phoneSnap.docs.isNotEmpty) {
+            final sData = phoneSnap.docs.first.data();
+            final name = _extractPersonName(sData, companyName);
+            fetchedSupervisors.add({
+              ...sData,
+              'displayName': name.isNotEmpty
+                  ? name
+                  : (companySupervisorName.isNotEmpty
+                      ? companySupervisorName
+                      : 'مشرف الشركة'),
+              'phoneNumber': cleanPhone,
+              'email': (sData['email'] as String?)?.trim() ?? '',
+              'companyName': companyName,
+            });
+          }
+        } catch (_) {}
+      }
 
       // 1. First attempt: Get company info & contact phone
       try {
@@ -90,7 +146,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             companyPhone =
                 (compData['phone'] as String?)?.trim() ??
                 (compData['phoneNumber'] as String?)?.trim() ??
-                '';
+                companyPhone;
             companyEmail =
                 (compData['email'] as String?)?.trim() ??
                 (compData['emailAddress'] as String?)?.trim() ??
@@ -121,7 +177,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         }
       } catch (_) {}
 
-      // 2. Query the users collection for company admins/supervisors
+      // 2. Query the users collection for company admins/supervisors (cross-organization query by companyUID)
       try {
         final userRoles = [
           'company-admin',
@@ -134,7 +190,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
         final snapshot = await FirebaseFirestore.instance
             .collection('users')
-            .where('organizationUID', isEqualTo: orgId)
             .where('companyUID', isEqualTo: compId)
             .get();
 
@@ -414,40 +469,80 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.badge_rounded,
-                            size: 14,
-                            color: Colors.white,
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        // Position Chip
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isArabic
-                                ? 'مندوب ميداني (Delegate)'
-                                : 'Field Delegate',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
                             ),
                           ),
-                        ],
-                      ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.badge_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isArabic ? 'مندوب ميداني' : 'Field Delegate',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Organization Chip (Distinct Accent)
+                        if (widget.delegate.organizationName.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFBBF24).withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFFDE68A).withValues(alpha: 0.6),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.domain_rounded,
+                                  size: 14,
+                                  color: Color(0xFFFEF3C7),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  widget.delegate.organizationName,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFFEF3C7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),

@@ -502,6 +502,15 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           .timeout(const Duration(seconds: 15));
 
       if (querySnapshot.docs.isEmpty) {
+        final groupSnap = await firestore
+            .collectionGroup('branches')
+            .where('branchName', isEqualTo: branchName.trim())
+            .limit(1)
+            .get()
+            .timeout(const Duration(seconds: 15));
+        if (groupSnap.docs.isNotEmpty) {
+          return groupSnap.docs.first.data();
+        }
         return null;
       }
 

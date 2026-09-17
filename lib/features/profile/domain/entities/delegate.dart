@@ -70,6 +70,9 @@ class Delegate extends Equatable {
   final String? boundDeviceModel;
   final DateTime? deviceBoundAt;
   final bool isDeviceLocked;
+  final String? supervisorName;
+  final String? supervisorPhone;
+  final String? supervisorUid;
 
   const Delegate({
     required this.uid,
@@ -112,6 +115,9 @@ class Delegate extends Equatable {
     this.boundDeviceModel,
     this.deviceBoundAt,
     this.isDeviceLocked = false,
+    this.supervisorName,
+    this.supervisorPhone,
+    this.supervisorUid,
   });
 
   @override
@@ -156,6 +162,9 @@ class Delegate extends Equatable {
     boundDeviceModel,
     deviceBoundAt,
     isDeviceLocked,
+    supervisorName,
+    supervisorPhone,
+    supervisorUid,
   ];
 
   String? get personalPhotoUrl {

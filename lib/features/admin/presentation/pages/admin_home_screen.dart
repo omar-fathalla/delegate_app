@@ -21,6 +21,8 @@ import 'package:delegate_app/features/admin/domain/repositories/delegate_subscri
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_delegate_form_screen.dart';
+import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -44,10 +46,262 @@ class AdminHomeScreen extends StatelessWidget {
   }
 }
 
-class _AdminHomeBody extends StatelessWidget {
+class _AdminHomeBody extends StatefulWidget {
   final Delegate adminDelegate;
 
   const _AdminHomeBody({required this.adminDelegate});
+
+  @override
+  State<_AdminHomeBody> createState() => _AdminHomeBodyState();
+}
+
+class _AdminHomeBodyState extends State<_AdminHomeBody> {
+  static final Map<String, List<String>> _orgsMemoryCache = {};
+  List<String> _supervisorOrganizations = [];
+
+  Delegate get adminDelegate => widget.adminDelegate;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCachedAndFreshOrganizations();
+  }
+
+  String get _cacheKey =>
+      widget.adminDelegate.companyUID.isNotEmpty
+          ? widget.adminDelegate.companyUID
+          : (widget.adminDelegate.companyName.isNotEmpty
+              ? widget.adminDelegate.companyName
+              : widget.adminDelegate.organizationUID);
+
+  bool get _isArabic => mounted
+      ? ((Localizations.maybeLocaleOf(context)?.languageCode ?? 'ar') == 'ar')
+      : true;
+
+  Future<void> _loadCachedAndFreshOrganizations({bool forceRefresh = false}) async {
+    final key = _cacheKey;
+    if (key.isEmpty) return;
+    final isArabic = _isArabic;
+
+    // 1. In-memory cache first (0ms)
+    if (!forceRefresh && _orgsMemoryCache.containsKey(key)) {
+      if (mounted) {
+        setState(() {
+          _supervisorOrganizations = List.from(_orgsMemoryCache[key]!);
+        });
+      }
+      return;
+    }
+
+    // 2. Persistent cache (SharedPreferences)
+    if (!forceRefresh) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cached = prefs.getStringList('supervisor_orgs_$key');
+        if (cached != null && cached.isNotEmpty) {
+          _orgsMemoryCache[key] = cached;
+          if (mounted) {
+            setState(() {
+              _supervisorOrganizations = cached;
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback to supervisor's own organization if empty
+    if (_supervisorOrganizations.isEmpty &&
+        widget.adminDelegate.organizationName.isNotEmpty) {
+      final initialOrg = _normalizeOrgName(
+        widget.adminDelegate.organizationName,
+        isArabic,
+      );
+      if (initialOrg.isNotEmpty) {
+        _supervisorOrganizations = [initialOrg];
+      }
+    }
+
+    // 4. Background revalidation from Firestore & Delegate usecase
+    _fetchFreshOrganizations(key, isArabic);
+  }
+
+  Future<void> _fetchFreshOrganizations(String key, bool isArabic) async {
+    try {
+      final Set<String> collected = {};
+
+      // Add supervisor's own org
+      if (widget.adminDelegate.organizationName.isNotEmpty) {
+        final norm = _normalizeOrgName(widget.adminDelegate.organizationName, isArabic);
+        if (norm.isNotEmpty) collected.add(norm);
+      }
+
+      // Query delegates via GetCompanyDelegates
+      if (widget.adminDelegate.companyUID.isNotEmpty) {
+        try {
+          final result = await sl<GetCompanyDelegates>()(
+            GetCompanyDelegatesParams(
+              organizationUID: '',
+              companyUID: widget.adminDelegate.companyUID,
+            ),
+          );
+          result.fold(
+            (_) {},
+            (delegates) {
+              for (final d in delegates) {
+                if (d.organizationName.isNotEmpty) {
+                  final norm = _normalizeOrgName(d.organizationName, isArabic);
+                  if (norm.isNotEmpty) collected.add(norm);
+                }
+              }
+            },
+          );
+        } catch (_) {}
+      }
+
+      // Also query users collection by companyUID and companyName
+      try {
+        final List<Future<QuerySnapshot<Map<String, dynamic>>>> queries = [];
+        if (widget.adminDelegate.companyUID.isNotEmpty) {
+          queries.add(
+            FirebaseFirestore.instance
+                .collection('users')
+                .where('companyUID', isEqualTo: widget.adminDelegate.companyUID)
+                .get(),
+          );
+        }
+        if (widget.adminDelegate.companyName.isNotEmpty) {
+          queries.add(
+            FirebaseFirestore.instance
+                .collection('users')
+                .where('companyName', isEqualTo: widget.adminDelegate.companyName)
+                .get(),
+          );
+        }
+        final snapshots = await Future.wait(queries);
+        for (final snap in snapshots) {
+          for (final doc in snap.docs) {
+            final data = doc.data();
+            final org = data['organizationName']?.toString().trim() ?? '';
+            if (org.isNotEmpty) {
+              final norm = _normalizeOrgName(org, isArabic);
+              if (norm.isNotEmpty) collected.add(norm);
+            }
+          }
+        }
+      } catch (_) {}
+
+      // If still only 1 org, check if company is registered in other organizations
+      if (widget.adminDelegate.companyUID.isNotEmpty) {
+        try {
+          final orgsSnap = await FirebaseFirestore.instance.collection('organizations').get();
+          for (final orgDoc in orgsSnap.docs) {
+            final cDoc = await FirebaseFirestore.instance
+                .collection('organizations')
+                .doc(orgDoc.id)
+                .collection('companies')
+                .doc(widget.adminDelegate.companyUID)
+                .get();
+            if (cDoc.exists) {
+              final orgName = orgDoc.data()['name']?.toString() ?? '';
+              final norm = _normalizeOrgName(orgName, isArabic);
+              if (norm.isNotEmpty) collected.add(norm);
+            }
+          }
+        } catch (_) {}
+      }
+
+      final list = collected.toList();
+      if (list.isNotEmpty && mounted) {
+        _orgsMemoryCache[key] = list;
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setStringList('supervisor_orgs_$key', list);
+        } catch (_) {}
+        setState(() {
+          _supervisorOrganizations = list;
+        });
+      }
+    } catch (_) {}
+  }
+
+  String _normalizeOrgName(String raw, bool isArabic) {
+    final clean = raw.trim();
+    final lower = clean.toLowerCase();
+    if (lower.contains('fathalla') || clean.contains('فتح الله') || clean.contains('فتح_الله')) {
+      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
+    }
+    if (lower.contains('gomla') || clean.contains('جملة')) {
+      return isArabic ? 'جملة ماركت' : 'Gomla Market';
+    }
+    if (lower.contains('zahran') || clean.contains('زهران')) {
+      return isArabic ? 'زهران ماركت' : 'Zahran Market';
+    }
+    if (lower.contains('carrefour') || clean.contains('كارفور')) {
+      return isArabic ? 'كارفور' : 'Carrefour';
+    }
+    if (lower.contains('beit') || clean.contains('بيت الجملة')) {
+      return isArabic ? 'بيت الجملة' : 'Beit El Gomla';
+    }
+    return clean;
+  }
+
+  Color _getOrgAccentColor(String orgName) {
+    final lower = orgName.toLowerCase();
+    if (lower.contains('fathalla') || orgName.contains('فتح الله') || orgName.contains('فتح_الله')) {
+      return const Color(0xFFEF4444); // Crimson red
+    }
+    if (lower.contains('gomla') || orgName.contains('جملة')) {
+      return const Color(0xFFF59E0B); // Warm amber/gold
+    }
+    if (lower.contains('zahran') || orgName.contains('زهران')) {
+      return const Color(0xFF10B981); // Emerald green
+    }
+    if (lower.contains('carrefour') || orgName.contains('كارفور')) {
+      return const Color(0xFF0EA5E9); // Sky blue
+    }
+    if (lower.contains('beit') || orgName.contains('بيت الجملة')) {
+      return const Color(0xFF8B5CF6); // Purple
+    }
+    return const Color(0xFF14B8A6); // Teal fallback
+  }
+
+  Widget _buildOrgBadgeChip(String orgName, bool isArabic) {
+    final accentColor = _getOrgAccentColor(orgName);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.7),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.storefront_rounded,
+            size: 13,
+            color: accentColor.withValues(alpha: 0.95),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            orgName,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showAttendanceDetailsSheet(BuildContext context, String initialFilter) {
     showModalBottomSheet(
@@ -72,6 +326,7 @@ class _AdminHomeBody extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: () async {
         AdminDashboardBloc.clearCache();
+        _loadCachedAndFreshOrganizations(forceRefresh: true);
         context.read<AdminDashboardBloc>().add(
           LoadDashboard(
             organizationUID: adminDelegate.companyUID.isNotEmpty
@@ -716,39 +971,50 @@ class _AdminHomeBody extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                     ],
-                    // شارة المسمى الوظيفي
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            roleIcon,
-                            size: 14,
-                            color: Colors.white,
+                    // شارة المسمى الوظيفي ورُقاقات المنظمات التابع لها مناديب المشرف
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            roleBadge,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              width: 1,
                             ),
                           ),
-                        ],
-                      ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                roleIcon,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                roleBadge,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_isCompanySupervisor)
+                          ..._supervisorOrganizations.map(
+                            (org) => _buildOrgBadgeChip(org, isArabic),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -1105,7 +1371,7 @@ class _AdminHomeBody extends StatelessWidget {
                     },
                     icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
                     label: Text(
-                      isArabic ? 'إضافة مندوب في فرع' : 'Add Delegate',
+                      isArabic ? 'إضافة مندوب' : 'Add Delegate',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     style: FilledButton.styleFrom(

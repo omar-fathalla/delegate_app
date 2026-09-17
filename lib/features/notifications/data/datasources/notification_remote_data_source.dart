@@ -7,12 +7,16 @@ abstract class NotificationRemoteDataSource {
     String delegateUid,
     String organizationId, {
     String? phoneNumber,
+    String? userRole,
+    DateTime? accountCreatedAt,
   });
 
   Stream<int> getUnreadCount(
     String delegateUid,
     String organizationId, {
     String? phoneNumber,
+    String? userRole,
+    DateTime? accountCreatedAt,
   });
 
   Future<void> markAsRead(String notificationId);
@@ -40,10 +44,13 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     String delegateUid,
     String organizationId, {
     String? phoneNumber,
+    String? userRole,
+    DateTime? accountCreatedAt,
   }) async {
     final Set<String> docIds = {};
     final List<QueryDocumentSnapshot> docs = [];
-    String normalizedRole = '';
+    String normalizedRole = userRole?.toLowerCase() ?? '';
+    DateTime? userCreatedAt = accountCreatedAt;
 
     void addDocs(List<QueryDocumentSnapshot> newDocs) {
       for (final doc in newDocs) {
@@ -100,7 +107,6 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
 
       // 3. User profile lookup for companyId & role
       String? userCompanyId;
-      String? userRole;
       try {
         final userDoc = await firestore.collection('users').doc(delegateUid).get();
         if (userDoc.exists) {
@@ -109,11 +115,44 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
                   userData?['phone'] ??
                   userData?['mobileNumber']) as String?;
           userCompanyId = (userData?['companyUID'] ?? userData?['companyId']) as String?;
-          userRole = userData?['role']?.toString();
-          normalizedRole = userRole?.toLowerCase() ?? '';
+          final r = userData?['role']?.toString();
+          if (normalizedRole.isEmpty && r != null && r.isNotEmpty) {
+            normalizedRole = r.toLowerCase();
+          }
+          userCreatedAt ??= (userData?['createdAt'] as Timestamp?)?.toDate();
           if (p != null && p.isNotEmpty) phonesToCheck.add(p);
         }
       } catch (_) {}
+
+      // Fallback lookup from delegates collection if companyId or createdAt is still missing
+      if (userCompanyId == null || userCreatedAt == null) {
+        try {
+          final delSnap = await firestore
+              .collectionGroup('delegates')
+              .where('uid', isEqualTo: delegateUid)
+              .limit(1)
+              .get();
+          if (delSnap.docs.isNotEmpty) {
+            final delData = delSnap.docs.first.data();
+            userCompanyId ??= (delData['companyUID'] ?? delData['companyId']) as String?;
+            if (normalizedRole.isEmpty) {
+              normalizedRole = (delData['role']?.toString() ?? 'delegate').toLowerCase();
+            }
+            userCreatedAt ??= (delData['createdAt'] as Timestamp?)?.toDate();
+          }
+        } catch (_) {}
+      }
+
+      final isSupervisorOrAdmin = normalizedRole.contains('supervisor') ||
+          normalizedRole.contains('admin') ||
+          normalizedRole.contains('company_admin') ||
+          normalizedRole.contains('company-admin') ||
+          normalizedRole.contains('super') ||
+          normalizedRole.contains('support') ||
+          delegateUid == 'super-admin-login';
+
+      final isDelegate = normalizedRole.contains('delegate') ||
+          (!isSupervisorOrAdmin && (userRole?.toLowerCase() == 'delegate'));
 
       // 4. Parallel Company and Role broadcast queries
       final roleQueries = <Future<QuerySnapshot>>[];
@@ -121,12 +160,24 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
         roleQueries.add(
           _collection.where('delegateUid', isEqualTo: 'company_$userCompanyId').limit(30).get(),
         );
-        roleQueries.add(
-          _collection.where('delegateUid', isEqualTo: 'supervisor_$userCompanyId').limit(30).get(),
-        );
-        roleQueries.add(
-          _collection.where('companyId', isEqualTo: userCompanyId).where('delegateUid', isEqualTo: 'all_company_supervisors').limit(30).get(),
-        );
+        // Only supervisors and admins receive supervisor-specific and all_company_supervisors broadcasts
+        if (isSupervisorOrAdmin) {
+          roleQueries.add(
+            _collection.where('delegateUid', isEqualTo: 'supervisor_$userCompanyId').limit(30).get(),
+          );
+          roleQueries.add(
+            _collection.where('companyId', isEqualTo: userCompanyId).where('delegateUid', isEqualTo: 'all_company_supervisors').limit(30).get(),
+          );
+        }
+        if (isDelegate) {
+          roleQueries.add(
+            _collection.where('delegateUid', isEqualTo: 'delegates_$userCompanyId').limit(30).get(),
+          );
+        }
+      }
+
+      if (isDelegate) {
+        roleQueries.add(_collection.where('delegateUid', isEqualTo: 'delegates').limit(30).get());
       }
 
       if (normalizedRole.contains('marketing') || normalizedRole.contains('branches')) {
@@ -191,9 +242,17 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     // Filter out notifications deleted by this user (Soft Delete) and role-restricted notifications
     final filteredDocs = docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>?;
+      if (data == null) return false;
+
+      final deletedBy = data['deletedBy'];
+      if (deletedBy is List) {
+        if (deletedBy.contains(delegateUid)) return false;
+        if (phoneNumber != null && deletedBy.contains(phoneNumber)) return false;
+      }
+
+      final type = data['type']?.toString();
 
       // Delegate subscription requests are strictly restricted ONLY to Super Admin and Technical Support
-      final type = data?['type']?.toString();
       if (type == 'delegate_subscription_request') {
         final isPrivileged = normalizedRole.contains('super') ||
             normalizedRole.contains('technical') ||
@@ -204,11 +263,33 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
         if (!isPrivileged) return false;
       }
 
-      final deletedBy = data?['deletedBy'];
-      if (deletedBy is List) {
-        if (deletedBy.contains(delegateUid)) return false;
-        if (phoneNumber != null && deletedBy.contains(phoneNumber)) return false;
+      final isSupervisorOrAdmin = normalizedRole.contains('supervisor') ||
+          normalizedRole.contains('admin') ||
+          normalizedRole.contains('company_admin') ||
+          normalizedRole.contains('company-admin') ||
+          normalizedRole.contains('super') ||
+          normalizedRole.contains('support') ||
+          delegateUid == 'super-admin-login';
+
+      // Attendance check-in / check-out alerts are strictly for supervisors & admins to monitor their delegates.
+      // Delegates should NEVER receive attendance alerts of other delegates or administrative check-in broadcasts.
+      final isAttendance = type == 'attendance_check_in' ||
+          type == 'attendance_check_out' ||
+          data['attendanceType'] != null;
+      if (isAttendance && !isSupervisorOrAdmin) {
+        return false;
       }
+
+      // Exclude historical notifications created BEFORE the user/delegate account was created
+      final effectiveCreatedAt = accountCreatedAt ?? userCreatedAt;
+      if (effectiveCreatedAt != null) {
+        final notifTime = (data['createdAt'] as Timestamp?)?.toDate();
+        if (notifTime != null &&
+            notifTime.isBefore(effectiveCreatedAt.subtract(const Duration(minutes: 5)))) {
+          return false;
+        }
+      }
+
       return true;
     }).toList();
 
@@ -260,12 +341,16 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     String delegateUid,
     String organizationId, {
     String? phoneNumber,
+    String? userRole,
+    DateTime? accountCreatedAt,
   }) {
     return Stream.fromFuture(
       getNotifications(
         delegateUid,
         organizationId,
         phoneNumber: phoneNumber,
+        userRole: userRole,
+        accountCreatedAt: accountCreatedAt,
       ),
     ).map((list) => list.where((n) => !n.isRead).length);
   }

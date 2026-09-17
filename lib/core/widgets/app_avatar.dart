@@ -1,0 +1,113 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+
+/// ويدجت موحد وآمن لعرض الصور الشخصية والأفاتار في التطبيق
+/// يتعامل تلقائياً وبأمان تام مع أخطاء الروابط المنتهية أو غير المصرح بها (مثل 403 Forbidden و 404)
+/// دون إلقاء استثناءات حمراء في كونسول التطبيق (Debug Console)، مع عرض الحرف الأول كبديل تلقائي
+class AppAvatar extends StatelessWidget {
+  final String? imageUrl;
+  final String fallbackText;
+  final double radius;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+  final Widget? badge;
+
+  const AppAvatar({
+    super.key,
+    this.imageUrl,
+    required this.fallbackText,
+    this.radius = 20,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bg = backgroundColor ?? theme.colorScheme.primaryContainer;
+    final fg = foregroundColor ?? theme.colorScheme.onPrimaryContainer;
+    final size = radius * 2;
+    final trimmed = fallbackText.trim();
+    final initial = trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '؟';
+
+    Widget fallbackWidget() {
+      return Container(
+        width: size,
+        height: size,
+        color: bg,
+        alignment: Alignment.center,
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: fg,
+            fontWeight: FontWeight.bold,
+            fontSize: radius * 0.85,
+          ),
+        ),
+      );
+    }
+
+    final cleanUrl = imageUrl?.trim();
+    final hasUrl = cleanUrl != null &&
+        cleanUrl.isNotEmpty &&
+        (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://'));
+
+    Widget avatarContent;
+    if (!hasUrl) {
+      avatarContent = fallbackWidget();
+    } else {
+      avatarContent = CachedNetworkImage(
+        imageUrl: cleanUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        fadeInDuration: const Duration(milliseconds: 150),
+        fadeOutDuration: const Duration(milliseconds: 100),
+        placeholder: (context, url) => Container(
+          width: size,
+          height: size,
+          color: bg,
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: radius * 0.65,
+            height: radius * 0.65,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: fg.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+        errorWidget: (context, url, error) {
+          // التعامل بمرونة مع أخطاء الروابط المنتهية (403 أو 404 أو انقطاع النت)
+          // يمنع نهائياً طباعة خطأ HttpException 403 باللون الأحمر في كونسول الفحص
+          return fallbackWidget();
+        },
+      );
+    }
+
+    final circularAvatar = ClipOval(
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: avatarContent,
+      ),
+    );
+
+    if (badge == null) {
+      return circularAvatar;
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        circularAvatar,
+        Positioned(
+          bottom: -1,
+          right: -1,
+          child: badge!,
+        ),
+      ],
+    );
+  }
+}

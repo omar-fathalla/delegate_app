@@ -2,6 +2,7 @@ import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
+import 'package:delegate_app/core/services/session_management_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
@@ -53,8 +54,26 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         // Always cache all delegates for organization switching later
         await cacheAllDelegatesUseCase(delegates);
 
-        if (delegates.length == 1) {
-          final delegate = delegates.first;
+        // Group delegates by distinct organization
+        final uniqueOrgs = <String, List<Delegate>>{};
+        for (final d in delegates) {
+          final orgKey = d.organizationUID.isNotEmpty ? d.organizationUID : d.organizationName;
+          uniqueOrgs.putIfAbsent(orgKey, () => []).add(d);
+        }
+
+        // If the user belongs to only ONE organization (or all records belong to the same org),
+        // log in directly without prompting the user to choose!
+        if (uniqueOrgs.length <= 1) {
+          final orgDelegates = uniqueOrgs.isNotEmpty ? uniqueOrgs.values.first : delegates;
+          final delegate = orgDelegates.firstWhere(
+            (d) => d.status == DelegateStatus.approved || d.status == DelegateStatus.active,
+            orElse: () => orgDelegates.first,
+          );
+
+          if (event.rememberMe) {
+            await cacheDelegateUseCase(delegate);
+          }
+
           // التحقق من بصمة الجهاز وقفل الحساب
           final deviceCheck = await DeviceBindingService.verifyOrBindDevice(delegate: delegate);
           if (deviceCheck.isMismatched) {
@@ -69,12 +88,26 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             return;
           }
 
+          // تصفير علامة الخروج الإجباري فور تسجيل الدخول بنجاح
+          SessionManagementService.clearReLoginFlag(
+            delegateUid: delegate.uid,
+            organizationUID: delegate.organizationUID,
+            companyUID: delegate.companyUID,
+          ).ignore();
+
           emit(AuthAuthenticated(delegate: delegate));
         } else {
-          // Multiple organizations - show selection
+          // Truly multiple organizations: show selection with 1 distinct entry per organization
+          final distinctDelegates = uniqueOrgs.values.map((orgDelegates) {
+            return orgDelegates.firstWhere(
+              (d) => d.status == DelegateStatus.approved || d.status == DelegateStatus.active,
+              orElse: () => orgDelegates.first,
+            );
+          }).toList();
+
           emit(
             AuthOrganizationSelectionRequired(
-              delegates: delegates,
+              delegates: distinctDelegates,
               rememberMe: event.rememberMe,
             ),
           );
@@ -92,11 +125,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     await result.fold(
       (failure) async {
-        emit(AuthUnauthenticated());
+        emit(const AuthUnauthenticated());
       },
       (delegate) async {
         if (delegate != null) {
-          // فحص بصمة الجهاز للتسجيل التلقائي
+          // 1. فحص إبطال الجلسة أو الخروج الإجباري من الإدارة
+          final sessionCheck = await SessionManagementService.checkSessionStatus(delegate: delegate);
+          if (!sessionCheck.isValid) {
+            await logoutUseCase(NoParams());
+            emit(AuthUnauthenticated(message: sessionCheck.reason));
+            return;
+          }
+
+          // 2. فحص بصمة الجهاز للتسجيل التلقائي
           final deviceCheck = await DeviceBindingService.verifyOrBindDevice(delegate: delegate);
           if (deviceCheck.isMismatched) {
             await logoutUseCase(NoParams());
@@ -113,7 +154,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
           emit(AuthAuthenticated(delegate: delegate));
         } else {
-          emit(AuthUnauthenticated());
+          emit(const AuthUnauthenticated());
         }
       },
     );
@@ -125,7 +166,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     await logoutUseCase(NoParams());
-    emit(AuthUnauthenticated());
+    emit(const AuthUnauthenticated());
   }
 
   Future<void> _onOrganizationSelected(
@@ -150,6 +191,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     if (event.rememberMe) {
       await cacheDelegateUseCase(delegate);
     }
+
+    // تصفير علامة الخروج الإجباري فور اختيار المنظمة
+    SessionManagementService.clearReLoginFlag(
+      delegateUid: delegate.uid,
+      organizationUID: delegate.organizationUID,
+      companyUID: delegate.companyUID,
+    ).ignore();
+
     emit(AuthAuthenticated(delegate: delegate));
   }
 }

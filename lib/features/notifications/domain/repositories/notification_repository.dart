@@ -7,6 +7,8 @@ abstract class NotificationRepository {
     String delegateUid,
     String organizationId, {
     String? phoneNumber,
+    String? userRole,
+    DateTime? accountCreatedAt,
   });
 
   Future<List<NotificationEntity>> getCachedNotifications(String delegateUid);
@@ -15,6 +17,8 @@ abstract class NotificationRepository {
     String delegateUid,
     String organizationId, {
     String? phoneNumber,
+    String? userRole,
+    DateTime? accountCreatedAt,
   });
 
   Future<Either<Failure, void>> markAsRead(String notificationId);

@@ -99,6 +99,8 @@ class _MainScreenState extends State<MainScreen> {
                             delegateUid: delegate.uid,
                             organizationId: delegate.organizationUID,
                             phoneNumber: delegate.phoneNumber,
+                            userRole: delegate.role.name,
+                            accountCreatedAt: delegate.createdAt,
                           ),
                         ),
                       child: BlocBuilder<NotificationBloc, NotificationState>(

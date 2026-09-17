@@ -1,20 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
 import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 /// الشاشة الرئيسية للفروع - تعرض جميع الفروع المفضلة في نفس الصفحة
 class BranchHomeScreen extends StatelessWidget {
   final Delegate marketingUser;
+  final bool showAppBar;
 
-  const BranchHomeScreen({super.key, required this.marketingUser});
+  const BranchHomeScreen({
+    super.key,
+    required this.marketingUser,
+    this.showAppBar = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +36,9 @@ class BranchHomeScreen extends StatelessWidget {
           bloc.add(
             LoadAllFavoriteBranchesAttendance(
               favoriteBranches: favorites,
-              organizationId: marketingUser.organizationUID,
+              organizationId: marketingUser.organizationUID.isNotEmpty
+                  ? marketingUser.organizationUID
+                  : 'PiioBFgxaHAeuRdjlDgj',
               date: DateTime.now(),
             ),
           );
@@ -35,14 +46,22 @@ class BranchHomeScreen extends StatelessWidget {
         bloc.add(LoadBranchPreferences(userId: marketingUser.uid));
         return bloc;
       },
-      child: _BranchHomeView(marketingUser: marketingUser),
+      child: _BranchHomeView(
+        marketingUser: marketingUser,
+        showAppBar: showAppBar,
+      ),
     );
   }
 }
 
 class _BranchHomeView extends StatefulWidget {
   final Delegate marketingUser;
-  const _BranchHomeView({required this.marketingUser});
+  final bool showAppBar;
+
+  const _BranchHomeView({
+    required this.marketingUser,
+    this.showAppBar = false,
+  });
 
   @override
   State<_BranchHomeView> createState() => _BranchHomeViewState();
@@ -52,6 +71,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   List<String> _favoriteBranches = [];
   bool _prefsLoaded = false;
   DateTime _selectedDate = DateTime.now();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -64,12 +85,20 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     } catch (_) {}
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   void _loadAllBranches(BuildContext context, List<String> favorites) {
     if (favorites.isEmpty) return;
     context.read<MarketingBloc>().add(
       LoadAllFavoriteBranchesAttendance(
         favoriteBranches: favorites,
-        organizationId: widget.marketingUser.organizationUID,
+        organizationId: widget.marketingUser.organizationUID.isNotEmpty
+            ? widget.marketingUser.organizationUID
+            : 'PiioBFgxaHAeuRdjlDgj',
         date: _selectedDate,
       ),
     );
@@ -144,7 +173,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           body = const Center(child: CircularProgressIndicator());
         }
 
-        return Stack(
+        final content = Stack(
           children: [
             body,
             // ─── FAB: إضافة فرع ───────────────────────────────────────────
@@ -152,7 +181,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               bottom: 16,
               left: 16,
               child: FloatingActionButton.extended(
-                heroTag: 'add_branch_fab',
+                heroTag: null,
                 onPressed: () => _showBranchPicker(context),
                 icon: const Icon(Icons.add_location_alt_rounded),
                 label: const Text('إضافة فرع'),
@@ -161,6 +190,33 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             ),
           ],
         );
+
+        if (widget.showAppBar) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(
+                'متابعة حضور الفروع',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+              ),
+              centerTitle: false,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.calendar_month_rounded),
+                  tooltip: 'تغيير التاريخ',
+                  onPressed: _selectDate,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  tooltip: 'تحديث',
+                  onPressed: () => _loadAllBranches(context, _favoriteBranches),
+                ),
+              ],
+            ),
+            body: content,
+          );
+        }
+
+        return content;
       },
     );
   }
@@ -336,6 +392,61 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             ),
           ),
 
+          // ─── شريط البحث عن مندوب أو شركة ────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (val) {
+                  setState(() => _searchQuery = val.trim());
+                },
+                decoration: InputDecoration(
+                  hintText: 'ابحث باسم المندوب أو اسم الشركة...',
+                  hintStyle: TextStyle(
+                    fontSize: 14,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: colorScheme.primary,
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           // ─── قسم لكل فرع ──────────────────────────────────────────────
           for (final branchName in state.favoriteBranches)
             _buildBranchSection(
@@ -359,6 +470,16 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     List<Map<String, dynamic>> records,
     ColorScheme colorScheme,
   ) {
+    final query = _searchQuery.toLowerCase();
+    final filteredRecords = query.isEmpty
+        ? records
+        : records.where((r) {
+            final name = (r['fullName'] as String? ?? '').toLowerCase();
+            final company = (r['companyName'] as String? ?? '').toLowerCase();
+            final phone = (r['phoneNumber'] as String? ?? '').toLowerCase();
+            return name.contains(query) || company.contains(query) || phone.contains(query);
+          }).toList();
+
     return SliverToBoxAdapter(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -417,7 +538,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${records.length} مندوب',
+                    query.isEmpty
+                        ? '${records.length} مندوب'
+                        : '${filteredRecords.length} من ${records.length}',
                     style: TextStyle(
                       color: colorScheme.onPrimary,
                       fontSize: 12,
@@ -447,7 +570,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           ),
 
           // ── Delegates List ──
-          if (records.isEmpty)
+          if (filteredRecords.isEmpty)
             Container(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               padding: const EdgeInsets.symmetric(vertical: 20),
@@ -461,13 +584,17 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               child: Column(
                 children: [
                   Icon(
-                    Icons.people_outline_rounded,
+                    query.isNotEmpty
+                        ? Icons.search_off_rounded
+                        : Icons.people_outline_rounded,
                     color: colorScheme.outlineVariant,
                     size: 36,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'لا يوجد حضور اليوم',
+                    query.isNotEmpty
+                        ? 'لا يوجد مندوب مطابق للبحث في هذا الفرع'
+                        : 'لا يوجد حضور اليوم',
                     style: TextStyle(
                       color: colorScheme.onSurfaceVariant,
                       fontSize: 13,
@@ -489,8 +616,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               ),
               clipBehavior: Clip.antiAlias,
               child: Column(
-                children: records.asMap().entries.map((entry) {
-                  final isLast = entry.key == records.length - 1;
+                children: filteredRecords.asMap().entries.map((entry) {
+                  final isLast = entry.key == filteredRecords.length - 1;
                   return Column(
                     children: [
                       _buildDelegateRow(context, entry.value, colorScheme),
@@ -549,34 +676,18 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                         companyName,
                       )
                   : null,
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: hasCheckOut
-                        ? colorScheme.surfaceContainerHighest
-                        : colorScheme.primaryContainer,
-                    backgroundImage: hasPhoto
-                        ? CachedNetworkImageProvider(imageUrl)
-                        : null,
-                    child: !hasPhoto
-                        ? Text(
-                            fullName.isNotEmpty ? fullName[0] : '؟',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: hasCheckOut
-                                  ? colorScheme.onSurfaceVariant
-                                  : colorScheme.onPrimaryContainer,
-                            ),
-                          )
-                        : null,
-                  ),
-                  if (hasPhoto)
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
+              child: AppAvatar(
+                imageUrl: hasPhoto ? imageUrl : null,
+                fallbackText: fullName,
+                radius: 22,
+                backgroundColor: hasCheckOut
+                    ? colorScheme.surfaceContainerHighest
+                    : colorScheme.primaryContainer,
+                foregroundColor: hasCheckOut
+                    ? colorScheme.onSurfaceVariant
+                    : colorScheme.onPrimaryContainer,
+                badge: hasPhoto
+                    ? Container(
                         padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
                           color: colorScheme.surface,
@@ -593,9 +704,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                           size: 10,
                           color: colorScheme.primary,
                         ),
-                      ),
-                    ),
-                ],
+                      )
+                    : null,
               ),
             ),
             const SizedBox(width: 12),
@@ -647,6 +757,23 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                 ],
               ),
             ),
+            // Call Supervisor Button
+            IconButton(
+              icon: Icon(
+                Icons.phone_in_talk_rounded,
+                color: colorScheme.primary,
+                size: 19,
+              ),
+              tooltip: 'اتصال بمشرف المندوب',
+              style: IconButton.styleFrom(
+                backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                padding: const EdgeInsets.all(6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => _contactSupervisor(context, record),
+            ),
+            const SizedBox(width: 8),
             // Status
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -693,6 +820,433 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     );
   }
 
+  // ─── Contact Supervisor (اتصال بمشرف المندوب) ──────────────────────────
+  Future<void> _contactSupervisor(
+    BuildContext context,
+    Map<String, dynamic> record,
+  ) async {
+    final String delegateName = record['fullName'] as String? ?? 'المندوب';
+    final String companyName = record['companyName'] as String? ?? '';
+    final String companyUID = record['companyUID'] as String? ?? '';
+    final delegateData = record['delegateData'] as Map<String, dynamic>?;
+
+    String? supName = record['supervisorName'] as String? ??
+        delegateData?['supervisorName'] as String?;
+    String? supPhone = record['supervisorPhone'] as String? ??
+        delegateData?['supervisorPhone'] as String?;
+
+    // If supervisor phone is not directly present, resolve it dynamically
+    if (supPhone == null || supPhone.trim().isEmpty) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
+      try {
+        final firestore = di.sl<FirebaseFirestore>();
+
+        // 1. Check createdBy in users
+        final createdBy = (record['createdBy'] ?? delegateData?['createdBy']) as String?;
+        if (createdBy != null && createdBy.isNotEmpty) {
+          final supDoc = await firestore.collection('users').doc(createdBy).get();
+          if (supDoc.exists && supDoc.data() != null) {
+            final data = supDoc.data()!;
+            final phone = data['phoneNumber'] as String? ?? data['phone'] as String?;
+            if (phone != null && phone.isNotEmpty) {
+              supPhone = phone;
+              supName ??= data['displayName'] as String? ?? data['name'] as String?;
+            }
+          }
+        }
+
+        // 2. If still empty, search users for company-admin or supervisor of this company
+        if ((supPhone == null || supPhone.isEmpty) && companyUID.isNotEmpty) {
+          final querySnap = await firestore
+              .collection('users')
+              .where('companyUID', isEqualTo: companyUID)
+              .where('role', whereIn: ['company-admin', 'supervisor'])
+              .limit(1)
+              .get();
+
+          if (querySnap.docs.isNotEmpty) {
+            final data = querySnap.docs.first.data();
+            final phone = data['phoneNumber'] as String? ?? data['phone'] as String?;
+            if (phone != null && phone.isNotEmpty) {
+              supPhone = phone;
+              supName ??= data['displayName'] as String? ?? data['name'] as String?;
+            }
+          }
+        }
+
+        // 3. If still empty, check company document in organizations
+        final effectiveOrg = widget.marketingUser.organizationUID.isNotEmpty
+            ? widget.marketingUser.organizationUID
+            : (record['organizationId'] as String? ??
+                delegateData?['organizationUID'] as String? ??
+                'PiioBFgxaHAeuRdjlDgj');
+
+        if ((supPhone == null || supPhone.isEmpty) &&
+            companyUID.isNotEmpty &&
+            effectiveOrg.isNotEmpty) {
+          final compDoc = await firestore
+              .collection('organizations')
+              .doc(effectiveOrg)
+              .collection('companies')
+              .doc(companyUID)
+              .get();
+          if (compDoc.exists && compDoc.data() != null) {
+            final compData = compDoc.data()!;
+            final phone = compData['supervisorPhone'] as String? ??
+                compData['phone'] as String? ??
+                compData['phoneNumber'] as String?;
+            if (phone != null && phone.isNotEmpty) {
+              supPhone = phone;
+              supName ??= compData['supervisorName'] as String? ??
+                  (companyName.isNotEmpty ? 'مشرف $companyName' : null);
+            }
+          }
+        }
+
+        // Cache for subsequent taps
+        if (supPhone != null && supPhone.isNotEmpty) {
+          record['supervisorPhone'] = supPhone;
+          if (supName != null) record['supervisorName'] = supName;
+        }
+      } catch (_) {
+      } finally {
+        if (context.mounted) Navigator.of(context).pop();
+      }
+    }
+
+    if (!context.mounted) return;
+
+    _showSupervisorModal(
+      context: context,
+      delegateName: delegateName,
+      companyName: companyName,
+      supervisorName: (supName != null && supName.isNotEmpty)
+          ? supName
+          : (companyName.isNotEmpty ? 'مشرف $companyName' : 'مشرف المندوب'),
+      supervisorPhone: supPhone,
+    );
+  }
+
+  void _showSupervisorModal({
+    required BuildContext context,
+    required String delegateName,
+    required String companyName,
+    required String supervisorName,
+    required String? supervisorPhone,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final hasPhone = supervisorPhone != null && supervisorPhone.trim().isNotEmpty;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            MediaQuery.of(sheetCtx).padding.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Grab Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Header Avatar & Titles
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.supervisor_account_rounded,
+                      color: colorScheme.primary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'الاتصال بمشرف المندوب',
+                          style: GoogleFonts.cairo(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          '$delegateName ${companyName.isNotEmpty ? '• $companyName' : ''}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(sheetCtx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              if (hasPhone) ...[
+                // Supervisor Info Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline_rounded,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              supervisorName,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'مشرف الشركة',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.phone_iphone_rounded,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              supervisorPhone,
+                              style: GoogleFonts.cairo(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
+                              textDirection: TextDirection.ltr,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.copy_rounded, size: 20),
+                            tooltip: 'نسخ الرقم',
+                            onPressed: () {
+                              Clipboard.setData(
+                                ClipboardData(text: supervisorPhone),
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('تم نسخ رقم المشرف إلى الحافظة'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Action Buttons (Call / WhatsApp)
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(sheetCtx);
+                          _callPhone(supervisorPhone);
+                        },
+                        icon: const Icon(Icons.phone_in_talk_rounded),
+                        label: Text(
+                          'اتصال الآن',
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          backgroundColor: Colors.green.withValues(alpha: 0.15),
+                          foregroundColor: Colors.green.shade800,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(sheetCtx);
+                          _openWhatsApp(supervisorPhone, delegateName);
+                        },
+                        icon: const Icon(Icons.chat_rounded, color: Colors.green),
+                        label: Text(
+                          'واتساب',
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: Colors.green.shade800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                // Empty state for supervisor phone
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.phone_disabled_rounded,
+                        size: 40,
+                        color: colorScheme.error.withValues(alpha: 0.8),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'لا يوجد رقم هاتف مسجل لمشرف هذا المندوب',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (companyName.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'شركة: $companyName',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonal(
+                    onPressed: () => Navigator.pop(sheetCtx),
+                    child: const Text('إغلاق'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _callPhone(String phone) async {
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final uri = Uri.parse('tel:$cleanPhone');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openWhatsApp(String phone, String delegateName) async {
+    var cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '2$cleanPhone';
+    }
+    final message = Uri.encodeComponent('مرحباً، بخصوص المندوب: $delegateName');
+    final uri = Uri.parse('https://wa.me/$cleanPhone?text=$message');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
+
   // ─── Open Attendance History ───────────────────────────────────────────────
   void _openAttendanceHistory(BuildContext context, Map<String, dynamic> record) {
     final delegateData = record['delegateData'] as Map<String, dynamic>?;
@@ -710,7 +1264,10 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       safeData.putIfAbsent('phoneNumber', () => record['phoneNumber'] ?? '');
       safeData.putIfAbsent('companyName', () => record['companyName'] ?? '');
       safeData.putIfAbsent('companyUID', () => record['companyUID'] ?? '');
-      safeData.putIfAbsent('organizationUID', () => widget.marketingUser.organizationUID);
+      final effectiveOrg = widget.marketingUser.organizationUID.isNotEmpty
+          ? widget.marketingUser.organizationUID
+          : (record['organizationId'] as String? ?? 'PiioBFgxaHAeuRdjlDgj');
+      safeData['organizationUID'] = effectiveOrg;
       safeData.putIfAbsent('status', () => 'Active');
       safeData.putIfAbsent('role', () => 'delegate');
 

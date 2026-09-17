@@ -55,6 +55,8 @@ class AdminRepositoryImpl implements AdminRepository {
         latitude: branch.latitude,
         longitude: branch.longitude,
         geofenceRadius: branch.geofenceRadius,
+        organizationUID: branch.organizationUID,
+        organizationName: branch.organizationName,
       );
       final result = await remoteDataSource.addBranch(model);
       return Right(result);
@@ -74,6 +76,8 @@ class AdminRepositoryImpl implements AdminRepository {
         latitude: branch.latitude,
         longitude: branch.longitude,
         geofenceRadius: branch.geofenceRadius,
+        organizationUID: branch.organizationUID,
+        organizationName: branch.organizationName,
       );
       final result = await remoteDataSource.updateBranch(model);
       return Right(result);

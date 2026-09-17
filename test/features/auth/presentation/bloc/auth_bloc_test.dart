@@ -155,6 +155,115 @@ void main() {
     );
 
     blocTest<AuthBloc, AuthState>(
+      'emits [AuthLoading, AuthAuthenticated] directly when multiple accounts belong to the SAME organization',
+      build: () {
+        final tDelegateSameOrg = Delegate(
+          uid: '2',
+          firstName: 'Test2',
+          middleName: 'User',
+          lastName: 'Name',
+          fullName: 'Test User Name 2',
+          nationalityID: 'testPass',
+          motherName: 'Mother',
+          city: 'Cairo',
+          phoneNumber: '01234567890',
+          gender: DelegateGender.male,
+          position: DelegatePosition.promoter,
+          birthDate: DateTime(1990, 1, 1),
+          organizationUID: 'org1',
+          organizationName: 'Org',
+          companyUID: 'comp2',
+          companyName: 'Comp 2',
+          status: DelegateStatus.active,
+          delegatePublicId: 'DEL-2',
+          allReceiptCodes: const [],
+          createdAt: DateTime(2024, 1, 1),
+          createdBy: 'admin',
+          hasPendingUpdate: false,
+          isDeductedFromCompany: false,
+          isPrinted: false,
+          isProfileComplete: true,
+          numberOfDocuments: 0,
+          paymentAmount: 0,
+          version: 1,
+          documents: const [],
+        );
+
+        when(
+          () => mockLogin(any()),
+        ).thenAnswer((_) async => Right([tDelegate, tDelegateSameOrg]));
+        return authBloc;
+      },
+      act: (bloc) => bloc.add(
+        const LoginRequested(phoneNumber: '01234567890', password: 'testPass'),
+      ),
+      expect: () => [AuthLoading(), AuthAuthenticated(delegate: tDelegate)],
+      verify: (_) {
+        verify(() => mockLogin(any())).called(1);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'emits [AuthLoading, AuthOrganizationSelectionRequired] when accounts belong to DIFFERENT organizations',
+      build: () {
+        final tDelegateDiffOrg = Delegate(
+          uid: '3',
+          firstName: 'Test3',
+          middleName: 'User',
+          lastName: 'Name',
+          fullName: 'Test User Name 3',
+          nationalityID: 'testPass',
+          motherName: 'Mother',
+          city: 'Cairo',
+          phoneNumber: '01234567890',
+          gender: DelegateGender.male,
+          position: DelegatePosition.promoter,
+          birthDate: DateTime(1990, 1, 1),
+          organizationUID: 'org2',
+          organizationName: 'Org 2',
+          companyUID: 'comp3',
+          companyName: 'Comp 3',
+          status: DelegateStatus.active,
+          delegatePublicId: 'DEL-3',
+          allReceiptCodes: const [],
+          createdAt: DateTime(2024, 1, 1),
+          createdBy: 'admin',
+          hasPendingUpdate: false,
+          isDeductedFromCompany: false,
+          isPrinted: false,
+          isProfileComplete: true,
+          numberOfDocuments: 0,
+          paymentAmount: 0,
+          version: 1,
+          documents: const [],
+        );
+
+        when(
+          () => mockLogin(any()),
+        ).thenAnswer((_) async => Right([tDelegate, tDelegateDiffOrg]));
+        return authBloc;
+      },
+      act: (bloc) => bloc.add(
+        const LoginRequested(phoneNumber: '01234567890', password: 'testPass', rememberMe: true),
+      ),
+      expect: () => [
+        AuthLoading(),
+        isA<AuthOrganizationSelectionRequired>().having(
+          (s) => s.delegates.length,
+          'distinct delegates length',
+          2,
+        ).having(
+          (s) => s.rememberMe,
+          'rememberMe',
+          true,
+        ),
+      ],
+      verify: (_) {
+        verify(() => mockLogin(any())).called(1);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
       'emits [AuthLoading, AuthError] when login fails',
       build: () {
         when(() => mockLogin(any())).thenAnswer(

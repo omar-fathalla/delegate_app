@@ -218,6 +218,8 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                   delegateUid: delegate.uid,
                   organizationId: delegate.organizationUID,
                   phoneNumber: delegate.phoneNumber,
+                  userRole: delegate.role.name,
+                  accountCreatedAt: delegate.createdAt,
                 ),
               ),
             child: BlocBuilder<NotificationBloc, NotificationState>(

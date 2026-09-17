@@ -115,11 +115,25 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           .where('phoneNumber', isEqualTo: normalizedPhone)
           .get();
 
-      final delegates = <DelegateModel>[];
+      final delegatesMap = <String, DelegateModel>{};
       for (final doc in querySnapshot.docs) {
         final data = doc.data();
-        delegates.add(DelegateModel.fromJson(data, doc.id));
+        final model = DelegateModel.fromJson(data, doc.id);
+        // Key based on uid, organizationUID, and companyUID to prevent identical duplicate records
+        final key = '${model.uid}_${model.organizationUID}_${model.companyUID}';
+        if (delegatesMap.containsKey(key)) {
+          final existing = delegatesMap[key]!;
+          if (existing.status != DelegateStatus.approved &&
+              existing.status != DelegateStatus.active &&
+              (model.status == DelegateStatus.approved || model.status == DelegateStatus.active)) {
+            delegatesMap[key] = model;
+          }
+        } else {
+          delegatesMap[key] = model;
+        }
       }
+
+      final delegates = delegatesMap.values.toList();
 
       // Also check if the user is an admin in the 'users' collection
       // (a phone number can exist in both delegates and users collections)

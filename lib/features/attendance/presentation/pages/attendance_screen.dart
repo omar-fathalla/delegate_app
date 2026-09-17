@@ -6,6 +6,9 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/admin/domain/entities/branch.dart';
+import 'package:delegate_app/features/admin/data/models/branch_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
@@ -34,7 +37,7 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
   late DateTime _selectedMonth;
   late final AttendanceBloc _attendanceBloc;
 
@@ -48,6 +51,32 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   List<String> _dayKeys = [];
 
   final ScrollController _scrollController = ScrollController();
+
+  // --- Geofencing & Motion State ---
+  late final AnimationController _radarController;
+  late final Animation<double> _radarAnimation;
+
+  String? _orgAttendanceMode;
+  List<Branch> _orgBranches = [];
+  bool _isLoadingBranches = false;
+  Position? _currentPosition;
+  Branch? _matchedBranch;
+  Branch? _nearestBranch;
+  double? _distanceToNearest;
+  bool _isInsideGeofence = false;
+  bool _isCheckingLocation = false;
+  String? _locationStatusMessage;
+
+  bool get _isGeofenceMode {
+    if (_orgAttendanceMode != null) {
+      return _orgAttendanceMode == 'geofence' || _orgAttendanceMode == 'gps';
+    }
+    final orgName = widget.delegate.organizationName.toLowerCase();
+    if (orgName.contains('فتح الله') || orgName.contains('fathalla')) {
+      return false;
+    }
+    return true; // Default for Gomla Market and all other retail chains
+  }
 
   @override
   bool get wantKeepAlive => true;
@@ -88,6 +117,32 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     });
 
     _scrollController.addListener(_onScroll);
+
+    // Initialize Material 3 Radar Pulse Animation
+    _radarController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    );
+    if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+      _radarController.repeat();
+    }
+    _radarAnimation = CurvedAnimation(
+      parent: _radarController,
+      curve: AppMotionCurves.standardDecelerate,
+    );
+
+    // If Geofence mode is expected, load organization settings and branches
+    if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _fetchOrganizationSettings().then((_) {
+            if (mounted && _isGeofenceMode) {
+              _loadBranches();
+            }
+          });
+        }
+      });
+    }
   }
 
   void _onScroll() {
@@ -118,6 +173,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   @override
   void dispose() {
+    _radarController.dispose();
     _connectivitySub.cancel();
     _scrollController.dispose();
     _attendanceBloc.close();
@@ -133,6 +189,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _filteredHistory.clear();
         _groupedByDay.clear();
         _dayKeys.clear();
+        _orgBranches.clear();
+        _matchedBranch = null;
+        _nearestBranch = null;
+        _distanceToNearest = null;
+        _isInsideGeofence = false;
+      });
+      _fetchOrganizationSettings().then((_) {
+        if (mounted && _isGeofenceMode) {
+          _loadBranches();
+        }
       });
       _attendanceBloc.add(
         HistoryRequested(
@@ -287,26 +353,61 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 : FloatingActionButton.extended(
                     onPressed: (state is AttendanceLoading || isSyncing)
                         ? null
-                        : () => _showQRScanner(
-                            context,
-                            isCheckedIn,
-                            activeAttendance,
-                          ),
+                        : () {
+                            if (_isGeofenceMode) {
+                              _handleGeofenceAction(
+                                isCheckedIn: isCheckedIn,
+                                activeAttendance: activeAttendance,
+                              );
+                            } else {
+                              _showQRScanner(
+                                context,
+                                isCheckedIn,
+                                activeAttendance,
+                              );
+                            }
+                          },
                     backgroundColor: isCheckedIn
                         ? Theme.of(context).colorScheme.errorContainer
-                        : Theme.of(context).colorScheme.primaryContainer,
+                        : (_isGeofenceMode
+                            ? (_isInsideGeofence
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : Theme.of(context).colorScheme.secondaryContainer)
+                            : Theme.of(context).colorScheme.primaryContainer),
                     icon: Icon(
-                      Icons.qr_code_scanner,
+                      isCheckedIn
+                          ? Icons.logout_rounded
+                          : (_isGeofenceMode
+                              ? (_isCheckingLocation
+                                  ? Icons.radar_rounded
+                                  : (_isInsideGeofence
+                                      ? Icons.how_to_reg_rounded
+                                      : Icons.location_searching_rounded))
+                              : Icons.qr_code_scanner),
                       color: isCheckedIn
                           ? Theme.of(context).colorScheme.onErrorContainer
-                          : Theme.of(context).colorScheme.onPrimaryContainer,
+                          : (_isGeofenceMode
+                              ? (_isInsideGeofence
+                                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                                  : Theme.of(context).colorScheme.onSecondaryContainer)
+                              : Theme.of(context).colorScheme.onPrimaryContainer),
                     ),
                     label: Text(
-                      isCheckedIn ? l10n.scanToCheckOut : l10n.scanToCheckIn,
+                      _buildFabLabel(
+                        context,
+                        isCheckedIn: isCheckedIn,
+                        activeAttendance: activeAttendance,
+                        l10n: l10n,
+                      ),
                       style: TextStyle(
+                        fontWeight: FontWeight.bold,
                         color: isCheckedIn
                             ? Theme.of(context).colorScheme.onErrorContainer
-                            : Theme.of(context).colorScheme.onPrimaryContainer,
+                            : (_isGeofenceMode
+                                ? (_isInsideGeofence
+                                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                                    : Theme.of(context).colorScheme.onSecondaryContainer)
+                                : Theme.of(context).colorScheme.onPrimaryContainer),
                       ),
                     ),
                   ),
@@ -710,39 +811,42 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: colorScheme.outlineVariant),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.qr_code_scanner,
-                      color: colorScheme.primary,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      child: Text(
-                        l10n.scanQrInstruction,
-                        style: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        textAlign: TextAlign.center,
+              if (_isGeofenceMode)
+                _buildGeofenceCard(context)
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.qr_code_scanner,
+                        color: colorScheme.primary,
+                        size: 24,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          l10n.scanQrInstruction,
+                          style: TextStyle(
+                            color: colorScheme.onSurface,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         );
@@ -750,6 +854,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
       return RefreshIndicator(
         onRefresh: () async {
+          if (_isGeofenceMode) {
+            _detectNearestBranch(showSnackBar: false);
+          }
           _attendanceBloc.add(const SyncRequested());
           _attendanceBloc.add(
             HistoryRequested(
@@ -766,7 +873,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           itemCount: _dayKeys.length + (state.hasReachedMax ? 1 : 2),
           itemBuilder: (context, index) {
             if (index == 0) {
-              return _buildMonthlyStatsBanner(context);
+              return Column(
+                children: [
+                  _buildMonthlyStatsBanner(context),
+                  if (_isGeofenceMode) _buildGeofenceCard(context),
+                ],
+              );
             }
             final dayIndex = index - 1;
             if (dayIndex >= _dayKeys.length) {
@@ -994,6 +1106,431 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     return Center(child: Text(l10n.somethingWentWrong));
   }
 
+  String _buildFabLabel(
+    BuildContext context, {
+    required bool isCheckedIn,
+    required Attendance? activeAttendance,
+    required AppLocalizations l10n,
+  }) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    if (!_isGeofenceMode) {
+      return isCheckedIn ? l10n.scanToCheckOut : l10n.scanToCheckIn;
+    }
+
+    if (isCheckedIn) {
+      final bName = activeAttendance?.branchName ?? _matchedBranch?.branchName;
+      if (bName != null && bName.isNotEmpty) {
+        return isArabic ? 'تسجيل انصراف ($bName)' : 'Check Out ($bName)';
+      }
+      return isArabic ? 'تسجيل الانصراف' : 'Check Out';
+    }
+
+    if (_isCheckingLocation) {
+      return isArabic ? 'جاري فحص الموقع...' : 'Checking location...';
+    }
+
+    if (_isInsideGeofence && _matchedBranch != null) {
+      return isArabic
+          ? 'تسجيل حضور (${_matchedBranch!.branchName})'
+          : 'Check In (${_matchedBranch!.branchName})';
+    }
+
+    return isArabic ? 'فحص الموقع وتسجيل الحضور' : 'Verify & Check In';
+  }
+
+  Future<void> _fetchOrganizationSettings() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('organizations')
+          .doc(widget.delegate.organizationUID)
+          .get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _orgAttendanceMode = doc.data()?['attendanceMode'] as String?;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadBranches() async {
+    if (!_isGeofenceMode) return;
+    if (_isLoadingBranches) return;
+    setState(() => _isLoadingBranches = true);
+    try {
+      final orgId = widget.delegate.organizationUID;
+      final branchesList = <Branch>[];
+
+      // 1. Fetch from organizations/{orgId}/branches
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('organizations')
+            .doc(orgId)
+            .collection('branches')
+            .get();
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          branchesList.add(BranchModel.fromMap({...data, 'id': doc.id}));
+        }
+      } catch (_) {}
+
+      // 2. Fetch from root branches where organizationUID == orgId
+      if (branchesList.isEmpty) {
+        try {
+          final snap = await FirebaseFirestore.instance
+              .collection('branches')
+              .where('organizationUID', isEqualTo: orgId)
+              .get();
+          for (final doc in snap.docs) {
+            final data = doc.data();
+            branchesList.add(BranchModel.fromMap({...data, 'id': doc.id}));
+          }
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+        setState(() {
+          _orgBranches = branchesList;
+          _isLoadingBranches = false;
+          if (branchesList.isEmpty) {
+            _locationStatusMessage = isArabic
+                ? 'لا توجد فروع مسجلة لهذه المؤسسة حالياً.'
+                : 'No branches registered for this organization yet.';
+            _isInsideGeofence = false;
+          }
+        });
+
+        // Only scan GPS if branches exist
+        if (branchesList.isNotEmpty) {
+          _detectNearestBranch(showSnackBar: false, silent: true);
+        }
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingBranches = false);
+    }
+  }
+
+  Future<void> _detectNearestBranch({
+    bool showSnackBar = false,
+    bool silent = false,
+  }) async {
+    if (!mounted || _isCheckingLocation) return;
+    if (_orgBranches.isEmpty) {
+      final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+      setState(() {
+        _isCheckingLocation = false;
+        _locationStatusMessage = isArabic
+            ? 'لا توجد فروع مسجلة لهذه المؤسسة.'
+            : 'No branches registered for this organization.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingLocation = true;
+      _locationStatusMessage = 'جاري تحديد موقعك الجغرافي والتحقق من الفروع...';
+    });
+
+    final position = await _getCurrentLocation(
+      context,
+      actionType: 'فحص النطاق الجغرافي',
+      silent: silent,
+    );
+
+    if (!mounted) return;
+
+    if (position == null) {
+      setState(() {
+        _isCheckingLocation = false;
+        _locationStatusMessage =
+            'تعذر الحصول على الموقع الجغرافي. يرجى تفعيل الـ GPS.';
+      });
+      return;
+    }
+
+    _currentPosition = position;
+
+    Branch? closest;
+    double minDistance = double.infinity;
+    Branch? matched;
+
+    for (final branch in _orgBranches) {
+      if (branch.latitude == 0.0 && branch.longitude == 0.0) continue;
+
+      final dist = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        branch.latitude,
+        branch.longitude,
+      );
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        closest = branch;
+      }
+
+      final allowedRadius = branch.geofenceRadius > 0
+          ? (branch.geofenceRadius + 50.0)
+          : 150.0;
+
+      if (dist <= allowedRadius) {
+        matched = branch;
+      }
+    }
+
+    setState(() {
+      _isCheckingLocation = false;
+      _nearestBranch = closest;
+      _distanceToNearest = minDistance.isFinite ? minDistance : null;
+      _matchedBranch = matched;
+      _isInsideGeofence = matched != null;
+
+      if (matched != null) {
+        _locationStatusMessage =
+            'أنت متواجد داخل نطاق فرع ${matched.branchName} (${minDistance.toInt()} م)';
+      } else if (closest != null && minDistance.isFinite) {
+        _locationStatusMessage =
+            'أنت خارج نطاق العمل - أقرب فرع: ${closest.branchName} (يبعد ${minDistance.toInt()} م)';
+      } else {
+        _locationStatusMessage = 'أنت خارج نطاق الفروع المعتمدة.';
+      }
+    });
+
+    if (showSnackBar && mounted) {
+      if (_isInsideGeofence && matched != null) {
+        AppSnackBar.showSuccess(
+          context,
+          'أنت داخل نطاق فرع ${matched.branchName} (${minDistance.toInt()} متر) ✅',
+        );
+      } else if (closest != null) {
+        AppSnackBar.showError(
+          context,
+          'أنت خارج نطاق الفرع (${minDistance.toInt()} متر). النطاق المسموح: ${(closest.geofenceRadius + 50).toInt()} متر.',
+        );
+      }
+    }
+  }
+
+  Future<void> _handleGeofenceAction({
+    required bool isCheckedIn,
+    required Attendance? activeAttendance,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final parentContext = context;
+    final attendanceBloc = _attendanceBloc;
+
+    await _detectNearestBranch(showSnackBar: false, silent: false);
+
+    if (!parentContext.mounted) return;
+
+    if (_currentPosition == null) {
+      AppSnackBar.showError(
+        parentContext,
+        'يرجى التأكد من تشغيل الـ GPS والانتظار حتى يتم تحديد موقعك.',
+      );
+      return;
+    }
+
+    final branchToUse = _matchedBranch ?? _nearestBranch;
+    if (!_isInsideGeofence || branchToUse == null) {
+      final distStr = _distanceToNearest != null
+          ? '${_distanceToNearest!.toInt()} متر'
+          : '';
+      AppSnackBar.showError(
+        parentContext,
+        'عفواً، لا يمكنك تسجيل ${isCheckedIn ? "الانصراف" : "الحضور"} وأنت خارج نطاق الفرع ($distStr). يرجى التواجد داخل الفرع.',
+      );
+      return;
+    }
+
+    final branchName = branchToUse.branchName;
+    final position = _currentPosition!;
+
+    if (isCheckedIn && activeAttendance != null) {
+      final now = _getTrustedNow();
+      final isPreviousDay =
+          activeAttendance.checkInTime.year != now.year ||
+          activeAttendance.checkInTime.month != now.month ||
+          activeAttendance.checkInTime.day != now.day;
+
+      if (isPreviousDay) {
+        _showPreviousDayCheckoutDialog(
+          parentContext,
+          activeAttendance,
+          branchName,
+          position,
+          attendanceBloc,
+          l10n,
+        );
+      } else if (activeAttendance.branchName == branchName ||
+          activeAttendance.branchName == null) {
+        attendanceBloc.add(
+          CheckOutRequested(
+            attendanceId: activeAttendance.id,
+            userId: widget.delegate.uid,
+            organizationId: widget.delegate.organizationUID,
+            lat: position.latitude,
+            long: position.longitude,
+          ),
+        );
+      } else {
+        _showForgotCheckoutDialog(
+          parentContext,
+          activeAttendance,
+          branchName,
+          position,
+          attendanceBloc,
+          l10n,
+        );
+      }
+    } else {
+      await _checkIn(attendanceBloc, branchName, position);
+      if (parentContext.mounted) {
+        AppSnackBar.showInfo(
+          parentContext,
+          'تسجيل حضور في $branchName...',
+        );
+      }
+    }
+  }
+
+  Widget _buildGeofenceCard(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final isBusy = _isCheckingLocation || _isLoadingBranches;
+
+    final containerColor = isBusy
+        ? colorScheme.surfaceContainer
+        : (_isInsideGeofence
+            ? colorScheme.primaryContainer.withValues(alpha: 0.45)
+            : colorScheme.errorContainer.withValues(alpha: 0.4));
+
+    final borderColor = isBusy
+        ? colorScheme.outlineVariant
+        : (_isInsideGeofence
+            ? colorScheme.primary.withValues(alpha: 0.3)
+            : colorScheme.error.withValues(alpha: 0.3));
+
+    return AnimatedContainer(
+      duration: AppMotionDurations.medium2,
+      curve: AppMotionCurves.standardDecelerate,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: containerColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor, width: 1.2),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              _GeofenceRadarWidget(
+                animation: _radarAnimation,
+                isInside: _isInsideGeofence,
+                isChecking: isBusy,
+                primaryColor: colorScheme.primary,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isBusy
+                          ? (isArabic ? 'جاري فحص الموقع والفرع...' : 'Checking location & branch...')
+                          : (_isInsideGeofence
+                              ? (isArabic ? 'أنت داخل نطاق العمل ✅' : 'Inside Work Zone ✅')
+                              : (isArabic ? 'خارج نطاق الفرع 📍' : 'Outside Branch Zone 📍')),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: isBusy
+                            ? colorScheme.onSurface
+                            : (_isInsideGeofence
+                                ? colorScheme.primary
+                                : colorScheme.error),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _locationStatusMessage ??
+                          (isArabic
+                              ? 'قم بالاقتراب من فرعك المعتمد لتسجيل الحضور'
+                              : 'Move closer to your branch to check in'),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.3,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (_matchedBranch != null || _nearestBranch != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.store_rounded,
+                        size: 14,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        (_matchedBranch ?? _nearestBranch)!.branchName,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+              ],
+              TextButton.icon(
+                onPressed: isBusy
+                    ? null
+                    : () => _detectNearestBranch(showSnackBar: true, silent: false),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                ),
+                icon: isBusy
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded, size: 16),
+                label: Text(
+                  isArabic ? 'إعادة فحص الموقع' : 'Recheck Location',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showQRScanner(
     BuildContext context,
     bool isCheckedIn,
@@ -1098,6 +1635,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     BuildContext context, {
     String? branchName,
     String? actionType,
+    bool silent = false,
   }) async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -1105,7 +1643,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (!context.mounted) return null;
-      AppSnackBar.showError(context, 'خدمات الموقع معطلة. يرجى تفعيلها.');
+      if (!silent) {
+        AppSnackBar.showError(context, 'خدمات الموقع معطلة. يرجى تفعيلها.');
+      }
       return null;
     }
 
@@ -1114,14 +1654,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         if (!context.mounted) return null;
-        AppSnackBar.showError(context, 'تم رفض إذن الوصول للموقع');
+        if (!silent) {
+          AppSnackBar.showError(context, 'تم رفض إذن الوصول للموقع');
+        }
         return null;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
       if (!context.mounted) return null;
-      AppSnackBar.showError(context, 'إذن الموقع مرفوض بشكل دائم.');
+      if (!silent) {
+        AppSnackBar.showError(context, 'إذن الموقع مرفوض بشكل دائم.');
+      }
       return null;
     }
 
@@ -1129,7 +1673,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
+          timeLimit: Duration(seconds: 6),
         ),
       );
 
@@ -1140,7 +1684,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           branchName: branchName,
           actionType: actionType,
         );
-        if (context.mounted) {
+        if (context.mounted && !silent) {
           AppSnackBar.showError(
             context,
             'تم اكتشاف استخدام برنامج لتزييف الموقع الجغرافي (Fake GPS). يرجى إيقاف التطبيق لتسجيل الحضور والانصراف.',
@@ -1159,7 +1703,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             branchName: branchName,
             actionType: actionType,
           );
-          if (context.mounted) {
+          if (context.mounted && !silent) {
             AppSnackBar.showError(
               context,
               'تم اكتشاف استخدام برنامج لتزييف الموقع الجغرافي (Fake GPS). يرجى إيقاف التطبيق لتسجيل الحضور والانصراف.',
@@ -1169,7 +1713,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         }
         return lastPosition;
       }
-      if (context.mounted) {
+      if (context.mounted && !silent) {
         AppSnackBar.showError(
           context,
           'انتهى الوقت ولم نتمكن من تحديد الموقع. يرجى التأكد من تفعيل الـ GPS وأنت في مكان مفتوح.',
@@ -1177,7 +1721,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
       return null;
     } catch (e) {
-      if (context.mounted) {
+      if (context.mounted && !silent) {
         AppSnackBar.showError(context, 'حدث خطأ أثناء تحديد الموقع.');
       }
       return null;
@@ -1720,3 +2264,99 @@ class _ScannerModalState extends State<_ScannerModal>
     );
   }
 }
+
+/// Material Design 3 Expressive Radar Wave Widget
+/// Features concentric pulsing circles with monotonic opacity decay (zero overshoot).
+class _GeofenceRadarWidget extends StatelessWidget {
+  final Animation<double> animation;
+  final bool isInside;
+  final bool isChecking;
+  final Color primaryColor;
+
+  const _GeofenceRadarWidget({
+    required this.animation,
+    required this.isInside,
+    required this.isChecking,
+    required this.primaryColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = isChecking
+        ? primaryColor
+        : (isInside ? const Color(0xFF10B981) : const Color(0xFFEF4444));
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final rippleVal = animation.value;
+        return SizedBox(
+          width: 72,
+          height: 72,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Outer ripple
+              Transform.scale(
+                scale: 0.6 + (0.4 * rippleVal),
+                child: Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: statusColor.withValues(
+                        alpha: (0.45 * (1.0 - rippleVal)).clamp(0.0, 0.45),
+                      ),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+              // Inner ripple
+              Transform.scale(
+                scale: 0.3 + (0.45 * rippleVal),
+                child: Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: statusColor.withValues(
+                      alpha: (0.25 * (1.0 - rippleVal)).clamp(0.0, 0.25),
+                    ),
+                  ),
+                ),
+              ),
+              // Center Core Button/Icon
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: statusColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: statusColor.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  isChecking
+                      ? Icons.radar_rounded
+                      : (isInside
+                          ? Icons.check_rounded
+                          : Icons.location_off_rounded),
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+

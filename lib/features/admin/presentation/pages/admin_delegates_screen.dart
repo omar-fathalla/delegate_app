@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_event.dart';
@@ -14,6 +13,8 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:delegate_app/core/services/session_management_service.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
 
 class AdminDelegatesScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -398,6 +399,7 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
                               final delegate = filteredDelegates[index];
                               return _CompactDelegateTile(
                                 delegate: delegate,
+                                adminDelegate: widget.adminDelegate,
                                 onRefresh: () {
                                   AdminDelegatesBloc.clearCache();
                                   context.read<AdminDelegatesBloc>().add(
@@ -667,12 +669,78 @@ class _NoResultsView extends StatelessWidget {
 /// Replaces large buttons with compact icon buttons and text badges with status dots.
 class _CompactDelegateTile extends StatelessWidget {
   final Delegate delegate;
+  final Delegate? adminDelegate;
   final VoidCallback? onRefresh;
 
   const _CompactDelegateTile({
     required this.delegate,
+    this.adminDelegate,
     this.onRefresh,
   });
+
+  Future<void> _confirmForceLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Colors.deepOrange),
+            SizedBox(width: 8),
+            Text('تسجيل خروج إجباري'),
+          ],
+        ),
+        content: Text(
+          'هل تريد إجبار المندوب "${delegate.fullName}" على تسجيل الخروج؟\n\n'
+          'سيتم إعادته لشاشة تسجيل الدخول لإدخال رقم الهاتف والرقم القومي للتحقق من شركته الحالية وتحديث بياناته.',
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: Colors.deepOrange),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: const Icon(Icons.logout_rounded, size: 18),
+            label: const Text('تأكيد الخروج الإجباري'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final success = await SessionManagementService.forceLogoutDelegate(
+        delegateUid: delegate.uid,
+        organizationUID: delegate.organizationUID,
+        companyUID: delegate.companyUID,
+        delegateName: delegate.fullName,
+        delegatePhone: delegate.phoneNumber,
+        reason: 'إعادة التحقق من الشركة عبر الإدارة',
+        adminUid: adminDelegate?.uid,
+      );
+
+      if (context.mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم تسجيل خروج المندوب "${delegate.fullName}" بنجاح.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          onRefresh?.call();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('فشل تنفيذ تسجيل الخروج الإجباري'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
 
   Future<void> _makePhoneCall(BuildContext context, String rawPhone) async {
     final cleanPhone = rawPhone.replaceAll(RegExp(r'\s+'), '').trim();
@@ -780,7 +848,6 @@ class _CompactDelegateTile extends StatelessWidget {
     final theme = Theme.of(context);
     final statusColor = _getStatusColor(context, delegate.status);
     final photoUrl = delegate.personalPhotoUrl;
-    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
     return InkWell(
       borderRadius: BorderRadius.circular(12),
@@ -812,44 +879,24 @@ class _CompactDelegateTile extends StatelessWidget {
         child: Row(
           children: [
             // ── Avatar with Status Dot ──
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  backgroundImage:
-                      hasPhoto ? CachedNetworkImageProvider(photoUrl) : null,
-                  child: hasPhoto
-                      ? null
-                      : Text(
-                          delegate.firstName.isNotEmpty
-                              ? delegate.firstName[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            color: theme.colorScheme.onPrimaryContainer,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                ),
-                Positioned(
-                  bottom: -1,
-                  right: -1,
-                  child: Container(
-                    width: 11,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: theme.colorScheme.surface,
-                        width: 2,
-                      ),
-                    ),
+            AppAvatar(
+              imageUrl: photoUrl,
+              fallbackText: delegate.firstName,
+              radius: 20,
+              backgroundColor: theme.colorScheme.primaryContainer,
+              foregroundColor: theme.colorScheme.onPrimaryContainer,
+              badge: Container(
+                width: 11,
+                height: 11,
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: theme.colorScheme.surface,
+                    width: 2,
                   ),
                 ),
-              ],
+              ),
             ),
             const SizedBox(width: 10),
 
@@ -967,6 +1014,24 @@ class _CompactDelegateTile extends StatelessWidget {
                   tooltip: l10n.viewProfileData,
                   icon: const Icon(Icons.person_search_rounded, size: 18),
                 ),
+                if (adminDelegate?.role == UserRole.superAdmin ||
+                    adminDelegate?.role == UserRole.admin) ...[
+                  const SizedBox(width: 6),
+                  IconButton.filledTonal(
+                    visualDensity: VisualDensity.compact,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.deepOrange.withValues(
+                        alpha: theme.brightness == Brightness.dark ? 0.25 : 0.15,
+                      ),
+                      foregroundColor: Colors.deepOrange,
+                      padding: const EdgeInsets.all(8),
+                      minimumSize: const Size(36, 36),
+                    ),
+                    onPressed: () => _confirmForceLogout(context),
+                    tooltip: 'تسجيل خروج إجباري للتحقق من الشركة',
+                    icon: const Icon(Icons.logout_rounded, size: 18),
+                  ),
+                ],
               ],
             ),
           ],

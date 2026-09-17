@@ -29,12 +29,16 @@ class NotificationRepositoryImpl implements NotificationRepository {
     String delegateUid,
     String organizationId, {
     String? phoneNumber,
+    String? userRole,
+    DateTime? accountCreatedAt,
   }) async {
     try {
       final notifications = await remoteDataSource.getNotifications(
         delegateUid,
         organizationId,
         phoneNumber: phoneNumber,
+        userRole: userRole,
+        accountCreatedAt: accountCreatedAt,
       );
       if (localDataSource != null) {
         await localDataSource!.cacheNotifications(delegateUid, notifications);
@@ -56,11 +60,15 @@ class NotificationRepositoryImpl implements NotificationRepository {
     String delegateUid,
     String organizationId, {
     String? phoneNumber,
+    String? userRole,
+    DateTime? accountCreatedAt,
   }) {
     return remoteDataSource.getUnreadCount(
       delegateUid,
       organizationId,
       phoneNumber: phoneNumber,
+      userRole: userRole,
+      accountCreatedAt: accountCreatedAt,
     );
   }
 

@@ -199,6 +199,12 @@ service cloud.firestore {
       );
       allow delete: if isAuthenticated() && isSuperAdmin();
 
+      // Branches subcollection (Organization level)
+      match /branches/{branchId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+
       // Sent Notifications subcollection (Organization level)
       match /sent_notifications/{notificationId} {
         // Read: Org Admins, Super Admins, and Marketing (read-only)
@@ -363,6 +369,13 @@ service cloud.firestore {
         allow read, create: if isAuthenticated();
         // Append-only logs
         allow update, delete: if false;
+      }
+
+      // ==================== BRANCHES ====================
+      // Branches scoped to the organization
+      match /branches/{branchId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
       }
     }
 

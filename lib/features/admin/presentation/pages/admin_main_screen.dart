@@ -35,6 +35,7 @@ import 'package:delegate_app/features/marketing_search/presentation/pages/market
 import 'package:delegate_app/features/marketing/presentation/pages/branches_marketing_home_screen.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
+import 'package:delegate_app/features/admin/presentation/pages/super_admin_session_control_screen.dart';
 
 class AdminMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -193,6 +194,16 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           MaterialPageRoute(builder: (_) => const AddBranchScreen(showAppBar: true)),
         );
         break;
+      case 'branch_attendance':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BranchHomeScreen(
+              marketingUser: widget.delegate,
+              showAppBar: true,
+            ),
+          ),
+        );
+        break;
       case 'create_admin':
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -223,6 +234,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   companyUID: '',
                 )),
               child: MarketingPermissionsScreen(marketingDelegate: widget.delegate),
+            ),
+          ),
+        );
+        break;
+      case 'session_control':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SuperAdminSessionControlScreen(
+              adminDelegate: widget.delegate,
             ),
           ),
         );
@@ -372,7 +392,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ? (isArabic ? 'متابعة الفروع' : 'Branch Marketing')
               : (isArabic ? 'المخالفات والغرامات' : 'Penalties'))
         : (_currentIndex == 0
-              ? l10n.supervisorUser(delegate.firstName)
+              ? (delegate.fullName.isNotEmpty ? delegate.fullName : delegate.firstName)
               : _currentIndex == 1
               ? l10n.companyDelegates
               : _currentIndex == 2
@@ -391,6 +411,8 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   delegateUid: delegate.uid,
                   organizationId: delegate.organizationUID,
                   phoneNumber: delegate.phoneNumber,
+                  userRole: delegate.role.name,
+                  accountCreatedAt: delegate.createdAt,
                 ),
               ),
             child: BlocBuilder<NotificationBloc, NotificationState>(
@@ -459,15 +481,24 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ),
             ),
             const PopupMenuItem(
-              value: 'add_branch',
+              value: 'branch_attendance',
               child: ListTile(
-                leading: Icon(Icons.add_location_alt_rounded),
-                title: Text('إضافة فرع'),
+                leading: Icon(Icons.co_present_rounded),
+                title: Text('متابعة حضور الفروع'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
               ),
             ),
             if (isSuperAdmin) ...[
+              const PopupMenuItem(
+                value: 'session_control',
+                child: ListTile(
+                  leading: Icon(Icons.sync_lock_rounded),
+                  title: Text('إدارة جلسات المناديب والخروج الإجباري'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
               PopupMenuItem(
                 value: 'create_admin',
                 child: ListTile(

@@ -14,6 +14,7 @@ import 'package:delegate_app/features/notifications/presentation/pages/send_noti
 import 'anti_fraud_audit_screen.dart';
 import 'delegate_subscription_requests_page.dart';
 import 'super_admin_payment_receipts_report_screen.dart';
+import 'super_admin_session_control_screen.dart';
 import '../../../photo_permission/presentation/pages/super_admin_permissions_report_screen.dart';
 import '../../../photo_permission/presentation/bloc/photo_permission_bloc.dart';
 
@@ -864,6 +865,20 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                     MaterialPageRoute(
                       builder: (_) => DelegateSubscriptionRequestsPage(
                         currentAdmin: widget.delegate,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              _buildActionButton(
+                label: 'إدارة جلسات المناديب',
+                icon: Icons.sync_lock_rounded,
+                color: Colors.deepOrange.shade800,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SuperAdminSessionControlScreen(
+                        adminDelegate: widget.delegate,
                       ),
                     ),
                   );

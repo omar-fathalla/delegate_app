@@ -80,18 +80,23 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   @override
   Future<BranchModel> addBranch(BranchModel branch) async {
     try {
-      final ref = await _branches.add(branch.toMap());
+      final data = branch.toMap();
+      final ref = await _branches.add(data);
 
-      // If the branch is assigned to an organization, link/sync it under the organization's subcollection
+      // If the branch is assigned to an organization, save it directly under the organization's branches subcollection
       if (branch.organizationUID != null && branch.organizationUID!.isNotEmpty) {
-        try {
-          await firestore
-              .collection('organizations')
-              .doc(branch.organizationUID)
-              .collection('branches')
-              .doc(ref.id)
-              .set(branch.toMap(), SetOptions(merge: true));
-        } catch (_) {}
+        final orgBranchData = {
+          ...data,
+          'id': ref.id,
+          'branchId': ref.id,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        await firestore
+            .collection('organizations')
+            .doc(branch.organizationUID)
+            .collection('branches')
+            .doc(ref.id)
+            .set(orgBranchData, SetOptions(merge: true));
       }
 
       return BranchModel(
@@ -111,17 +116,22 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   @override
   Future<BranchModel> updateBranch(BranchModel branch) async {
     try {
-      await _branches.doc(branch.id).update(branch.toMap());
+      final data = branch.toMap();
+      await _branches.doc(branch.id).update(data);
 
       if (branch.organizationUID != null && branch.organizationUID!.isNotEmpty) {
-        try {
-          await firestore
-              .collection('organizations')
-              .doc(branch.organizationUID)
-              .collection('branches')
-              .doc(branch.id)
-              .set(branch.toMap(), SetOptions(merge: true));
-        } catch (_) {}
+        final orgBranchData = {
+          ...data,
+          'id': branch.id,
+          'branchId': branch.id,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        await firestore
+            .collection('organizations')
+            .doc(branch.organizationUID)
+            .collection('branches')
+            .doc(branch.id)
+            .set(orgBranchData, SetOptions(merge: true));
       }
 
       return branch;

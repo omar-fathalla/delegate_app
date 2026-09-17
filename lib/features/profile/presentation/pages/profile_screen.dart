@@ -7,10 +7,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -124,8 +126,6 @@ class _ProfileBody extends StatelessWidget {
       );
     }
 
-    final isFathalla = _isFathallaDelegate(delegate);
-
     return Scaffold(
       appBar: showBackButton
           ? AppBar(
@@ -133,7 +133,7 @@ class _ProfileBody extends StatelessWidget {
               backgroundColor: colorScheme.surface,
               scrolledUnderElevation: 0,
               actions: [
-                if (!isFathalla)
+                if (_canDeleteDelegate(context, delegate))
                   IconButton(
                     icon: Icon(
                       Icons.delete_outline_rounded,
@@ -258,21 +258,13 @@ class _ProfileBody extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: colorScheme.outlineVariant, width: 2),
       ),
-      child: personalPhotoUrl != null
-          ? CircleAvatar(
-              radius: 48,
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              backgroundImage: CachedNetworkImageProvider(personalPhotoUrl),
-            )
-          : CircleAvatar(
-              radius: 48,
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              child: Icon(
-                Icons.person,
-                size: 50,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
+      child: AppAvatar(
+        imageUrl: personalPhotoUrl,
+        fallbackText: delegate.firstName,
+        radius: 48,
+        backgroundColor: colorScheme.surfaceContainerHighest,
+        foregroundColor: colorScheme.onSurfaceVariant,
+      ),
     );
   }
 
@@ -385,7 +377,7 @@ class _ProfileBody extends StatelessWidget {
             ),
           ],
         ),
-        if (!_isFathallaDelegate(delegate)) ...[
+        if (_canDeleteDelegate(context, delegate)) ...[
           const SizedBox(height: 20),
           _buildDeleteDelegateSection(context, l10n),
         ],
@@ -403,6 +395,39 @@ class _ProfileBody extends StatelessWidget {
         orgUid.contains('fathalla') ||
         orgUid.contains('فتح الله') ||
         orgUid.contains('فتح_الله');
+  }
+
+  bool _canDeleteDelegate(BuildContext context, Delegate targetDelegate) {
+    // 1. A delegate can NEVER delete themselves or any other user.
+    // 2. Only Admins / Super Admins / Org Admins can delete a delegate (and never delete themselves).
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        final currentUser = authState.delegate;
+        // A user can never delete their own account/profile
+        if (currentUser.uid == targetDelegate.uid) {
+          return false;
+        }
+        // Only administrative roles have delete permissions
+        final isAdmin = currentUser.role == UserRole.superAdmin ||
+            currentUser.role == UserRole.admin ||
+            currentUser.role == UserRole.organizationAdmin;
+        if (!isAdmin) {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    } catch (_) {
+      return false;
+    }
+
+    // Fathalla delegates cannot be deleted
+    if (_isFathallaDelegate(targetDelegate)) {
+      return false;
+    }
+
+    return true;
   }
 
   Widget _buildDeleteDelegateSection(
@@ -501,6 +526,15 @@ class _ProfileBody extends StatelessWidget {
     AppLocalizations l10n,
   ) async {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    if (!_canDeleteDelegate(context, delegate)) {
+      AppSnackBar.showError(
+        context,
+        isArabic
+            ? 'غير مصرح لك بحذف هذا الحساب'
+            : 'You are not authorized to delete this account',
+      );
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

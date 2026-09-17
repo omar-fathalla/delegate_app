@@ -323,6 +323,10 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           final ts = data['timestamp'] as Timestamp?;
           final delegateNameInLog =
               data['delegateName'] ?? data['fullName'] ?? data['userName'];
+          final orgIdInLog = data['organizationId'] as String? ??
+              data['organizationUID'] as String? ??
+              data['orgId'] as String? ??
+              data['orgUID'] as String?;
           final companyNameInLog = data['companyName'];
           final companyIdInLog = data['companyId'] ?? data['companyUID'];
           final phoneInLog = data['phoneNumber'] ?? data['phone'];
@@ -337,6 +341,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
               'delegateNameInLog': delegateNameInLog,
               'companyNameInLog': companyNameInLog,
               'companyIdInLog': companyIdInLog,
+              'organizationIdInLog': orgIdInLog,
               'phoneInLog': phoneInLog,
               'checkOutTime': null,
             };
@@ -348,6 +353,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
               if (delegateNameInLog != null) existing['delegateNameInLog'] = delegateNameInLog;
               if (companyNameInLog != null) existing['companyNameInLog'] = companyNameInLog;
               if (companyIdInLog != null) existing['companyIdInLog'] = companyIdInLog;
+              if (orgIdInLog != null) existing['organizationIdInLog'] = orgIdInLog;
               if (phoneInLog != null) existing['phoneInLog'] = phoneInLog;
             }
           }
@@ -430,54 +436,63 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         }
       }
 
-      // ── Step 2: جلب بيانات وصور المناديب الحاضرين فقط بالـ ID المباشر ──
+      // ── Step 2: تحديد المنظمة وجلب بيانات وصور المناديب بالتوازي ──
+      String defaultOrgId = organizationId.trim();
+      if (defaultOrgId.isEmpty) {
+        for (final doc in todayDocs) {
+          final o = doc.data()['organizationId'] as String? ??
+              doc.data()['organizationUID'] as String? ??
+              doc.data()['orgId'] as String? ??
+              doc.data()['orgUID'] as String?;
+          if (o != null && o.trim().isNotEmpty) {
+            defaultOrgId = o.trim();
+            break;
+          }
+        }
+      }
+      if (defaultOrgId.isEmpty) {
+        defaultOrgId = 'PiioBFgxaHAeuRdjlDgj'; // Fathalla Market default
+      }
+
       final delegateLookup = <String, Map<String, dynamic>>{};
       final companyNameCache = <String, String>{};
 
       if (allDelegateIds.isNotEmpty) {
-        for (final delegateId in allDelegateIds) {
-          try {
-            String? companyId;
-            for (final branch in branchNames) {
-              if (checkInsByBranch[branch]?.containsKey(delegateId) ?? false) {
-                companyId = checkInsByBranch[branch]![delegateId]!['companyIdInLog'] as String?;
-                if (companyId != null && companyId.isNotEmpty) break;
+        final delegateIdsList = allDelegateIds.toList();
+        const batchSize = 25;
+        for (var i = 0; i < delegateIdsList.length; i += batchSize) {
+          final end = (i + batchSize > delegateIdsList.length)
+              ? delegateIdsList.length
+              : i + batchSize;
+          final batch = delegateIdsList.sublist(i, end);
+
+          await Future.wait(batch.map((delegateId) async {
+            try {
+              String? companyId;
+              String? orgId;
+
+              for (final branch in branchNames) {
+                final rec = checkInsByBranch[branch]?[delegateId];
+                if (rec != null) {
+                  final c = rec['companyIdInLog'] as String?;
+                  if (c != null && c.isNotEmpty) companyId = c;
+                  final o = rec['organizationIdInLog'] as String?;
+                  if (o != null && o.isNotEmpty) orgId = o;
+                  if (companyId != null && orgId != null) break;
+                }
               }
-            }
 
-            // 1. المسار المباشر في الشركة
-            if (companyId != null && companyId.isNotEmpty) {
-              final directDoc = await firestore
-                  .collection('organizations')
-                  .doc(organizationId)
-                  .collection('companies')
-                  .doc(companyId)
-                  .collection('delegates')
-                  .doc(delegateId)
-                  .get();
+              final effectiveOrgId = (orgId != null && orgId.isNotEmpty)
+                  ? orgId
+                  : defaultOrgId;
 
-              if (directDoc.exists && directDoc.data() != null) {
-                final dData = Map<String, dynamic>.from(directDoc.data()!);
-                dData['uid'] = directDoc.id;
-                dData['companyUID'] = companyId;
-                delegateLookup[delegateId] = dData;
-                continue;
-              }
-            }
-
-            // 2. البحث في مجموعة users (مع استخراج companyUID للوصول للمستند الكامل)
-            final userDoc = await firestore.collection('users').doc(delegateId).get();
-            if (userDoc.exists && userDoc.data() != null) {
-              final uData = userDoc.data()!;
-              final userCompId = uData['companyUID'] as String? ?? uData['companyId'] as String?;
-              final userOrgId = uData['organizationUID'] as String? ?? organizationId;
-
-              if (userCompId != null && userCompId.isNotEmpty) {
+              // 1. المسار المباشر في الشركة
+              if (companyId != null && companyId.isNotEmpty && effectiveOrgId.isNotEmpty) {
                 final directDoc = await firestore
                     .collection('organizations')
-                    .doc(userOrgId)
+                    .doc(effectiveOrgId)
                     .collection('companies')
-                    .doc(userCompId)
+                    .doc(companyId)
                     .collection('delegates')
                     .doc(delegateId)
                     .get();
@@ -485,25 +500,56 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
                 if (directDoc.exists && directDoc.data() != null) {
                   final dData = Map<String, dynamic>.from(directDoc.data()!);
                   dData['uid'] = directDoc.id;
-                  dData['companyUID'] = userCompId;
+                  dData['companyUID'] = companyId;
+                  dData['organizationUID'] = effectiveOrgId;
                   delegateLookup[delegateId] = dData;
-                  continue;
+                  return;
                 }
               }
-              delegateLookup[delegateId] = {'uid': userDoc.id, ...uData};
-              continue;
-            }
 
-            // 3. مجموعة delegates الرئيسية
-            final rootDoc = await firestore.collection('delegates').doc(delegateId).get();
-            if (rootDoc.exists && rootDoc.data() != null) {
-              delegateLookup[delegateId] = {'uid': rootDoc.id, ...rootDoc.data()!};
-              continue;
-            }
-          } catch (_) {}
+              // 2. البحث في مجموعة users
+              final userDoc = await firestore.collection('users').doc(delegateId).get();
+              if (userDoc.exists && userDoc.data() != null) {
+                final uData = userDoc.data()!;
+                final userCompId = uData['companyUID'] as String? ?? uData['companyId'] as String?;
+                final userOrgId = uData['organizationUID'] as String? ??
+                    uData['orgUID'] as String? ??
+                    effectiveOrgId;
+
+                if (userCompId != null && userCompId.isNotEmpty && userOrgId.isNotEmpty) {
+                  final directDoc = await firestore
+                      .collection('organizations')
+                      .doc(userOrgId)
+                      .collection('companies')
+                      .doc(userCompId)
+                      .collection('delegates')
+                      .doc(delegateId)
+                      .get();
+
+                  if (directDoc.exists && directDoc.data() != null) {
+                    final dData = Map<String, dynamic>.from(directDoc.data()!);
+                    dData['uid'] = directDoc.id;
+                    dData['companyUID'] = userCompId;
+                    dData['organizationUID'] = userOrgId;
+                    delegateLookup[delegateId] = dData;
+                    return;
+                  }
+                }
+                delegateLookup[delegateId] = {'uid': userDoc.id, ...uData};
+                return;
+              }
+
+              // 3. مجموعة delegates الجذرية
+              final rootDoc = await firestore.collection('delegates').doc(delegateId).get();
+              if (rootDoc.exists && rootDoc.data() != null) {
+                delegateLookup[delegateId] = {'uid': rootDoc.id, ...rootDoc.data()!};
+                return;
+              }
+            } catch (_) {}
+          }));
         }
 
-        // جلب أسماء الشركات لكافة سجلات الحضور والمناديب
+        // جلب أسماء الشركات لكافة سجلات الحضور والمناديب بالتوازي
         final allCompanyIdsToFetch = <String>{};
         for (final branch in branchNames) {
           for (final entry in checkInsByBranch[branch]!.values) {
@@ -516,26 +562,25 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           if (cid != null && cid.isNotEmpty) allCompanyIdsToFetch.add(cid);
         }
 
-        for (final compId in allCompanyIdsToFetch) {
-          if (!companyNameCache.containsKey(compId)) {
-            try {
-              final compDoc = await firestore
-                  .collection('organizations')
-                  .doc(organizationId)
-                  .collection('companies')
-                  .doc(compId)
-                  .get();
-              if (compDoc.exists && compDoc.data() != null) {
-                companyNameCache[compId] =
-                    compDoc.data()!['name'] as String? ?? '';
-              } else {
-                companyNameCache[compId] = '';
-              }
-            } catch (_) {
+        await Future.wait(allCompanyIdsToFetch.map((compId) async {
+          if (companyNameCache.containsKey(compId)) return;
+          try {
+            final compDoc = await firestore
+                .collection('organizations')
+                .doc(defaultOrgId)
+                .collection('companies')
+                .doc(compId)
+                .get();
+            if (compDoc.exists && compDoc.data() != null) {
+              companyNameCache[compId] =
+                  compDoc.data()!['name'] as String? ?? '';
+            } else {
               companyNameCache[compId] = '';
             }
+          } catch (_) {
+            companyNameCache[compId] = '';
           }
-        }
+        }));
       }
 
       // ── Step 3: بناء القائمة النهائية لكل فرع ──
@@ -574,12 +619,17 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
 
           final resolvedCompanyName = delegateData?['companyName'] as String? ??
               (logCompanyId != null ? companyNameCache[logCompanyId] : null) ??
+              (delegateData?['companyUID'] != null ? companyNameCache[delegateData!['companyUID']] : null) ??
               logCompany ??
               '';
 
           // جلب الصورة الشخصية من كافة المسارات المحتملة بما فيها قائمة documents
           final photoUrl = _extractPersonalPhoto(delegateData) ??
               _extractPersonalPhoto(rawCheckIn);
+
+          final effectiveRecordOrg = delegateData?['organizationUID'] ??
+              rawCheckIn['organizationIdInLog'] ??
+              defaultOrgId;
 
           delegateData ??= {
             'uid': delegateId,
@@ -589,7 +639,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             'phoneNumber': logPhone ?? '',
             'companyName': resolvedCompanyName,
             'companyUID': logCompanyId ?? '',
-            'organizationUID': organizationId,
+            'organizationUID': effectiveRecordOrg,
             'personalPhotoURL': photoUrl,
             'status': 'Active',
             'role': 'delegate',
@@ -601,8 +651,12 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           record['phoneNumber'] = delegateData['phoneNumber'] ?? logPhone ?? '';
           record['companyName'] = resolvedCompanyName;
           record['companyUID'] = delegateData['companyUID'] ?? logCompanyId ?? '';
+          record['organizationId'] = effectiveRecordOrg;
           record['imageUrl'] = photoUrl;
           record['personalPhotoURL'] = photoUrl;
+          record['supervisorPhone'] = delegateData['supervisorPhone'] ?? rawCheckIn['supervisorPhone'];
+          record['supervisorName'] = delegateData['supervisorName'] ?? rawCheckIn['supervisorName'];
+          record['createdBy'] = delegateData['createdBy'] ?? rawCheckIn['createdBy'];
           record['delegateData'] = delegateData;
           branchRecords.add(record);
         }

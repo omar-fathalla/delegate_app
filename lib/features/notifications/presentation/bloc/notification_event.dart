@@ -11,30 +11,50 @@ class LoadNotifications extends NotificationEvent {
   final String delegateUid;
   final String organizationId;
   final String? phoneNumber;
+  final String? userRole;
+  final DateTime? accountCreatedAt;
 
   const LoadNotifications({
     required this.delegateUid,
     required this.organizationId,
     this.phoneNumber,
+    this.userRole,
+    this.accountCreatedAt,
   });
 
   @override
-  List<Object?> get props => [delegateUid, organizationId, phoneNumber];
+  List<Object?> get props => [
+        delegateUid,
+        organizationId,
+        phoneNumber,
+        userRole,
+        accountCreatedAt,
+      ];
 }
 
 class SubscribeToUnreadCount extends NotificationEvent {
   final String delegateUid;
   final String organizationId;
   final String? phoneNumber;
+  final String? userRole;
+  final DateTime? accountCreatedAt;
 
   const SubscribeToUnreadCount({
     required this.delegateUid,
     required this.organizationId,
     this.phoneNumber,
+    this.userRole,
+    this.accountCreatedAt,
   });
 
   @override
-  List<Object?> get props => [delegateUid, organizationId, phoneNumber];
+  List<Object?> get props => [
+        delegateUid,
+        organizationId,
+        phoneNumber,
+        userRole,
+        accountCreatedAt,
+      ];
 }
 
 class UnreadCountUpdated extends NotificationEvent {

@@ -95,6 +95,19 @@ class _SplashScreenState extends State<SplashScreen>
           });
         } else if (state is AuthUnauthenticated) {
           context.go('/login');
+          if (state.message != null && state.message!.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.message!),
+                    duration: const Duration(seconds: 5),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            });
+          }
         }
       },
       child: Scaffold(

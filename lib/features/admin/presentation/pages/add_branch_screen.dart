@@ -1,33 +1,54 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:go_router/go_router.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/models/branch_model.dart';
 import '../bloc/branch_bloc.dart';
+import 'branch_details_screen.dart';
 
 class AddBranchScreen extends StatelessWidget {
   final bool showAppBar;
-  const AddBranchScreen({super.key, this.showAppBar = false});
+  final String? initialOrganizationUID;
+  final String? initialOrganizationName;
+
+  const AddBranchScreen({
+    super.key,
+    this.showAppBar = false,
+    this.initialOrganizationUID,
+    this.initialOrganizationName,
+  });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => di.sl<BranchBloc>(),
-      child: _AddBranchView(showAppBar: showAppBar),
+      child: _AddBranchView(
+        showAppBar: showAppBar,
+        initialOrganizationUID: initialOrganizationUID,
+        initialOrganizationName: initialOrganizationName,
+      ),
     );
   }
 }
 
 class _AddBranchView extends StatefulWidget {
   final bool showAppBar;
-  const _AddBranchView({this.showAppBar = false});
+  final String? initialOrganizationUID;
+  final String? initialOrganizationName;
+
+  const _AddBranchView({
+    this.showAppBar = false,
+    this.initialOrganizationUID,
+    this.initialOrganizationName,
+  });
 
   @override
   State<_AddBranchView> createState() => _AddBranchViewState();
@@ -40,9 +61,9 @@ class _AddBranchViewState extends State<_AddBranchView> {
 
   String? _selectedOrgUID;
   String? _selectedOrgName;
+  String? _orgValidationError;
   List<Map<String, dynamic>> _organizations = [];
   bool _isLoadingOrgs = true;
-  StreamSubscription<QuerySnapshot>? _orgsSubscription;
 
   LatLng? _selectedActionPoint;
   bool _isLocating = false;
@@ -58,15 +79,17 @@ class _AddBranchViewState extends State<_AddBranchView> {
   @override
   void initState() {
     super.initState();
+    _selectedOrgUID = widget.initialOrganizationUID;
+    _selectedOrgName = widget.initialOrganizationName;
     _fetchInitialLocation();
-    _subscribeToOrganizations();
+    _loadOrganizations();
   }
 
-  void _subscribeToOrganizations() {
-    _orgsSubscription = FirebaseFirestore.instance
-        .collection('organizations')
-        .snapshots()
-        .listen((snapshot) {
+  Future<void> _loadOrganizations() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('organizations')
+          .get();
       if (!mounted) return;
       final orgs = snapshot.docs.map((doc) {
         final data = doc.data();
@@ -93,24 +116,18 @@ class _AddBranchViewState extends State<_AddBranchView> {
           );
           if (found.isNotEmpty) {
             _selectedOrgName = found['name'] as String?;
-          } else {
-            _selectedOrgUID = null;
-            _selectedOrgName = null;
           }
         }
       });
-    }, onError: (_) {
+    } catch (_) {
       if (mounted) {
-        setState(() {
-          _isLoadingOrgs = false;
-        });
+        setState(() => _isLoadingOrgs = false);
       }
-    });
+    }
   }
 
   @override
   void dispose() {
-    _orgsSubscription?.cancel();
     _nameController.dispose();
     _radiusController.dispose();
     _searchController.dispose();
@@ -129,9 +146,28 @@ class _AddBranchViewState extends State<_AddBranchView> {
       }
       if (permission == LocationPermission.deniedForever) return;
 
+      // 1. Fast fallback: last known position (0ms)
+      try {
+        final lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null && mounted) {
+          final userLatLng = LatLng(lastKnown.latitude, lastKnown.longitude);
+          setState(() {
+            _initialLocation = userLatLng;
+            _selectedActionPoint ??= userLatLng;
+          });
+          _mapController?.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(target: userLatLng, zoom: 15),
+            ),
+          );
+        }
+      } catch (_) {}
+
+      // 2. High accuracy with strict timeout so it never hangs the thread
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 4),
         ),
       );
       final userLatLng = LatLng(position.latitude, position.longitude);
@@ -139,15 +175,161 @@ class _AddBranchViewState extends State<_AddBranchView> {
       if (mounted) {
         setState(() {
           _initialLocation = userLatLng;
+          _selectedActionPoint ??= userLatLng;
         });
 
         _mapController?.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(target: userLatLng, zoom: 14),
+            CameraPosition(target: userLatLng, zoom: 15),
           ),
         );
       }
     } catch (_) {}
+  }
+
+  void _showOrganizationPicker() {
+    FocusScope.of(context).unfocus();
+    String query = '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final colorScheme = Theme.of(context).colorScheme;
+            final filtered = query.trim().isEmpty
+                ? _organizations
+                : _organizations.where((org) {
+                    final name = (org['name'] as String? ?? '').toLowerCase();
+                    return name.contains(query.trim().toLowerCase());
+                  }).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.4,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (_, scrollController) {
+                return Column(
+                  children: [
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.corporate_fare_rounded, color: colorScheme.primary),
+                          const SizedBox(width: 10),
+                          Text(
+                            'اختر المنظمة التابع لها الفرع',
+                            style: GoogleFonts.cairo(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () => Navigator.pop(sheetContext),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Search Bar
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'ابحث عن منظمة...',
+                          hintStyle: GoogleFonts.cairo(fontSize: 14),
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onChanged: (val) {
+                          setSheetState(() => query = val);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // List of Organizations
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Text(
+                                _isLoadingOrgs
+                                    ? 'جاري تحميل المنظمات...'
+                                    : 'لا توجد منظمات مطابقة للبحث',
+                                style: GoogleFonts.cairo(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: scrollController,
+                              itemCount: filtered.length,
+                              itemBuilder: (ctx, i) {
+                                final org = filtered[i];
+                                final uid = org['uid'] as String;
+                                final name = org['name'] as String;
+                                final isSelected = uid == _selectedOrgUID;
+
+                                return ListTile(
+                                  leading: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? colorScheme.primary.withValues(alpha: 0.15)
+                                          : colorScheme.surfaceContainerHighest,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.storefront_rounded,
+                                      color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                      size: 22,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    name,
+                                    style: GoogleFonts.cairo(
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                      color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  trailing: isSelected
+                                      ? Icon(Icons.check_circle_rounded, color: colorScheme.primary)
+                                      : null,
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedOrgUID = uid;
+                                      _selectedOrgName = name;
+                                      _orgValidationError = null;
+                                    });
+                                    Navigator.pop(sheetContext);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _searchLocation(String query) async {
@@ -241,7 +423,22 @@ class _AddBranchViewState extends State<_AddBranchView> {
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition();
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+      }
+
+      if (position == null) {
+        throw Exception('Location unavailable');
+      }
+
       final newLatLng = LatLng(position.latitude, position.longitude);
 
       setState(() {
@@ -271,9 +468,10 @@ class _AddBranchViewState extends State<_AddBranchView> {
   }
 
   void _saveBranch() {
-    if (!_formKey.currentState!.validate()) return;
-
     if (_selectedOrgUID == null || _selectedOrgUID!.isEmpty) {
+      setState(() {
+        _orgValidationError = 'يرجى اختيار المنظمة أولاً';
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('يرجى اختيار المنظمة أولاً'),
@@ -281,6 +479,8 @@ class _AddBranchViewState extends State<_AddBranchView> {
       );
       return;
     }
+
+    if (!_formKey.currentState!.validate()) return;
 
     if (_selectedActionPoint == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -317,7 +517,22 @@ class _AddBranchViewState extends State<_AddBranchView> {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text(l10n.branchAddedSuccessfully)));
-          context.pushReplacement('/admin/branch-details', extra: state.branch);
+          final branchModel = state.branch is BranchModel
+              ? state.branch as BranchModel
+              : BranchModel(
+                  id: state.branch.id,
+                  branchName: state.branch.branchName,
+                  latitude: state.branch.latitude,
+                  longitude: state.branch.longitude,
+                  geofenceRadius: state.branch.geofenceRadius,
+                  organizationUID: state.branch.organizationUID,
+                  organizationName: state.branch.organizationName,
+                );
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => BranchDetailsScreen(branch: branchModel),
+            ),
+          );
         } else if (state is BranchError) {
           ScaffoldMessenger.of(
             context,
@@ -346,74 +561,94 @@ class _AddBranchViewState extends State<_AddBranchView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Organization Dropdown Field
-                    DropdownButtonFormField<String>(
+                    // Organization Selection Field
+                    FormField<String>(
                       initialValue: _selectedOrgUID,
-                      isExpanded: true,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: colorScheme.onSurface,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'المنظمة',
-                        labelStyle: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.corporate_fare_rounded,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        filled: true,
-                        fillColor: colorScheme.surfaceContainerHighest,
-                        border: UnderlineInputBorder(
-                          borderSide: BorderSide(color: colorScheme.outline),
-                        ),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: colorScheme.outline),
-                        ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: colorScheme.primary),
-                        ),
-                      ),
-                      hint: _isLoadingOrgs
-                          ? Text(
-                              'جاري تحميل المنظمات...',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            )
-                          : Text(
-                              'اختر المنظمة التابع لها الفرع',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                      items: _organizations.map((org) {
-                        return DropdownMenuItem<String>(
-                          value: org['uid'] as String,
-                          child: Text(
-                            org['name'] as String,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
                       validator: (val) {
-                        if (val == null || val.isEmpty) {
+                        if (_selectedOrgUID == null || _selectedOrgUID!.isEmpty) {
                           return 'يرجى اختيار المنظمة';
                         }
                         return null;
                       },
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedOrgUID = val;
-                          final org = _organizations.firstWhere(
-                            (o) => o['uid'] == val,
-                            orElse: () => {'name': ''},
-                          );
-                          _selectedOrgName = org['name'] as String?;
-                        });
+                      builder: (field) {
+                        final hasError = field.hasError || _orgValidationError != null;
+                        final errorText = field.errorText ?? _orgValidationError;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            InkWell(
+                              onTap: _showOrganizationPicker,
+                              borderRadius: BorderRadius.circular(12),
+                              child: InputDecorator(
+                                decoration: InputDecoration(
+                                  labelText: 'المنظمة',
+                                  labelStyle: TextStyle(
+                                    color: hasError
+                                        ? colorScheme.error
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                  prefixIcon: Icon(
+                                    Icons.corporate_fare_rounded,
+                                    color: hasError
+                                        ? colorScheme.error
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                  suffixIcon: Icon(
+                                    Icons.arrow_drop_down_rounded,
+                                    color: colorScheme.onSurfaceVariant,
+                                    size: 30,
+                                  ),
+                                  filled: true,
+                                  fillColor: colorScheme.surfaceContainerHighest,
+                                  border: UnderlineInputBorder(
+                                    borderSide: BorderSide(
+                                      color: hasError
+                                          ? colorScheme.error
+                                          : colorScheme.outline,
+                                    ),
+                                  ),
+                                  enabledBorder: UnderlineInputBorder(
+                                    borderSide: BorderSide(
+                                      color: hasError
+                                          ? colorScheme.error
+                                          : colorScheme.outline,
+                                    ),
+                                  ),
+                                  focusedBorder: UnderlineInputBorder(
+                                    borderSide: BorderSide(color: colorScheme.primary),
+                                  ),
+                                ),
+                                child: Text(
+                                  _selectedOrgName ??
+                                      (_isLoadingOrgs
+                                          ? 'جاري تحميل المنظمات...'
+                                          : 'اختر المنظمة التابع لها الفرع'),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: _selectedOrgName != null
+                                        ? colorScheme.onSurface
+                                        : colorScheme.onSurfaceVariant,
+                                    fontWeight: _selectedOrgName != null
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (hasError && errorText != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6, right: 12),
+                                child: Text(
+                                  errorText,
+                                  style: TextStyle(
+                                    color: colorScheme.error,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
                       },
                     ),
                     const SizedBox(height: 24),
@@ -684,17 +919,25 @@ class _AddBranchViewState extends State<_AddBranchView> {
   }
 
   Widget _buildMapWidget(double radius, ColorScheme colorScheme) {
-    if (!_isMapReady && _selectedActionPoint == null) {
-      // Return the map directly, but it might take a moment to initialize
-    }
     return GoogleMap(
       initialCameraPosition: CameraPosition(
         target: _selectedActionPoint ?? _initialLocation,
-        zoom: _selectedActionPoint == null ? 12 : 16,
+        zoom: _selectedActionPoint == null ? 14 : 16,
       ),
-      myLocationEnabled: false,
+      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+        Factory<OneSequenceGestureRecognizer>(
+          () => EagerGestureRecognizer(),
+        ),
+      },
+      scrollGesturesEnabled: true,
+      zoomGesturesEnabled: true,
+      rotateGesturesEnabled: true,
+      tiltGesturesEnabled: true,
+      myLocationEnabled: true,
       myLocationButtonEnabled: false,
       zoomControlsEnabled: true,
+      mapToolbarEnabled: true,
+      compassEnabled: true,
       onMapCreated: (controller) {
         _mapController = controller;
         if (!_isMapReady) {

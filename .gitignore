@@ -68,3 +68,6 @@ android/app/upload-keystore.jks
 *.p12
 Certificates.p12
 Certificates_modern.p12
+# Binaries & packages
+*.apk
+*.aab

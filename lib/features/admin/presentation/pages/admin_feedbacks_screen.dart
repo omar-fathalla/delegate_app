@@ -35,10 +35,12 @@ class _AdminFeedbacksView extends StatelessWidget {
         subtitle: 'إدارة المقترحات',
         showBackButton: true,
         onBackPressed: () {
-          if (GoRouter.of(context).canPop()) {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else if (GoRouter.of(context).canPop()) {
             context.pop();
           } else {
-            context.go('/');
+            Navigator.of(context).maybePop();
           }
         },
       ),
