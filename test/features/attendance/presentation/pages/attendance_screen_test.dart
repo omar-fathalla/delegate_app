@@ -187,14 +187,14 @@ void main() {
 
     // Verify Previous Month Button
     final prevButtonFinder = find.widgetWithIcon(
-      FilledButton,
+      IconButton,
       Icons.chevron_left_rounded,
     );
     expect(prevButtonFinder, findsOneWidget);
 
     // Verify Next Month Button
     final nextButtonFinder = find.widgetWithIcon(
-      FilledButton,
+      IconButton,
       Icons.chevron_right_rounded,
     );
     expect(nextButtonFinder, findsOneWidget);

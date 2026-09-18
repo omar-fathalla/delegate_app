@@ -47,6 +47,7 @@ class NotificationModel extends NotificationEntity {
   static String formatSenderRoleArabic(String? role) {
     if (role == null || role.trim().isEmpty) return 'النظام';
     final r = role.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_').trim();
+    if (r.contains('supervis')) return 'مشرف الشركة';
     if (r.contains('super')) return 'سوبر أدمن';
     if (r.contains('org') || r == 'organization_admin') return 'مسؤول المنظمة';
     if (r.contains('branch') || r == 'branches_marketing' || r == 'branches_marketing_manager') {
@@ -55,7 +56,7 @@ class NotificationModel extends NotificationEntity {
     if (r == 'marketing_promotion' || r == 'promotion_marketing') return 'مسؤول تسويق العروض';
     if (r.contains('market')) return 'مسؤول التسويق';
     if (r.contains('support') || r.contains('tech')) return 'الدعم الفني';
-    if (r.contains('supervis') || r == 'company_admin' || r == 'admin') return 'مشرف الشركة';
+    if (r == 'company_admin' || r == 'admin') return 'مشرف الشركة';
     if (r.contains('promoter')) return 'مروج';
     if (r.contains('delegate')) return 'مندوب';
     if (r.contains('system')) return 'النظام';

@@ -96,6 +96,7 @@ void main() {
           }
         ],
         'isRepeated': false,
+        'isConfidential': false,
         'createdAt': Timestamp.fromDate(tDate),
         'updatedAt': Timestamp.fromDate(tDate),
       };
