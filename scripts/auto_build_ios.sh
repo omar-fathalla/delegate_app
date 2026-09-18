@@ -164,8 +164,12 @@ fi
 if ! git diff --quiet "$PUBSPEC"; then
   git add "$PUBSPEC"
   git commit -m "chore: auto-increment iOS version to ${NEW_VERSION} [skip ci]" 2>/dev/null || true
-  git push origin main 2>/dev/null || true
-  echo -e "  ${GREEN}✅ تمت مزامنة رقم الإصدار ${NEW_VERSION} تلقائياً مع GitHub${NC}"
+  if [ "$PUSH_TO_GITHUB" = "true" ]; then
+    git push origin main 2>/dev/null || true
+    echo -e "  ${GREEN}✅ تمت مزامنة رقم الإصدار ${NEW_VERSION} تلقائياً مع GitHub${NC}"
+  else
+    echo -e "  ${YELLOW}ℹ️ تم تسجيل الإصدار ${NEW_VERSION} محلياً (بدون push إلى GitHub بناءً على سياسة المشروع).${NC}"
+  fi
 fi
 echo ""
 
