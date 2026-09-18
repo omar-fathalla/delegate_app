@@ -81,7 +81,7 @@ class _OrganizationBranchesScreenState
             bloc.add(BranchLoadRequested());
           }
         },
-        icon: const Icon(Icons.add_location_alt_outlined),
+        icon: const Icon(Icons.add_location_alt_rounded),
         label: Text(
           'إضافة فرع',
           style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
@@ -98,7 +98,7 @@ class _OrganizationBranchesScreenState
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, size: 48, color: colorScheme.error),
+                  Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
                   const SizedBox(height: 16),
                   Text(state.message, textAlign: TextAlign.center),
                   const SizedBox(height: 16),
@@ -225,7 +225,7 @@ class _OrganizationBranchesScreenState
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
-                                      Icons.store_mall_directory_outlined,
+                                      Icons.store_mall_directory_rounded,
                                       size: 72,
                                       color: colorScheme.onSurfaceVariant
                                           .withValues(alpha: 0.5),
@@ -269,7 +269,7 @@ class _OrganizationBranchesScreenState
                                           }
                                         },
                                         icon: const Icon(
-                                          Icons.add_location_alt_outlined,
+                                          Icons.add_location_alt_rounded,
                                         ),
                                         label: const Text('إضافة فرع الآن'),
                                       ),

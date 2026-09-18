@@ -23,6 +23,7 @@ class PushNotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications;
 
   StreamSubscription<String>? _tokenRefreshSub;
+  String? _initializedUid;
 
   /// Callback invoked when a notification is tapped.
   /// Receives the notification data payload.
@@ -40,45 +41,81 @@ class PushNotificationService {
   /// Initializes FCM: requests permissions, saves token, subscribes to topics,
   /// and sets up foreground/tap handlers.
   Future<void> initialize(String delegateUid) async {
-    // Request permission (iOS/macOS require explicit permission)
-    final settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    if (settings.authorizationStatus == AuthorizationStatus.denied) {
-      debugPrint('FCM: User denied notification permissions');
+    if (_initializedUid == delegateUid) {
+      debugPrint('FCM: Already initialized for delegate $delegateUid');
       return;
     }
+    _initializedUid = delegateUid;
 
-    // Save FCM token
-    final token = await _messaging.getToken();
-    if (token != null) {
-      await _saveToken(delegateUid, token);
+    // 1. Initialize local notifications first (fast, local, no network)
+    try {
+      await _initLocalNotifications();
+    } catch (e) {
+      debugPrint('FCM: Local notifications init error: $e');
     }
 
-    // Listen for token refresh
-    _tokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
-      _saveToken(delegateUid, newToken);
-    });
+    // 2. Set up foreground/background message stream listeners
+    try {
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+    } catch (e) {
+      debugPrint('FCM: Message listener setup error: $e');
+    }
 
-    // Subscribe to app_updates topic for changelog notifications
-    await _messaging.subscribeToTopic('app_updates');
+    // 3. Check for initial message (when app opened from terminated state)
+    try {
+      final initialMessage = await _messaging
+          .getInitialMessage()
+          .timeout(const Duration(seconds: 3));
+      if (initialMessage != null) {
+        _handleNotificationTap(initialMessage);
+      }
+    } catch (e) {
+      debugPrint('FCM: getInitialMessage error: $e');
+    }
 
-    // Initialize local notifications for foreground display
-    await _initLocalNotifications();
+    // 4. Request permission safely with timeout (non-blocking)
+    try {
+      await _messaging
+          .requestPermission(
+            alert: true,
+            badge: true,
+            sound: true,
+          )
+          .timeout(const Duration(seconds: 4));
+    } catch (e) {
+      debugPrint('FCM: Permission request timeout or error: $e');
+    }
 
-    // Handle foreground messages
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    // 5. Get and save FCM token safely with timeout
+    try {
+      final token = await _messaging
+          .getToken()
+          .timeout(const Duration(seconds: 4));
+      if (token != null) {
+        await _saveToken(delegateUid, token);
+      }
+    } catch (e) {
+      debugPrint('FCM: getToken error: $e');
+    }
 
-    // Handle notification tap when app is in background
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+    // 6. Listen for token refresh
+    try {
+      await _tokenRefreshSub?.cancel();
+      _tokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
+        _saveToken(delegateUid, newToken);
+      });
+    } catch (e) {
+      debugPrint('FCM: onTokenRefresh listen error: $e');
+    }
 
-    // Handle notification tap when app was terminated
-    final initialMessage = await _messaging.getInitialMessage();
-    if (initialMessage != null) {
-      _handleNotificationTap(initialMessage);
+    // 7. Subscribe to app_updates topic safely with timeout
+    try {
+      await _messaging
+          .subscribeToTopic('app_updates')
+          .timeout(const Duration(seconds: 4));
+    } catch (e) {
+      debugPrint('FCM: subscribeToTopic error: $e');
     }
 
     debugPrint('FCM: Initialized for delegate $delegateUid');
@@ -86,10 +123,15 @@ class PushNotificationService {
 
   /// Removes the FCM token from Firestore. Call on logout.
   Future<void> clearToken(String delegateUid) async {
+    _initializedUid = null;
     try {
       await _tokenRefreshSub?.cancel();
       _tokenRefreshSub = null;
-      await _firestore.collection('fcm_tokens').doc(delegateUid).delete();
+      await _firestore
+          .collection('fcm_tokens')
+          .doc(delegateUid)
+          .delete()
+          .timeout(const Duration(seconds: 4));
       debugPrint('FCM: Token cleared for $delegateUid');
     } catch (e) {
       debugPrint('FCM: Error clearing token: $e');
@@ -98,11 +140,15 @@ class PushNotificationService {
 
   Future<void> _saveToken(String delegateUid, String token) async {
     try {
-      await _firestore.collection('fcm_tokens').doc(delegateUid).set({
-        'token': token,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'platform': Platform.isIOS ? 'ios' : 'android',
-      });
+      await _firestore
+          .collection('fcm_tokens')
+          .doc(delegateUid)
+          .set({
+            'token': token,
+            'updatedAt': FieldValue.serverTimestamp(),
+            'platform': Platform.isIOS ? 'ios' : 'android',
+          })
+          .timeout(const Duration(seconds: 4));
       debugPrint('FCM: Token saved for $delegateUid');
     } catch (e) {
       debugPrint('FCM: Error saving token: $e');

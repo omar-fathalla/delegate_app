@@ -402,7 +402,7 @@ class CompanyDetailsScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    Icons.description_outlined,
+                    Icons.description_rounded,
                     color: colorScheme.tertiary,
                     size: 22,
                   ),

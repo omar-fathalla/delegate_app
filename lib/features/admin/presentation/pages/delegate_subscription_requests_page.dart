@@ -6,6 +6,7 @@ import 'package:delegate_app/features/admin/domain/entities/delegate_subscriptio
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'super_admin_subscription_financial_report_screen.dart';
 
 class DelegateSubscriptionRequestsPage extends StatefulWidget {
   final Delegate currentAdmin;
@@ -48,6 +49,22 @@ class _DelegateSubscriptionRequestsPageState
         ),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          if (widget.currentAdmin.role == UserRole.superAdmin)
+            IconButton(
+              icon: const Icon(Icons.analytics_rounded),
+              tooltip: 'التقرير المالي والجرد',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SuperAdminSubscriptionFinancialReportScreen(
+                      adminDelegate: widget.currentAdmin,
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -77,20 +94,21 @@ class _DelegateSubscriptionRequestsPageState
             ),
           ),
 
-          // 2. Status Filter Chips
+          // 2. Status Filter Chips (M3 Icon-Enhanced)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Row(
               children: [
-                _buildFilterChip('قيد الانتظار (لم يتم الاعتماد)', SubscriptionRequestStatus.pending, colorScheme),
+                _buildFilterChip('قيد الانتظار', SubscriptionRequestStatus.pending, Icons.hourglass_top_rounded, colorScheme),
                 const SizedBox(width: 8),
-                _buildFilterChip('تم الاعتماد', SubscriptionRequestStatus.approved, colorScheme),
+                _buildFilterChip('المعتمدة', SubscriptionRequestStatus.approved, Icons.verified_rounded, colorScheme),
                 const SizedBox(width: 8),
-                _buildFilterChip('المرفوضة', SubscriptionRequestStatus.rejected, colorScheme),
+                _buildFilterChip('المرفوضة', SubscriptionRequestStatus.rejected, Icons.cancel_rounded, colorScheme),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: const Text('الكل', style: TextStyle(fontSize: 12.5)),
+                  avatar: const Icon(Icons.clear_all_rounded, size: 16),
+                  label: const Text('الكل', style: TextStyle(fontSize: 12)),
                   selected: _statusFilter == null,
                   onSelected: (selected) {
                     if (selected) setState(() => _statusFilter = null);
@@ -188,11 +206,13 @@ class _DelegateSubscriptionRequestsPageState
   Widget _buildFilterChip(
     String label,
     SubscriptionRequestStatus status,
+    IconData icon,
     ColorScheme colorScheme,
   ) {
     final isSelected = _statusFilter == status;
     return ChoiceChip(
-      label: Text(label, style: const TextStyle(fontSize: 12.5)),
+      avatar: Icon(icon, size: 16),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: isSelected,
       onSelected: (selected) {
         if (selected) setState(() => _statusFilter = status);
@@ -213,7 +233,8 @@ class _DelegateSubscriptionRequestsPageState
           ],
         ),
         content: Text(
-          'هل أنت متأكد من اعتماد المندوب "${request.fullName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر) حتى نهاية دورة ${request.subscriptionCycle}؟',
+          'هل أنت متأكد من اعتماد المندوب "${request.fullName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر) حتى نهاية دورة ${request.subscriptionCycle}؟\n\n'
+          'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}',
         ),
         actions: [
           TextButton(
@@ -439,7 +460,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                _buildStatusBadge(request.status),
+                _buildStatusBadge(request.status, colorScheme),
               ],
             ),
             const SizedBox(height: 10),
@@ -457,25 +478,25 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     child: CachedNetworkImage(
                       imageUrl: request.profileImageUrl,
-                      width: 52,
-                      height: 52,
+                      width: 50,
+                      height: 50,
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(
-                        width: 52,
-                        height: 52,
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.person, color: Colors.grey),
+                        width: 50,
+                        height: 50,
+                        color: colorScheme.surfaceContainerHighest,
+                        child: const Icon(Icons.person_rounded, color: Colors.grey),
                       ),
                       errorWidget: (context, url, error) => Container(
-                        width: 52,
-                        height: 52,
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.person, color: Colors.grey),
+                        width: 50,
+                        height: 50,
+                        color: colorScheme.surfaceContainerHighest,
+                        child: const Icon(Icons.person_rounded, color: Colors.grey),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,7 +505,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                         request.fullName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 14.5,
+                          fontSize: 14,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -494,158 +515,185 @@ class _SubscriptionRequestCard extends StatelessWidget {
                           const SizedBox(width: 4),
                           Text(
                             request.phoneNumber,
-                            style: TextStyle(fontSize: 12, color: colorScheme.outline),
+                            style: TextStyle(fontSize: 11.5, color: colorScheme.outline),
                           ),
-                          const SizedBox(width: 10),
-                          Icon(Icons.credit_card_rounded, size: 12, color: colorScheme.outline),
+                          const SizedBox(width: 8),
+                          Icon(Icons.badge_rounded, size: 12, color: colorScheme.outline),
                           const SizedBox(width: 4),
                           Text(
                             request.nationalId,
-                            style: TextStyle(fontSize: 12, color: colorScheme.outline),
+                            style: TextStyle(fontSize: 11.5, color: colorScheme.outline),
                           ),
                         ],
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'المشرف: ${request.supervisorName} • $dateStr',
-                        style: TextStyle(fontSize: 10.5, color: colorScheme.outline),
+                        '${request.supervisorName} • $dateStr',
+                        style: TextStyle(fontSize: 10, color: colorScheme.outline),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const Divider(height: 18),
+            const Divider(height: 16),
 
-            // Row 3: Payment & Cycle info
+            // Row 3: Payment & Cycle info + Document Icon Buttons (Responsive & Icon-First)
             Row(
               children: [
-                // Payment Method
+                // Payment Method & Fee
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
-                      const Text(
-                        'طريقة الدفع:',
-                        style: TextStyle(fontSize: 11, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 2),
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          if (request.paymentMethod == SubscriptionPaymentMethod.companyDeduction)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'خصم من حساب الشركة',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue.shade800,
-                                ),
-                              ),
-                            )
-                          else ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade100,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.amber.shade400),
-                              ),
-                              child: Text(
-                                'كود: ${request.receiptCode ?? "بدون"}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.amber.shade900,
-                                ),
-                              ),
-                            ),
-                            if (request.receiptImageUrl != null)
-                              InkWell(
-                                onTap: () => _showImageDialog(
-                                  context,
-                                  'إيصال الدفع - كود ${request.receiptCode}',
-                                  request.receiptImageUrl!,
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.receipt_long_rounded, size: 12),
-                                      SizedBox(width: 3),
-                                      Text('عرض الإيصال', style: TextStyle(fontSize: 10.5)),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ],
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.green.shade300),
-                            ),
-                            child: Text(
-                              '${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر)',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green.shade800,
-                              ),
+                      if (request.paymentMethod == SubscriptionPaymentMethod.companyDeduction)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'خصم شركة',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSecondaryContainer,
                             ),
                           ),
-                        ],
+                        )
+                      else if (request.paymentMethod == SubscriptionPaymentMethod.instaPay) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6B21A8).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF9333EA).withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                'assets/images/instapay_logo.png',
+                                width: 14,
+                                height: 14,
+                                fit: BoxFit.contain,
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'انستاباي',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF9333EA),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (request.receiptImageUrl != null)
+                          IconButton.filledTonal(
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            padding: EdgeInsets.zero,
+                            tooltip: 'عرض إشعار تحويل انستاباي',
+                            icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                            onPressed: () => _showImageDialog(
+                              context,
+                              'إشعار تحويل انستاباي - ${request.fullName}',
+                              request.receiptImageUrl!,
+                            ),
+                          ),
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'إيصال إلكتروني',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'كود: ${request.receiptCode ?? "-"}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        if (request.receiptImageUrl != null)
+                          IconButton.filledTonal(
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            padding: EdgeInsets.zero,
+                            tooltip: 'عرض الإيصال الإلكتروني',
+                            icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                            onPressed: () => _showImageDialog(
+                              context,
+                              'إيصال إلكتروني - كود ${request.receiptCode}',
+                              request.receiptImageUrl!,
+                            ),
+                          ),
+                      ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${request.fee.toInt()} ج.م (${request.remainingMonths} ش)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
 
-                // Documents viewer buttons
+                // Documents viewer buttons (Icon-Only with tooltips)
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
+                    IconButton.outlined(
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      padding: EdgeInsets.zero,
+                      tooltip: 'وجه البطاقة',
+                      icon: const Icon(Icons.badge_outlined, size: 16),
                       onPressed: () => _showImageDialog(
                         context,
                         'بطاقة الرقم القومي (الوجه) - ${request.fullName}',
                         request.nationalIdFrontUrl,
                       ),
-                      icon: const Icon(Icons.credit_card_rounded, size: 14),
-                      label: const Text('وجه البطاقة', style: TextStyle(fontSize: 11)),
                     ),
                     const SizedBox(width: 4),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
+                    IconButton.outlined(
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      padding: EdgeInsets.zero,
+                      tooltip: 'ظهر البطاقة',
+                      icon: const Icon(Icons.flip_rounded, size: 16),
                       onPressed: () => _showImageDialog(
                         context,
                         'بطاقة الرقم القومي (الظهر) - ${request.fullName}',
                         request.nationalIdBackUrl,
                       ),
-                      icon: const Icon(Icons.flip_rounded, size: 14),
-                      label: const Text('ظهر البطاقة', style: TextStyle(fontSize: 11)),
                     ),
                   ],
                 ),
@@ -662,12 +710,10 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     Expanded(
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF6B4B00),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          shape: const StadiumBorder(),
                         ),
                         onPressed: onApprove,
                         icon: const Icon(Icons.verified_rounded, size: 17),
@@ -679,14 +725,12 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: FilledButton.tonalIcon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colorScheme.errorContainer,
-                          foregroundColor: colorScheme.onErrorContainer,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colorScheme.error,
+                          side: BorderSide(color: colorScheme.error.withValues(alpha: 0.7)),
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          shape: const StadiumBorder(),
                         ),
                         onPressed: onReject,
                         icon: const Icon(Icons.cancel_rounded, size: 17),
@@ -700,22 +744,21 @@ class _SubscriptionRequestCard extends StatelessWidget {
                 )
               else
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.shade300),
+                    color: colorScheme.secondaryContainer.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.hourglass_top_rounded, size: 18, color: Colors.amber.shade900),
-                      const SizedBox(width: 8),
+                      Icon(Icons.hourglass_top_rounded, size: 16, color: colorScheme.secondary),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'الطلب قيد الانتظار وبانتظار المراجعة والاعتماد من قبل الإدارة والدعم الفني.',
+                          'الطلب قيد الانتظار وبانتظار المراجعة والاعتماد.',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.amber.shade900,
+                            fontSize: 11.5,
+                            color: colorScheme.onSecondaryContainer,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -726,22 +769,21 @@ class _SubscriptionRequestCard extends StatelessWidget {
             ] else if (request.status == SubscriptionRequestStatus.approved) ...[
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.shade300),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle_rounded, size: 18, color: Colors.green.shade700),
-                    const SizedBox(width: 8),
+                    Icon(Icons.check_circle_rounded, size: 16, color: colorScheme.primary),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'تم اعتماد وتفعيل المندوب بنجاح${request.reviewedBy != null ? " بواسطة ${request.reviewedBy}" : ""}!',
+                        'تم اعتماد وتفعيل المندوب بنجاح${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}!',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.green.shade800,
+                          fontSize: 11.5,
+                          color: colorScheme.onPrimaryContainer,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -752,23 +794,22 @@ class _SubscriptionRequestCard extends StatelessWidget {
             ] else if (request.status == SubscriptionRequestStatus.rejected) ...[
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.shade200),
+                  color: colorScheme.errorContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.cancel_rounded, size: 18, color: Colors.red.shade700),
-                    const SizedBox(width: 8),
+                    Icon(Icons.cancel_rounded, size: 16, color: colorScheme.error),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'تم رفض الطلب: ${request.rejectionReason ?? "لا يوجد سبب محدد"}${request.reviewedBy != null ? " (بواسطة ${request.reviewedBy})" : ""}',
+                        'تم رفض الطلب: ${request.rejectionReason ?? "بدون سبب"}${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.red.shade800,
+                          fontSize: 11.5,
+                          color: colorScheme.onErrorContainer,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -783,7 +824,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge(SubscriptionRequestStatus status) {
+  Widget _buildStatusBadge(SubscriptionRequestStatus status, ColorScheme colorScheme) {
     Color bg;
     Color fg;
     String label;
@@ -791,27 +832,27 @@ class _SubscriptionRequestCard extends StatelessWidget {
 
     switch (status) {
       case SubscriptionRequestStatus.pending:
-        bg = Colors.amber.shade50;
-        fg = Colors.amber.shade900;
+        bg = colorScheme.secondaryContainer.withValues(alpha: 0.6);
+        fg = colorScheme.onSecondaryContainer;
         label = 'قيد الانتظار';
         icon = Icons.hourglass_empty_rounded;
         break;
       case SubscriptionRequestStatus.approved:
-        bg = Colors.green.shade50;
-        fg = Colors.green.shade800;
+        bg = colorScheme.primaryContainer.withValues(alpha: 0.7);
+        fg = colorScheme.onPrimaryContainer;
         label = 'معتمد';
         icon = Icons.check_circle_rounded;
         break;
       case SubscriptionRequestStatus.rejected:
-        bg = Colors.red.shade50;
-        fg = Colors.red.shade800;
+        bg = colorScheme.errorContainer;
+        fg = colorScheme.onErrorContainer;
         label = 'مرفوض';
         icon = Icons.cancel_rounded;
         break;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(8),
@@ -823,7 +864,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: fg),
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: fg),
           ),
         ],
       ),

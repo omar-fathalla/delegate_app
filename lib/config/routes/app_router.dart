@@ -55,7 +55,13 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/home',
       pageBuilder: (context, state) {
-        final delegate = state.extra as Delegate;
+        final delegate = state.extra is Delegate ? state.extra as Delegate : null;
+        if (delegate == null) {
+          return AppMotionPage.fadeThrough(
+            state: state,
+            child: const SplashScreen(),
+          );
+        }
         return AppMotionPage.fadeThrough(
           state: state,
           child: MainScreen(delegate: delegate),
@@ -65,7 +71,13 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/admin/home',
       pageBuilder: (context, state) {
-        final delegate = state.extra as Delegate;
+        final delegate = state.extra is Delegate ? state.extra as Delegate : null;
+        if (delegate == null) {
+          return AppMotionPage.fadeThrough(
+            state: state,
+            child: const SplashScreen(),
+          );
+        }
         return AppMotionPage.fadeThrough(
           state: state,
           child: AdminMainScreen(delegate: delegate),
@@ -75,7 +87,13 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/marketing/home',
       pageBuilder: (context, state) {
-        final delegate = state.extra as Delegate;
+        final delegate = state.extra is Delegate ? state.extra as Delegate : null;
+        if (delegate == null) {
+          return AppMotionPage.fadeThrough(
+            state: state,
+            child: const SplashScreen(),
+          );
+        }
         return AppMotionPage.fadeThrough(
           state: state,
           child: MarketingMainScreen(delegate: delegate),
@@ -190,10 +208,13 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/user-profile',
-      pageBuilder: (context, state) => AppMotionPage.sharedAxis(
-        state: state,
-        child: const UserProfileScreen(),
-      ),
+      pageBuilder: (context, state) {
+        final delegate = state.extra is Delegate ? state.extra as Delegate : null;
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: UserProfileScreen(delegate: delegate),
+        );
+      },
     ),
     GoRoute(
       path: '/profile',

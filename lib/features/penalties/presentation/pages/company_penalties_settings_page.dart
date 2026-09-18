@@ -12,6 +12,8 @@ import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.
 import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evidence_viewer.dart';
 import 'package:delegate_app/features/penalties/presentation/utils/penalty_creator_helper.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_create_penalty_page.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_settings_page.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_catalog_page.dart';
 
 class CompanyPenaltiesSettingsPage extends StatefulWidget {
   final Delegate delegate;
@@ -150,13 +152,13 @@ class _CompanyPenaltiesSettingsPageState
 
       final count = _selectedBranchIds.length;
       final msg = count == 1
-          ? '📌 تم تثبيت الفرع كفرع افتراضي لقسم الغرامات'
-          : '📌 تم تثبيت ($count فروع) كقطاع افتراضي لقسم الغرامات';
+          ? 'تم تثبيت الفرع كفرع افتراضي لقسم الغرامات'
+          : 'تم تثبيت ($count فروع) كقطاع افتراضي لقسم الغرامات';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(msg),
-          backgroundColor: Colors.teal.shade700,
+          backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -354,15 +356,15 @@ class _CompanyPenaltiesSettingsPageState
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: Colors.teal.withValues(alpha: 0.12),
+                                          color: colorScheme.primary.withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
-                                          'ضمن الافتراضي 📌',
+                                          'ضمن الافتراضي',
                                           style: TextStyle(
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.teal.shade800,
+                                            color: colorScheme.primary,
                                           ),
                                         ),
                                       ),
@@ -465,6 +467,31 @@ class _CompanyPenaltiesSettingsPageState
     return false;
   }
 
+  bool _canUserViewConfidentialPenalty(PenaltyEntity p, Delegate user) {
+    // 1. Super Admin, Technical Support, Organization Admin
+    if (user.role == UserRole.superAdmin ||
+        user.role == UserRole.technicalSupport ||
+        user.role == UserRole.organizationAdmin) {
+      return true;
+    }
+
+    // 2. The Target Delegate himself
+    if (user.role == UserRole.delegate) {
+      return _isPenaltyForDelegate(p, user);
+    }
+
+    // 3. The Company Supervisor of that company
+    if (user.role == UserRole.admin) {
+      final compId = user.companyUID.isNotEmpty ? user.companyUID : user.organizationUID;
+      if (compId.isNotEmpty && (compId == p.companyId || compId.toLowerCase() == p.companyName.toLowerCase())) {
+        return true;
+      }
+    }
+
+    // Strictly hidden from all other roles (Branches Marketing Manager, Marketing, other supervisors, etc.)
+    return false;
+  }
+
   void _loadData() {
     if (widget.delegate.role == UserRole.marketingPromotion) return;
     if (widget.delegate.role == UserRole.delegate) {
@@ -488,10 +515,24 @@ class _CompanyPenaltiesSettingsPageState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     if (widget.delegate.role == UserRole.marketingPromotion) {
       return Scaffold(
+        backgroundColor: colorScheme.surfaceContainerLowest,
         appBar: widget.showAppBar
-            ? AppBar(title: const Text('قسم الغرامات والمخالفات'))
+            ? AppBar(
+                title: const Text('قسم الغرامات والمخالفات'),
+                backgroundColor: colorScheme.surfaceContainer,
+                elevation: 0,
+                shape: Border(
+                  bottom: BorderSide(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                    width: 1,
+                  ),
+                ),
+              )
             : null,
         body: const Center(
           child: Padding(
@@ -506,8 +547,6 @@ class _CompanyPenaltiesSettingsPageState
       );
     }
 
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isDelegate = widget.delegate.role == UserRole.delegate;
     final canCreatePenalty = widget.delegate.role == UserRole.organizationAdmin ||
         widget.delegate.role == UserRole.superAdmin ||
@@ -518,8 +557,17 @@ class _CompanyPenaltiesSettingsPageState
         widget.delegate.role == UserRole.technicalSupport;
 
     return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: widget.showAppBar
           ? AppBar(
+              backgroundColor: colorScheme.surfaceContainer,
+              elevation: 0,
+              shape: Border(
+                bottom: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  width: 1,
+                ),
+              ),
               title: Text(
                 isDelegate
                     ? 'سجل مخالفاتي وغراماتي'
@@ -534,6 +582,32 @@ class _CompanyPenaltiesSettingsPageState
                     )
                   : null,
               actions: [
+                IconButton(
+                  icon: const Icon(Icons.menu_book_rounded),
+                  tooltip: 'لائحة الغرامات المعتمدة',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PenaltyRulesCatalogPage(
+                          currentDelegate: widget.delegate,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                if (widget.delegate.role == UserRole.superAdmin ||
+                    widget.delegate.role == UserRole.technicalSupport)
+                  IconButton(
+                    icon: const Icon(Icons.tune_rounded),
+                    tooltip: 'إعدادات ولائحة الغرامات',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PenaltyRulesSettingsPage(adminDelegate: widget.delegate),
+                        ),
+                      );
+                    },
+                  ),
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
                   tooltip: 'تحديث',
@@ -607,6 +681,12 @@ class _CompanyPenaltiesSettingsPageState
                   .toList();
             }
 
+            // Confidentiality filter: strictly isolated to the 4 permitted roles
+            penalties = penalties.where((p) {
+              if (!p.isConfidential) return true;
+              return _canUserViewConfidentialPenalty(p, widget.delegate);
+            }).toList();
+
             // Multi-Branch Filter
             if (_selectedBranchIds.isNotEmpty && !_selectedBranchIds.contains('all')) {
               penalties = penalties.where((p) =>
@@ -665,6 +745,77 @@ class _CompanyPenaltiesSettingsPageState
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
+                  // Official Rules Catalog Quick Link Banner
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PenaltyRulesCatalogPage(
+                                currentDelegate: widget.delegate,
+                              ),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: colorScheme.primary.withValues(alpha: 0.22),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.menu_book_rounded,
+                                  color: colorScheme.onPrimary,
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'لائحة الغرامات والجزاءات الرسمية',
+                                      style: theme.textTheme.labelLarge?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    Text(
+                                      'استعراض بنود التجاوزات وقيم الخصم المعتمدة للمرة الأولى والتكرار',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 14,
+                                color: colorScheme.primary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   // 0. Multi-Branch Selector & Pin Bar (Reserved for Supervisors & Admins)
                   if (!isDelegate)
                     SliverToBoxAdapter(
@@ -706,25 +857,25 @@ class _CompanyPenaltiesSettingsPageState
                                       : 'تثبيت الفروع المحددة كقطاع افتراضي',
                                   style: IconButton.styleFrom(
                                     backgroundColor: isPinned
-                                        ? Colors.teal.shade100
+                                        ? colorScheme.tertiaryContainer
                                         : colorScheme.surface,
                                     foregroundColor: isPinned
-                                        ? Colors.teal.shade900
+                                        ? colorScheme.onTertiaryContainer
                                         : colorScheme.onSurfaceVariant,
                                     visualDensity: VisualDensity.compact,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                       side: BorderSide(
                                         color: isPinned
-                                            ? Colors.teal.shade600
+                                            ? colorScheme.tertiary
                                             : colorScheme.outlineVariant,
                                       ),
                                     ),
                                   ),
                                   icon: Icon(
-                                    isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                                    Icons.push_pin_rounded,
                                     size: 16,
-                                    color: isPinned ? Colors.teal.shade700 : null,
+                                    color: isPinned ? colorScheme.tertiary : null,
                                   ),
                                   onPressed: _togglePinCurrentBranches,
                                 ),
@@ -748,7 +899,7 @@ class _CompanyPenaltiesSettingsPageState
                                     _loadBranchesAndPinned();
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('تم تحديث بيانات وسجلات الغرامات بنجاح 🔄'),
+                                        content: Text('تم تحديث بيانات وسجلات الغرامات بنجاح'),
                                         duration: Duration(seconds: 1),
                                         behavior: SnackBarBehavior.floating,
                                       ),
@@ -773,7 +924,7 @@ class _CompanyPenaltiesSettingsPageState
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
                                         color: isPinned
-                                            ? Colors.teal.shade600
+                                            ? colorScheme.primary
                                             : colorScheme.outlineVariant.withValues(alpha: 0.7),
                                       ),
                                     ),
@@ -793,11 +944,11 @@ class _CompanyPenaltiesSettingsPageState
                                               ),
                                               if (isPinned)
                                                 Text(
-                                                  'القطاع الافتراضي المثبت 📌',
+                                                  'القطاع الافتراضي المثبت',
                                                   style: TextStyle(
                                                     fontSize: 10.5,
                                                     fontWeight: FontWeight.bold,
-                                                    color: Colors.teal.shade800,
+                                                    color: colorScheme.primary,
                                                   ),
                                                 ),
                                             ],
@@ -825,7 +976,7 @@ class _CompanyPenaltiesSettingsPageState
                                     return Padding(
                                       padding: const EdgeInsets.only(left: 6),
                                       child: Chip(
-                                        avatar: Icon(Icons.location_on_outlined,
+                                        avatar: Icon(Icons.location_on_rounded,
                                             size: 13, color: colorScheme.primary),
                                         label: Text(
                                           bObj['name'] ?? branchId,
@@ -1146,24 +1297,19 @@ class _CompanyPenaltiesSettingsPageState
                             Container(
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: (isDelegate ? Colors.teal : colorScheme.primary)
-                                    .withValues(alpha: 0.1),
+                                color: colorScheme.primary.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                isDelegate
-                                    ? Icons.verified_user_rounded
-                                    : Icons.verified_user_outlined,
+                                Icons.verified_user_rounded,
                                 size: 56,
-                                color: isDelegate
-                                    ? Colors.teal.shade700
-                                    : colorScheme.primary,
+                                color: colorScheme.primary,
                               ),
                             ),
                             const SizedBox(height: 16),
                             Text(
                               isDelegate
-                                  ? 'سجلك نظيف ومتميز! 👏'
+                                  ? 'سجلك نظيف ومتميز!'
                                   : (isOrgAdmin
                                       ? 'لا توجد مخالفات مسجلة على أية شركة بعد'
                                       : 'لا توجد مخالفات مسجلة على هذه الشركة'),
@@ -1391,6 +1537,32 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
+                      ),
+                    ),
+                  ],
+                  if (widget.penalty.isConfidential) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.shade900.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.purple.shade400.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock_rounded, size: 12, color: Colors.purple.shade700),
+                          const SizedBox(width: 3),
+                          Text(
+                            'سرية ومقيدة',
+                            style: TextStyle(
+                              color: Colors.purple.shade700,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -1753,7 +1925,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                 Row(
                   children: [
                     if (widget.penalty.createdByName.isNotEmpty) ...[
-                      Icon(Icons.badge_outlined, size: 13, color: colorScheme.onSurfaceVariant),
+                      Icon(Icons.badge_rounded, size: 13, color: colorScheme.onSurfaceVariant),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(

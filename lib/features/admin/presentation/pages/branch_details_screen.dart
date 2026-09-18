@@ -352,7 +352,7 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
                     const SizedBox(height: 40),
                     FilledButton.icon(
                       onPressed: isLoading ? null : _downloadQR,
-                      icon: const Icon(Icons.file_download_outlined),
+                      icon: const Icon(Icons.file_download_rounded),
                       label: Text(
                         l10n.downloadQR,
                         style: const TextStyle(
@@ -373,7 +373,7 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
                         Expanded(
                           child: FilledButton.tonalIcon(
                             onPressed: isLoading ? null : _editName,
-                            icon: const Icon(Icons.edit_outlined),
+                            icon: const Icon(Icons.edit_rounded),
                             label: Text(l10n.editName),
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 18),
@@ -388,7 +388,7 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
                           child: OutlinedButton.icon(
                             onPressed: isLoading ? null : _deleteBranch,
                             icon: Icon(
-                              Icons.delete_outline,
+                              Icons.delete_rounded,
                               color: theme.colorScheme.error,
                             ),
                             label: Text(

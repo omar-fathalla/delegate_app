@@ -3,6 +3,8 @@ import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
 
+import 'package:delegate_app/features/penalties/domain/entities/penalty_rule_entity.dart';
+
 abstract class PenaltyRepository {
   Future<Either<Failure, Unit>> createPenalty(PenaltyEntity penalty);
   Future<Either<Failure, List<PenaltyEntity>>> getCompanyPenalties(String companyId);
@@ -25,4 +27,10 @@ abstract class PenaltyRepository {
     required File file,
     required String penaltyId,
   });
+  Future<Either<Failure, List<PenaltyRuleEntity>>> getPenaltyRules();
+  Future<Either<Failure, Unit>> savePenaltyRule(PenaltyRuleEntity rule);
+  Future<Either<Failure, Unit>> updatePenaltyRuleConfidentiality(String ruleId, bool isConfidential);
+  Future<Either<Failure, Unit>> deletePenaltyRule(String ruleId);
+  Future<Either<Failure, Unit>> seedDefaultPenaltyRules();
 }
+

@@ -313,6 +313,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           }
         },
         builder: (context, state) {
+          final colorScheme = Theme.of(context).colorScheme;
           bool isCheckedIn = false;
           Attendance? activeAttendance;
           bool isSyncing = false;
@@ -324,6 +325,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           }
 
           return Scaffold(
+            backgroundColor: colorScheme.surfaceContainerLowest,
             appBar: widget.viewOnly
                 ? AppBar(
                     title: Text(
@@ -338,14 +340,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             body: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    _buildHeader(context),
-
-                    Expanded(child: _buildBody(context, state)),
-                  ],
-                ),
+                child: _buildBody(context, state),
               ),
             ),
             floatingActionButton: widget.viewOnly
@@ -383,7 +378,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                   : (_isInsideGeofence
                                       ? Icons.how_to_reg_rounded
                                       : Icons.location_searching_rounded))
-                              : Icons.qr_code_scanner),
+                              : Icons.qr_code_scanner_rounded),
                       color: isCheckedIn
                           ? Theme.of(context).colorScheme.onErrorContainer
                           : (_isGeofenceMode
@@ -428,119 +423,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     return DateTime.now();
   }
 
-  Widget _buildHeader(BuildContext context) {
-    final locale = Localizations.localeOf(context).languageCode;
-    final l10n = AppLocalizations.of(context)!;
-    final colorScheme = Theme.of(context).colorScheme;
-    final trustedNow = _getTrustedNow();
-    final isCurrentMonth = _selectedMonth.year == trustedNow.year &&
-        _selectedMonth.month == trustedNow.month;
-
-    return Card(
-      elevation: 0,
-      color: colorScheme.primaryContainer,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                FilledButton.tonal(
-                  style: FilledButton.styleFrom(
-                    shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(12),
-                    backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
-                    foregroundColor: colorScheme.onPrimaryContainer,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedMonth = DateTime(
-                        _selectedMonth.year,
-                        _selectedMonth.month - 1,
-                      );
-                      _recomputeFilteredHistory();
-                    });
-                  },
-                  child: const Icon(Icons.chevron_left_rounded, size: 26),
-                ),
-                Column(
-                  children: [
-                    Text(
-                      DateFormat('MMMM yyyy', locale).format(_selectedMonth),
-                      style: TextStyle(
-                        color: colorScheme.onPrimaryContainer,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (!isCurrentMonth) ...[
-                      const SizedBox(height: 4),
-                      InkWell(
-                        onTap: () {
-                          setState(() {
-                            _selectedMonth = trustedNow;
-                            _recomputeFilteredHistory();
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'العودة للشهر الحالي ↩',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                FilledButton.tonal(
-                  style: FilledButton.styleFrom(
-                    shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(12),
-                    backgroundColor: colorScheme.surface.withValues(alpha: 0.5),
-                    foregroundColor: colorScheme.onPrimaryContainer,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedMonth = DateTime(
-                        _selectedMonth.year,
-                        _selectedMonth.month + 1,
-                      );
-                      _recomputeFilteredHistory();
-                    });
-                  },
-                  child: const Icon(Icons.chevron_right_rounded, size: 26),
-                ),
-              ],
-            ),
-            if (_isOffline) ...[
-              const SizedBox(height: 14),
-              _buildConnectivityBadge(context, l10n),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMonthlyStatsBanner(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+  int _calculateAbsentDays() {
     final totalDaysInMonth = DateUtils.getDaysInMonth(
       _selectedMonth.year,
       _selectedMonth.month,
@@ -556,11 +439,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
 
     final attendedDays = _dayKeys.length;
-    int absentDays = 0;
 
     if (isPastMonth) {
-      // For a completed past month, 26 work days standard (4 off days excluded)
-      absentDays = (26 - attendedDays).clamp(0, 26);
+      return (26 - attendedDays).clamp(0, 26);
     } else if (isCurrentMonth) {
       final currentDay = trustedNow.day;
       int activeDays = currentDay;
@@ -570,140 +451,538 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         activeDays = (currentDay - widget.delegate.createdAt.day + 1)
             .clamp(1, totalDaysInMonth);
       }
-      // 4 off days per month (~1 off day every 7 days)
       final offDaysSoFar = (activeDays / 7).floor().clamp(0, 4);
       final elapsedWorkDays = (activeDays - offDaysSoFar).clamp(0, 26);
-      absentDays = (elapsedWorkDays - attendedDays).clamp(0, 26);
+      return (elapsedWorkDays - attendedDays).clamp(0, 26);
     } else if (isFutureMonth) {
-      absentDays = 0;
+      return 0;
+    }
+    return 0;
+  }
+
+  /// Unified Material Design 3 Header Card consolidating:
+  /// 1. Month / Date navigation
+  /// 2. Attendance & Absence statistics (condensed with Google Icons)
+  /// 3. Geofence & Location status with M3 radar animation
+  Widget _buildUnifiedAttendanceCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+    final locale = Localizations.localeOf(context).languageCode;
+    final isArabic = locale == 'ar';
+    final l10n = AppLocalizations.of(context)!;
+    final trustedNow = _getTrustedNow();
+    final isCurrentMonth = _selectedMonth.year == trustedNow.year &&
+        _selectedMonth.month == trustedNow.month;
+
+    final attendedDays = _dayKeys.length;
+    final absentDays = _calculateAbsentDays();
+    final isBusy = _isCheckingLocation || _isLoadingBranches;
+
+    // Semantic status for geofence section
+    final Color statusColor;
+    final IconData headerIcon;
+    final String statusTitle;
+    final String statusSubtitle;
+    final activeBranch = _matchedBranch ?? _nearestBranch;
+
+    if (isBusy) {
+      statusColor = colorScheme.primary;
+      headerIcon = Icons.radar_rounded;
+      statusTitle = isArabic ? 'جاري فحص النطاق...' : 'Checking location...';
+      statusSubtitle = isArabic
+          ? 'يتم الآن التحقق من إحداثياتك والمسافة للفرع'
+          : 'Verifying GPS coordinates and branch';
+    } else if (_isInsideGeofence) {
+      statusColor = const Color(0xFF059669); // Emerald M3 Success
+      headerIcon = Icons.verified_rounded;
+      statusTitle = isArabic ? 'أنت داخل نطاق العمل' : 'Inside Work Zone';
+      statusSubtitle = activeBranch != null
+          ? (isArabic
+              ? 'متواجد داخل نطاق فرع ${activeBranch.branchName}'
+              : 'Within range of ${activeBranch.branchName}')
+          : (isArabic ? 'داخل النطاق المسموح' : 'Within approved range');
+    } else {
+      statusColor = colorScheme.error;
+      headerIcon = Icons.wrong_location_rounded;
+      statusTitle = isArabic ? 'خارج نطاق العمل' : 'Outside Work Zone';
+      statusSubtitle = activeBranch != null
+          ? (isArabic
+              ? 'يرجى الاقتراب من فرع ${activeBranch.branchName} لتسجيل الحضور'
+              : 'Move closer to ${activeBranch.branchName} to check in')
+          : (isArabic ? 'خارج نطاق الفروع المعتمدة' : 'Outside approved branches');
     }
 
-    return Container(
-      margin: const EdgeInsets.only(top: 12, bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
+    // Smart distance formatting
+    String? formattedDistance;
+    if (_distanceToNearest != null && _distanceToNearest!.isFinite) {
+      final meters = _distanceToNearest!.toInt();
+      if (meters < 1000) {
+        formattedDistance = '$meters م';
+      } else {
+        final km = (_distanceToNearest! / 1000).toStringAsFixed(1);
+        formattedDistance = isArabic ? '$km كم ($meters م)' : '$km km ($meters m)';
+      }
+    }
+
+    final allowedRadius = activeBranch != null
+        ? (activeBranch.geofenceRadius > 0
+            ? (activeBranch.geofenceRadius + 50.0).toInt()
+            : 150)
+        : null;
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsetsDirectional.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(
           color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 1.0,
         ),
       ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              // 1. أيام الحضور
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.calendar_month_rounded,
-                      size: 18,
-                      color: colorScheme.primary,
-                    ),
+      color: colorScheme.surfaceContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ================= 1. MONTH SELECTOR =================
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton.filledTonal(
+                  style: IconButton.styleFrom(
+                    backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                    foregroundColor: colorScheme.onSurface,
                   ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  iconSize: 22,
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = DateTime(
+                        _selectedMonth.year,
+                        _selectedMonth.month - 1,
+                      );
+                      _recomputeFilteredHistory();
+                    });
+                  },
+                  icon: const Icon(Icons.chevron_left_rounded),
+                ),
+                Expanded(
+                  child: Column(
                     children: [
-                      Text(
-                        isArabic ? 'أيام الحضور' : 'Attendance Days',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: colorScheme.onSurfaceVariant,
+                      AnimatedSwitcher(
+                        duration: AppMotionDurations.medium2,
+                        child: Text(
+                          DateFormat('MMMM yyyy', locale).format(_selectedMonth),
+                          key: ValueKey(_selectedMonth),
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: colorScheme.onSurface,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                      Text(
-                        isArabic ? '$attendedDays يوم' : '$attendedDays days',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
+                      if (!isCurrentMonth) ...[
+                        const SizedBox(height: 4),
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _selectedMonth = trustedNow;
+                              _recomputeFilteredHistory();
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.restore_rounded, size: 12, color: colorScheme.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isArabic ? 'العودة للشهر الحالي' : 'Back to current month',
+                                  style: textTheme.labelSmall?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
-                ],
-              ),
-              Container(width: 1, height: 28, color: colorScheme.outlineVariant),
-              // 2. أيام الغياب
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.errorContainer,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.event_busy_rounded,
-                      size: 18,
-                      color: colorScheme.onErrorContainer,
-                    ),
+                ),
+                IconButton.filledTonal(
+                  style: IconButton.styleFrom(
+                    backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                    foregroundColor: colorScheme.onSurface,
                   ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isArabic ? 'أيام الغياب' : 'Absence Days',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      Text(
-                        isArabic ? '$absentDays يوم' : '$absentDays days',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: absentDays > 0
-                              ? colorScheme.error
-                              : colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(10),
+                  iconSize: 22,
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = DateTime(
+                        _selectedMonth.year,
+                        _selectedMonth.month + 1,
+                      );
+                      _recomputeFilteredHistory();
+                    });
+                  },
+                  icon: const Icon(Icons.chevron_right_rounded),
+                ),
+              ],
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            if (_isOffline) ...[
+              const SizedBox(height: 8),
+              _buildConnectivityBadge(context, l10n),
+            ],
+
+            const SizedBox(height: 12),
+            Divider(height: 1, thickness: 0.8, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+            const SizedBox(height: 12),
+
+            // ================= 2. ATTENDANCE & ABSENCE STATS =================
+            Row(
+              children: [
+                // Attendance Stat (Condensed with Google Icon)
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF059669).withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check_circle_rounded,
+                            size: 18,
+                            color: Color(0xFF059669),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isArabic ? 'حضور' : 'Attendance',
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              AnimatedSwitcher(
+                                duration: AppMotionDurations.short4,
+                                child: Text(
+                                  isArabic ? '$attendedDays يوم' : '$attendedDays days',
+                                  key: ValueKey(attendedDays),
+                                  style: textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Absence Stat (Condensed with Google Icon)
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: colorScheme.error.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.event_busy_rounded,
+                            size: 18,
+                            color: colorScheme.error,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isArabic ? 'غياب' : 'Absence',
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              AnimatedSwitcher(
+                                duration: AppMotionDurations.short4,
+                                child: Text(
+                                  isArabic ? '$absentDays يوم' : '$absentDays days',
+                                  key: ValueKey(absentDays),
+                                  style: textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: absentDays > 0 ? colorScheme.error : colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            // Work days policy badge (condensed)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   Icons.info_outline_rounded,
                   size: 13,
                   color: colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 4),
                 Text(
                   isArabic
-                      ? 'نظام 26 يوم عمل شهرياً • 4 أيام إجازة مستبعدة من الغياب'
-                      : '26 work days/month • 4 off days excluded from absence',
-                  style: TextStyle(
+                      ? 'نظام 26 يوم عمل • 4 أيام إجازة مستبعدة من الغياب'
+                      : '26 work days • 4 off days excluded from absence',
+                  style: textTheme.labelSmall?.copyWith(
                     fontSize: 10.5,
                     color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+
+            // ================= 3. GEOFENCE ZONE STATUS =================
+            if (_isGeofenceMode) ...[
+              const SizedBox(height: 12),
+              Divider(height: 1, thickness: 0.8, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+              const SizedBox(height: 12),
+
+              AnimatedContainer(
+                duration: AppMotionDurations.medium3,
+                curve: AppMotionCurves.emphasized,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _isInsideGeofence
+                      ? const Color(0xFF059669).withValues(alpha: 0.08)
+                      : (isBusy
+                          ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+                          : colorScheme.error.withValues(alpha: 0.08)),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: statusColor.withValues(alpha: 0.25),
+                    width: 1.0,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _GeofenceRadarWidget(
+                          animation: _radarAnimation,
+                          isInside: _isInsideGeofence,
+                          isChecking: isBusy,
+                          statusColor: statusColor,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    headerIcon,
+                                    size: 18,
+                                    color: statusColor,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      statusTitle,
+                                      style: textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: statusColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _locationStatusMessage ?? statusSubtitle,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontSize: 11.5,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    // 1. Distance Chip (Top, if available)
+                    if (formattedDistance != null) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: statusColor.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isInsideGeofence
+                                    ? Icons.near_me_rounded
+                                    : Icons.straighten_rounded,
+                                size: 14,
+                                color: statusColor,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                isArabic ? 'المسافة: $formattedDistance' : 'Dist: $formattedDistance',
+                                style: textTheme.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    // 2. Branch Name Chip (Under Distance)
+                    if (activeBranch != null) ...[
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surface.withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.storefront_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 5),
+                              Text(
+                                activeBranch.branchName,
+                                style: textTheme.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    // 3. Allowed Radius & Recheck Location on the same row
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        if (allowedRadius != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surface.withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.radar_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                                const SizedBox(width: 5),
+                                Text(
+                                  isArabic ? 'النطاق: $allowedRadius م' : 'Radius: $allowedRadius m',
+                                  style: textTheme.labelSmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          const SizedBox.shrink(),
+                        OutlinedButton.icon(
+                          onPressed: isBusy
+                              ? null
+                              : () => _detectNearestBranch(showSnackBar: true, silent: false),
+                          style: OutlinedButton.styleFrom(
+                            shape: const StadiumBorder(),
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            side: BorderSide(color: colorScheme.outlineVariant),
+                            backgroundColor: colorScheme.surface.withValues(alpha: 0.7),
+                          ),
+                          icon: isBusy
+                              ? SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colorScheme.primary,
+                                  ),
+                                )
+                              : Icon(Icons.refresh_rounded, size: 16, color: colorScheme.primary),
+                          label: Text(
+                            isArabic ? 'إعادة فحص الموقع' : 'Recheck Location',
+                            style: textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: isBusy ? colorScheme.onSurfaceVariant : colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -757,7 +1036,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: colorScheme.error),
+            Icon(Icons.error_outline_rounded, size: 64, color: colorScheme.error),
             const SizedBox(height: 16),
             Text(
               state.message,
@@ -785,69 +1064,87 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       // --- Performance: Use pre-computed cached data ---
       if (_filteredHistory.isEmpty && state.hasReachedMax) {
         final colorScheme = Theme.of(context).colorScheme;
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.verified_user_outlined,
-                  size: 64,
-                  color: colorScheme.primary,
-                ),
+        return RefreshIndicator(
+          onRefresh: () async {
+            if (_isGeofenceMode) {
+              _detectNearestBranch(showSnackBar: false);
+            }
+            _attendanceBloc.add(const SyncRequested());
+            _attendanceBloc.add(
+              HistoryRequested(
+                userId: widget.delegate.uid,
+                organizationId: widget.delegate.organizationUID,
+                nationalityID: widget.delegate.nationalityID,
+                phoneNumber: widget.delegate.phoneNumber,
               ),
-              const SizedBox(height: 24),
-              Text(
-                l10n.noHistoryAvailable,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (_isGeofenceMode)
-                _buildGeofenceCard(context)
-              else
+            );
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsetsDirectional.only(top: 12, bottom: 80),
+            child: Column(
+              children: [
+                _buildUnifiedAttendanceCard(context),
+                const SizedBox(height: 32),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: colorScheme.outlineVariant),
+                    color: colorScheme.surfaceContainerHighest,
+                    shape: BoxShape.circle,
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.qr_code_scanner,
-                        color: colorScheme.primary,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Text(
-                          l10n.scanQrInstruction,
-                          style: TextStyle(
-                            color: colorScheme.onSurface,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
+                  child: Icon(
+                    Icons.verified_user_rounded,
+                    size: 56,
+                    color: colorScheme.primary,
                   ),
                 ),
-            ],
+                const SizedBox(height: 20),
+                Text(
+                  l10n.noHistoryAvailable,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (!_isGeofenceMode)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: colorScheme.outlineVariant),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.qr_code_scanner_rounded,
+                          color: colorScheme.primary,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            l10n.scanQrInstruction,
+                            style: TextStyle(
+                              color: colorScheme.onSurface,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       }
@@ -873,12 +1170,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           itemCount: _dayKeys.length + (state.hasReachedMax ? 1 : 2),
           itemBuilder: (context, index) {
             if (index == 0) {
-              return Column(
-                children: [
-                  _buildMonthlyStatsBanner(context),
-                  if (_isGeofenceMode) _buildGeofenceCard(context),
-                ],
-              );
+              return _buildUnifiedAttendanceCard(context);
             }
             final dayIndex = index - 1;
             if (dayIndex >= _dayKeys.length) {
@@ -1002,7 +1294,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 Row(
                                   children: [
                                     Icon(
-                                      Icons.login,
+                                      Icons.login_rounded,
                                       size: 16,
                                       color: colorScheme.tertiary,
                                     ),
@@ -1019,7 +1311,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 Row(
                                   children: [
                                     Icon(
-                                      Icons.logout,
+                                      Icons.logout_rounded,
                                       size: 16,
                                       color: colorScheme.error,
                                     ),
@@ -1036,7 +1328,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 Row(
                                   children: [
                                     Icon(
-                                      Icons.timer_outlined,
+                                      Icons.timer_rounded,
                                       size: 14,
                                       color: item.checkOutTime != null
                                           ? colorScheme.primary
@@ -1066,7 +1358,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               child: Tooltip(
                                 message: l10n.pendingSync,
                                 child: Icon(
-                                  Icons.cloud_off,
+                                  Icons.cloud_off_rounded,
                                   color: colorScheme.error,
                                   size: 20,
                                 ),
@@ -1113,15 +1405,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     required AppLocalizations l10n,
   }) {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    if (!_isGeofenceMode) {
-      return isCheckedIn ? l10n.scanToCheckOut : l10n.scanToCheckIn;
-    }
-
     if (isCheckedIn) {
-      final bName = activeAttendance?.branchName ?? _matchedBranch?.branchName;
-      if (bName != null && bName.isNotEmpty) {
-        return isArabic ? 'تسجيل انصراف ($bName)' : 'Check Out ($bName)';
-      }
       return isArabic ? 'تسجيل الانصراف' : 'Check Out';
     }
 
@@ -1129,13 +1413,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       return isArabic ? 'جاري فحص الموقع...' : 'Checking location...';
     }
 
-    if (_isInsideGeofence && _matchedBranch != null) {
-      return isArabic
-          ? 'تسجيل حضور (${_matchedBranch!.branchName})'
-          : 'Check In (${_matchedBranch!.branchName})';
-    }
-
-    return isArabic ? 'فحص الموقع وتسجيل الحضور' : 'Verify & Check In';
+    return isArabic ? 'تسجيل الحضور' : 'Check In';
   }
 
   Future<void> _fetchOrganizationSettings() async {
@@ -1278,6 +1556,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
     }
 
+    final isArabic = mounted
+        ? Localizations.localeOf(context).languageCode == 'ar'
+        : true;
+
     setState(() {
       _isCheckingLocation = false;
       _nearestBranch = closest;
@@ -1286,13 +1568,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _isInsideGeofence = matched != null;
 
       if (matched != null) {
-        _locationStatusMessage =
-            'أنت متواجد داخل نطاق فرع ${matched.branchName} (${minDistance.toInt()} م)';
+        _locationStatusMessage = isArabic
+            ? 'أنت متواجد داخل نطاق فرع ${matched.branchName}'
+            : 'You are within range of ${matched.branchName}';
       } else if (closest != null && minDistance.isFinite) {
-        _locationStatusMessage =
-            'أنت خارج نطاق العمل - أقرب فرع: ${closest.branchName} (يبعد ${minDistance.toInt()} م)';
+        _locationStatusMessage = isArabic
+            ? 'يرجى الاقتراب من الفرع لتتمكن من تسجيل الحضور'
+            : 'Move closer to the branch to check in';
       } else {
-        _locationStatusMessage = 'أنت خارج نطاق الفروع المعتمدة.';
+        _locationStatusMessage = isArabic
+            ? 'أنت خارج نطاق الفروع المعتمدة'
+            : 'You are outside approved branches';
       }
     });
 
@@ -1300,7 +1586,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (_isInsideGeofence && matched != null) {
         AppSnackBar.showSuccess(
           context,
-          'أنت داخل نطاق فرع ${matched.branchName} (${minDistance.toInt()} متر) ✅',
+          'أنت داخل نطاق فرع ${matched.branchName} (${minDistance.toInt()} متر)',
         );
       } else if (closest != null) {
         AppSnackBar.showError(
@@ -1394,142 +1680,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
   }
 
-  Widget _buildGeofenceCard(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final isBusy = _isCheckingLocation || _isLoadingBranches;
-
-    final containerColor = isBusy
-        ? colorScheme.surfaceContainer
-        : (_isInsideGeofence
-            ? colorScheme.primaryContainer.withValues(alpha: 0.45)
-            : colorScheme.errorContainer.withValues(alpha: 0.4));
-
-    final borderColor = isBusy
-        ? colorScheme.outlineVariant
-        : (_isInsideGeofence
-            ? colorScheme.primary.withValues(alpha: 0.3)
-            : colorScheme.error.withValues(alpha: 0.3));
-
-    return AnimatedContainer(
-      duration: AppMotionDurations.medium2,
-      curve: AppMotionCurves.standardDecelerate,
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: containerColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor, width: 1.2),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              _GeofenceRadarWidget(
-                animation: _radarAnimation,
-                isInside: _isInsideGeofence,
-                isChecking: isBusy,
-                primaryColor: colorScheme.primary,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isBusy
-                          ? (isArabic ? 'جاري فحص الموقع والفرع...' : 'Checking location & branch...')
-                          : (_isInsideGeofence
-                              ? (isArabic ? 'أنت داخل نطاق العمل ✅' : 'Inside Work Zone ✅')
-                              : (isArabic ? 'خارج نطاق الفرع 📍' : 'Outside Branch Zone 📍')),
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: isBusy
-                            ? colorScheme.onSurface
-                            : (_isInsideGeofence
-                                ? colorScheme.primary
-                                : colorScheme.error),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _locationStatusMessage ??
-                          (isArabic
-                              ? 'قم بالاقتراب من فرعك المعتمد لتسجيل الحضور'
-                              : 'Move closer to your branch to check in'),
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        height: 1.3,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (_matchedBranch != null || _nearestBranch != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.store_rounded,
-                        size: 14,
-                        color: colorScheme.primary,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        (_matchedBranch ?? _nearestBranch)!.branchName,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-              ],
-              TextButton.icon(
-                onPressed: isBusy
-                    ? null
-                    : () => _detectNearestBranch(showSnackBar: true, silent: false),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                ),
-                icon: isBusy
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh_rounded, size: 16),
-                label: Text(
-                  isArabic ? 'إعادة فحص الموقع' : 'Recheck Location',
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showQRScanner(
     BuildContext context,
@@ -2266,39 +2416,38 @@ class _ScannerModalState extends State<_ScannerModal>
 }
 
 /// Material Design 3 Expressive Radar Wave Widget
-/// Features concentric pulsing circles with monotonic opacity decay (zero overshoot).
+/// Features dual concentric pulsing ripples with monotonic opacity decay (zero overshoot)
+/// and an animated core container with spring transitions.
 class _GeofenceRadarWidget extends StatelessWidget {
   final Animation<double> animation;
   final bool isInside;
   final bool isChecking;
-  final Color primaryColor;
+  final Color statusColor;
 
   const _GeofenceRadarWidget({
     required this.animation,
     required this.isInside,
     required this.isChecking,
-    required this.primaryColor,
+    required this.statusColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = isChecking
-        ? primaryColor
-        : (isInside ? const Color(0xFF10B981) : const Color(0xFFEF4444));
-
     return AnimatedBuilder(
       animation: animation,
       builder: (context, child) {
-        final rippleVal = animation.value;
+        final ripple1 = animation.value;
+        final ripple2 = (animation.value + 0.5) % 1.0;
+
         return SizedBox(
           width: 72,
           height: 72,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Outer ripple
+              // Outer wave (Ripple 1)
               Transform.scale(
-                scale: 0.6 + (0.4 * rippleVal),
+                scale: 0.55 + (0.45 * ripple1),
                 child: Container(
                   width: 72,
                   height: 72,
@@ -2306,50 +2455,71 @@ class _GeofenceRadarWidget extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: statusColor.withValues(
-                        alpha: (0.45 * (1.0 - rippleVal)).clamp(0.0, 0.45),
+                        alpha: (0.45 * (1.0 - ripple1)).clamp(0.0, 0.45),
                       ),
                       width: 1.5,
                     ),
                   ),
                 ),
               ),
-              // Inner ripple
+              // Staggered secondary wave (Ripple 2)
               Transform.scale(
-                scale: 0.3 + (0.45 * rippleVal),
+                scale: 0.4 + (0.45 * ripple2),
                 child: Container(
-                  width: 54,
-                  height: 54,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: statusColor.withValues(
-                      alpha: (0.25 * (1.0 - rippleVal)).clamp(0.0, 0.25),
+                    border: Border.all(
+                      color: statusColor.withValues(
+                        alpha: (0.35 * (1.0 - ripple2)).clamp(0.0, 0.35),
+                      ),
+                      width: 1.2,
                     ),
                   ),
                 ),
               ),
-              // Center Core Button/Icon
+              // Breathing ambient glow
               Container(
-                width: 40,
-                height: 40,
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: statusColor.withValues(
+                    alpha: isChecking ? 0.12 : (isInside ? 0.16 : 0.14),
+                  ),
+                ),
+              ),
+              // Center Core Button/Icon with M3 Elevation Shadow
+              Container(
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: statusColor,
                   boxShadow: [
                     BoxShadow(
-                      color: statusColor.withValues(alpha: 0.3),
-                      blurRadius: 8,
+                      color: statusColor.withValues(alpha: 0.35),
+                      blurRadius: 10,
                       spreadRadius: 1,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-                child: Icon(
-                  isChecking
-                      ? Icons.radar_rounded
-                      : (isInside
-                          ? Icons.check_rounded
-                          : Icons.location_off_rounded),
-                  color: Colors.white,
-                  size: 20,
+                child: AnimatedSwitcher(
+                  duration: AppMotionDurations.short4,
+                  switchInCurve: AppMotionCurves.expressiveFastSpatial,
+                  switchOutCurve: AppMotionCurves.standardAccelerate,
+                  child: Icon(
+                    isChecking
+                        ? Icons.radar_rounded
+                        : (isInside
+                            ? Icons.check_rounded
+                            : Icons.location_off_rounded),
+                    key: ValueKey('${isChecking}_$isInside'),
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
               ),
             ],
@@ -2359,4 +2529,5 @@ class _GeofenceRadarWidget extends StatelessWidget {
     );
   }
 }
+
 

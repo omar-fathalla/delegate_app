@@ -148,7 +148,7 @@ class SettingsScreen extends StatelessWidget {
                         children: [
                           _buildSettingsTile(
                             context: context,
-                            icon: Icons.privacy_tip_outlined,
+                            icon: Icons.privacy_tip_rounded,
                             title: l10n.privacyPolicy,
                             onTap: () => context.push('/privacy-policy'),
                           ),
@@ -170,7 +170,7 @@ class SettingsScreen extends StatelessWidget {
                           ),
                           _buildSettingsTile(
                             context: context,
-                            icon: Icons.feedback_outlined,
+                            icon: Icons.feedback_rounded,
                             title: isArabic ? 'إرسال مقترح' : 'Submit Feedback',
                             onTap: () => context.push(
                               '/submit-feedback',
@@ -424,7 +424,11 @@ class SettingsScreen extends StatelessWidget {
           ],
         ),
         child: isSelected
-            ? const Icon(Icons.check, color: Colors.white, size: 24)
+            ? Icon(
+                Icons.check_rounded,
+                color: Theme.of(context).colorScheme.onPrimary,
+                size: 24,
+              )
             : null,
       ),
     );

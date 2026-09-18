@@ -85,21 +85,21 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.15),
+                      color: colorScheme.tertiaryContainer.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.shade300),
+                      border: Border.all(color: colorScheme.tertiary.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.push_pin_rounded, size: 12, color: Colors.amber.shade900),
+                        Icon(Icons.push_pin_rounded, size: 12, color: colorScheme.tertiary),
                         const SizedBox(width: 4),
                         Text(
                           'أقسام مثبتة (${_pinnedDepartments.length})',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Colors.amber.shade900,
+                            color: colorScheme.onTertiaryContainer,
                           ),
                         ),
                       ],
@@ -137,23 +137,11 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primary,
-            colorScheme.primary.withValues(alpha: 0.85),
-            colorScheme.primaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.18),
+        ),
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -166,17 +154,17 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: colorScheme.onPrimary.withValues(alpha: 0.2),
+                  color: colorScheme.primary.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.35),
+                    color: colorScheme.primary.withValues(alpha: 0.3),
                     width: 2,
                   ),
                 ),
                 child: Icon(
                   Icons.campaign_rounded,
-                  color: colorScheme.onPrimary,
-                  size: 30,
+                  color: colorScheme.primary,
+                  size: 28,
                 ),
               ),
               const SizedBox(width: 14),
@@ -185,10 +173,10 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isArabic ? 'مرحباً بك، $displayName 👋' : 'Welcome, $displayName 👋',
+                      isArabic ? 'مرحباً بك، $displayName' : 'Welcome, $displayName',
                       style: TextStyle(
-                        color: colorScheme.onPrimary,
-                        fontSize: 20,
+                        color: colorScheme.onSurface,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -196,7 +184,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.18),
+                        color: colorScheme.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -204,7 +192,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                             ? 'مسؤول تسويق العروض الترويجية'
                             : 'Marketing Promotion Manager',
                         style: TextStyle(
-                          color: colorScheme.onPrimary,
+                          color: colorScheme.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -217,14 +205,14 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
           ),
 
           const SizedBox(height: 16),
-          Divider(color: colorScheme.onPrimary.withValues(alpha: 0.2), height: 1),
+          Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.35), height: 1),
           const SizedBox(height: 14),
 
           // المهام والمسؤوليات الأساسية لليوزر
           Text(
             isArabic ? 'المهام والمسؤوليات التشغيلية:' : 'Core Responsibilities:',
             style: TextStyle(
-              color: colorScheme.onPrimary.withValues(alpha: 0.95),
+              color: colorScheme.onSurface,
               fontSize: 13,
               fontWeight: FontWeight.bold,
             ),
@@ -284,15 +272,18 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: colorScheme.onPrimary.withValues(alpha: 0.12),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
             icon,
-            color: colorScheme.onPrimary,
+            color: colorScheme.primary,
             size: 18,
           ),
           const SizedBox(width: 10),
@@ -303,7 +294,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                 Text(
                   title,
                   style: TextStyle(
-                    color: colorScheme.onPrimary,
+                    color: colorScheme.onSurface,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -312,7 +303,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.85),
+                    color: colorScheme.onSurfaceVariant,
                     fontSize: 11,
                     height: 1.3,
                   ),
@@ -380,7 +371,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                     ? '...'
                     : '$pendingCount',
                 icon: Icons.pending_actions_rounded,
-                color: Colors.orange,
+                color: colorScheme.tertiary,
                 onTap: () => widget.onNavigateTab(1), // الانتقال المباشر لتبويب أذونات التصوير
               ),
             ),
@@ -392,7 +383,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                     ? '...'
                     : '$activeCount',
                 icon: Icons.verified_rounded,
-                color: Colors.green,
+                color: colorScheme.primary,
                 onTap: () => widget.onNavigateTab(1), // الانتقال المباشر لتبويب أذونات التصوير
               ),
             ),
@@ -435,7 +426,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 13,
-                    color: Colors.grey.shade400,
+                    color: Theme.of(context).colorScheme.outline,
                   ),
                 ],
               ),
@@ -494,7 +485,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
             children: [
               Icon(
                 Icons.lightbulb_outline_rounded,
-                color: Colors.amber.shade800,
+                color: colorScheme.tertiary,
                 size: 22,
               ),
               const SizedBox(width: 8),
@@ -509,18 +500,21 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
           ),
           const SizedBox(height: 10),
           _buildGuidanceBullet(
+            colorScheme,
             isArabic
                 ? 'تأكد من اختيار وتثبيت الأقسام التي تتابعها من شريط الفلترة لظهور الإشعارات والطلبات الخاصة بك فوراً.'
                 : 'Pin your assigned departments to filter relevant photo requests instantly.',
           ),
           const SizedBox(height: 6),
           _buildGuidanceBullet(
+            colorScheme,
             isArabic
                 ? 'استخدم أيقونة الاتصال أو الواتساب بجانب زر الحذف للتواصل السريع مع مشرف الشركة عند الحاجة لتعديل الفروع أو المدة.'
                 : 'Use the supervisor contact icon next to delete for fast phone & WhatsApp adjustments.',
           ),
           const SizedBox(height: 6),
           _buildGuidanceBullet(
+            colorScheme,
             isArabic
                 ? 'أرسل مهام واضحة لمسؤولي تسويق الفروع مع تحديد الفرع وتفاصيل العرض الترويجي المطلوب تصويره ومتابعته.'
                 : 'Assign precise tasks to branch marketing specialists with store locations & requirements.',
@@ -530,22 +524,22 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
     );
   }
 
-  Widget _buildGuidanceBullet(String text) {
+  Widget _buildGuidanceBullet(ColorScheme colorScheme, String text) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(top: 6),
-          child: Icon(Icons.circle, size: 6, color: Colors.grey),
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Icon(Icons.circle, size: 6, color: colorScheme.outline),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               height: 1.4,
-              color: Colors.black87,
+              color: colorScheme.onSurface,
             ),
           ),
         ),

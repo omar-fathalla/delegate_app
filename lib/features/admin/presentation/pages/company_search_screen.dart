@@ -143,7 +143,7 @@ class _CompanySearchViewState extends State<_CompanySearchView> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 64, color: colorScheme.error),
+              Icon(Icons.error_outline_rounded, size: 64, color: colorScheme.error),
               const SizedBox(height: 16),
               Text(
                 'لم يتم العثور على معرف المنظمة',
@@ -290,7 +290,7 @@ class _CompanySearchViewState extends State<_CompanySearchView> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.business_outlined,
+                  Icons.business_rounded,
                   size: 64,
                   color: colorScheme.outline,
                 ),

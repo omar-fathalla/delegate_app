@@ -27,8 +27,11 @@
   "storage": {
     "rules": "storage.rules"
   },
-  "functions": {
-    "source": "functions",
-    "runtime": "nodejs20"
-  }
+  "functions": [
+    {
+      "codebase": "tashil-mobile-notifications",
+      "source": "functions",
+      "runtime": "nodejs20"
+    }
+  ]
 }

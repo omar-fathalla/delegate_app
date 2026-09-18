@@ -1,6 +1,34 @@
 import 'package:equatable/equatable.dart';
 
-enum SubscriptionPaymentMethod { companyDeduction, receipt }
+enum SubscriptionPaymentMethod {
+  companyDeduction,
+  instaPay,
+  branchReceipt,
+}
+
+extension SubscriptionPaymentMethodX on SubscriptionPaymentMethod {
+  String get displayName {
+    switch (this) {
+      case SubscriptionPaymentMethod.companyDeduction:
+        return 'خصم من حساب الشركة';
+      case SubscriptionPaymentMethod.instaPay:
+        return 'تحويل عبر انستاباي (InstaPay)';
+      case SubscriptionPaymentMethod.branchReceipt:
+        return 'إيصال إلكتروني من تسويق الفرع';
+    }
+  }
+
+  String get shortName {
+    switch (this) {
+      case SubscriptionPaymentMethod.companyDeduction:
+        return 'خصم شركة';
+      case SubscriptionPaymentMethod.instaPay:
+        return 'انستاباي';
+      case SubscriptionPaymentMethod.branchReceipt:
+        return 'إيصال إلكتروني';
+    }
+  }
+}
 
 enum SubscriptionRequestStatus { pending, approved, rejected }
 
@@ -88,9 +116,11 @@ class DelegateSubscriptionRequest extends Equatable {
       'profileImageUrl': profileImageUrl,
       'nationalIdFrontUrl': nationalIdFrontUrl,
       'nationalIdBackUrl': nationalIdBackUrl,
-      'paymentMethod': paymentMethod == SubscriptionPaymentMethod.companyDeduction
-          ? 'company_deduction'
-          : 'receipt',
+      'paymentMethod': switch (paymentMethod) {
+        SubscriptionPaymentMethod.companyDeduction => 'company_deduction',
+        SubscriptionPaymentMethod.instaPay => 'instapay',
+        SubscriptionPaymentMethod.branchReceipt => 'branch_receipt',
+      },
       'receiptCode': receiptCode,
       'receiptImageUrl': receiptImageUrl,
       'subscriptionCycle': subscriptionCycle,
@@ -109,7 +139,8 @@ class DelegateSubscriptionRequest extends Equatable {
   factory DelegateSubscriptionRequest.fromMap(Map<String, dynamic> map, String docId) {
     SubscriptionPaymentMethod parsePaymentMethod(dynamic val) {
       if (val == 'company_deduction') return SubscriptionPaymentMethod.companyDeduction;
-      return SubscriptionPaymentMethod.receipt;
+      if (val == 'instapay' || val == 'insta_pay') return SubscriptionPaymentMethod.instaPay;
+      return SubscriptionPaymentMethod.branchReceipt;
     }
 
     SubscriptionRequestStatus parseStatus(dynamic val) {

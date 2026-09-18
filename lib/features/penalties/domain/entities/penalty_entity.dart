@@ -189,6 +189,7 @@ class PenaltyEntity extends Equatable {
   final String? targetDelegateId;
   final String? targetDelegateName;
   final bool isRepeated;
+  final bool isConfidential;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -216,6 +217,7 @@ class PenaltyEntity extends Equatable {
     this.targetDelegateId,
     this.targetDelegateName,
     this.isRepeated = false,
+    this.isConfidential = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -245,7 +247,9 @@ class PenaltyEntity extends Equatable {
         targetDelegateId,
         targetDelegateName,
         isRepeated,
+        isConfidential,
         createdAt,
         updatedAt,
       ];
 }
+

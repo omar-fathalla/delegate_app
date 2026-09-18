@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
+import 'package:delegate_app/features/penalties/data/models/penalty_rule_model.dart';
 import 'package:delegate_app/features/penalties/domain/entities/standard_violation.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
@@ -56,7 +57,9 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
   String? _selectedCompanyName;
   ViolationCategory _selectedCategory = ViolationCategory.protocolBreach;
 
+  List<StandardViolation> _availableViolations = List.from(officialViolationsSchedule);
   StandardViolation? _selectedOfficialViolation;
+  bool _isConfidential = false;
   String? _selectedDelegateId;
   String? _selectedDelegateName;
   List<Map<String, String>> _companyDelegates = [];
@@ -122,6 +125,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       _descriptionController.text = p.incidentDescription;
       _fineAmountController.text = p.fineAmount.toStringAsFixed(0);
       _isRepeated = p.isRepeated;
+      _isConfidential = p.isConfidential;
       _existingEvidenceFiles = List<EvidenceFile>.from(p.evidenceFiles);
 
       // Match official violation if possible
@@ -164,6 +168,63 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
     }
     _fetchCompanies();
     _fetchBranches();
+    _loadDynamicRules();
+  }
+
+  Future<void> _loadDynamicRules() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('penalty_rules').get();
+      if (!mounted) return;
+
+      final canCreateConfidential = widget.adminDelegate.role == UserRole.superAdmin ||
+          widget.adminDelegate.role == UserRole.technicalSupport;
+
+      if (snapshot.docs.isNotEmpty) {
+        final dynamicRules = snapshot.docs
+            .map((doc) => PenaltyRuleModel.fromFirestore(doc))
+            .toList();
+
+        final mappedList = <StandardViolation>[];
+        int counter = 1;
+        for (final r in dynamicRules) {
+          // Strictly exclude confidential penalties if creator is not Super Admin / Technical Support
+          if (r.isConfidential && !canCreateConfidential) {
+            continue;
+          }
+          mappedList.add(StandardViolation.fromRule(r, counter++));
+        }
+
+        if (mappedList.isNotEmpty && mounted) {
+          setState(() {
+            _availableViolations = mappedList;
+            if (widget.penaltyToEdit == null && _selectedOfficialViolation != null) {
+              final cleanSelected = _selectedOfficialViolation!.title.trim().toLowerCase();
+              final matchIndex = mappedList.indexWhere(
+                (v) =>
+                    v.title.trim().toLowerCase() == cleanSelected ||
+                    (v.ruleId != null && v.ruleId == _selectedOfficialViolation!.ruleId) ||
+                    v.id == _selectedOfficialViolation!.id,
+              );
+              if (matchIndex != -1) {
+                final match = mappedList[matchIndex];
+                _selectedOfficialViolation = match;
+                _isConfidential = match.isConfidential;
+              }
+            }
+          });
+        }
+      } else {
+        if (!canCreateConfidential && mounted) {
+          setState(() {
+            _availableViolations = officialViolationsSchedule
+                .where((v) => !v.isConfidential)
+                .toList();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading penalty rules in create page: $e');
+    }
   }
 
   Future<void> _fetchBranches() async {
@@ -567,9 +628,20 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
   }
 
   void _applyViolationSelection(StandardViolation violation, bool repeated) {
-    _selectedOfficialViolation = violation;
-    _selectedCategory = violation.category;
-    _titleController.text = violation.title;
+    StandardViolation effectiveViolation = violation;
+    final matchIndex = _availableViolations.indexWhere(
+      (v) =>
+          v.title.trim().toLowerCase() == violation.title.trim().toLowerCase() ||
+          v.id == violation.id,
+    );
+    if (matchIndex != -1) {
+      effectiveViolation = _availableViolations[matchIndex];
+    }
+
+    _selectedOfficialViolation = effectiveViolation;
+    _selectedCategory = effectiveViolation.category;
+    _titleController.text = effectiveViolation.title;
+    _isConfidential = effectiveViolation.isConfidential;
 
     if (repeated) {
       if (violation.repeatedFine != null && violation.repeatedFine! > 0) {
@@ -613,9 +685,9 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
               ),
               const SizedBox(height: 16),
               ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFE8F5E9),
-                  child: Icon(Icons.camera_alt_rounded, color: Colors.green),
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  child: Icon(Icons.camera_alt_rounded, color: Theme.of(context).colorScheme.onPrimaryContainer),
                 ),
                 title: const Text('التقاط صورة بالكاميرا'),
                 subtitle: const Text('تصوير الإيصال أو الواقعة مباشرة'),
@@ -631,9 +703,9 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
               ),
               const Divider(),
               ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFE3F2FD),
-                  child: Icon(Icons.photo_library_rounded, color: Colors.blue),
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                  child: Icon(Icons.photo_library_rounded, color: Theme.of(context).colorScheme.onSecondaryContainer),
                 ),
                 title: const Text('اختيار من المعرض'),
                 subtitle: const Text('تحديد صورة أو إيصال محفوظ بالجهاز'),
@@ -737,6 +809,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
         targetDelegateId: _selectedDelegateId,
         targetDelegateName: _selectedDelegateName,
         isRepeated: _isRepeated,
+        isConfidential: _isConfidential,
         createdAt: old.createdAt,
         updatedAt: DateTime.now(),
       );
@@ -769,6 +842,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
         targetDelegateId: _selectedDelegateId,
         targetDelegateName: _selectedDelegateName,
         isRepeated: _isRepeated,
+        isConfidential: _isConfidential,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -807,8 +881,11 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
           if (state is PenaltyActionSuccessState) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.green,
+                content: Text(
+                  state.message,
+                  style: TextStyle(color: colorScheme.onPrimaryContainer),
+                ),
+                backgroundColor: colorScheme.primaryContainer,
               ),
             );
             Navigator.of(context).pop(true);
@@ -996,7 +1073,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.teal.withValues(alpha: 0.12),
+                            color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -1004,7 +1081,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.bold,
-                              color: Colors.teal.shade800,
+                              color: colorScheme.onSecondaryContainer,
                             ),
                           ),
                         ),
@@ -1140,17 +1217,17 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                         ),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<StandardViolation>(
-                          key: ValueKey('violation_${_selectedOfficialViolation?.id}'),
+                          key: ValueKey('violation_${_selectedOfficialViolation?.id}_${_availableViolations.length}'),
                           initialValue: _selectedOfficialViolation != null
-                              ? officialViolationsSchedule.firstWhere(
-                                  (v) => v.id == _selectedOfficialViolation!.id,
+                              ? _availableViolations.firstWhere(
+                                  (v) => v.id == _selectedOfficialViolation!.id || v.title == _selectedOfficialViolation!.title,
                                   orElse: () => _selectedOfficialViolation!,
                                 )
                               : null,
                           isExpanded: true,
                           decoration: InputDecoration(
                             hintText:
-                                'اختر المخالفة حسب اللائحة (1 - ${officialViolationsSchedule.length})...',
+                                'اختر المخالفة حسب اللائحة (1 - ${_availableViolations.length})...',
                             fillColor: colorScheme.surface,
                             filled: true,
                             contentPadding: const EdgeInsets.symmetric(
@@ -1161,13 +1238,27 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          items: officialViolationsSchedule.map((v) {
+                          items: _availableViolations.map((v) {
                             return DropdownMenuItem<StandardViolation>(
                               value: v,
-                              child: Text(
-                                '${v.id}. ${v.title}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: Row(
+                                children: [
+                                  if (v.isConfidential) ...[
+                                    Icon(Icons.lock_rounded, size: 16, color: colorScheme.tertiary),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  Expanded(
+                                    child: Text(
+                                      '${v.id}. ${v.title}${v.isConfidential ? " [سرية ومقيدة]" : ""}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: v.isConfidential ? colorScheme.onTertiaryContainer : null,
+                                        fontWeight: v.isConfidential ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             );
                           }).toList(),
@@ -1179,6 +1270,58 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                             }
                           },
                         ),
+                        if (_isConfidential) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.tertiaryContainer.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: colorScheme.tertiary.withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.lock_rounded, size: 18, color: colorScheme.tertiary),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '🔒 هذه الغرامة محددة كغرامة سرية ومقيدة (مرئية فقط لـ 4 أدوار: السوبر أدمن، الدعم الفني، مشرف الشركة، والمندوب المعني).',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onTertiaryContainer,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (widget.adminDelegate.role == UserRole.superAdmin ||
+                            widget.adminDelegate.role == UserRole.technicalSupport) ...[
+                          const SizedBox(height: 6),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: Row(
+                              children: [
+                                Icon(Icons.lock_rounded, size: 18, color: colorScheme.tertiary),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'تقييد الغرامة كسرية ومحصورة لـ 4 أدوار',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            value: _isConfidential,
+                            activeTrackColor: colorScheme.tertiaryContainer,
+                            activeThumbColor: colorScheme.tertiary,
+                            onChanged: (val) {
+                              setState(() {
+                                _isConfidential = val;
+                              });
+                            },
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1455,7 +1598,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Colors.green.shade800,
+                          color: colorScheme.primary,
                         ),
                       ),
                     if (_existingEvidenceFiles.isNotEmpty) const SizedBox(height: 6),
@@ -1567,12 +1710,12 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                               ? Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const SizedBox(
+                                    SizedBox(
                                       width: 20,
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2.5,
-                                        color: Colors.white,
+                                        color: colorScheme.onPrimary,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
@@ -1581,7 +1724,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                                           ? 'جاري حفظ التعديلات والمستندات...'
                                           : 'جاري تسجيل الغرامة...',
                                       style: theme.textTheme.titleMedium?.copyWith(
-                                        color: Colors.white,
+                                        color: colorScheme.onPrimary,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -1605,7 +1748,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                                             : 'تسجيل وإصدار الغرامة',
                                         style: theme.textTheme.titleMedium
                                             ?.copyWith(
-                                          color: Colors.white,
+                                          color: colorScheme.onPrimary,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -1763,7 +1906,7 @@ class _CompanySearchBottomSheetState
                           child: Icon(
                             Icons.business_rounded,
                             color: isSelected
-                                ? Colors.white
+                                ? colorScheme.onPrimary
                                 : colorScheme.onPrimaryContainer,
                             size: 20,
                           ),

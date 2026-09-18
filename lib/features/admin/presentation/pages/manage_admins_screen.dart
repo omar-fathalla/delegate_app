@@ -159,9 +159,8 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
                               selected: _selectedStatusFilter == 'active',
                               onSelected: (_) => setState(
                                   () => _selectedStatusFilter = 'active'),
-                              selectedColor:
-                                  Colors.green.withValues(alpha: 0.2),
-                              checkmarkColor: Colors.green,
+                              selectedColor: colorScheme.primaryContainer,
+                              checkmarkColor: colorScheme.primary,
                             ),
                             const SizedBox(width: 8),
                             FilterChip(
@@ -169,8 +168,7 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
                               selected: _selectedStatusFilter == 'suspended',
                               onSelected: (_) => setState(
                                   () => _selectedStatusFilter = 'suspended'),
-                              selectedColor:
-                                  colorScheme.error.withValues(alpha: 0.2),
+                              selectedColor: colorScheme.errorContainer,
                               checkmarkColor: colorScheme.error,
                             ),
                           ],
@@ -229,75 +227,80 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                isSearchingOrFiltering
-                                    ? Icons.search_off_rounded
-                                    : Icons.admin_panel_settings_outlined,
-                                size: 64,
-                                color: colorScheme.onSurfaceVariant.withValues(
-                                  alpha: 0.5,
+                                Icon(
+                                  isSearchingOrFiltering
+                                      ? Icons.search_off_rounded
+                                      : Icons.admin_panel_settings_rounded,
+                                  size: 64,
+                                  color: colorScheme.onSurfaceVariant.withValues(
+                                    alpha: 0.5,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                isSearchingOrFiltering
-                                    ? (isArabic
-                                        ? 'لا توجد نتائج تطابق البحث أو الفلتر'
-                                        : 'No matching admins found')
-                                    : l10n.noAdminsFound,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: colorScheme.onSurfaceVariant,
+                                const SizedBox(height: 16),
+                                Text(
+                                  isSearchingOrFiltering
+                                      ? (isArabic
+                                          ? 'لا توجد نتائج تطابق البحث أو الفلتر'
+                                          : 'No matching admins found')
+                                      : l10n.noAdminsFound,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            itemCount: filteredAdmins.length,
+                            itemBuilder: (context, index) {
+                              final admin = filteredAdmins[index];
+                              return _AdminCard(admin: admin);
+                            },
                           ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          itemCount: filteredAdmins.length,
-                          itemBuilder: (context, index) {
-                            final admin = filteredAdmins[index];
-                            return _AdminCard(admin: admin);
-                          },
-                        ),
-                ),
-              ],
-            );
-          }
+                  ),
+                ],
+              );
+            }
 
-          return const SizedBox.shrink();
-        },
-      ),
-    );
+            return const SizedBox.shrink();
+          },
+        ),
+      );
+    }
   }
-}
 
-class _AdminCard extends StatelessWidget {
-  final AdminUser admin;
-  const _AdminCard({required this.admin});
+  class _AdminCard extends StatelessWidget {
+    final AdminUser admin;
+    const _AdminCard({required this.admin});
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final isSuspended = !admin.isActive;
+    @override
+    Widget build(BuildContext context) {
+      final colorScheme = Theme.of(context).colorScheme;
+      final l10n = AppLocalizations.of(context)!;
+      final isSuspended = !admin.isActive;
+      final bloc = context.read<ManageAdminsBloc>();
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      color: isSuspended
-          ? colorScheme.errorContainer.withValues(alpha: 0.3)
-          : colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _showActionsSheet(context),
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 0,
+        color: isSuspended
+            ? colorScheme.errorContainer.withValues(alpha: 0.25)
+            : colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: isSuspended
+                ? colorScheme.error.withValues(alpha: 0.3)
+                : colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
               CircleAvatar(
@@ -311,7 +314,7 @@ class _AdminCard extends StatelessWidget {
                       : colorScheme.onPrimaryContainer,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -322,170 +325,98 @@ class _AdminCard extends StatelessWidget {
                           child: Text(
                             admin.displayName,
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
                               color: colorScheme.onSurface,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (isSuspended)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
+                              horizontal: 6,
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
                               color: colorScheme.error.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               l10n.suspended,
                               style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
                                 color: colorScheme.error,
                               ),
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       admin.phoneNumber,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                     if (admin.email.isNotEmpty) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         admin.email,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           color: colorScheme.onSurfaceVariant.withValues(
                             alpha: 0.7,
                           ),
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ],
                 ),
               ),
-              Icon(
-                Icons.more_vert_rounded,
-                color: colorScheme.onSurfaceVariant,
+              const SizedBox(width: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(Icons.edit_rounded, size: 18, color: colorScheme.primary),
+                    tooltip: l10n.editAdmin,
+                    onPressed: () => _showEditDialog(context, bloc),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      isSuspended ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                      size: 18,
+                      color: isSuspended ? colorScheme.primary : colorScheme.error,
+                    ),
+                    tooltip: isSuspended ? l10n.activateAdmin : l10n.suspendAdmin,
+                    onPressed: () => bloc.add(
+                      SuspendAdminRequested(
+                        adminId: admin.uid,
+                        suspend: !isSuspended,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(Icons.delete_outline_rounded, size: 18, color: colorScheme.error),
+                    tooltip: l10n.deleteAdmin,
+                    onPressed: () => _showDeleteConfirmation(context, bloc),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _showActionsSheet(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final bloc = context.read<ManageAdminsBloc>();
-    final isSuspended = !admin.isActive;
-
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: colorScheme.primaryContainer,
-                      child: Icon(
-                        Icons.person_rounded,
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            admin.displayName,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          Text(
-                            admin.phoneNumber,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              // Edit
-              ListTile(
-                leading: Icon(Icons.edit_rounded, color: colorScheme.primary),
-                title: Text(l10n.editAdmin),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _showEditDialog(context, bloc);
-                },
-              ),
-              // Suspend / Activate
-              ListTile(
-                leading: Icon(
-                  isSuspended ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                  color: isSuspended ? Colors.green : Colors.orange,
-                ),
-                title: Text(
-                  isSuspended ? l10n.activateAdmin : l10n.suspendAdmin,
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  bloc.add(
-                    SuspendAdminRequested(
-                      adminId: admin.uid,
-                      suspend: !isSuspended,
-                    ),
-                  );
-                },
-              ),
-              // Delete
-              ListTile(
-                leading: Icon(Icons.delete_rounded, color: colorScheme.error),
-                title: Text(
-                  l10n.deleteAdmin,
-                  style: TextStyle(color: colorScheme.error),
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _showDeleteConfirmation(context, bloc);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-  }
+      );
+    }
 
   void _showEditDialog(BuildContext context, ManageAdminsBloc bloc) {
     final l10n = AppLocalizations.of(context)!;

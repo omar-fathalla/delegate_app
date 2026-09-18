@@ -10,6 +10,7 @@ part 'theme_state.dart';
 class ThemeCubit extends Cubit<ThemeState> {
   static const _kThemeKey = 'app_theme_mode';
   static const _kSeedColorKey = 'app_seed_color';
+  static const _kMigratedPurpleKey = 'migrated_to_purple_default_v3';
   final SharedPreferences _prefs;
 
   ThemeCubit(this._prefs) : super(const ThemeState()) {
@@ -26,10 +27,21 @@ class ThemeCubit extends Cubit<ThemeState> {
       );
     }
 
-    final savedColor = _prefs.getInt(_kSeedColorKey);
+    // Default primary color is Material You Deep Purple
     Color color = AppColorSchemes.seedColors[0];
-    if (savedColor != null) {
-      color = Color(savedColor);
+
+    final isMigrated = _prefs.getBool(_kMigratedPurpleKey) ?? false;
+    if (!isMigrated) {
+      // One-time automatic migration: Ensure all existing and new devices start with Deep Purple as primary default
+      _prefs.setBool(_kMigratedPurpleKey, true);
+      // ignore: deprecated_member_use
+      _prefs.setInt(_kSeedColorKey, color.value);
+    } else {
+      final rawSavedColor = _prefs.getInt(_kSeedColorKey);
+      if (rawSavedColor != null) {
+        final savedColor = rawSavedColor & 0xFFFFFFFF;
+        color = Color(savedColor);
+      }
     }
 
     emit(state.copyWith(themeMode: mode, seedColor: color));

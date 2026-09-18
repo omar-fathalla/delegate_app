@@ -107,6 +107,28 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         // Fallback gracefully if collectionGroup rules restrict supervisor access
       }
 
+      // 0b. Payment method & receipt validation
+      if (paymentMethod == SubscriptionPaymentMethod.branchReceipt) {
+        final cleanCode = (receiptCode ?? '').trim();
+        if (cleanCode.length != 5) {
+          return const Left(ServerFailure('كود الإيصال الخماسي مطلوب ويجب أن يتكون من 5 أرقام بالضبط.'));
+        }
+        if (receiptImage == null) {
+          return const Left(ServerFailure('يرجى إرفاق صورة الإيصال الإلكتروني الصادر من تسويق الفرع.'));
+        }
+        final checkUsed = await isReceiptCodeUsed(cleanCode);
+        final isUsed = checkUsed.fold((_) => false, (used) => used);
+        if (isUsed) {
+          return Left(ServerFailure(
+            'كود الإيصال الخماسي ($cleanCode) مستخدم مسبقاً في النظام ولا يمكن تكراره.',
+          ));
+        }
+      } else if (paymentMethod == SubscriptionPaymentMethod.instaPay) {
+        if (receiptImage == null) {
+          return const Left(ServerFailure('يرجى إرفاق صورة إيصال التحويل أو إشعار الدفع من تطبيق انستاباي.'));
+        }
+      }
+
       // 1. Upload Profile Image
       final profileSnap = await _storage
           .ref('delegate_documents/$requestId/profile.jpg')
@@ -178,6 +200,26 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // 6. Write request to Firestore
       await docRef.set(request.toMap());
 
+      // 6b. If branch electronic receipt, record code in used_receipt_codes
+      if (paymentMethod == SubscriptionPaymentMethod.branchReceipt &&
+          receiptCode != null &&
+          receiptCode.trim().isNotEmpty) {
+        try {
+          await _firestore.collection('used_receipt_codes').doc(receiptCode.trim()).set({
+            'receiptCode': receiptCode.trim(),
+            'requestId': requestId,
+            'supervisorUid': supervisorUid,
+            'supervisorName': supervisorName,
+            'companyUID': companyUID,
+            'companyName': companyName,
+            'organizationUID': organizationUID,
+            'organizationName': organizationName,
+            'status': 'reserved',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        } catch (_) {}
+      }
+
       // 7. Create pending delegate placeholder if permissions permit
       try {
         await _firestore
@@ -241,7 +283,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       }
 
       // 8. Notify Technical Support and Super Admins ONLY (Restricted Targeting)
-      final notifTitle = 'طلب إضافة مندوب جديد 👤';
+      final notifTitle = 'طلب إضافة مندوب جديد';
       final notifBody =
           'قام المشرف $supervisorName ($companyName) بطلب تسجيل المندوب $fullName لمنظمة $organizationName';
 
@@ -270,6 +312,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             'body': notifBody,
             'type': 'delegate_subscription_request',
             'requestId': requestId,
+            'senderName': supervisorName,
+            'senderRole': 'supervisor',
             'createdAt': FieldValue.serverTimestamp(),
             'isRead': false,
             'targetRoles': ['superAdmin', 'technicalSupport'],
@@ -292,6 +336,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             'body': notifBody,
             'type': 'delegate_subscription_request',
             'requestId': requestId,
+            'senderName': supervisorName,
+            'senderRole': 'supervisor',
             'createdAt': FieldValue.serverTimestamp(),
             'isRead': false,
             'targetRoles': ['superAdmin', 'technicalSupport'],
@@ -308,6 +354,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             'body': notifBody,
             'type': 'delegate_subscription_request',
             'requestId': requestId,
+            'senderName': supervisorName,
+            'senderRole': 'supervisor',
             'createdAt': FieldValue.serverTimestamp(),
             'isRead': false,
             'targetRoles': ['superAdmin', 'technicalSupport'],
@@ -318,6 +366,57 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       return Right(requestId);
     } catch (e) {
       return Left(ServerFailure('فشل إرسال طلب تسجيل المندوب: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> isReceiptCodeUsed(String receiptCode) async {
+    try {
+      final cleanCode = receiptCode.trim();
+      if (cleanCode.length != 5) {
+        return const Right(false);
+      }
+
+      // 1. Check used_receipt_codes collection (O(1) doc get)
+      try {
+        final usedDoc = await _firestore.collection('used_receipt_codes').doc(cleanCode).get();
+        if (usedDoc.exists) {
+          final data = usedDoc.data();
+          if (data?['status'] != 'rejected') {
+            return const Right(true);
+          }
+        }
+      } catch (_) {}
+
+      // 2. Check delegate_requests where receiptCode == cleanCode and status != 'rejected'
+      try {
+        final reqSnap = await _firestore
+            .collection('delegate_requests')
+            .where('receiptCode', isEqualTo: cleanCode)
+            .get();
+        for (final doc in reqSnap.docs) {
+          final status = doc.data()['status'] as String?;
+          if (status != 'rejected') {
+            return const Right(true);
+          }
+        }
+      } catch (_) {}
+
+      // 3. Check collectionGroup('delegates') where receiptCode == cleanCode
+      try {
+        final delSnap = await _firestore
+            .collectionGroup('delegates')
+            .where('receiptCode', isEqualTo: cleanCode)
+            .limit(1)
+            .get();
+        if (delSnap.docs.isNotEmpty) {
+          return const Right(true);
+        }
+      } catch (_) {}
+
+      return const Right(false);
+    } catch (e) {
+      return Left(ServerFailure('تعذر التحقق من كود الإيصال: $e'));
     }
   }
 
@@ -514,14 +613,27 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      // 3b. Update used_receipt_codes if branch receipt
+      if (request.receiptCode != null && request.receiptCode!.trim().isNotEmpty) {
+        try {
+          await _firestore.collection('used_receipt_codes').doc(request.receiptCode!.trim()).set({
+            'status': 'approved',
+            'approvedAt': FieldValue.serverTimestamp(),
+            'approvedBy': reviewerName,
+          }, SetOptions(merge: true));
+        } catch (_) {}
+      }
+
       // 4. Send notification to supervisor
       try {
         await _firestore.collection('notifications').add({
           'delegateUid': request.supervisorUid,
-          'title': 'تم اعتماد المندوب بنجاح ✅',
+          'title': 'تم اعتماد المندوب بنجاح',
           'body':
               'تمت الموافقة على اشتراك المندوب ${request.fullName} في ${request.organizationName}، وأصبح حسابه نشطاً الآن.',
           'type': 'subscription_approved',
+          'senderName': 'الإدارة العامة',
+          'senderRole': 'superAdmin',
           'createdAt': FieldValue.serverTimestamp(),
           'isRead': false,
         });
@@ -572,12 +684,21 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // 3. Send notification to supervisor
       await _firestore.collection('notifications').add({
         'delegateUid': request.supervisorUid,
-        'title': 'تم رفض طلب اشتراك المندوب ❌',
+        'title': 'تم رفض طلب اشتراك المندوب',
         'body': 'تم رفض طلب المندوب ${request.fullName}. السبب: $reason',
         'type': 'subscription_rejected',
+        'senderName': reviewerName,
+        'senderRole': 'superAdmin',
         'createdAt': FieldValue.serverTimestamp(),
         'isRead': false,
       });
+
+      // 4. Release used receipt code so it can be corrected or reused
+      if (request.receiptCode != null && request.receiptCode!.trim().isNotEmpty) {
+        try {
+          await _firestore.collection('used_receipt_codes').doc(request.receiptCode!.trim()).delete();
+        } catch (_) {}
+      }
 
       return const Right(null);
     } catch (e) {

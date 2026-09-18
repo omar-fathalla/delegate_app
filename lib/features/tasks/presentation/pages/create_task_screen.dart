@@ -95,7 +95,17 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             }
 
             return Scaffold(
+              backgroundColor: theme.colorScheme.surfaceContainerLowest,
               appBar: AppBar(
+                backgroundColor: theme.colorScheme.surfaceContainer,
+                elevation: 0,
+                scrolledUnderElevation: 2.0,
+                shape: Border(
+                  bottom: BorderSide(
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+                    width: 0.8,
+                  ),
+                ),
                 centerTitle: true,
                 title: Text(
                   l10n.createTask,
@@ -167,7 +177,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                               .withValues(alpha: 0.3),
                           prefixIcon: const Padding(
                             padding: EdgeInsets.only(bottom: 50),
-                            child: Icon(Icons.description_outlined),
+                            child: Icon(Icons.description_rounded),
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -640,13 +650,13 @@ class _TaskAssigneeSelectionBottomSheetState
       Color roleColor = colorScheme.primary;
 
       if (d.role == UserRole.marketing) {
-        subtitleText = 'موظف تسويق الفروع 📢';
+        subtitleText = 'موظف تسويق الفروع';
         iconData = Icons.campaign_rounded;
-        roleColor = Colors.amber.shade800;
+        roleColor = colorScheme.secondary;
       } else if (d.role == UserRole.marketingPromotion) {
-        subtitleText = 'موظف تسويق العروض 🖼️';
+        subtitleText = 'موظف تسويق العروض';
         iconData = Icons.photo_library_rounded;
-        roleColor = Colors.purple.shade700;
+        roleColor = colorScheme.tertiary;
       }
 
       options.add(_AssigneeItem(
@@ -802,9 +812,9 @@ class _TaskAssigneeSelectionBottomSheetState
                 const SizedBox(width: 8),
                 _buildFilterChip('sectors', 'القطاعات', theme),
                 const SizedBox(width: 8),
-                _buildFilterChip('branch_marketing', 'تسويق الفروع 📢', theme),
+                _buildFilterChip('branch_marketing', 'تسويق الفروع', theme),
                 const SizedBox(width: 8),
-                _buildFilterChip('promotion_marketing', 'تسويق العروض 🖼️', theme),
+                _buildFilterChip('promotion_marketing', 'تسويق العروض', theme),
                 if (!isOrgAdmin) ...[
                   const SizedBox(width: 8),
                   _buildFilterChip('delegates', 'المناديب الميدانيين', theme),

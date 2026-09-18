@@ -32,15 +32,14 @@ void callbackDispatcher() {
       debugPrint("Native called background task: $task");
       WidgetsFlutterBinding.ensureInitialized();
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-      final sharedPrefs = await SharedPreferences.getInstance();
-      await di.init(sharedPreferences: sharedPrefs);
+      await di.initBackgroundSync();
 
       final syncManager = di.sl<SyncManager>();
       await syncManager.syncPendingPhotos();
       
       return Future.value(true);
     } catch (err) {
-      debugPrint(err.toString());
+      debugPrint("Background sync error: $err");
       return Future.value(false);
     }
   });
@@ -95,19 +94,6 @@ void main() async {
   // Providers are now registered in DI — no duplicate SharedPreferences call
   localeProvider = di.sl<LocaleProvider>();
 
-  // Initialize Workmanager for background photo uploads
-  Workmanager().initialize(
-    callbackDispatcher,
-  );
-  Workmanager().registerPeriodicTask(
-    "offlineSyncTask",
-    "offlineSyncTask",
-    frequency: const Duration(minutes: 15),
-    constraints: Constraints(
-      networkType: NetworkType.connected,
-    ),
-  );
-
   // Set up notification tap handler for navigation
   PushNotificationService.onNotificationTap = (data) {
     final taskId = data['taskId'];
@@ -123,6 +109,32 @@ void main() async {
   // so we have the delegate UID for token storage.
 
   runApp(const MyApp());
+
+  // Schedule background tasks non-blockingly after UI has launched
+  _scheduleBackgroundSync();
+}
+
+/// Schedules background sync safely after UI has settled, avoiding main-thread contention during boot.
+void _scheduleBackgroundSync() {
+  Future.delayed(const Duration(seconds: 8), () {
+    try {
+      Workmanager().initialize(
+        callbackDispatcher,
+      );
+      Workmanager().registerPeriodicTask(
+        "offlineSyncTask",
+        "offlineSyncTask",
+        frequency: const Duration(minutes: 15),
+        initialDelay: const Duration(minutes: 2),
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+        constraints: Constraints(
+          networkType: NetworkType.connected,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Workmanager init error: $e');
+    }
+  });
 }
 
 class MyApp extends StatefulWidget {

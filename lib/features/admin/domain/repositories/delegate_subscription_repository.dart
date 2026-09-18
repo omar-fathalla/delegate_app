@@ -28,6 +28,9 @@ abstract class DelegateSubscriptionRepository {
     int? remainingMonths,
   });
 
+  /// Checks whether a 5-digit receipt code is already used across the system
+  Future<Either<Failure, bool>> isReceiptCodeUsed(String receiptCode);
+
   /// Streams subscription requests filtered by status or organization/company
   Stream<List<DelegateSubscriptionRequest>> getSubscriptionRequestsStream({
     SubscriptionRequestStatus? statusFilter,

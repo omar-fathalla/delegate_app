@@ -131,13 +131,14 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
 
   Future<void> _confirmDeletePhoto(CapturedPhoto photo) async {
     final bloc = context.read<PhotoPermissionBloc>();
+    final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+            Icon(Icons.warning_amber_rounded, color: colorScheme.error, size: 28),
             const SizedBox(width: 8),
             const Expanded(
               child: Text(
@@ -159,18 +160,18 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
+                color: colorScheme.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
+                border: Border.all(color: colorScheme.error.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
+                  Icon(Icons.info_outline_rounded, size: 18, color: colorScheme.error),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'سيتم حذف الصورة بشكل نهائي من قاعدة البيانات ومساحة التخزين.',
-                      style: TextStyle(fontSize: 12, color: Colors.red),
+                      style: TextStyle(fontSize: 12, color: colorScheme.error),
                     ),
                   ),
                 ],
@@ -185,8 +186,8 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
@@ -428,7 +429,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.green,
+                backgroundColor: colorScheme.primary,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -437,7 +438,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.red,
+                backgroundColor: colorScheme.error,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -1259,9 +1260,11 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                           ],
                           if (photo.comment.trim().isNotEmpty) ...[
                             const SizedBox(width: 6),
+                            Icon(Icons.comment_rounded, size: 12, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                '💬 ${photo.comment.trim()}',
+                                photo.comment.trim(),
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   color: colorScheme.onSurfaceVariant,
@@ -1306,7 +1309,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.photo_library_outlined,
+                Icons.photo_library_rounded,
                 size: 56,
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
               ),
@@ -1439,10 +1442,10 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               ),
                             ),
                             const SizedBox(height: 6),
-                            const Center(
+                            Center(
                               child: Text(
-                                '💡 يمكنك قرص الصورة أو استخدام إصبعين لتكبير التفاصيل',
-                                style: TextStyle(fontSize: 11, color: Colors.grey),
+                                'يمكنك قرص الصورة أو استخدام إصبعين لتكبير التفاصيل',
+                                style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -1456,13 +1459,13 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                       Navigator.pop(modalContext);
                                       _confirmDeletePhoto(photo);
                                     },
-                                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
-                                    label: const Text(
+                                    icon: Icon(Icons.delete_rounded, color: colorScheme.error, size: 18),
+                                    label: Text(
                                       'حذف الصورة',
-                                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
+                                      style: TextStyle(color: colorScheme.error, fontWeight: FontWeight.bold, fontSize: 13),
                                     ),
                                     style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: Colors.redAccent),
+                                      side: BorderSide(color: colorScheme.error),
                                       padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
@@ -1488,8 +1491,8 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                                   isSaving = false;
                                                   saveSuccess = success;
                                                   statusText = success
-                                                      ? '✅ تم حفظ الصورة في ألبوم صور الهاتف بنجاح.'
-                                                      : '⚠️ يرجى منح الإذن للوصول للصور من إعدادات الهاتف.';
+                                                      ? 'تم حفظ الصورة في ألبوم صور الهاتف بنجاح.'
+                                                      : 'يرجى منح الإذن للوصول للصور من إعدادات الهاتف.';
                                                 });
                                               }
                                             } catch (e) {
@@ -1497,7 +1500,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                                 setSheetState(() {
                                                   isSaving = false;
                                                   saveSuccess = false;
-                                                  statusText = '❌ تعذر حفظ الصورة: $e';
+                                                  statusText = 'تعذر حفظ الصورة: $e';
                                                 });
                                               }
                                             }
@@ -1519,12 +1522,12 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                       isSaving
                                           ? 'جاري حفظ الصورة...'
                                           : saveSuccess
-                                              ? 'تم الحفظ في الهاتف ✓'
+                                              ? 'تم الحفظ في الهاتف'
                                               : 'حفظ الصورة',
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                     ),
                                     style: FilledButton.styleFrom(
-                                      backgroundColor: saveSuccess ? Colors.green.shade700 : null,
+                                      backgroundColor: saveSuccess ? colorScheme.primary : null,
                                       padding: const EdgeInsets.symmetric(vertical: 13),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),

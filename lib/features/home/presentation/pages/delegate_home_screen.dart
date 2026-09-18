@@ -10,6 +10,8 @@ import 'package:delegate_app/features/attendance/data/datasources/attendance_loc
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class DelegateHomeScreen extends StatefulWidget {
   final Delegate delegate;
@@ -547,14 +549,42 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   ],
                 ),
               ),
-              const CircleAvatar(
-                radius: 24,
-                backgroundColor: Colors.white24,
-                child: Icon(
-                  Icons.person_pin_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
+              Builder(
+                builder: (context) {
+                  final photoUrl = widget.delegate.personalPhotoUrl ??
+                      (widget.delegate.documents
+                          .where((d) =>
+                              d.documentKey == DocumentKey.personalPhoto &&
+                              d.documentURL.isNotEmpty)
+                          .firstOrNull
+                          ?.documentURL) ??
+                      FirebaseAuth.instance.currentUser?.photoURL;
+
+                  return Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: AppAvatar(
+                      imageUrl: photoUrl,
+                      fallbackText: widget.delegate.firstName,
+                      radius: 26,
+                      backgroundColor: Colors.white.withValues(alpha: 0.22),
+                      foregroundColor: Colors.white,
+                      fallbackIcon: Icons.person_pin_rounded,
+                    ),
+                  );
+                },
               ),
             ],
           ),

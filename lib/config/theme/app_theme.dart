@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -55,8 +54,8 @@ class AppTheme {
 
       // Navigation (Micro-interactions & State Management)
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: colorScheme.surface,
-        elevation: 8,
+        backgroundColor: colorScheme.surfaceContainer,
+        elevation: 0,
         indicatorColor: colorScheme.secondaryContainer,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
@@ -79,15 +78,21 @@ class AppTheme {
 
       // App Bar
       appBarTheme: AppBarTheme(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: colorScheme.surfaceContainer,
         foregroundColor: colorScheme.onSurface,
         elevation: 0,
         scrolledUnderElevation: 2,
         centerTitle: false,
+        shape: Border(
+          bottom: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
       ),
 
       // Scaffold Background
-      scaffoldBackgroundColor: colorScheme.surface,
+      scaffoldBackgroundColor: colorScheme.surfaceContainerLowest,
 
       // Dialogs & Cards
       cardTheme: CardThemeData(

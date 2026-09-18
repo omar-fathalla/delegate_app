@@ -157,7 +157,7 @@ class CompanyListItem extends StatelessWidget {
                   child: Row(
                     children: [
                       Icon(
-                        Icons.description_outlined,
+                        Icons.description_rounded,
                         size: 16,
                         color: colorScheme.onSurfaceVariant,
                       ),

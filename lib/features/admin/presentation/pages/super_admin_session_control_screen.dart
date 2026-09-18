@@ -1023,7 +1023,7 @@ class _SuperAdminSessionControlScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isReLoginRequired
@@ -1031,13 +1031,6 @@ class _SuperAdminSessionControlScreenState
               : colorScheme.outlineVariant.withValues(alpha: 0.5),
           width: isReLoginRequired ? 1.5 : 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -1079,7 +1072,7 @@ class _SuperAdminSessionControlScreenState
                       decoration: BoxDecoration(
                         color: isReLoginRequired
                             ? colorScheme.errorContainer.withValues(alpha: 0.5)
-                            : Colors.green.withValues(alpha: 0.12),
+                            : colorScheme.primaryContainer.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -1092,7 +1085,7 @@ class _SuperAdminSessionControlScreenState
                             size: 11,
                             color: isReLoginRequired
                                 ? colorScheme.error
-                                : Colors.green.shade800,
+                                : colorScheme.primary,
                           ),
                           const SizedBox(width: 3),
                           Text(
@@ -1104,7 +1097,7 @@ class _SuperAdminSessionControlScreenState
                               fontWeight: FontWeight.bold,
                               color: isReLoginRequired
                                   ? colorScheme.error
-                                  : Colors.green.shade800,
+                                  : colorScheme.onPrimaryContainer,
                             ),
                           ),
                         ],
@@ -1173,30 +1166,23 @@ class _SuperAdminSessionControlScreenState
           ),
           const SizedBox(width: 8),
 
-          // Action Button (Material 3 Stadium)
-          FilledButton.tonalIcon(
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: const Size(0, 36),
+          // Action Button (M3 Icon-Only with Tooltip)
+          IconButton.filledTonal(
+            style: IconButton.styleFrom(
               backgroundColor: isReLoginRequired
                   ? colorScheme.surfaceContainerHighest
                   : colorScheme.errorContainer.withValues(alpha: 0.6),
               foregroundColor: isReLoginRequired
                   ? colorScheme.onSurfaceVariant
                   : colorScheme.onErrorContainer,
-              shape: const StadiumBorder(),
             ),
+            tooltip: isReLoginRequired ? 'تجديد جلسة الدخول' : 'تسجيل خروج إجباري',
             onPressed: () => _confirmForceLogoutDelegate(delegate),
             icon: Icon(
               isReLoginRequired
                   ? Icons.lock_reset_rounded
                   : Icons.logout_rounded,
-              size: 15,
-            ),
-            label: Text(
-              isReLoginRequired ? 'تجديد' : 'خروج إجباري',
-              style: GoogleFonts.cairo(
-                  fontSize: 11, fontWeight: FontWeight.bold),
+              size: 18,
             ),
           ),
         ],

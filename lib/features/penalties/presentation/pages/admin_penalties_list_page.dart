@@ -13,6 +13,7 @@ import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.
 import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evidence_viewer.dart';
 import 'package:delegate_app/features/penalties/presentation/utils/penalty_creator_helper.dart';
 import 'admin_create_penalty_page.dart';
+import 'penalty_rules_settings_page.dart';
 
 class AdminPenaltiesListPage extends StatefulWidget {
   final Delegate adminDelegate;
@@ -169,10 +170,14 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
           ? '📌 تم تثبيت الفرع المختار كفرع افتراضي لسجل المخالفات'
           : '📌 تم تثبيت ($branchCount فروع) كقطاع افتراضي لسجل المخالفات';
 
+      final colorScheme = Theme.of(context).colorScheme;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(msg),
-          backgroundColor: Colors.teal.shade700,
+          content: Text(
+            msg,
+            style: TextStyle(color: colorScheme.onPrimaryContainer),
+          ),
+          backgroundColor: colorScheme.primaryContainer,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -378,7 +383,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: Colors.teal.withValues(alpha: 0.12),
+                                          color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
@@ -386,7 +391,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                                           style: TextStyle(
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.teal.shade800,
+                                            color: colorScheme.onSecondaryContainer,
                                           ),
                                         ),
                                       ),
@@ -467,43 +472,46 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'تأكيد حذف المخالفة',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+      builder: (dialogContext) {
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.warning_rounded, color: colorScheme.error, size: 28),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'تأكيد حذف المخالفة',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
               ),
+            ],
+          ),
+          content: Text(
+            'هل أنت متأكد من رغبتك في حذف المخالفة "${penalty.title}" نهائياً؟',
+            style: const TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.delete_forever_rounded, size: 18),
+              label: const Text('حذف نهائي'),
             ),
           ],
-        ),
-        content: Text(
-          'هل أنت متأكد من رغبتك في حذف المخالفة "${penalty.title}" نهائياً؟',
-          style: const TextStyle(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_forever_rounded, size: 18),
-            label: const Text('حذف نهائي'),
-          ),
-        ],
-      ),
+        );
+      },
     );
 
     if (confirmed == true && context.mounted) {
@@ -568,8 +576,77 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
         }
       }
 
+      // 4. Confidentiality filter:
+      // If penalty is confidential, ONLY 4 roles are allowed to see it:
+      // 1) Super Admin
+      // 2) Technical Support
+      // 3) Company Supervisor (Admin with same companyId)
+      // 4) Target Delegate (if delegate is viewing)
+      if (p.isConfidential) {
+        final canView = _canUserViewConfidentialPenalty(p, widget.adminDelegate);
+        if (!canView) return false;
+      }
+
       return true;
     }).toList();
+  }
+
+  bool _canUserViewConfidentialPenalty(PenaltyEntity p, Delegate user) {
+    // 1. Super Admin, Technical Support, Organization Admin
+    if (user.role == UserRole.superAdmin ||
+        user.role == UserRole.technicalSupport ||
+        user.role == UserRole.organizationAdmin) {
+      return true;
+    }
+
+    // 2. The Target Delegate himself
+    if (user.role == UserRole.delegate) {
+      return _isPenaltyForDelegate(p, user);
+    }
+
+    // 3. The Company Supervisor of that company
+    if (user.role == UserRole.admin) {
+      final compId = user.companyUID.isNotEmpty
+          ? user.companyUID
+          : user.organizationUID;
+      if (compId.isNotEmpty &&
+          (compId == p.companyId ||
+              compId.toLowerCase() == p.companyName.toLowerCase())) {
+        return true;
+      }
+    }
+
+    // Strictly hidden from all other roles (Branches Marketing Manager, Marketing, other supervisors, etc.)
+    return false;
+  }
+
+  bool _isPenaltyForDelegate(PenaltyEntity p, Delegate delegate) {
+    if (p.targetDelegateId != null && p.targetDelegateId!.trim().isNotEmpty) {
+      final tid = p.targetDelegateId!.trim();
+      if (tid == delegate.uid) return true;
+      if (delegate.delegatePublicId.isNotEmpty && tid == delegate.delegatePublicId) return true;
+
+      final cleanTid = tid.replaceAll(RegExp(r'\D'), '');
+      final cleanDelPhone = delegate.phoneNumber.replaceAll(RegExp(r'\D'), '');
+      if (cleanTid.isNotEmpty && cleanDelPhone.isNotEmpty) {
+        if (cleanTid == cleanDelPhone ||
+            cleanTid.endsWith(cleanDelPhone) ||
+            cleanDelPhone.endsWith(cleanTid)) {
+          return true;
+        }
+      }
+    }
+
+    if (p.targetDelegateName != null && p.targetDelegateName!.trim().isNotEmpty) {
+      final tName = p.targetDelegateName!.trim().toLowerCase();
+      final delName = delegate.fullName.trim().toLowerCase();
+      if (tName == delName) return true;
+
+      final combined = '${delegate.firstName} ${delegate.lastName}'.trim().toLowerCase();
+      if (combined.isNotEmpty && tName == combined) return true;
+    }
+
+    return false;
   }
 
   @override
@@ -585,6 +662,23 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               actions: [
+                if (widget.adminDelegate.role == UserRole.superAdmin ||
+                    widget.adminDelegate.role == UserRole.technicalSupport ||
+                    widget.adminDelegate.role == UserRole.organizationAdmin)
+                  IconButton(
+                    tooltip: 'إعدادات الغرامات والمخالفات',
+                    icon: const Icon(Icons.tune_rounded),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PenaltyRulesSettingsPage(
+                            adminDelegate: widget.adminDelegate,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 IconButton(
                   tooltip: 'تحديث البيانات',
                   icon: const Icon(Icons.refresh_rounded),
@@ -626,11 +720,15 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
           Expanded(
             child: BlocConsumer<PenaltyBloc, PenaltyState>(
               listener: (context, state) {
+                final colorScheme = Theme.of(context).colorScheme;
                 if (state is PenaltyActionSuccessState) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(state.message),
-                      backgroundColor: Colors.green,
+                      content: Text(
+                        state.message,
+                        style: TextStyle(color: colorScheme.onPrimaryContainer),
+                      ),
+                      backgroundColor: colorScheme.primaryContainer,
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -638,8 +736,11 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                 } else if (state is PenaltyErrorState) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(state.message),
-                      backgroundColor: Colors.red,
+                      content: Text(
+                        state.message,
+                        style: TextStyle(color: colorScheme.onError),
+                      ),
+                      backgroundColor: colorScheme.error,
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -795,7 +896,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isPinned
-                            ? Colors.teal.shade600
+                            ? colorScheme.secondary
                             : colorScheme.outlineVariant.withValues(alpha: 0.6),
                         width: isPinned ? 1.5 : 1.0,
                       ),
@@ -805,7 +906,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                         Icon(
                           Icons.storefront_rounded,
                           size: 20,
-                          color: isPinned ? Colors.teal.shade700 : colorScheme.primary,
+                          color: isPinned ? colorScheme.secondary : colorScheme.primary,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -828,7 +929,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                                   style: TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.teal.shade800,
+                                    color: colorScheme.secondary,
                                   ),
                                 ),
                             ],
@@ -851,24 +952,24 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                     : 'تثبيت الفروع المحددة كقطاع افتراضي عند الفتح',
                 style: IconButton.styleFrom(
                   backgroundColor: isPinned
-                      ? Colors.teal.shade100
+                      ? colorScheme.secondaryContainer
                       : colorScheme.surfaceContainerHigh,
                   foregroundColor: isPinned
-                      ? Colors.teal.shade900
+                      ? colorScheme.onSecondaryContainer
                       : colorScheme.onSurfaceVariant,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                     side: BorderSide(
                       color: isPinned
-                          ? Colors.teal.shade600
+                          ? colorScheme.secondary
                           : colorScheme.outlineVariant.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
                 icon: Icon(
-                  isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                  Icons.push_pin_rounded,
                   size: 20,
-                  color: isPinned ? Colors.teal.shade700 : null,
+                  color: isPinned ? colorScheme.secondary : null,
                 ),
                 onPressed: _togglePinCurrentBranches,
               ),
@@ -920,7 +1021,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                     return Padding(
                       padding: const EdgeInsets.only(left: 6),
                       child: Chip(
-                        avatar: Icon(Icons.location_on_outlined, size: 14, color: colorScheme.primary),
+                        avatar: Icon(Icons.location_on_rounded, size: 14, color: colorScheme.primary),
                         label: Text(
                           branchObj['name'] ?? branchId,
                           style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
@@ -1085,8 +1186,8 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
           _buildStatItem(
             'الإجمالي',
             '${totalFines.toStringAsFixed(0)} ج.م',
-            Icons.monetization_on_outlined,
-            Colors.red.shade700,
+            Icons.monetization_on_rounded,
+            colorScheme.error,
           ),
           Container(
             height: 24,
@@ -1097,7 +1198,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
             'بانتظار الإجراء',
             '$pendingCount',
             Icons.hourglass_top_rounded,
-            pendingCount > 0 ? Colors.orange.shade800 : colorScheme.onSurfaceVariant,
+            pendingCount > 0 ? colorScheme.secondary : colorScheme.onSurfaceVariant,
           ),
         ],
       ),
@@ -1105,6 +1206,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
   }
 
   Widget _buildStatItem(String label, String value, IconData icon, Color valueColor) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1116,7 +1218,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
           children: [
             Text(
               label,
-              style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
             ),
             Text(
               value,
@@ -1136,7 +1238,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.folder_off_outlined,
+              Icons.folder_off_rounded,
               size: 54,
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
@@ -1198,26 +1300,26 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
     _isExpanded = requiresAction;
   }
 
-  Color _getStatusColor(PenaltyStatus status) {
+  Color _getStatusColor(ColorScheme colorScheme, PenaltyStatus status) {
     switch (status) {
       case PenaltyStatus.pendingBranchesMarketing:
-        return Colors.orange.shade800;
+        return colorScheme.secondary;
       case PenaltyStatus.rejectedByBranchesMarketing:
-        return Colors.red.shade800;
+        return colorScheme.error;
       case PenaltyStatus.pendingGeneralManager:
-        return Colors.amber.shade900;
+        return colorScheme.secondary;
       case PenaltyStatus.rejectedByGeneralManager:
-        return Colors.red.shade900;
+        return colorScheme.error;
       case PenaltyStatus.issued:
-        return Colors.green.shade700;
+        return colorScheme.primary;
       case PenaltyStatus.acknowledged:
-        return Colors.blue.shade700;
+        return colorScheme.primary;
       case PenaltyStatus.deducted:
-        return Colors.teal.shade700;
+        return colorScheme.tertiary;
       case PenaltyStatus.disputed:
-        return Colors.purple.shade700;
+        return colorScheme.error;
       case PenaltyStatus.cancelled:
-        return Colors.grey.shade600;
+        return colorScheme.outline;
     }
   }
 
@@ -1252,7 +1354,7 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final statusColor = _getStatusColor(widget.penalty.status);
+    final statusColor = _getStatusColor(colorScheme, widget.penalty.status);
     final dateStr = DateFormat('yyyy/MM/dd HH:mm').format(widget.penalty.createdAt);
 
     return Card(
@@ -1367,6 +1469,31 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                               ),
                             ),
                           ),
+
+                        if (widget.penalty.isConfidential)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: colorScheme.tertiary.withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.lock_rounded, size: 10.5, color: colorScheme.tertiary),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'سرية ومقيدة',
+                                  style: TextStyle(
+                                    color: colorScheme.onTertiaryContainer,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -1436,7 +1563,7 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.person_outline_rounded,
+                          Icon(Icons.person_rounded,
                               size: 12, color: colorScheme.onSurfaceVariant),
                           const SizedBox(width: 3),
                           Text(
@@ -1640,13 +1767,13 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                                         child: Container(
                                           padding: const EdgeInsets.all(2),
                                           decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.55),
+                                            color: colorScheme.scrim.withValues(alpha: 0.65),
                                             shape: BoxShape.circle,
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.zoom_in_rounded,
                                             size: 13,
-                                            color: Colors.white,
+                                            color: colorScheme.surface,
                                           ),
                                         ),
                                       ),
@@ -1692,7 +1819,7 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                 // Metadata Row
                 Row(
                   children: [
-                    Icon(Icons.badge_outlined, size: 13, color: colorScheme.onSurfaceVariant),
+                    Icon(Icons.badge_rounded, size: 13, color: colorScheme.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
@@ -1711,21 +1838,21 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.12),
+                          color: colorScheme.primaryContainer.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.green.withValues(alpha: 0.35)),
+                          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.35)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.phone_in_talk_rounded, size: 11, color: Colors.green.shade700),
+                            Icon(Icons.phone_in_talk_rounded, size: 11, color: colorScheme.primary),
                             const SizedBox(width: 3),
                             Text(
                               'اتصال',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.green.shade700,
+                                color: colorScheme.primary,
                               ),
                             ),
                           ],
@@ -1802,8 +1929,8 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                     // Call creator action button
                     IconButton(
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.green.withValues(alpha: 0.1),
-                        foregroundColor: Colors.green.shade700,
+                        backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                        foregroundColor: colorScheme.primary,
                         visualDensity: VisualDensity.compact,
                       ),
                       icon: const Icon(Icons.phone_forwarded_rounded, size: 18),
@@ -1820,8 +1947,8 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                       const SizedBox(width: 4),
                       IconButton(
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                          foregroundColor: Colors.blue.shade700,
+                          backgroundColor: colorScheme.secondary.withValues(alpha: 0.1),
+                          foregroundColor: colorScheme.secondary,
                           visualDensity: VisualDensity.compact,
                         ),
                         icon: const Icon(Icons.edit_note_rounded, size: 20),
@@ -1834,8 +1961,8 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                       const SizedBox(width: 4),
                       IconButton(
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.red.withValues(alpha: 0.1),
-                          foregroundColor: Colors.red.shade700,
+                          backgroundColor: colorScheme.error.withValues(alpha: 0.1),
+                          foregroundColor: colorScheme.error,
                           visualDensity: VisualDensity.compact,
                         ),
                         icon: const Icon(Icons.delete_outline_rounded, size: 18),
@@ -1980,8 +2107,11 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('إلغاء'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
             onPressed: () {
               final reason = reasonController.text.trim();
               if (reason.isEmpty) return;
@@ -1995,7 +2125,7 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                     ),
                   );
             },
-            child: const Text('تأكيد الرفض', style: TextStyle(color: Colors.white)),
+            child: const Text('تأكيد الرفض'),
           ),
         ],
       ),

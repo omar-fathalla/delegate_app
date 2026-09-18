@@ -44,11 +44,11 @@ service firebase.storage {
     }
 
     // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================
-    match /delegate_documents/{fileName} {
+    match /delegate_documents/{allPaths=**} {
       allow read, write: if isAuthenticated();
     }
 
-    match /delegate_subscription_receipts/{fileName} {
+    match /delegate_subscription_receipts/{allPaths=**} {
       allow read, write: if isAuthenticated();
     }
 

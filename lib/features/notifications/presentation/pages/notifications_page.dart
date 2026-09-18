@@ -101,6 +101,7 @@ class NotificationsPage extends StatelessWidget {
           ),
         ),
       child: Scaffold(
+        backgroundColor: colorScheme.surfaceContainerLowest,
         floatingActionButton: canSendNotification
             ? FloatingActionButton.extended(
                 onPressed: () {
@@ -110,12 +111,33 @@ class NotificationsPage extends StatelessWidget {
                     ),
                   );
                 },
+                backgroundColor: colorScheme.primaryContainer,
+                foregroundColor: colorScheme.onPrimaryContainer,
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 icon: const Icon(Icons.send_rounded),
                 label: const Text('إرسال إشعار جديد'),
               )
             : null,
         appBar: AppBar(
-          title: Text(AppLocalizations.of(context)!.notifications),
+          backgroundColor: colorScheme.surfaceContainer,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1.0),
+            child: Container(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              height: 1.0,
+            ),
+          ),
+          title: Text(
+            AppLocalizations.of(context)!.notifications,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              color: colorScheme.onSurface,
+            ),
+          ),
           actions: [
             BlocBuilder<NotificationBloc, NotificationState>(
               builder: (context, state) {
@@ -134,7 +156,7 @@ class NotificationsPage extends StatelessWidget {
                               ),
                             );
                           },
-                          icon: Icon(Icons.done_all, size: 18, color: colorScheme.primary),
+                          icon: Icon(Icons.check_circle_rounded, size: 18, color: colorScheme.primary),
                           label: Text(
                             AppLocalizations.of(context)!.markAllRead,
                             style: TextStyle(fontSize: 12, color: colorScheme.primary, fontWeight: FontWeight.w600),
@@ -146,7 +168,7 @@ class NotificationsPage extends StatelessWidget {
                         ),
                       IconButton(
                         tooltip: 'حذف جميع الإشعارات',
-                        icon: Icon(Icons.delete_sweep_outlined, color: colorScheme.error),
+                        icon: Icon(Icons.delete_sweep_rounded, color: colorScheme.error),
                         onPressed: () => _confirmDeleteAll(context, state.notifications),
                       ),
                     ],
@@ -169,7 +191,7 @@ class NotificationsPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.error_outline,
+                      Icons.error_outline_rounded,
                       size: 64,
                       color: Theme.of(context).colorScheme.error,
                     ),
@@ -191,7 +213,7 @@ class NotificationsPage extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.notifications_none,
+                        Icons.notifications_none_rounded,
                         size: 64,
                         color: Theme.of(context).colorScheme.outline,
                       ),

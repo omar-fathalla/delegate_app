@@ -595,3 +595,35 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => FirebaseAuth.instance);
   sl.registerLazySingleton(() => FirebaseStorage.instance);
 }
+
+/// Minimal dependency initialization specifically for background isolates (e.g. WorkManager photo sync).
+/// Avoids loading hundreds of BLoCs, UI UseCases, and services into background memory.
+Future<void> initBackgroundSync() async {
+  if (!sl.isRegistered<FirebaseFirestore>()) {
+    sl.registerLazySingleton(() => FirebaseFirestore.instance);
+  }
+  if (!sl.isRegistered<FirebaseStorage>()) {
+    sl.registerLazySingleton(() => FirebaseStorage.instance);
+  }
+  if (!sl.isRegistered<PhotoOfflineDataSource>()) {
+    sl.registerLazySingleton<PhotoOfflineDataSource>(
+      () => PhotoOfflineDataSource(),
+    );
+  }
+  if (!sl.isRegistered<PhotoPermissionRemoteDataSource>()) {
+    sl.registerLazySingleton<PhotoPermissionRemoteDataSource>(
+      () => PhotoPermissionRemoteDataSourceImpl(
+        firestore: sl(),
+        storage: sl(),
+      ),
+    );
+  }
+  if (!sl.isRegistered<SyncManager>()) {
+    sl.registerLazySingleton<SyncManager>(
+      () => SyncManager(
+        offlineDataSource: sl(),
+        remoteDataSource: sl(),
+      ),
+    );
+  }
+}

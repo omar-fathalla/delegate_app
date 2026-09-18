@@ -21,6 +21,9 @@ import 'package:delegate_app/features/notifications/presentation/bloc/notificati
 import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
+import 'dart:async';
+import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
+import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 class MarketingMainScreen extends StatefulWidget {
@@ -34,14 +37,48 @@ class MarketingMainScreen extends StatefulWidget {
 
 class _MarketingMainScreenState extends State<MarketingMainScreen> {
   int _currentIndex = 0;
+  StreamSubscription? _walletSubscription;
+  bool _isWalletEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _walletSubscription = WalletRemoteDataSourceImpl()
+        .streamUserWallet(widget.delegate.uid)
+        .listen((w) {
+      if (mounted) {
+        setState(() {
+          _isWalletEnabled = w?.isWalletEnabled ?? false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _walletSubscription?.cancel();
+    super.dispose();
+  }
 
   void _onMenuSelected(String value) {
     final delegate = widget.delegate;
     final isPromotionOnly = delegate.role == UserRole.marketingPromotion;
 
     switch (value) {
+      case 'wallet':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => UserWalletScreen(
+              targetUserId: delegate.uid,
+              targetUserName: delegate.fullName.isNotEmpty
+                  ? delegate.fullName
+                  : delegate.firstName,
+            ),
+          ),
+        );
+        break;
       case 'profile':
-        context.push('/user-profile');
+        context.push('/user-profile', extra: delegate);
         break;
       case 'search':
         Navigator.of(context).push(
@@ -185,10 +222,18 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
     }
 
     return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
-        backgroundColor: colorScheme.surface,
-        surfaceTintColor: colorScheme.surfaceTint,
-        scrolledUnderElevation: 3.0,
+        backgroundColor: colorScheme.surfaceContainer,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 2.0,
+        shape: Border(
+          bottom: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -232,7 +277,7 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                   label: Text('$unreadCount'),
                   isLabelVisible: unreadCount > 0,
                   child: IconButton(
-                    icon: const Icon(Icons.notifications_outlined),
+                    icon: const Icon(Icons.notifications_rounded),
                     tooltip: l10n.notifications,
                     onPressed: () {
                       context.push('/notifications', extra: delegate);
@@ -255,7 +300,7 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
               const PopupMenuItem(
                 value: 'profile',
                 child: ListTile(
-                  leading: Icon(Icons.person_outline_rounded),
+                  leading: Icon(Icons.person_rounded),
                   title: Text('الملف الشخصي'),
                   dense: true,
                   contentPadding: EdgeInsets.zero,
@@ -300,10 +345,21 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
+              if (_isWalletEnabled)
+                PopupMenuItem(
+                  value: 'wallet',
+                  child: ListTile(
+                    leading: Icon(Icons.account_balance_wallet_rounded, color: colorScheme.primary),
+                    title: const Text('المحفظة والمستحقات'),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              // الإعدادات دائماً في أسفل القائمة
               PopupMenuItem(
                 value: 'settings',
                 child: ListTile(
-                  leading: const Icon(Icons.settings_outlined),
+                  leading: const Icon(Icons.settings_rounded),
                   title: Text(l10n.settings),
                   dense: true,
                   contentPadding: EdgeInsets.zero,
@@ -314,49 +370,62 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
         ],
       ),
       body: M3FadeThroughIndexedStack(index: _currentIndex, children: screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        destinations: isPromotionOnly
-            ? const [
-                NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home_rounded),
-                  label: 'الرئيسية',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.photo_library_outlined),
-                  selectedIcon: Icon(Icons.photo_library_rounded),
-                  label: 'أذونات التصوير',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.task_alt_outlined),
-                  selectedIcon: Icon(Icons.task_alt_rounded),
-                  label: 'المهام',
-                ),
-              ]
-            : const [
-                NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home_rounded),
-                  label: 'الرئيسية',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.store_outlined),
-                  selectedIcon: Icon(Icons.store_rounded),
-                  label: 'الفروع',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.photo_library_outlined),
-                  selectedIcon: Icon(Icons.photo_library_rounded),
-                  label: 'أذونات التصوير',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.gavel_outlined),
-                  selectedIcon: Icon(Icons.gavel_rounded),
-                  label: 'الغرامات',
-                ),
-              ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainer,
+          border: Border(
+            top: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              width: 0.8,
+            ),
+          ),
+        ),
+        child: NavigationBar(
+          backgroundColor: colorScheme.surfaceContainer,
+          elevation: 0,
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (index) => setState(() => _currentIndex = index),
+          destinations: isPromotionOnly
+              ? const [
+                  NavigationDestination(
+                    icon: Icon(Icons.home_rounded),
+                    selectedIcon: Icon(Icons.home_rounded),
+                    label: 'الرئيسية',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.photo_library_rounded),
+                    selectedIcon: Icon(Icons.photo_library_rounded),
+                    label: 'أذونات التصوير',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.task_alt_rounded),
+                    selectedIcon: Icon(Icons.task_alt_rounded),
+                    label: 'المهام',
+                  ),
+                ]
+              : const [
+                  NavigationDestination(
+                    icon: Icon(Icons.home_rounded),
+                    selectedIcon: Icon(Icons.home_rounded),
+                    label: 'الرئيسية',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.store_rounded),
+                    selectedIcon: Icon(Icons.store_rounded),
+                    label: 'الفروع',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.photo_library_rounded),
+                    selectedIcon: Icon(Icons.photo_library_rounded),
+                    label: 'أذونات التصوير',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.gavel_rounded),
+                    selectedIcon: Icon(Icons.gavel_rounded),
+                    label: 'الغرامات',
+                  ),
+                ],
+        ),
       ),
     );
   }

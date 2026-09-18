@@ -71,6 +71,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surfaceContainerLowest,
       appBar: AppBar(
         title: const SizedBox.shrink(),
         bottom: PreferredSize(
@@ -95,8 +96,8 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
                       : 'تم بدء العمل على المهمة بنجاح ⏱️',
                 ),
                 backgroundColor: state.newStatus == TaskStatus.completed
-                    ? Colors.green.shade700
-                    : Colors.blue.shade700,
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.secondary,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -105,7 +106,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.red.shade700,
+                backgroundColor: theme.colorScheme.error,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -126,7 +127,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
                 children: [
                   Text(
                     state.message,
-                    style: const TextStyle(color: Colors.red),
+                    style: TextStyle(color: theme.colorScheme.error),
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
@@ -501,9 +502,9 @@ class _TaskCard extends StatelessWidget {
       case TaskPriority.high:
         return theme.colorScheme.error;
       case TaskPriority.medium:
-        return Colors.orange;
+        return theme.colorScheme.tertiary;
       case TaskPriority.low:
-        return Colors.green;
+        return theme.colorScheme.primary;
     }
   }
 }
@@ -530,12 +531,12 @@ class _StatusSmallChip extends StatelessWidget {
         icon = Icons.sync_rounded;
         break;
       case TaskStatus.completed:
-        color = Colors.green;
-        icon = Icons.check_circle_outline_rounded;
+        color = theme.colorScheme.primary;
+        icon = Icons.check_circle_rounded;
         break;
       case TaskStatus.cancelled:
         color = theme.colorScheme.error;
-        icon = Icons.block_flipped;
+        icon = Icons.block_rounded;
         break;
     }
 

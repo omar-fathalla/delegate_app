@@ -21,6 +21,8 @@ void main() {
     taskId: 'task123',
     isRead: false,
     createdAt: tDateTime,
+    senderName: 'محمد أحمد',
+    senderRole: 'superAdmin',
   );
 
   test('should be a subclass of NotificationEntity', () {
@@ -29,20 +31,22 @@ void main() {
   });
 
   group('fromFirestore', () {
-    test('should return a valid model when creating from DocumentSnapshot', () {
+    test('should return a valid model with sender info and sanitized text', () {
       // Arrange
       final Map<String, dynamic> data = {
         'delegateUid': 'delegate123',
         'organizationId': 'org123',
         'companyId': 'company123',
-        'title': 'Test Notification',
-        'body': 'Notification body',
+        'title': '✅ Test Notification',
+        'body': '🚨 Notification body',
         'type': 'general',
         'taskId': 'task123',
         'isRead': false,
         'createdAt': tTimestamp,
+        'senderName': 'محمد أحمد',
+        'senderRole': 'superAdmin',
       };
-      
+
       final mockDocumentSnapshot = MockDocumentSnapshot();
       when(() => mockDocumentSnapshot.data()).thenReturn(data);
       when(() => mockDocumentSnapshot.id).thenReturn('notification123');
@@ -51,12 +55,16 @@ void main() {
       final result = NotificationModel.fromFirestore(mockDocumentSnapshot);
 
       // Assert
+      expect(result.title, 'Test Notification');
+      expect(result.body, 'Notification body');
+      expect(result.senderName, 'محمد أحمد');
+      expect(result.senderRole, 'superAdmin');
       expect(result, equals(tNotificationModel));
     });
   });
 
   group('toFirestore', () {
-    test('should return a JSON map containing the proper data', () {
+    test('should return a JSON map containing the proper data with sender info', () {
       // Act
       final result = tNotificationModel.toFirestore();
 
@@ -74,8 +82,27 @@ void main() {
         'read': false,
         'createdAt': tTimestamp,
         'deletedBy': const [],
+        'senderName': 'محمد أحمد',
+        'senderRole': 'superAdmin',
       };
       expect(result, equals(expectedMap));
+    });
+  });
+
+  group('role mapping & sanitization', () {
+    test('should map English role keys to Arabic correctly', () {
+      expect(NotificationModel.formatSenderRoleArabic('superAdmin'), 'سوبر أدمن');
+      expect(NotificationModel.formatSenderRoleArabic('organizationAdmin'), 'مسؤول المنظمة');
+      expect(NotificationModel.formatSenderRoleArabic('branchesMarketingManager'), 'مسؤول تسويق الفروع');
+      expect(NotificationModel.formatSenderRoleArabic('technicalSupport'), 'الدعم الفني');
+      expect(NotificationModel.formatSenderRoleArabic('supervisor'), 'مشرف الشركة');
+      expect(NotificationModel.formatSenderRoleArabic('delegate'), 'مندوب');
+    });
+
+    test('should sanitize emojis completely', () {
+      expect(NotificationModel.sanitizeText('✅ اعتماد نهائي للغرامة'), 'اعتماد نهائي للغرامة');
+      expect(NotificationModel.sanitizeText('🚨 تسجيل مخالفة جديدة بحقك'), 'تسجيل مخالفة جديدة بحقك');
+      expect(NotificationModel.sanitizeText('إيداع رصيد في محفظتك 💰'), 'إيداع رصيد في محفظتك');
     });
   });
 }

@@ -55,7 +55,7 @@ class _AdminFeedbacksView extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, size: 48, color: colorScheme.error),
+                  Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
                   const SizedBox(height: 16),
                   Text(state.message, textAlign: TextAlign.center),
                   const SizedBox(height: 16),
@@ -77,7 +77,7 @@ class _AdminFeedbacksView extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.feedback_outlined,
+                      Icons.feedback_rounded,
                       size: 80,
                       color: colorScheme.onSurfaceVariant,
                     ),

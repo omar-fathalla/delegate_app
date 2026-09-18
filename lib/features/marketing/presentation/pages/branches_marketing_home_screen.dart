@@ -150,23 +150,11 @@ class _BranchesMarketingHomeScreenState
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primary,
-            colorScheme.primary.withValues(alpha: 0.85),
-            const Color(0xFF6D4C41), // Deep bronze accent
-          ],
-          begin: AlignmentDirectional.topStart,
-          end: AlignmentDirectional.bottomEnd,
+        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.18),
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -176,13 +164,21 @@ class _BranchesMarketingHomeScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // الأيقونة والرمز الدائري
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: Colors.white.withValues(alpha: 0.22),
-                child: const Icon(
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colorScheme.primary.withValues(alpha: 0.3),
+                    width: 2,
+                  ),
+                ),
+                child: Icon(
                   Icons.campaign_rounded,
-                  color: Colors.white,
-                  size: 30,
+                  color: colorScheme.primary,
+                  size: 28,
                 ),
               ),
               const SizedBox(width: 14),
@@ -196,16 +192,16 @@ class _BranchesMarketingHomeScreenState
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       displayName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: colorScheme.onSurface,
                         letterSpacing: 0.2,
                       ),
                       maxLines: 1,
@@ -219,30 +215,30 @@ class _BranchesMarketingHomeScreenState
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
+                        color: colorScheme.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: colorScheme.primary.withValues(alpha: 0.25),
                           width: 1,
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.storefront_rounded,
                             size: 13,
-                            color: Colors.white,
+                            color: colorScheme.primary,
                           ),
                           const SizedBox(width: 5),
                           Text(
                             isArabic
                                 ? 'مدير تسويق الفروع'
                                 : 'Branches Marketing Manager',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: colorScheme.primary,
                             ),
                           ),
                         ],
@@ -255,7 +251,7 @@ class _BranchesMarketingHomeScreenState
           ),
 
           const SizedBox(height: 14),
-          Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
+          Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.35), height: 1),
           const SizedBox(height: 12),
 
           // شريط التاريخ والمنظمة
@@ -268,7 +264,7 @@ class _BranchesMarketingHomeScreenState
                   Icon(
                     Icons.calendar_today_rounded,
                     size: 13,
-                    color: Colors.white.withValues(alpha: 0.85),
+                    color: colorScheme.primary,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -276,7 +272,7 @@ class _BranchesMarketingHomeScreenState
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -290,7 +286,7 @@ class _BranchesMarketingHomeScreenState
                       Icon(
                         Icons.corporate_fare_rounded,
                         size: 13,
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: colorScheme.primary,
                       ),
                       const SizedBox(width: 4),
                       Flexible(
@@ -299,7 +295,7 @@ class _BranchesMarketingHomeScreenState
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.95),
+                            color: colorScheme.onSurface,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -343,14 +339,14 @@ class _BranchesMarketingHomeScreenState
                   ),
                   decoration: BoxDecoration(
                     color: pendingCount > 0
-                        ? Colors.amber.withValues(alpha: 0.12)
+                        ? colorScheme.tertiaryContainer.withValues(alpha: 0.35)
                         : colorScheme.surfaceContainerHighest.withValues(
                             alpha: 0.5,
                           ),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: pendingCount > 0
-                          ? Colors.amber.shade700.withValues(alpha: 0.4)
+                          ? colorScheme.tertiary.withValues(alpha: 0.5)
                           : colorScheme.outlineVariant.withValues(alpha: 0.6),
                       width: 1.2,
                     ),
@@ -361,14 +357,14 @@ class _BranchesMarketingHomeScreenState
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: pendingCount > 0
-                              ? Colors.amber.shade700.withValues(alpha: 0.18)
+                              ? colorScheme.tertiaryContainer
                               : colorScheme.surface,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.pending_actions_rounded,
                           color: pendingCount > 0
-                              ? Colors.amber.shade900
+                              ? colorScheme.onTertiaryContainer
                               : colorScheme.onSurfaceVariant,
                           size: 20,
                         ),
@@ -384,7 +380,7 @@ class _BranchesMarketingHomeScreenState
                                 fontSize: 17,
                                 fontWeight: FontWeight.bold,
                                 color: pendingCount > 0
-                                    ? Colors.amber.shade900
+                                    ? colorScheme.tertiary
                                     : colorScheme.onSurface,
                               ),
                             ),
@@ -584,7 +580,7 @@ class _BranchesMarketingHomeScreenState
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: colorScheme.shadow.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -731,7 +727,7 @@ class _BranchesMarketingHomeScreenState
         _buildToolItemCard(
           context: context,
           icon: Icons.person_search_rounded,
-          iconColor: Colors.blue.shade700,
+          iconColor: colorScheme.primary,
           title: isArabic ? 'الاستعلامات والبحث' : 'Search & Verify',
           subtitle: isArabic ? 'كود الشركة أو هاتف المندوب' : 'Find company/delegate',
           onTap: () {
@@ -759,7 +755,7 @@ class _BranchesMarketingHomeScreenState
         _buildToolItemCard(
           context: context,
           icon: Icons.campaign_rounded,
-          iconColor: Colors.deepOrange.shade700,
+          iconColor: colorScheme.tertiary,
           title: isArabic ? 'إرسال إشعار' : 'Broadcast Alert',
           subtitle: isArabic ? 'تنبيه فوري للمناديب' : 'Push notifications',
           onTap: () {
@@ -777,7 +773,7 @@ class _BranchesMarketingHomeScreenState
         _buildToolItemCard(
           context: context,
           icon: Icons.task_alt_rounded,
-          iconColor: const Color(0xFF7C3AED),
+          iconColor: colorScheme.secondary,
           title: isArabic ? 'إدارة المهام' : 'Tasks',
           subtitle: isArabic ? 'متابعة وتكليف' : 'Dispatch & track',
           onTap: () {

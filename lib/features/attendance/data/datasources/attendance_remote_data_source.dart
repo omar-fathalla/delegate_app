@@ -601,8 +601,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
       final bool isCheckIn = type == 'check_in';
       final title = isCheckIn
-          ? '🟢 تسجيل حضور مندوب: $delegateName'
-          : '🔴 تسجيل انصراف مندوب: $delegateName';
+          ? 'تسجيل حضور مندوب: $delegateName'
+          : 'تسجيل انصراف مندوب: $delegateName';
       final body = isCheckIn
           ? 'قام المندوب $delegateName بتسجيل الحضور بنجاح في فرع ($safeBranchName) الساعة $formattedTime.'
           : 'قام المندوب $delegateName بتسجيل الانصراف بنجاح من فرع ($safeBranchName) الساعة $formattedTime.';
@@ -642,6 +642,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
                 'branchName': safeBranchName,
                 'targetDelegateId': userId,
                 'targetDelegateName': delegateName,
+                'senderName': delegateName,
+                'senderRole': 'delegate',
                 'delegateUid': doc.id,
                 if (phone != null && phone.isNotEmpty) 'phoneNumber': phone,
                 'isRead': false,
@@ -670,6 +672,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           'branchName': safeBranchName,
           'targetDelegateId': userId,
           'targetDelegateName': delegateName,
+          'senderName': delegateName,
+          'senderRole': 'delegate',
           'delegateUid': targetKey,
           'isRead': false,
           'read': false,

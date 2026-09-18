@@ -23,6 +23,10 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_delegate_form_screen.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:delegate_app/core/providers/locale_provider.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -74,9 +78,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
               ? widget.adminDelegate.companyName
               : widget.adminDelegate.organizationUID);
 
-  bool get _isArabic => mounted
-      ? ((Localizations.maybeLocaleOf(context)?.languageCode ?? 'ar') == 'ar')
-      : true;
+  bool get _isArabic => sl<LocaleProvider>().isArabic;
 
   Future<void> _loadCachedAndFreshOrganizations({bool forceRefresh = false}) async {
     final key = _cacheKey;
@@ -193,19 +195,30 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
       // If still only 1 org, check if company is registered in other organizations
       if (widget.adminDelegate.companyUID.isNotEmpty) {
         try {
-          final orgsSnap = await FirebaseFirestore.instance.collection('organizations').get();
-          for (final orgDoc in orgsSnap.docs) {
-            final cDoc = await FirebaseFirestore.instance
-                .collection('organizations')
-                .doc(orgDoc.id)
-                .collection('companies')
-                .doc(widget.adminDelegate.companyUID)
-                .get();
-            if (cDoc.exists) {
-              final orgName = orgDoc.data()['name']?.toString() ?? '';
-              final norm = _normalizeOrgName(orgName, isArabic);
-              if (norm.isNotEmpty) collected.add(norm);
-            }
+          final orgsSnap = await FirebaseFirestore.instance
+              .collection('organizations')
+              .get()
+              .timeout(const Duration(seconds: 4));
+          final futures = orgsSnap.docs.map((orgDoc) async {
+            try {
+              final cDoc = await FirebaseFirestore.instance
+                  .collection('organizations')
+                  .doc(orgDoc.id)
+                  .collection('companies')
+                  .doc(widget.adminDelegate.companyUID)
+                  .get()
+                  .timeout(const Duration(seconds: 3));
+              if (cDoc.exists) {
+                final orgName = orgDoc.data()['name']?.toString() ?? '';
+                final norm = _normalizeOrgName(orgName, isArabic);
+                if (norm.isNotEmpty) return norm;
+              }
+            } catch (_) {}
+            return null;
+          });
+          final results = await Future.wait(futures);
+          for (final norm in results) {
+            if (norm != null && norm.isNotEmpty) collected.add(norm);
           }
         } catch (_) {}
       }
@@ -937,7 +950,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isArabic ? 'أهلاً بك، $displayName 👋' : 'Welcome, $displayName 👋',
+                      isArabic ? 'أهلاً بك، $displayName' : 'Welcome, $displayName',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -969,67 +982,96 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                     ],
-                    // شارة المسمى الوظيفي ورُقاقات المنظمات التابع لها مناديب المشرف
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
+                    // شارة المسمى الوظيفي (على صف بمفرده)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            roleIcon,
+                            size: 14,
+                            color: Colors.white,
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.3),
-                              width: 1,
+                          const SizedBox(width: 6),
+                          Text(
+                            roleBadge,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                roleIcon,
-                                size: 14,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                roleBadge,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (_isCompanySupervisor)
-                          ..._supervisorOrganizations.map(
-                            (org) => _buildOrgBadgeChip(org, isArabic),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
+                    // رُقاقات سلاسل المنظمات التابع لها مناديب المشرف (صف منفصل متصل يلتف معاً)
+                    if (_isCompanySupervisor && _supervisorOrganizations.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: _supervisorOrganizations.map(
+                          (org) => _buildOrgBadgeChip(org, isArabic),
+                        ).toList(),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              // أيقونة بروفايل دائرية
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: Colors.white.withValues(alpha: 0.22),
-                child: Icon(
-                  isOrgAdmin || isSuperAdmin
-                      ? Icons.shield_rounded
-                      : Icons.person_pin_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
+              // صورة البروفايل بالأفاتار الدائري
+              Builder(
+                builder: (context) {
+                  final photoUrl = widget.adminDelegate.personalPhotoUrl ??
+                      (widget.adminDelegate.documents
+                          .where((d) =>
+                              d.documentKey == DocumentKey.personalPhoto &&
+                              d.documentURL.isNotEmpty)
+                          .firstOrNull
+                          ?.documentURL) ??
+                      FirebaseAuth.instance.currentUser?.photoURL;
+
+                  return Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: AppAvatar(
+                      imageUrl: photoUrl,
+                      fallbackText: widget.adminDelegate.firstName,
+                      radius: 26,
+                      backgroundColor: Colors.white.withValues(alpha: 0.22),
+                      foregroundColor: Colors.white,
+                      fallbackIcon: isOrgAdmin || isSuperAdmin
+                          ? Icons.shield_rounded
+                          : Icons.person_pin_rounded,
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -1973,9 +2015,9 @@ class _AttendanceDetailsBottomSheetState
                   ChoiceChip(
                     label: Text('الحاضرون اليوم ($checkedInCount)'),
                     selected: _filter == 'checked_in',
-                    selectedColor: Colors.green.withValues(alpha: 0.2),
+                    selectedColor: colorScheme.primaryContainer,
                     labelStyle: TextStyle(
-                      color: _filter == 'checked_in' ? Colors.green : null,
+                      color: _filter == 'checked_in' ? colorScheme.onPrimaryContainer : null,
                       fontWeight: FontWeight.bold,
                     ),
                     onSelected: (selected) {
@@ -1986,9 +2028,9 @@ class _AttendanceDetailsBottomSheetState
                   ChoiceChip(
                     label: Text('الغائبون اليوم ($absentCount)'),
                     selected: _filter == 'absent',
-                    selectedColor: Colors.red.withValues(alpha: 0.2),
+                    selectedColor: colorScheme.errorContainer,
                     labelStyle: TextStyle(
-                      color: _filter == 'absent' ? Colors.red : null,
+                      color: _filter == 'absent' ? colorScheme.onErrorContainer : null,
                       fontWeight: FontWeight.bold,
                     ),
                     onSelected: (selected) {
@@ -2058,124 +2100,143 @@ class _AttendanceDetailsBottomSheetState
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
+                              clipBehavior: Clip.antiAlias,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 side: BorderSide(
                                   color: isCheckedIn
-                                      ? Colors.green.withValues(alpha: 0.3)
+                                      ? colorScheme.primary.withValues(alpha: 0.3)
                                       : colorScheme.outlineVariant.withValues(alpha: 0.5),
                                 ),
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(14),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        CircleAvatar(
-                                          backgroundColor: isCheckedIn
-                                              ? Colors.green.withValues(alpha: 0.15)
-                                              : colorScheme.surfaceContainerHighest,
-                                          child: Text(
-                                            item.delegate.fullName.isNotEmpty
-                                                ? item.delegate.fullName[0]
-                                                : 'D',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: isCheckedIn ? Colors.green : colorScheme.onSurfaceVariant,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                item.delegate.fullName,
-                                                style: theme.textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                'الهاتف: ${item.delegate.phoneNumber}',
-                                                style: theme.textTheme.bodySmall?.copyWith(
-                                                  color: colorScheme.onSurfaceVariant,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: isCheckedIn
-                                                ? Colors.green.withValues(alpha: 0.12)
-                                                : Colors.red.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            isCheckedIn ? 'حاضر 🟢' : 'غائب 🔴',
-                                            style: TextStyle(
-                                              color: isCheckedIn ? Colors.green : Colors.red,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => AttendanceScreen(
+                                        delegate: item.delegate,
+                                        viewOnly: true,
+                                      ),
                                     ),
-                                    if (isCheckedIn) ...[
-                                      const Divider(height: 20),
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
                                       Row(
                                         children: [
-                                          Icon(Icons.login_rounded, size: 16, color: Colors.green.shade700),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'الحضور: ${timeFormat.format(item.checkInTime!)}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13,
+                                          AppAvatar(
+                                            imageUrl: item.delegate.personalPhotoUrl,
+                                            fallbackText: item.delegate.firstName.isNotEmpty
+                                                ? item.delegate.firstName
+                                                : item.delegate.fullName,
+                                            radius: 20,
+                                            backgroundColor: isCheckedIn
+                                                ? colorScheme.primaryContainer
+                                                : colorScheme.surfaceContainerHighest,
+                                            foregroundColor: isCheckedIn
+                                                ? colorScheme.primary
+                                                : colorScheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  item.delegate.fullName,
+                                                  style: theme.textTheme.titleMedium?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  'الهاتف: ${item.delegate.phoneNumber}',
+                                                  style: theme.textTheme.bodySmall?.copyWith(
+                                                    color: colorScheme.onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                          const SizedBox(width: 16),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: isCheckedIn
+                                                  ? colorScheme.primaryContainer
+                                                  : colorScheme.errorContainer,
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              isCheckedIn ? 'حاضر' : 'غائب',
+                                              style: TextStyle(
+                                                color: isCheckedIn ? colorScheme.onPrimaryContainer : colorScheme.onErrorContainer,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
                                           Icon(
-                                            Icons.logout_rounded,
-                                            size: 16,
-                                            color: item.checkOutTime != null ? Colors.orange.shade700 : Colors.grey,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            item.checkOutTime != null
-                                                ? 'الانصراف: ${timeFormat.format(item.checkOutTime!)}'
-                                                : 'لم يسجل انصراف بعد',
-                                            style: TextStyle(
-                                              fontWeight: item.checkOutTime != null ? FontWeight.bold : FontWeight.normal,
-                                              fontSize: 13,
-                                              color: item.checkOutTime != null ? Colors.black87 : Colors.grey.shade700,
-                                            ),
+                                            Icons.arrow_forward_ios_rounded,
+                                            size: 14,
+                                            color: colorScheme.outline.withValues(alpha: 0.6),
                                           ),
                                         ],
                                       ),
-                                      if (item.branchName != null && item.branchName!.isNotEmpty) ...[
-                                        const SizedBox(height: 6),
+                                      if (isCheckedIn) ...[
+                                        const Divider(height: 20),
                                         Row(
                                           children: [
-                                            Icon(Icons.location_on_rounded, size: 16, color: colorScheme.primary),
+                                            Icon(Icons.login_rounded, size: 16, color: colorScheme.primary),
                                             const SizedBox(width: 6),
                                             Text(
-                                              'الفرع: ${item.branchName}',
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                fontWeight: FontWeight.w600,
+                                              'الحضور: ${timeFormat.format(item.checkInTime!)}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            Icon(
+                                              Icons.logout_rounded,
+                                              size: 16,
+                                              color: item.checkOutTime != null ? colorScheme.secondary : colorScheme.outline,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              item.checkOutTime != null
+                                                  ? 'الانصراف: ${timeFormat.format(item.checkOutTime!)}'
+                                                  : 'لم يسجل انصراف بعد',
+                                              style: TextStyle(
+                                                fontWeight: item.checkOutTime != null ? FontWeight.bold : FontWeight.normal,
+                                                fontSize: 13,
+                                                color: item.checkOutTime != null ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
                                               ),
                                             ),
                                           ],
                                         ),
+                                        if (item.branchName != null && item.branchName!.isNotEmpty) ...[
+                                          const SizedBox(height: 6),
+                                          Row(
+                                            children: [
+                                              Icon(Icons.location_on_rounded, size: 16, color: colorScheme.primary),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'الفرع: ${item.branchName}',
+                                                style: theme.textTheme.bodySmall?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ],
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ),
                             );

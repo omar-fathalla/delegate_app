@@ -233,14 +233,19 @@ class DeviceBindingService {
       if (delegate.organizationUID.isNotEmpty &&
           delegate.companyUID.isNotEmpty &&
           delegate.uid.isNotEmpty) {
-        await _firestore
+        final docRef = _firestore
             .collection('organizations')
             .doc(delegate.organizationUID)
             .collection('companies')
             .doc(delegate.companyUID)
             .collection('delegates')
-            .doc(delegate.uid)
-            .update({'deviceLastSeenAt': FieldValue.serverTimestamp()});
+            .doc(delegate.uid);
+        final snap = await docRef.get().timeout(const Duration(seconds: 3));
+        if (snap.exists) {
+          await docRef.update({
+            'deviceLastSeenAt': FieldValue.serverTimestamp(),
+          }).timeout(const Duration(seconds: 3));
+        }
       }
     } catch (_) {}
   }

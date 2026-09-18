@@ -91,10 +91,14 @@ class _SuperAdminPermissionsReportScreenState
       }
     } catch (e) {
       if (mounted) {
+        final colorScheme = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('فشل في تصدير التقرير، يرجى المحاولة لاحقاً.'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: Text(
+              'فشل في تصدير التقرير، يرجى المحاولة لاحقاً.',
+              style: TextStyle(color: colorScheme.onError),
+            ),
+            backgroundColor: colorScheme.error,
           ),
         );
       }
@@ -109,7 +113,17 @@ class _SuperAdminPermissionsReportScreenState
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
+        backgroundColor: colorScheme.surfaceContainer,
+        elevation: 0,
+        scrolledUnderElevation: 2.0,
+        shape: Border(
+          bottom: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
         title: const Text(
           'تقرير أذونات التصوير المالي',
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -177,15 +191,15 @@ class _SuperAdminPermissionsReportScreenState
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.analytics_outlined,
+                    Icon(
+                      Icons.analytics_rounded,
                       size: 64,
-                      color: Colors.grey,
+                      color: colorScheme.outline,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'لا توجد شركات لديها أذونات تصوير نشطة حالياً.',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                      style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -273,7 +287,7 @@ class _SuperAdminPermissionsReportScreenState
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(16.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                           color: colorScheme.surfaceContainerHighest,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -284,15 +298,10 @@ class _SuperAdminPermissionsReportScreenState
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              FilledButton.icon(
+                              IconButton.filledTonal(
                                 onPressed: () => _exportToCSV(activePermissions),
                                 icon: const Icon(Icons.file_download_rounded),
-                                label: const Text('تصدير Excel'),
-                                style: FilledButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
+                                tooltip: 'تصدير Excel',
                               ),
                             ],
                           ),

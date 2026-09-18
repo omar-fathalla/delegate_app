@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/penalties/data/models/penalty_rule_model.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
 
 class StandardViolation {
@@ -8,6 +9,8 @@ class StandardViolation {
   final String action1;
   final String? action2;
   final ViolationCategory category;
+  final bool isConfidential;
+  final String? ruleId;
 
   const StandardViolation({
     required this.id,
@@ -17,7 +20,23 @@ class StandardViolation {
     required this.action1,
     this.action2,
     required this.category,
+    this.isConfidential = false,
+    this.ruleId,
   });
+
+  factory StandardViolation.fromRule(PenaltyRuleModel rule, int fallbackId) {
+    return StandardViolation(
+      id: int.tryParse(rule.id.replaceAll(RegExp(r'[^0-9]'), '')) ?? fallbackId,
+      title: rule.title,
+      defaultFine: rule.defaultFine,
+      repeatedFine: rule.repeatedFine,
+      action1: '${rule.defaultFine.toStringAsFixed(0)} ج.م',
+      action2: rule.repeatedFine != null ? '${rule.repeatedFine!.toStringAsFixed(0)} ج.م' : null,
+      category: rule.category,
+      isConfidential: rule.isConfidential,
+      ruleId: rule.id,
+    );
+  }
 }
 
 const List<StandardViolation> officialViolationsSchedule = [

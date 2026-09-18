@@ -10,6 +10,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/wallet/presentation/pages/super_admin_wallets_screen.dart';
+import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
+import 'package:delegate_app/features/wallet/data/models/user_wallet_model.dart';
 
 /// صفحة ومنظومة التحصيلات والفواتير الرسمية المعكوسة على الرصيد المتبقي مع الطباعة والمشاركة
 class SuperAdminCollectionsScreen extends StatefulWidget {
@@ -411,6 +414,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         textDirection: TextDirection.ltr,
         child: StatefulBuilder(
           builder: (dialogContext, setDialogState) {
+            final dialogColorScheme = Theme.of(ctx).colorScheme;
             final rQty = int.tryParse(receiptsCountController.text) ?? 0;
             final rAmt = double.tryParse(receiptsAmountController.text) ?? (rQty * _receiptUnitPrice);
 
@@ -436,16 +440,16 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   Container(
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.15),
+                      color: dialogColorScheme.primaryContainer,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.add_card_rounded, color: Colors.green, size: 22),
+                    child: Icon(Icons.add_card_rounded, color: dialogColorScheme.onPrimaryContainer, size: 22),
                   ),
                   const SizedBox(width: 10),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Record Collection & Deduction',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: dialogColorScheme.onSurface),
                     ),
                   ),
                 ],
@@ -461,9 +465,9 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.blue.shade200),
+                          color: dialogColorScheme.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: dialogColorScheme.outlineVariant.withValues(alpha: 0.6)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,19 +475,19 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Row(
+                                Row(
                                   children: [
-                                    Icon(Icons.account_balance_wallet_rounded, size: 14, color: Colors.blue),
-                                    SizedBox(width: 5),
+                                    Icon(Icons.account_balance_wallet_rounded, size: 14, color: dialogColorScheme.primary),
+                                    const SizedBox(width: 5),
                                     Text(
                                       'Current Outstanding Balance:',
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue),
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: dialogColorScheme.primary),
                                     ),
                                   ],
                                 ),
                                 Text(
                                   _formatCurrency(_remainingBalanceAmount),
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade900),
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: dialogColorScheme.primary),
                                 ),
                               ],
                             ),
@@ -494,21 +498,21 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                               children: [
                                 Text(
                                   '• Receipts: $_remainingReceiptsCount (${_formatAmountOnly(_remainingReceiptsAmount)} EGP)',
-                                  style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                  style: TextStyle(fontSize: 10, color: dialogColorScheme.onSurface),
                                 ),
                                 Text(
                                   '• Ad Cos: $_remainingAdCompaniesCount (${_formatAmountOnly(_remainingAdCompanyAmount)} EGP)',
-                                  style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                  style: TextStyle(fontSize: 10, color: dialogColorScheme.onSurface),
                                 ),
                                 if (_eventsAnalyticsTotalAmount > 0 || _eventsAnalyticsUnitPrice > 0)
                                   Text(
                                     '• Events Analytics: $_remainingEventsAnalyticsCount (${_formatAmountOnly(_remainingEventsAnalyticsAmount)} EGP)',
-                                    style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                    style: TextStyle(fontSize: 10, color: dialogColorScheme.onSurface),
                                   ),
                                 if (_settlementAmount > 0)
                                   Text(
                                     '• Settlement: ${_formatAmountOnly(_remainingSettlementAmount)} EGP',
-                                    style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                    style: TextStyle(fontSize: 10, color: dialogColorScheme.onSurface),
                                   ),
                               ],
                             ),
@@ -517,30 +521,30 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       ),
                       const SizedBox(height: 12),
 
-                      // Stream 1: Electronic Payment Receipts (إيصالات الدفع الإلكتروني)
+                      // Stream 1: Electronic Payment Receipts
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: dialogColorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: dialogColorScheme.outlineVariant.withValues(alpha: 0.5)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.receipt_long_rounded, size: 16, color: Colors.indigo),
+                                Icon(Icons.receipt_long_rounded, size: 16, color: dialogColorScheme.primary),
                                 const SizedBox(width: 6),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
                                     '1. Electronic Payment Receipts',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.indigo),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: dialogColorScheme.primary),
                                   ),
                                 ),
                                 Text(
                                   'Rem: $_remainingReceiptsCount',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                                  style: TextStyle(fontSize: 10, color: dialogColorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
                                 ),
                               ],
                             ),
@@ -593,30 +597,30 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       ),
                       const SizedBox(height: 10),
 
-                      // Stream 2: Advertising Company Subscription (تكويد واشتراك شركات الدعاية)
+                      // Stream 2: Advertising Company Subscription
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: dialogColorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: dialogColorScheme.outlineVariant.withValues(alpha: 0.5)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.campaign_rounded, size: 16, color: Colors.deepOrange),
+                                Icon(Icons.campaign_rounded, size: 16, color: dialogColorScheme.secondary),
                                 const SizedBox(width: 6),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
                                     '2. Advertising Companies Subscription',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.deepOrange),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: dialogColorScheme.secondary),
                                   ),
                                 ),
                                 Text(
                                   'Rem: $_remainingAdCompaniesCount',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                                  style: TextStyle(fontSize: 10, color: dialogColorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
                                 ),
                               ],
                             ),
@@ -669,30 +673,30 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       ),
                       const SizedBox(height: 10),
 
-                      // Stream 3: Events Analytics Software (برنامج تحليل الإيفنتات)
+                      // Stream 3: Events Analytics Software
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: dialogColorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: dialogColorScheme.outlineVariant.withValues(alpha: 0.5)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.analytics_rounded, size: 16, color: Colors.purple),
+                                Icon(Icons.analytics_rounded, size: 16, color: dialogColorScheme.tertiary),
                                 const SizedBox(width: 6),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
                                     '3. Events Analytics Software',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.purple),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: dialogColorScheme.tertiary),
                                   ),
                                 ),
                                 Text(
                                   'Rem: $_remainingEventsAnalyticsCount',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                                  style: TextStyle(fontSize: 10, color: dialogColorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
                                 ),
                               ],
                             ),
@@ -745,31 +749,31 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       ),
                       const SizedBox(height: 10),
 
-                      // Stream 4: Settlement & Additional Adjustments (التسويات والإيرادات الإضافية)
+                      // Stream 4: Settlement & Additional Adjustments
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: dialogColorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: dialogColorScheme.outlineVariant.withValues(alpha: 0.5)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.balance_rounded, size: 16, color: Colors.teal),
+                                Icon(Icons.balance_rounded, size: 16, color: dialogColorScheme.primary),
                                 const SizedBox(width: 6),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
                                     '4. Settlement & Adjustments',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.teal),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: dialogColorScheme.primary),
                                   ),
                                 ),
                                 if (_settlementAmount > 0)
                                   Text(
                                     'Rem: ${_formatAmountOnly(_remainingSettlementAmount)}',
-                                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                                    style: TextStyle(fontSize: 10, color: dialogColorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
                                   ),
                               ],
                             ),
@@ -796,23 +800,23 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade50,
+                          color: dialogColorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green.shade300),
+                          border: Border.all(color: dialogColorScheme.outlineVariant.withValues(alpha: 0.5)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            Text(
                               'Total Collection Entry:',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.green),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: dialogColorScheme.onPrimaryContainer),
                             ),
                             Text(
                               _formatCurrency(totalEntryAmount),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
-                                color: Colors.green.shade900,
+                                color: dialogColorScheme.primary,
                               ),
                             ),
                           ],
@@ -867,10 +871,10 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   onPressed: () => Navigator.pop(ctx),
                   child: const Text('Cancel', style: TextStyle(fontSize: 12)),
                 ),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade700,
-                    foregroundColor: Colors.white,
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: dialogColorScheme.primary,
+                    foregroundColor: dialogColorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
@@ -893,9 +897,9 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
                     if (recQty <= 0 && recAmt <= 0 && adQty <= 0 && adAmt <= 0 && evQty <= 0 && evAmt <= 0 && setAmt <= 0 && totalAmt <= 0) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter at least one collection quantity or amount.'),
-                          backgroundColor: Colors.red,
+                        SnackBar(
+                          content: const Text('Please enter at least one collection quantity or amount.'),
+                          backgroundColor: dialogColorScheme.error,
                         ),
                       );
                       return;
@@ -943,7 +947,6 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                               '${evQty > 0 ? ' ($evQty events analytics)' : ''}'
                               '${setAmt > 0 ? ' (settlement: ${_formatAmountOnly(setAmt)} EGP)' : ''}.',
                             ),
-                            backgroundColor: Colors.green,
                           ),
                         );
                         _fetchBillingAndCollectionsData();
@@ -953,7 +956,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         messenger.showSnackBar(
                           SnackBar(
                             content: Text('Error saving collection: $e'),
-                            backgroundColor: Colors.red,
+                            backgroundColor: dialogColorScheme.error,
                           ),
                         );
                       }
@@ -981,17 +984,20 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     required double settlementAmount,
     required double totalAmount,
   }) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.ltr,
         child: AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 22),
-              SizedBox(width: 8),
-              Text('Confirm Deletion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Icon(Icons.warning_amber_rounded, color: colorScheme.error, size: 22),
+              const SizedBox(width: 8),
+              const Text('Confirm Deletion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ],
           ),
           content: Column(
@@ -1006,7 +1012,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -1034,8 +1040,11 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancel'),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('Delete'),
             ),
@@ -1057,7 +1066,6 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Collection entry deleted and balances restored.'),
-              backgroundColor: Colors.green,
             ),
           );
           _fetchBillingAndCollectionsData();
@@ -1067,7 +1075,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error deleting collection entry: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: colorScheme.error,
             ),
           );
         }
@@ -1112,7 +1120,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error printing invoice: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -1147,7 +1155,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error sharing invoice: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -1176,6 +1184,9 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     final marketPercController =
         TextEditingController(text: _marketPercentage.toStringAsFixed(0));
 
+    final settingsTheme = Theme.of(context);
+    final settingsColorScheme = settingsTheme.colorScheme;
+
     showDialog(
       context: context,
       builder: (ctx) => Directionality(
@@ -1185,11 +1196,11 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.tune_rounded, color: Colors.blue, size: 22),
-                SizedBox(width: 8),
-                Text(
+                Icon(Icons.tune_rounded, color: settingsColorScheme.primary, size: 22),
+                const SizedBox(width: 8),
+                const Text(
                   'Pricing & Ratios Settings',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
@@ -1349,12 +1360,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Cancel'),
               ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade800,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
+              FilledButton(
                 onPressed: () {
                   final rPrice = double.tryParse(receiptPriceController.text) ?? 100.0;
                   final aPrice = double.tryParse(adPriceController.text) ?? 20000.0;
@@ -1430,6 +1436,24 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
           ),
           actions: [
             IconButton(
+              icon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
+              tooltip: 'إدارة محافظ المستحقات (Wallets)',
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SuperAdminWalletsScreen(
+                      adminDelegate: widget.delegate,
+                      initialRemainingBalance: _remainingBalanceAmount,
+                      initialPeriodKey: _periodKey,
+                    ),
+                  ),
+                );
+              },
+            ),
+            IconButton(
               icon: const Icon(Icons.tune_rounded, size: 20),
               tooltip: 'Pricing & Ratios Settings',
               padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1463,9 +1487,9 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _showAddCollectionDialog,
           icon: const Icon(Icons.add_card_rounded, size: 20),
-          label: const Text('Record Collection & Deduction', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          backgroundColor: Colors.green.shade700,
-          foregroundColor: Colors.white,
+          label: const Text('Record', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          backgroundColor: colorScheme.primary,
+          foregroundColor: colorScheme.onPrimary,
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -1476,11 +1500,11 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 44),
+                      Icon(Icons.error_outline_rounded, color: colorScheme.error, size: 44),
                       const SizedBox(height: 10),
                       Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
                       const SizedBox(height: 14),
-                      ElevatedButton(
+                      FilledButton(
                         onPressed: _fetchBillingAndCollectionsData,
                         child: const Text('Retry'),
                       ),
@@ -1510,70 +1534,76 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.description_rounded, color: Colors.indigo, size: 20),
-                              const SizedBox(width: 6),
-                              Text(
-                                _showRemainingInvoice ? 'Net Remaining Invoice ⏳' : 'Monthly Gross Invoice 📑',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                              ),
-                            ],
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Icon(Icons.description_rounded, color: colorScheme.primary, size: 20),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    _showRemainingInvoice ? 'Net Remaining Invoice' : 'Monthly Gross Invoice',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              FilledButton.tonalIcon(
+                              IconButton.filledTonal(
                                 onPressed: _printInvoice,
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                                icon: const Icon(Icons.print_rounded, size: 14),
-                                label: const Text('Print', style: TextStyle(fontSize: 11)),
+                                icon: const Icon(Icons.print_rounded, size: 18),
+                                tooltip: 'Print Invoice',
+                                constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                                padding: EdgeInsets.zero,
                               ),
                               const SizedBox(width: 6),
-                              FilledButton.tonalIcon(
+                              IconButton.filledTonal(
                                 onPressed: _shareInvoiceImage,
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                                icon: const Icon(Icons.share_rounded, size: 14),
-                                label: const Text('Share', style: TextStyle(fontSize: 11)),
+                                icon: const Icon(Icons.share_rounded, size: 18),
+                                tooltip: 'Share Invoice',
+                                constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                                padding: EdgeInsets.zero,
                               ),
                             ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
 
-                      // Switcher: Remaining vs Gross Total
-                      Row(
-                        children: [
-                          ChoiceChip(
-                            label: const Text('Net Remaining Invoice (Net)'),
-                            selected: _showRemainingInvoice,
-                            labelStyle: TextStyle(
-                              fontSize: 11,
-                              fontWeight: _showRemainingInvoice ? FontWeight.bold : FontWeight.normal,
+                      // Responsive M3 Segmented Button Switcher: Remaining vs Gross Total
+                      SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<bool>(
+                          segments: const [
+                            ButtonSegment<bool>(
+                              value: true,
+                              icon: Icon(Icons.hourglass_top_rounded, size: 16),
+                              label: Text(
+                                'Net Remaining',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
                             ),
-                            onSelected: (val) {
-                              if (val) setState(() => _showRemainingInvoice = true);
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          ChoiceChip(
-                            label: const Text('Monthly Gross Invoice'),
-                            selected: !_showRemainingInvoice,
-                            labelStyle: TextStyle(
-                              fontSize: 11,
-                              fontWeight: !_showRemainingInvoice ? FontWeight.bold : FontWeight.normal,
+                            ButtonSegment<bool>(
+                              value: false,
+                              icon: Icon(Icons.receipt_long_rounded, size: 16),
+                              label: Text(
+                                'Monthly Gross',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
                             ),
-                            onSelected: (val) {
-                              if (val) setState(() => _showRemainingInvoice = false);
-                            },
-                          ),
-                        ],
+                          ],
+                          selected: {_showRemainingInvoice},
+                          onSelectionChanged: (newSelection) {
+                            setState(() => _showRemainingInvoice = newSelection.first);
+                          },
+                        ),
                       ),
                       const SizedBox(height: 8),
 
@@ -1591,7 +1621,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.history_edu_rounded, color: Colors.teal, size: 20),
+                              Icon(Icons.history_edu_rounded, color: colorScheme.secondary, size: 20),
                               const SizedBox(width: 6),
                               Text(
                                 'Collection & Deduction Log (${_collectionTransactions.length})',
@@ -1624,7 +1654,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                           ),
                           child: Column(
                             children: [
-                              Icon(Icons.pending_actions_rounded, size: 36, color: Colors.grey.shade400),
+                              Icon(Icons.pending_actions_rounded, size: 36, color: colorScheme.outline),
                               const SizedBox(height: 6),
                               const Text(
                                 'No collection transactions recorded for this month.',
@@ -1632,7 +1662,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Tap "Record Collection & Deduction" below to deduct receipts and amounts.',
+                                'Tap "Record" below to deduct receipts and amounts.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(fontSize: 10.5, color: colorScheme.onSurfaceVariant),
                               ),
@@ -1663,46 +1693,52 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.15),
+              color: colorScheme.primaryContainer,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.calendar_month_rounded, color: Colors.blue, size: 18),
+            child: Icon(Icons.calendar_month_rounded, color: colorScheme.onPrimaryContainer, size: 20),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Service & Collection Period:',
-                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                  style: TextStyle(fontSize: 10.5, color: colorScheme.onSurfaceVariant),
                 ),
                 Text(
                   '$periodName ($periodCode)',
-                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 6),
           OutlinedButton.icon(
             onPressed: _pickServicePeriod,
             icon: const Icon(Icons.edit_calendar_rounded, size: 14),
-            label: const Text('Change Month', style: TextStyle(fontSize: 11)),
+            label: const Text('Change Month', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               visualDensity: VisualDensity.compact,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              side: BorderSide(color: colorScheme.outlineVariant),
             ),
           ),
         ],
@@ -1714,19 +1750,15 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
   Widget _buildTripleFinancialCards(ColorScheme colorScheme) {
     return Column(
       children: [
-        // 1. Grand Total Due Card
+        // 1. Grand Total Due Card (Material Design 3 Seed-Themed)
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1976D2)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: colorScheme.primary,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0D47A1).withValues(alpha: 0.2),
+                color: colorScheme.primary.withValues(alpha: 0.25),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -1738,82 +1770,27 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Total Due Collections (Grand Total)',
-                          style: TextStyle(color: Colors.white70, fontSize: 11),
+                          style: TextStyle(
+                            color: colorScheme.onPrimary.withValues(alpha: 0.75),
+                            fontSize: 11,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           _formatCurrency(_grandTotalDue),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 19,
+                          style: TextStyle(
+                            color: colorScheme.onPrimary,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (_eventsAnalyticsCount > 0 || _settlementAmount > 0) ...[
-                          const SizedBox(height: 5),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: [
-                              if (_eventsAnalyticsCount > 0)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.cyan.shade400.withValues(alpha: 0.25),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.cyan.shade300.withValues(alpha: 0.6)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.analytics_rounded, size: 12, color: Colors.cyanAccent),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '+${_formatAmountOnly(_eventsAnalyticsTotalAmount)} Events Soft.',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              if (_settlementAmount > 0)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber.shade400.withValues(alpha: 0.25),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.amber.shade300.withValues(alpha: 0.6)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.add_circle_outline_rounded, size: 12, color: Colors.amberAccent),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '+${_formatAmountOnly(_settlementAmount)} Settlement',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -1826,13 +1803,13 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: colorScheme.onPrimary.withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           '$_totalDueReceiptsCount Receipts',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colorScheme.onPrimary,
                             fontWeight: FontWeight.bold,
                             fontSize: 11,
                           ),
@@ -1842,13 +1819,13 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
+                            color: colorScheme.onPrimary.withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             '$_adCompanyCount Ad Cos',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: colorScheme.onPrimary,
                               fontWeight: FontWeight.w600,
                               fontSize: 9.5,
                             ),
@@ -1858,23 +1835,86 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              const Divider(color: Colors.white24, height: 1),
+              if (_eventsAnalyticsCount > 0 || _settlementAmount > 0) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    if (_eventsAnalyticsCount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: colorScheme.onPrimary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: colorScheme.onPrimary.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.analytics_outlined, size: 12, color: colorScheme.onPrimary),
+                            const SizedBox(width: 4),
+                            Text(
+                              '+${_formatAmountOnly(_eventsAnalyticsTotalAmount)} Events Soft.',
+                              style: TextStyle(
+                                color: colorScheme.onPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (_settlementAmount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: colorScheme.onPrimary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: colorScheme.onPrimary.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_circle_outline_rounded, size: 12, color: colorScheme.onPrimary),
+                            const SizedBox(width: 4),
+                            Text(
+                              '+${_formatAmountOnly(_settlementAmount)} Settlement',
+                              style: TextStyle(
+                                color: colorScheme.onPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 10),
+              Divider(color: colorScheme.onPrimary.withValues(alpha: 0.2), height: 1),
               const SizedBox(height: 8),
 
-              Row(
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 8,
+                runSpacing: 4,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Tashil (70%): ${_formatCurrency(_tashilDueAmount)}',
-                      style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
+                  Text(
+                    'Tashil (70%): ${_formatCurrency(_tashilDueAmount)}',
+                    style: TextStyle(
+                      color: colorScheme.onPrimary,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Expanded(
-                    child: Text(
-                      'Fathalla (30%): ${_formatCurrency(_marketDueAmount)}',
-                      style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
-                      textAlign: TextAlign.right,
+                  Text(
+                    'Fathalla (30%): ${_formatCurrency(_marketDueAmount)}',
+                    style: TextStyle(
+                      color: colorScheme.onPrimary,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -1885,53 +1925,78 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
         const SizedBox(height: 10),
 
-        // 2. Collected & Remaining Cards
+        // 2. Collected & Remaining Cards (Dynamic M3 ColorScheme Tonal Containers)
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Collected Card
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade800,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.shade800.withValues(alpha: 0.18),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+                  color: colorScheme.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Collected ✅',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
+                        Icon(Icons.check_circle_rounded, size: 15, color: colorScheme.onTertiaryContainer),
+                        const SizedBox(width: 4),
                         Text(
-                          '$_totalCollectedReceiptsCount Rec • $_totalCollectedAdCompaniesCount Ad${_totalCollectedEventsAnalyticsCount > 0 ? ' • $_totalCollectedEventsAnalyticsCount Ev' : ''}',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 9.5),
+                          'Collected',
+                          style: TextStyle(
+                            color: colorScheme.onTertiaryContainer,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _formatCurrency(_totalCollectedAmount),
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                      '$_totalCollectedReceiptsCount Rec • $_totalCollectedAdCompaniesCount Ad${_totalCollectedEventsAnalyticsCount > 0 ? ' • $_totalCollectedEventsAnalyticsCount Ev' : ''}',
+                      style: TextStyle(
+                        color: colorScheme.onTertiaryContainer.withValues(alpha: 0.8),
+                        fontSize: 9.0,
+                        fontWeight: FontWeight.w500,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
-                      'Tashil: ${_formatAmountOnly(_tashilCollectedAmount)} | Fathalla: ${_formatAmountOnly(_marketCollectedAmount)}',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 8.5),
+                      _formatCurrency(_totalCollectedAmount),
+                      style: TextStyle(
+                        color: colorScheme.onTertiaryContainer,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 2,
+                      children: [
+                        Text(
+                          'Tashil: ${_formatAmountOnly(_tashilCollectedAmount)}',
+                          style: TextStyle(
+                            color: colorScheme.onTertiaryContainer.withValues(alpha: 0.75),
+                            fontSize: 8.5,
+                          ),
+                        ),
+                        Text(
+                          '| Fathalla: ${_formatAmountOnly(_marketCollectedAmount)}',
+                          style: TextStyle(
+                            color: colorScheme.onTertiaryContainer.withValues(alpha: 0.75),
+                            fontSize: 8.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1944,45 +2009,69 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.deepOrange.shade800,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.deepOrange.shade800.withValues(alpha: 0.18),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+                  color: colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Remaining ⏳',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
+                        Icon(Icons.hourglass_top_rounded, size: 15, color: colorScheme.onErrorContainer),
+                        const SizedBox(width: 4),
                         Text(
-                          '$_remainingReceiptsCount Rec • $_remainingAdCompaniesCount Ad${_remainingEventsAnalyticsCount > 0 ? ' • $_remainingEventsAnalyticsCount Ev' : ''}',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 9.5),
+                          'Remaining',
+                          style: TextStyle(
+                            color: colorScheme.onErrorContainer,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _formatCurrency(_remainingBalanceAmount),
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                      '$_remainingReceiptsCount Rec • $_remainingAdCompaniesCount Ad${_remainingEventsAnalyticsCount > 0 ? ' • $_remainingEventsAnalyticsCount Ev' : ''}',
+                      style: TextStyle(
+                        color: colorScheme.onErrorContainer.withValues(alpha: 0.8),
+                        fontSize: 9.0,
+                        fontWeight: FontWeight.w500,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
-                      'Tashil: ${_formatAmountOnly(_tashilRemainingAmount)} | Fathalla: ${_formatAmountOnly(_marketRemainingAmount)}',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 8.5),
+                      _formatCurrency(_remainingBalanceAmount),
+                      style: TextStyle(
+                        color: colorScheme.onErrorContainer,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 2,
+                      children: [
+                        Text(
+                          'Tashil: ${_formatAmountOnly(_tashilRemainingAmount)}',
+                          style: TextStyle(
+                            color: colorScheme.onErrorContainer.withValues(alpha: 0.75),
+                            fontSize: 8.5,
+                          ),
+                        ),
+                        Text(
+                          '| Fathalla: ${_formatAmountOnly(_marketRemainingAmount)}',
+                          style: TextStyle(
+                            color: colorScheme.onErrorContainer.withValues(alpha: 0.75),
+                            fontSize: 8.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1991,53 +2080,154 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
           ],
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
 
-        // Monthly Progress Indicator
+        // Monthly Progress Indicator (M3 SurfaceContainer)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
           ),
           child: Column(
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Monthly Collection Progress:',
-                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                   Text(
                     '${_collectionProgressPercentage.toStringAsFixed(1)}%',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.bold,
-                      color: _collectionProgressPercentage >= 100
-                          ? Colors.green.shade800
-                          : Colors.blue.shade800,
+                      color: colorScheme.primary,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
                   value: _collectionProgressPercentage / 100.0,
                   minHeight: 6,
-                  backgroundColor: Colors.grey.shade300,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    _collectionProgressPercentage >= 100
-                        ? Colors.green.shade700
-                        : Colors.blue.shade700,
-                  ),
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
                 ),
               ),
             ],
           ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // 3. Allocated Wallets Summary & Quick Access (Fully Responsive M3 Surface)
+        StreamBuilder<List<UserWalletModel>>(
+          stream: WalletRemoteDataSourceImpl().streamAllWallets(),
+          builder: (context, walletSnap) {
+            final wallets = walletSnap.data ?? [];
+            final totalAllocated = wallets.fold<double>(0.0, (s, w) => s + w.currentBalance);
+            final activeWalletsCount = wallets.where((w) => w.isWalletEnabled).length;
+            final netFreeRemaining = (_remainingBalanceAmount - totalAllocated).clamp(0.0, double.infinity);
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: colorScheme.onSecondaryContainer,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'محافظ المستحقات ($activeWalletsCount مفعلة)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: colorScheme.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 2,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              _formatCurrency(totalAllocated),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12.5,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                            Text(
+                              '• صافي الحر: ${_formatCurrency(netFreeRemaining)}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.tonal(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SuperAdminWalletsScreen(
+                            adminDelegate: widget.delegate,
+                            initialRemainingBalance: _remainingBalanceAmount,
+                            initialPeriodKey: _periodKey,
+                          ),
+                        ),
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text(
+                      'إدارة المحافظ',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ],
     );
@@ -2055,14 +2245,14 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF0D47A1), width: 1.2),
-          boxShadow: const [
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.5), width: 1.2),
+          boxShadow: [
             BoxShadow(
-              color: Colors.black12,
+              color: colorScheme.shadow.withValues(alpha: 0.06),
               blurRadius: 8,
-              offset: Offset(0, 3),
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -2071,52 +2261,52 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
           children: [
             // 1. Header Information Section (LTR: Bill To on left, Invoice Details on right)
             Table(
-              border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
+              border: TableBorder.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6), width: 0.8),
               columnWidths: const {
                 0: FlexColumnWidth(1.15),
                 1: FlexColumnWidth(1.0),
               },
               children: [
-                const TableRow(
-                  decoration: BoxDecoration(color: Color(0xFFF1F5F9)),
+                TableRow(
+                  decoration: BoxDecoration(color: colorScheme.surfaceContainerHigh),
                   children: [
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                       child: Text(
                         'Bill To',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0D47A1), fontSize: 11),
+                        style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary, fontSize: 11),
                       ),
                     ),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                       child: Text(
                         'Invoice Details',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0D47A1), fontSize: 11),
+                        style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary, fontSize: 11),
                       ),
                     ),
                   ],
                 ),
                 TableRow(
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      child: Text('Customer: Fathalla Market', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('Customer: Fathalla Market', style: TextStyle(fontSize: 10, color: colorScheme.onSurface)),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      child: Text('Invoice No: $invoiceNo', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      child: Text('Invoice No: $invoiceNo', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
                     ),
                   ],
                 ),
                 TableRow(
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      child: Text('Attn: Mr. Mohamed A. Hassan', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('Attn: Mr. Mohamed A. Hassan', style: TextStyle(fontSize: 10, color: colorScheme.onSurface)),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      child: Text('Date: $invoiceDateStr', style: const TextStyle(fontSize: 10, color: Colors.black87)),
+                      child: Text('Date: $invoiceDateStr', style: TextStyle(fontSize: 10, color: colorScheme.onSurface)),
                     ),
                   ],
                 ),
@@ -2126,24 +2316,24 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       child: Text(
                         _showRemainingInvoice ? 'Type: Net Remaining Balance' : 'Company: All Companies',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                       ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      child: Text('Period: $servicePeriodStr', style: const TextStyle(fontSize: 10, color: Colors.black87)),
+                      child: Text('Period: $servicePeriodStr', style: TextStyle(fontSize: 10, color: colorScheme.onSurface)),
                     ),
                   ],
                 ),
-                const TableRow(
+                TableRow(
                   children: [
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      child: Text('System: Tashil Business', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('System: Tashil Business', style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant)),
                     ),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      child: Text('Payment: Official / Cash', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      child: Text('Payment: Official / Cash', style: TextStyle(fontSize: 10, color: colorScheme.onSurface)),
                     ),
                   ],
                 ),
@@ -2154,7 +2344,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
             // 2. Main Items Table (LTR: Description -> Qty -> Price -> Total (EGP))
             Table(
-              border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
+              border: TableBorder.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6), width: 0.8),
               columnWidths: const {
                 0: FlexColumnWidth(2.2),
                 1: FlexColumnWidth(0.7),
@@ -2162,37 +2352,37 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 3: FlexColumnWidth(1.3),
               },
               children: [
-                const TableRow(
-                  decoration: BoxDecoration(color: Color(0xFF0D47A1)),
+                TableRow(
+                  decoration: BoxDecoration(color: colorScheme.primary),
                   children: [
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                       child: Text(
                         'Description',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
+                        style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: 10.5),
                       ),
                     ),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                       child: Text(
                         'Qty',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
+                        style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: 10.5),
                         textAlign: TextAlign.center,
                       ),
                     ),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                       child: Text(
                         'Price',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
+                        style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: 10.5),
                         textAlign: TextAlign.center,
                       ),
                     ),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                       child: Text(
                         'Total (EGP)',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
+                        style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: 10.5),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -2202,7 +2392,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 // Item 1: Electronic Receipts (Shown only if Qty > 0 or Total > 0)
                 if (_invoiceReceiptsQty > 0 || _invoiceReceiptsTotal > 0)
                   TableRow(
-                    decoration: const BoxDecoration(color: Colors.white),
+                    decoration: BoxDecoration(color: colorScheme.surface),
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -2210,14 +2400,14 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                           _showRemainingInvoice
                               ? 'Issuing official electronic payment receipts\n(Remaining Balance)'
                               : 'Issuing official electronic payment receipts',
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                         ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                         child: Text(
                           NumberFormat('#,##0').format(_invoiceReceiptsQty),
-                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, color: colorScheme.onSurface),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -2225,7 +2415,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                         child: Text(
                           _formatAmountOnly(_receiptUnitPrice),
-                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, color: colorScheme.onSurface),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -2233,7 +2423,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                         child: Text(
                           _formatAmountOnly(_invoiceReceiptsTotal),
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                           textAlign: TextAlign.right,
                         ),
                       ),
@@ -2243,7 +2433,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 // Item 2: Advertising Company Subscription (Shown only if Qty > 0 or Total > 0)
                 if (_invoiceAdCompaniesQty > 0 || _invoiceAdCompaniesTotal > 0)
                   TableRow(
-                    decoration: const BoxDecoration(color: Color(0xFFFAFAFA)),
+                    decoration: BoxDecoration(color: colorScheme.surfaceContainerLowest),
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -2251,14 +2441,14 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                           _showRemainingInvoice
                               ? 'Advertising Company Subscription\n(Remaining Balance)'
                               : 'Advertising Company Subscription',
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                         ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                         child: Text(
                           '$_invoiceAdCompaniesQty',
-                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, color: colorScheme.onSurface),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -2266,7 +2456,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                         child: Text(
                           _formatAmountOnly(_adCompanyUnitPrice),
-                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, color: colorScheme.onSurface),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -2274,7 +2464,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                         child: Text(
                           _formatAmountOnly(_invoiceAdCompaniesTotal),
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                           textAlign: TextAlign.right,
                         ),
                       ),
@@ -2284,7 +2474,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 // Item 3: Events Analytics Software Subscription (Shown only if Qty > 0 or Total > 0)
                 if (_invoiceEventsAnalyticsQty > 0 || _invoiceEventsAnalyticsTotal > 0)
                   TableRow(
-                    decoration: const BoxDecoration(color: Colors.white),
+                    decoration: BoxDecoration(color: colorScheme.surface),
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -2296,14 +2486,14 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                               : (_eventsAnalyticsTitle.isNotEmpty
                                   ? _eventsAnalyticsTitle
                                   : 'Events Analytics Software Subscription'),
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                         ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                         child: Text(
                           '$_invoiceEventsAnalyticsQty',
-                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, color: colorScheme.onSurface),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -2311,7 +2501,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                         child: Text(
                           _formatAmountOnly(_eventsAnalyticsUnitPrice),
-                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, color: colorScheme.onSurface),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -2319,7 +2509,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                         child: Text(
                           _formatAmountOnly(_invoiceEventsAnalyticsTotal),
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                           textAlign: TextAlign.right,
                         ),
                       ),
@@ -2329,7 +2519,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 // Item 4: Settlement & Additional Adjustments (Shown only if Total > 0)
                 if (_invoiceSettlementTotal > 0)
                   TableRow(
-                    decoration: const BoxDecoration(color: Color(0xFFFAFAFA)),
+                    decoration: BoxDecoration(color: colorScheme.surfaceContainerLowest),
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -2341,14 +2531,14 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                               : (_settlementTitle.isNotEmpty
                                   ? _settlementTitle
                                   : 'Settlement & Additional Adjustments'),
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                         ),
                       ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                         child: Text(
                           '1',
-                          style: TextStyle(fontSize: 10, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, color: colorScheme.onSurface),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -2356,7 +2546,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                         child: Text(
                           _formatAmountOnly(_invoiceSettlementTotal),
-                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, color: colorScheme.onSurface),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -2364,7 +2554,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                         child: Text(
                           _formatAmountOnly(_invoiceSettlementTotal),
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                           textAlign: TextAlign.right,
                         ),
                       ),
@@ -2377,33 +2567,33 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                     (_invoiceEventsAnalyticsQty <= 0 && _invoiceEventsAnalyticsTotal <= 0) &&
                     _invoiceSettlementTotal <= 0)
                   TableRow(
-                    decoration: const BoxDecoration(color: Colors.white),
-                    children: const [
+                    decoration: BoxDecoration(color: colorScheme.surface),
+                    children: [
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                         child: Text(
                           'All monthly dues are fully settled (0.00 EGP remaining)',
-                          style: TextStyle(fontSize: 9.5, fontStyle: FontStyle.italic, color: Colors.grey),
+                          style: TextStyle(fontSize: 9.5, fontStyle: FontStyle.italic, color: colorScheme.onSurfaceVariant),
                         ),
                       ),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-                        child: Text('0', style: TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center),
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                        child: Text('0', style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
                       ),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-                        child: Text('0.00', style: TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center),
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                        child: Text('0.00', style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
                       ),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                        child: Text('0.00', style: TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.right),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                        child: Text('0.00', style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant), textAlign: TextAlign.right),
                       ),
                     ],
                   ),
 
                 // Grand Total Row
                 TableRow(
-                  decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
+                  decoration: BoxDecoration(color: colorScheme.surfaceContainerHigh),
                   children: [
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -2417,16 +2607,16 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                       child: Text(
                         _showRemainingInvoice ? 'Net Total' : 'Grand Total',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5, color: Color(0xFF0D47A1)),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5, color: colorScheme.primary),
                         textAlign: TextAlign.center,
                       ),
                     ),
                     Container(
-                      color: const Color(0xFF0D47A1),
+                      color: colorScheme.primary,
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                       child: Text(
                         _formatAmountOnly(_invoiceGrandTotal),
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 10.5),
+                        style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onPrimary, fontSize: 10.5),
                         textAlign: TextAlign.right,
                       ),
                     ),
@@ -2440,10 +2630,10 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
               child: Text(
                 _numberToWordsEnglish(_invoiceGrandTotal),
-                style: const TextStyle(
+                style: TextStyle(
                   fontStyle: FontStyle.italic,
                   fontSize: 9.5,
-                  color: Color(0xFF1E3A8A),
+                  color: colorScheme.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -2453,56 +2643,56 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
             // 3. Payment Split Table (LTR: Payment Split -> Ratio -> Amount (EGP))
             Table(
-              border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
+              border: TableBorder.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6), width: 0.8),
               columnWidths: const {
                 0: FlexColumnWidth(2.0),
                 1: FlexColumnWidth(0.9),
                 2: FlexColumnWidth(1.3),
               },
               children: [
-                const TableRow(
-                  decoration: BoxDecoration(color: Color(0xFF0D47A1)),
+                TableRow(
+                  decoration: BoxDecoration(color: colorScheme.primary),
                   children: [
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       child: Text(
                         'Payment Split',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                        style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: 10),
                       ),
                     ),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
                       child: Text(
                         'Ratio',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                        style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: 10),
                         textAlign: TextAlign.center,
                       ),
                     ),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                       child: Text(
                         'Amount (EGP)',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                        style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: 10),
                         textAlign: TextAlign.center,
                       ),
                     ),
                   ],
                 ),
                 TableRow(
-                  decoration: const BoxDecoration(color: Colors.white),
+                  decoration: BoxDecoration(color: colorScheme.surface),
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       child: Text(
                         'Tashil Delegate Business',
-                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                       ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
                       child: Text(
                         '${_tashilPercentage.toStringAsFixed(0)}%',
-                        style: const TextStyle(fontSize: 9.5, color: Colors.black87),
+                        style: TextStyle(fontSize: 9.5, color: colorScheme.onSurface),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -2510,27 +2700,27 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                       child: Text(
                         _formatAmountOnly(_invoiceTashilAmount),
-                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                         textAlign: TextAlign.right,
                       ),
                     ),
                   ],
                 ),
                 TableRow(
-                  decoration: const BoxDecoration(color: Color(0xFFFAFAFA)),
+                  decoration: BoxDecoration(color: colorScheme.surfaceContainerLowest),
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       child: Text(
                         'Fathalla Market',
-                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                       ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
                       child: Text(
                         '${_marketPercentage.toStringAsFixed(0)}%',
-                        style: const TextStyle(fontSize: 9.5, color: Colors.black87),
+                        style: TextStyle(fontSize: 9.5, color: colorScheme.onSurface),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -2538,27 +2728,27 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                       child: Text(
                         _formatAmountOnly(_invoiceMarketAmount),
-                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                         textAlign: TextAlign.right,
                       ),
                     ),
                   ],
                 ),
                 TableRow(
-                  decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
+                  decoration: BoxDecoration(color: colorScheme.surfaceContainerHigh),
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       child: Text(
                         'Total',
-                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: colorScheme.primary),
                       ),
                     ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
                       child: Text(
                         '100%',
-                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: colorScheme.primary),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -2566,7 +2756,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                       child: Text(
                         _formatAmountOnly(_invoiceGrandTotal),
-                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: colorScheme.primary),
                         textAlign: TextAlign.right,
                       ),
                     ),
@@ -2627,10 +2817,11 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      elevation: 1,
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.green.shade200),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -2644,8 +2835,8 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   children: [
                     CircleAvatar(
                       radius: 14,
-                      backgroundColor: Colors.green.shade50,
-                      foregroundColor: Colors.green.shade800,
+                      backgroundColor: colorScheme.primaryContainer,
+                      foregroundColor: colorScheme.onPrimaryContainer,
                       child: Text('$index', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                     ),
                     const SizedBox(width: 8),
@@ -2654,7 +2845,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       children: [
                         Text(
                           entryTitle,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.onSurface),
                         ),
                         Text(
                           dateStr,
@@ -2669,7 +2860,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13.5,
-                    color: Colors.green.shade800,
+                    color: colorScheme.primary,
                   ),
                 ),
               ],
@@ -2687,18 +2878,18 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.indigo.shade50,
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.indigo.shade200),
+                      border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.receipt_long_rounded, size: 11, color: Colors.indigo),
+                        Icon(Icons.receipt_long_rounded, size: 11, color: colorScheme.primary),
                         const SizedBox(width: 4),
                         Text(
                           'Receipts: $recQty (${_formatAmountOnly(recAmt)} EGP)',
-                          style: TextStyle(fontSize: 9.5, color: Colors.indigo.shade900, fontWeight: FontWeight.w600),
+                          style: TextStyle(fontSize: 9.5, color: colorScheme.onSurface, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -2707,18 +2898,18 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.deepOrange.shade50,
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.deepOrange.shade200),
+                      border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.campaign_rounded, size: 11, color: Colors.deepOrange),
+                        Icon(Icons.campaign_rounded, size: 11, color: colorScheme.secondary),
                         const SizedBox(width: 4),
                         Text(
                           'Ad Cos: $adQty (${_formatAmountOnly(adAmt)} EGP)',
-                          style: TextStyle(fontSize: 9.5, color: Colors.deepOrange.shade900, fontWeight: FontWeight.w600),
+                          style: TextStyle(fontSize: 9.5, color: colorScheme.onSurface, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -2727,18 +2918,18 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.cyan.shade50,
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.cyan.shade200),
+                      border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.analytics_rounded, size: 11, color: Colors.cyan),
+                        Icon(Icons.analytics_rounded, size: 11, color: colorScheme.tertiary),
                         const SizedBox(width: 4),
                         Text(
                           'Events Soft: $evQty (${_formatAmountOnly(evAmt)} EGP)',
-                          style: TextStyle(fontSize: 9.5, color: Colors.cyan.shade900, fontWeight: FontWeight.w600),
+                          style: TextStyle(fontSize: 9.5, color: colorScheme.onSurface, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -2747,18 +2938,18 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.teal.shade50,
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.teal.shade200),
+                      border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.balance_rounded, size: 11, color: Colors.teal),
+                        Icon(Icons.balance_rounded, size: 11, color: colorScheme.primary),
                         const SizedBox(width: 4),
                         Text(
                           'Settlement: ${_formatAmountOnly(setAmt)} EGP',
-                          style: TextStyle(fontSize: 9.5, color: Colors.teal.shade900, fontWeight: FontWeight.w600),
+                          style: TextStyle(fontSize: 9.5, color: colorScheme.onSurface, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -2788,7 +2979,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 ],
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.grey, size: 18),
+                  icon: Icon(Icons.delete_outline_rounded, color: colorScheme.outline, size: 18),
                   tooltip: 'Delete Collection Entry',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),

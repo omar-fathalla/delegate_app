@@ -31,3 +31,12 @@
   - **Zero Overshoot for Effects**: Opacity, surface tint, and color transitions must be strictly monotonic (no bounce/overshoot). Overshoot is reserved exclusively for spatial movements in the Expressive scheme.
   - **RTL-Aware Shared Axis**: In Arabic mode (`TextDirection.rtl`), horizontal directional motion (Shared Axis X) must be dynamically inverted.
 
+## Google Cloud & Firebase Functions Isolation Policy (Zero Deletion / Zero Conflict)
+- **Shared GCP Project Architecture**: The GCP / Firebase project (`practice-firebase-72df1` / `Tashil`) hosts 22+ active production Cloud Functions and Cloud Run services supporting the Web portal and other external systems (e.g., `approvecreaterequest`, `createorganization`, `deleteuser`, `verifyrecaptcha`, etc.).
+- **Mandatory Codebase Isolation**: All Cloud Functions developed in this mobile application repository MUST strictly belong to an isolated codebase (defined as `"codebase": "tashil-mobile-notifications"` in `firebase.json`).
+- **Targeted Deployment ONLY**: NEVER execute blanket un-scoped deployment commands like `firebase deploy --only functions`. Always use targeted deployment by function name or isolated codebase:
+  - Example: `firebase deploy --only functions:tashil-mobile-notifications` or `firebase deploy --only functions:tashil-mobile-notifications:onNotificationCreated,...`
+- **Zero Deletion / Zero Edit Rule**:
+  - NEVER delete, edit, or override any Cloud Function, Cloud Run service, or trigger belonging to other systems sharing this Google Cloud project.
+  - All operations must be ADDITIVE ONLY (`--only` targeted to mobile notification functions).
+

@@ -14,9 +14,14 @@ import 'package:delegate_app/features/notifications/presentation/pages/send_noti
 import 'anti_fraud_audit_screen.dart';
 import 'delegate_subscription_requests_page.dart';
 import 'super_admin_payment_receipts_report_screen.dart';
+import 'super_admin_subscription_financial_report_screen.dart';
 import 'super_admin_session_control_screen.dart';
 import '../../../photo_permission/presentation/pages/super_admin_permissions_report_screen.dart';
 import '../../../photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_settings_page.dart';
+import 'package:delegate_app/features/wallet/presentation/pages/super_admin_wallets_screen.dart';
 
 class SuperAdminDashboardScreen extends StatefulWidget {
   final Delegate delegate;
@@ -432,28 +437,24 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       return _buildTechnicalSupportDashboard(context, theme, colorScheme);
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final statAspectRatio = screenWidth < 360 ? 1.0 : (screenWidth < 400 ? 1.15 : 1.25);
+    final actionAspectRatio = screenWidth < 360 ? 1.9 : (screenWidth < 400 ? 2.1 : 2.35);
+
     return RefreshIndicator(
       onRefresh: () => _loadStats(isPullToRefresh: true),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         children: [
-          // Welcome Header Card
+          // Welcome Header Card (M3 Tonal Container)
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [colorScheme.primary, colorScheme.secondary],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+              color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: colorScheme.primary.withValues(alpha: 0.18),
               ),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.primary.withValues(alpha: 0.3),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
-                )
-              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -461,43 +462,70 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'أهلاً بك، ${widget.delegate.firstName}',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    Expanded(
+                      child: Text(
+                        'أهلاً بك، ${widget.delegate.firstName}',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
                     ),
-                    const CircleAvatar(
-                      backgroundColor: Colors.white24,
-                      child: Icon(Icons.admin_panel_settings_rounded, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Builder(
+                      builder: (context) {
+                        final photoUrl = widget.delegate.personalPhotoUrl ??
+                            (widget.delegate.documents
+                                .where((d) =>
+                                    d.documentKey == DocumentKey.personalPhoto &&
+                                    d.documentURL.isNotEmpty)
+                                .firstOrNull
+                                ?.documentURL) ??
+                            FirebaseAuth.instance.currentUser?.photoURL;
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: colorScheme.primary.withValues(alpha: 0.3),
+                              width: 2,
+                            ),
+                          ),
+                          child: AppAvatar(
+                            imageUrl: photoUrl,
+                            fallbackText: widget.delegate.firstName,
+                            radius: 22,
+                            backgroundColor: colorScheme.primaryContainer,
+                            foregroundColor: colorScheme.onPrimaryContainer,
+                            fallbackIcon: Icons.admin_panel_settings_rounded,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'إليك إحصائيات إيصالات الدفع الإلكتروني والنظام لحظة بلحظة مع التحديث المباشر.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
+                const SizedBox(height: 6),
+                Text(
+                  'إحصائيات إيصالات الدفع الإلكتروني والنظام لحظة بلحظة مع التحديث المباشر.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
-          // Statistics Header Title
+          // Statistics Header Title & Live Count Chip
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Icon(Icons.receipt_long_rounded, color: colorScheme.primary, size: 26),
+                  Icon(Icons.receipt_long_rounded, color: colorScheme.primary, size: 22),
                   const SizedBox(width: 8),
                   Text(
-                    'إحصائيات إيصالات الدفع الإلكتروني',
+                    'إحصائيات إيصالات الدفع',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -505,26 +533,26 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Text(
-                      'مباشر ($_totalDelegatesCount مندوب)',
+                      '$_totalDelegatesCount مندوب',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -536,25 +564,22 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Stats Grid Layout - Dedicated to electronicPaymentReceipt
+          // Stats Grid Layout - Dedicated to electronicPaymentReceipt (Responsive & Single-Seed M3)
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 1.1,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: statAspectRatio,
             children: [
               _buildStatCard(
                 title: 'مرفوعة بالصورة',
                 value: _electronicWithImageCount.toString(),
                 subtitle: 'إيصال دفع إلكتروني مخزن',
                 icon: Icons.photo_library_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1E88E5), Color(0xFF42A5F5)],
-                ),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -568,9 +593,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 value: _electronicEmptyCount.toString(),
                 subtitle: 'بدون صورة أو لم يتم الرفع',
                 icon: Icons.hourglass_empty_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF9800), Color(0xFFFFB74D)],
-                ),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -584,9 +606,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 value: _electronicApprovedCount.toString(),
                 subtitle: 'تمت مراجعتها واعتمادها',
                 icon: Icons.verified_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
-                ),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -600,9 +619,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 value: _deductedFromCompanyCount.toString(),
                 subtitle: 'مندوب بنظام الخصم',
                 icon: Icons.account_balance_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF8E24AA), Color(0xFFBA68C8)],
-                ),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -613,12 +629,12 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
           // Quick Actions section
           Row(
             children: [
-              Icon(Icons.bolt_rounded, color: colorScheme.secondary, size: 26),
+              Icon(Icons.bolt_rounded, color: colorScheme.primary, size: 22),
               const SizedBox(width: 8),
               Text(
                 'إجراءات سريعة',
@@ -628,21 +644,20 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Grid of Quick Action Buttons
+          // Grid of Quick Action Buttons (Responsive & Single-Seed M3)
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 2.2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: actionAspectRatio,
             children: [
               _buildActionButton(
                 label: 'طلبات اشتراك المناديب',
                 icon: Icons.how_to_reg_rounded,
-                color: Colors.indigo.shade800,
                 badgeCount: _pendingDelegateRequestsCount,
                 onTap: () {
                   Navigator.of(context).push(
@@ -657,7 +672,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               _buildActionButton(
                 label: 'تقرير الإيصالات',
                 icon: Icons.receipt_long_rounded,
-                color: Colors.orange.shade800,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -667,9 +681,21 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 },
               ),
               _buildActionButton(
+                label: 'التقرير المالي للاشتراكات',
+                icon: Icons.payments_rounded,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SuperAdminSubscriptionFinancialReportScreen(
+                        adminDelegate: widget.delegate,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              _buildActionButton(
                 label: 'تقرير أذونات التصوير',
-                icon: Icons.analytics_outlined,
-                color: Colors.blue.shade800,
+                icon: Icons.analytics_rounded,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -684,14 +710,38 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               _buildActionButton(
                 label: 'إضافة فرع',
                 icon: Icons.add_location_alt_rounded,
-                color: Colors.teal.shade800,
                 onTap: widget.onNavigateToAddBranch,
               ),
               _buildActionButton(
                 label: 'إنشاء أدمن جديد',
                 icon: Icons.admin_panel_settings_rounded,
-                color: Colors.purple.shade800,
                 onTap: widget.onNavigateToCreateAdmin,
+              ),
+              _buildActionButton(
+                label: 'إعدادات الغرامات',
+                icon: Icons.gavel_rounded,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PenaltyRulesSettingsPage(
+                        adminDelegate: widget.delegate,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              _buildActionButton(
+                label: 'إدارة المحافظ والمستحقات',
+                icon: Icons.account_balance_wallet_rounded,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SuperAdminWalletsScreen(
+                        adminDelegate: widget.delegate,
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -712,23 +762,15 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // Welcome Header Card
+          // Welcome Header Card (M3 Tonal Container)
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [colorScheme.primary, colorScheme.tertiary],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+              color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: colorScheme.primary.withValues(alpha: 0.18),
               ),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.primary.withValues(alpha: 0.3),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
-                )
-              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -736,26 +778,53 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'أهلاً بك، ${widget.delegate.firstName}',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    Expanded(
+                      child: Text(
+                        'أهلاً بك، ${widget.delegate.firstName}',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
                     ),
-                    const CircleAvatar(
-                      backgroundColor: Colors.white24,
-                      child: Icon(Icons.support_agent_rounded, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Builder(
+                      builder: (context) {
+                        final photoUrl = widget.delegate.personalPhotoUrl ??
+                            (widget.delegate.documents
+                                .where((d) =>
+                                    d.documentKey == DocumentKey.personalPhoto &&
+                                    d.documentURL.isNotEmpty)
+                                .firstOrNull
+                                ?.documentURL) ??
+                            FirebaseAuth.instance.currentUser?.photoURL;
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: colorScheme.primary.withValues(alpha: 0.3),
+                              width: 2,
+                            ),
+                          ),
+                          child: AppAvatar(
+                            imageUrl: photoUrl,
+                            fallbackText: widget.delegate.firstName,
+                            radius: 24,
+                            backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
+                            foregroundColor: colorScheme.primary,
+                            fallbackIcon: Icons.support_agent_rounded,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'لوحة متابعة المقترحات والشكاوى وبلاغات مشاكل الفروع والمستخدمين.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -766,7 +835,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
           // Statistics Header Title
           Row(
             children: [
-              Icon(Icons.mark_chat_unread_rounded, color: colorScheme.primary, size: 26),
+              Icon(Icons.mark_chat_unread_rounded, color: colorScheme.primary, size: 22),
               const SizedBox(width: 8),
               Text(
                 'إحصائيات إدارة المقترحات والشكاوى',
@@ -776,25 +845,22 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Stats Grid Layout
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 1.1,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: MediaQuery.of(context).size.width < 360 ? 1.0 : (MediaQuery.of(context).size.width < 400 ? 1.15 : 1.25),
             children: [
               _buildStatCard(
                 title: 'إجمالي المقترحات',
                 value: _totalFeedbacksCount.toString(),
                 subtitle: 'مقترح وشكوى مبعوثة',
-                icon: Icons.feedback_outlined,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF673AB7), Color(0xFF9575CD)],
-                ),
+                icon: Icons.feedback_rounded,
                 onTap: () => _openAdminFeedbacks(context),
               ),
               _buildStatCard(
@@ -802,39 +868,30 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 value: _pendingFeedbacksCount.toString(),
                 subtitle: 'في انتظار رد الدعم الفني',
                 icon: Icons.pending_actions_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF9800), Color(0xFFFFB74D)],
-                ),
                 onTap: () => _openAdminFeedbacks(context),
               ),
               _buildStatCard(
                 title: 'قيد المعالجة',
                 value: _inProgressFeedbacksCount.toString(),
                 subtitle: 'جاري العمل عليها',
-                icon: Icons.work_history_outlined,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0288D1), Color(0xFF4FC3F7)],
-                ),
+                icon: Icons.work_history_rounded,
                 onTap: () => _openAdminFeedbacks(context),
               ),
               _buildStatCard(
                 title: 'تم الحل والمكالمة',
                 value: _resolvedFeedbacksCount.toString(),
                 subtitle: 'مقترح وشكوى مكتملة',
-                icon: Icons.check_circle_outline_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
-                ),
+                icon: Icons.check_circle_rounded,
                 onTap: () => _openAdminFeedbacks(context),
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
           // Quick Actions section
           Row(
             children: [
-              Icon(Icons.bolt_rounded, color: colorScheme.secondary, size: 26),
+              Icon(Icons.bolt_rounded, color: colorScheme.primary, size: 22),
               const SizedBox(width: 8),
               Text(
                 'إجراءات سريعة',
@@ -844,21 +901,20 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Grid of Quick Action Buttons
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 2.2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: MediaQuery.of(context).size.width < 360 ? 1.9 : (MediaQuery.of(context).size.width < 400 ? 2.1 : 2.35),
             children: [
               _buildActionButton(
                 label: 'طلبات اشتراك المناديب',
                 icon: Icons.how_to_reg_rounded,
-                color: Colors.indigo.shade800,
                 badgeCount: _pendingDelegateRequestsCount,
                 onTap: () {
                   Navigator.of(context).push(
@@ -873,7 +929,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               _buildActionButton(
                 label: 'إدارة جلسات المناديب',
                 icon: Icons.sync_lock_rounded,
-                color: Colors.deepOrange.shade800,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -887,13 +942,11 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               _buildActionButton(
                 label: 'إدارة المقترحات',
                 icon: Icons.feedback_rounded,
-                color: Colors.deepPurple.shade700,
                 onTap: () => _openAdminFeedbacks(context),
               ),
               _buildActionButton(
                 label: 'كشف التزييف والأجهزة',
                 icon: Icons.security_rounded,
-                color: Colors.red.shade900,
                 onTap: widget.onNavigateToAntiFraud ?? () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -908,7 +961,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               _buildActionButton(
                 label: 'إرسال إشعار جديد',
                 icon: Icons.send_time_extension_rounded,
-                color: Colors.indigo.shade800,
                 onTap: widget.onNavigateToSendNotification ?? () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -920,13 +972,11 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               _buildActionButton(
                 label: 'إنشاء أدمن جديد',
                 icon: Icons.admin_panel_settings_rounded,
-                color: Colors.purple.shade800,
                 onTap: widget.onNavigateToCreateAdmin,
               ),
               _buildActionButton(
                 label: 'إدارة التسويق',
                 icon: Icons.campaign_rounded,
-                color: Colors.orange.shade800,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -938,8 +988,20 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               _buildActionButton(
                 label: 'إضافة فرع',
                 icon: Icons.add_location_alt_rounded,
-                color: Colors.teal.shade800,
                 onTap: widget.onNavigateToAddBranch,
+              ),
+              _buildActionButton(
+                label: 'إعدادات الغرامات',
+                icon: Icons.gavel_rounded,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PenaltyRulesSettingsPage(
+                        adminDelegate: widget.delegate,
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -974,18 +1036,19 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               elevation: 0,
               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: const Padding(
-                padding: EdgeInsets.all(24.0),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
                 child: Center(
                   child: Text(
                     'لا توجد مقترحات أو شكاوى مسجلة حتى الآن',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
                   ),
                 ),
               ),
             )
           else
             ..._recentFeedbacks.map((f) {
+              final statusColor = _getFeedbackStatusColor(colorScheme, f.status);
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 elevation: 0,
@@ -1023,14 +1086,14 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: _getFeedbackStatusColor(f.status).withValues(alpha: 0.1),
+                                color: statusColor.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: _getFeedbackStatusColor(f.status).withValues(alpha: 0.3)),
+                                border: Border.all(color: statusColor.withValues(alpha: 0.35)),
                               ),
                               child: Text(
                                 f.status.labelAr,
                                 style: TextStyle(
-                                  color: _getFeedbackStatusColor(f.status),
+                                  color: statusColor,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -1070,18 +1133,18 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     );
   }
 
-  Color _getFeedbackStatusColor(FeedbackStatus status) {
+  Color _getFeedbackStatusColor(ColorScheme colorScheme, FeedbackStatus status) {
     switch (status) {
       case FeedbackStatus.pending:
-        return Colors.orange.shade800;
+        return colorScheme.tertiary;
       case FeedbackStatus.reviewed:
-        return Colors.blue.shade700;
+        return colorScheme.primary;
       case FeedbackStatus.inProgress:
-        return Colors.purple.shade700;
+        return colorScheme.secondary;
       case FeedbackStatus.resolved:
-        return Colors.green.shade700;
+        return colorScheme.primary;
       case FeedbackStatus.rejected:
-        return Colors.red.shade700;
+        return colorScheme.error;
     }
   }
 
@@ -1090,111 +1153,136 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     required String value,
     required String subtitle,
     required IconData icon,
-    required Gradient gradient,
     VoidCallback? onTap,
+    Color? tonalColor,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            )
-          ],
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final iconBgColor = tonalColor?.withValues(alpha: 0.12) ?? colorScheme.primaryContainer.withValues(alpha: 0.6);
+    final iconColor = tonalColor ?? colorScheme.primary;
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
         ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: iconBgColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 20),
                   ),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 13,
+                    color: colorScheme.outline.withValues(alpha: 0.7),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                value,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
                 ),
               ),
-              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(height: 2),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12.5,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 10.5,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Colors.white70,
-            ),
-          ),
-        ],
+        ),
       ),
-    ),
     );
   }
 
   Widget _buildActionButton({
     required String label,
     required IconData icon,
-    required Color color,
     required VoidCallback? onTap,
     int? badgeCount,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
+      color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
               Badge(
                 isLabelVisible: (badgeCount != null && badgeCount > 0),
                 label: Text('$badgeCount'),
-                backgroundColor: Colors.red.shade700,
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: color.withValues(alpha: 0.1),
-                  child: Icon(icon, color: color, size: 20),
+                backgroundColor: colorScheme.error,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: colorScheme.primary, size: 18),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   label,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
                   ),
                 ),
               ),

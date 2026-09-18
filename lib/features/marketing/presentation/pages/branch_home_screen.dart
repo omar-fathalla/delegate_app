@@ -193,7 +193,16 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
 
         if (widget.showAppBar) {
           return Scaffold(
+            backgroundColor: colorScheme.surfaceContainerLowest,
             appBar: AppBar(
+              backgroundColor: colorScheme.surfaceContainer,
+              elevation: 0,
+              shape: Border(
+                bottom: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  width: 1,
+                ),
+              ),
               title: Text(
                 'متابعة حضور الفروع',
                 style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
@@ -234,7 +243,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.store_mall_directory_outlined,
+              Icons.store_mall_directory_rounded,
               size: 56,
               color: colorScheme.onPrimaryContainer,
             ),
@@ -256,7 +265,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: () => _showBranchPicker(context),
-            icon: const Icon(Icons.add_location_alt_outlined),
+            icon: const Icon(Icons.add_location_alt_rounded),
             label: const Text('إضافة فرع'),
           ),
         ],
@@ -286,7 +295,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 56, color: colorScheme.error),
+          Icon(Icons.error_outline_rounded, size: 56, color: colorScheme.error),
           const SizedBox(height: 12),
           Text(
             message,
@@ -1419,38 +1428,41 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   void _confirmRemoveBranch(BuildContext context, String branchName) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.delete_outline_rounded, color: Colors.red),
-            SizedBox(width: 8),
-            Text('حذف الفرع'),
-          ],
-        ),
-        content: Text('هل تريد إزالة "$branchName" من قائمة فروعك المتابعة؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
+      builder: (dialogCtx) {
+        final theme = Theme.of(dialogCtx);
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.delete_rounded, color: theme.colorScheme.error),
+              const SizedBox(width: 8),
+              const Text('حذف الفرع'),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
+          content: Text('هل تريد إزالة "$branchName" من قائمة فروعك المتابعة؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('إلغاء'),
             ),
-            onPressed: () {
-              Navigator.pop(context);
-              final bloc = context.read<MarketingBloc>();
-              bloc.add(RemoveFavoriteBranch(
-                userId: widget.marketingUser.uid,
-                branchName: branchName,
-              ));
-            },
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.error,
+                foregroundColor: theme.colorScheme.onError,
+              ),
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                final bloc = context.read<MarketingBloc>();
+                bloc.add(RemoveFavoriteBranch(
+                  userId: widget.marketingUser.uid,
+                  branchName: branchName,
+                ));
+              },
+              child: const Text('حذف'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1678,7 +1690,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error_outline, size: 48),
+                            Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
                             const SizedBox(height: 8),
                             Text(_error!),
                             TextButton(

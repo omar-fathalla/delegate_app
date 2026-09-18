@@ -16,8 +16,12 @@ import 'package:delegate_app/features/notifications/presentation/bloc/notificati
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_catalog_page.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
+import 'dart:async';
 import 'package:delegate_app/features/admin/presentation/pages/manage_organizations_page.dart';
+import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
+import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
@@ -38,11 +42,28 @@ class _MainScreenState extends State<MainScreen> {
   final Set<int> _initializedTabs = {0}; // Tab 0 (Attendance) loads first
 
   List<Delegate> _allDelegates = [];
+  StreamSubscription? _walletSubscription;
+  bool _isWalletEnabled = false;
 
   @override
   void initState() {
     super.initState();
     _loadAllDelegates();
+    _walletSubscription = WalletRemoteDataSourceImpl()
+        .streamUserWallet(widget.delegate.uid)
+        .listen((w) {
+      if (mounted) {
+        setState(() {
+          _isWalletEnabled = w?.isWalletEnabled ?? false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _walletSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadAllDelegates() async {
@@ -60,11 +81,19 @@ class _MainScreenState extends State<MainScreen> {
     final isArabic = localeProvider.isArabic;
 
     return Scaffold(
-          appBar: AppBar(
-                  backgroundColor: colorScheme.surface,
-                  foregroundColor: colorScheme.onSurface,
-                  surfaceTintColor: colorScheme.surfaceTint,
-                  title: Row(
+      backgroundColor: colorScheme.surfaceContainerLowest,
+      appBar: AppBar(
+        backgroundColor: colorScheme.surfaceContainer,
+        foregroundColor: colorScheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: Border(
+          bottom: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
+        title: Row(
                     children: [
                       Expanded(
                         child: Column(
@@ -113,7 +142,7 @@ class _MainScreenState extends State<MainScreen> {
                             label: Text('$unreadCount'),
                             isLabelVisible: unreadCount > 0,
                             child: IconButton(
-                              icon: const Icon(Icons.notifications_outlined),
+                              icon: const Icon(Icons.notifications_rounded),
                               tooltip: l10n.notifications,
                               onPressed: () {
                                 context.push('/notifications', extra: delegate);
@@ -134,6 +163,17 @@ class _MainScreenState extends State<MainScreen> {
                       onSelected: (value) {
                         if (value == 'profile') {
                           context.push('/profile', extra: delegate);
+                        } else if (value == 'wallet') {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => UserWalletScreen(
+                                targetUserId: delegate.uid,
+                                targetUserName: delegate.fullName.isNotEmpty
+                                    ? delegate.fullName
+                                    : delegate.firstName,
+                              ),
+                            ),
+                          );
                         } else if (value == 'settings') {
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -153,6 +193,14 @@ class _MainScreenState extends State<MainScreen> {
                                   delegate: delegate,
                                   showAppBar: true,
                                 ),
+                              ),
+                            ),
+                          );
+                        } else if (value == 'penalty_rules_catalog') {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PenaltyRulesCatalogPage(
+                                currentDelegate: delegate,
                               ),
                             ),
                           );
@@ -179,12 +227,24 @@ class _MainScreenState extends State<MainScreen> {
                           value: 'profile',
                           child: Row(
                             children: [
-                              const Icon(Icons.person_outline_rounded),
+                              const Icon(Icons.person_rounded),
                               const SizedBox(width: 12),
                               Text(l10n.profile),
                             ],
                           ),
                         ),
+                        if (_isWalletEnabled) ...[
+                          PopupMenuItem<String>(
+                            value: 'wallet',
+                            child: Row(
+                              children: [
+                                Icon(Icons.account_balance_wallet_rounded, color: colorScheme.primary),
+                                const SizedBox(width: 12),
+                                const Text('المحفظة والمستحقات'),
+                              ],
+                            ),
+                          ),
+                        ],
                         PopupMenuItem<String>(
                           value: 'penalties',
                           child: Row(
@@ -195,14 +255,24 @@ class _MainScreenState extends State<MainScreen> {
                             ],
                           ),
                         ),
+                        PopupMenuItem<String>(
+                          value: 'penalty_rules_catalog',
+                          child: Row(
+                            children: [
+                              Icon(Icons.menu_book_rounded, color: colorScheme.primary),
+                              const SizedBox(width: 12),
+                              const Text('لائحة الغرامات'),
+                            ],
+                          ),
+                        ),
                         if (delegate.role == UserRole.superAdmin) ...[
-                          const PopupMenuItem<String>(
+                          PopupMenuItem<String>(
                             value: 'manage_organizations',
                             child: Row(
                               children: [
-                                Icon(Icons.corporate_fare_rounded, color: Colors.indigo),
-                                SizedBox(width: 12),
-                                Text('إدارة المنظمات والسلاسل'),
+                                Icon(Icons.corporate_fare_rounded, color: colorScheme.primary),
+                                const SizedBox(width: 12),
+                                const Text('إدارة المنظمات والسلاسل'),
                               ],
                             ),
                           ),
@@ -214,7 +284,7 @@ class _MainScreenState extends State<MainScreen> {
                             value: 'delegate_subscriptions',
                             child: Row(
                               children: [
-                                Icon(Icons.how_to_reg_rounded, color: Colors.amber.shade800),
+                                Icon(Icons.how_to_reg_rounded, color: colorScheme.tertiary),
                                 const SizedBox(width: 12),
                                 const Text('اشتراكات واعتماد المناديب'),
                               ],
@@ -234,11 +304,12 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                           ),
                         ],
+                        // الإعدادات دائماً في أسفل القائمة
                         PopupMenuItem<String>(
                           value: 'settings',
                           child: Row(
                             children: [
-                              const Icon(Icons.settings_outlined),
+                              const Icon(Icons.settings_rounded),
                               const SizedBox(width: 12),
                               Text(l10n.settings),
                             ],
@@ -250,32 +321,45 @@ class _MainScreenState extends State<MainScreen> {
                   ],
                 ),
           body: _buildBody(delegate),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: (index) {
-              setState(() {
-                _currentIndex = index;
-                _initializedTabs.add(index); // Mark tab as visited
-              });
-            },
-            destinations: [
-              NavigationDestination(
-                icon: const Icon(Icons.home_rounded),
-                label: isArabic ? 'الرئيسية' : 'Home',
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainer,
+              border: Border(
+                top: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  width: 0.8,
+                ),
               ),
-              NavigationDestination(
-                icon: const Icon(Icons.access_time_filled),
-                label: l10n.attendance,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.task_alt_rounded),
-                label: l10n.tasks,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.photo_library_rounded),
-                label: isArabic ? 'تقارير الصور' : 'Photo Report',
-              ),
-            ],
+            ),
+            child: NavigationBar(
+              backgroundColor: colorScheme.surfaceContainer,
+              elevation: 0,
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (index) {
+                setState(() {
+                  _currentIndex = index;
+                  _initializedTabs.add(index); // Mark tab as visited
+                });
+              },
+              destinations: [
+                NavigationDestination(
+                  icon: const Icon(Icons.home_rounded),
+                  label: isArabic ? 'الرئيسية' : 'Home',
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.access_time_filled_rounded),
+                  label: l10n.attendance,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.task_alt_rounded),
+                  label: l10n.tasks,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.photo_library_rounded),
+                  label: isArabic ? 'تقارير الصور' : 'Photo Report',
+                ),
+              ],
+            ),
           ),
         );
   }
@@ -333,7 +417,7 @@ class _MainScreenState extends State<MainScreen> {
           content: Text(
             'تم التبديل بنجاح إلى: ${delegate.organizationName} - ${delegate.companyName}',
           ),
-          backgroundColor: Colors.green.shade700,
+          backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -406,7 +490,7 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
                   trailing: isCurrentOrg
-                      ? Icon(Icons.check_circle, color: colorScheme.primary)
+                      ? Icon(Icons.check_circle_rounded, color: colorScheme.primary)
                       : null,
                   onTap: () {
                     Navigator.pop(dialogContext);

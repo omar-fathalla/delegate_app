@@ -68,8 +68,8 @@ class DeviceLockDialog extends StatelessWidget {
       canPop: true,
       child: Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        elevation: 8,
-        backgroundColor: colorScheme.surface,
+        elevation: 0,
+        backgroundColor: colorScheme.surfaceContainerHigh,
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
@@ -81,26 +81,26 @@ class DeviceLockDialog extends StatelessWidget {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: colorScheme.errorContainer.withValues(alpha: 0.7),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.red.shade200, width: 2),
+                  border: Border.all(color: colorScheme.error.withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: Icon(
                   Icons.phonelink_lock_rounded,
-                  color: Colors.red.shade800,
+                  color: colorScheme.error,
                   size: 38,
                 ),
               ),
               const SizedBox(height: 18),
 
               // 2. Title
-              const Text(
+              Text(
                 'تنبيه أمان: الحساب مقترن بجهاز آخر',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 10),
@@ -122,15 +122,15 @@ class DeviceLockDialog extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50.withValues(alpha: 0.6),
+                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                 ),
                 child: Column(
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.check_circle_rounded, color: Colors.green.shade700, size: 18),
+                        Icon(Icons.check_circle_rounded, color: colorScheme.primary, size: 18),
                         const SizedBox(width: 8),
                         const Text(
                           'الجهاز المعتمد للحساب:',
@@ -148,18 +148,18 @@ class DeviceLockDialog extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Colors.green.shade900,
+                            color: colorScheme.primary,
                           ),
                         ),
                       ),
                     ),
                     if (currentDeviceModel != null && currentDeviceModel!.isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      Divider(height: 1, color: Colors.red.shade200),
+                      Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(Icons.cancel_rounded, color: Colors.red.shade700, size: 18),
+                          Icon(Icons.cancel_rounded, color: colorScheme.error, size: 18),
                           const SizedBox(width: 8),
                           const Text(
                             'الجهاز الحالي المستخدم:',
@@ -177,7 +177,7 @@ class DeviceLockDialog extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Colors.red.shade900,
+                              color: colorScheme.error,
                             ),
                           ),
                         ),
@@ -200,7 +200,7 @@ class DeviceLockDialog extends StatelessWidget {
 
               const SizedBox(height: 18),
 
-              // 5. Direct Action Call Support Button (01211857725)
+              // 5. Direct Action Call Support Button
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -211,8 +211,6 @@ class DeviceLockDialog extends StatelessWidget {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                   ),
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.teal.shade700,
-                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
@@ -226,13 +224,13 @@ class DeviceLockDialog extends StatelessWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => _openWhatsApp(context),
-                  icon: const Icon(Icons.chat_rounded, size: 18, color: Colors.green),
-                  label: const Text(
+                  icon: Icon(Icons.chat_rounded, size: 18, color: colorScheme.secondary),
+                  label: Text(
                     'مراسلة الدعم الفني عبر واتساب',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.secondary),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.green, width: 1.2),
+                    side: BorderSide(color: colorScheme.secondary.withValues(alpha: 0.5), width: 1.2),
                     padding: const EdgeInsets.symmetric(vertical: 11),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),

@@ -106,13 +106,13 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
+                Icon(
                   Icons.error_outline_rounded,
-                  color: Colors.red,
+                  color: theme.colorScheme.error,
                   size: 48,
                 ),
                 const SizedBox(height: 16),
-                Text(state.message, style: const TextStyle(color: Colors.red)),
+                Text(state.message, style: TextStyle(color: theme.colorScheme.error)),
                 const SizedBox(height: 16),
                 FilledButton.tonal(
                   onPressed: () {
@@ -165,7 +165,7 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
                     color: theme.colorScheme.surface,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
+                        color: theme.colorScheme.shadow.withValues(alpha: 0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -209,7 +209,7 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
                             children: [
                               FilterChip(
                                 avatar: _selectedOrgUID == null
-                                    ? const Icon(Icons.check, size: 14)
+                                    ? const Icon(Icons.check_rounded, size: 14)
                                     : const Icon(Icons.business_rounded,
                                         size: 14),
                                 label: Text(l10n.all),
@@ -226,7 +226,7 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
                                       const EdgeInsetsDirectional.only(start: 6),
                                   child: FilterChip(
                                     avatar: isSelected
-                                        ? Icon(Icons.check, size: 14, color: chipFg)
+                                        ? Icon(Icons.check_rounded, size: 14, color: chipFg)
                                         : null,
                                     label: Text(entry.value),
                                     labelStyle: TextStyle(
@@ -468,15 +468,16 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
   }
 
   Color _getStatusColor(BuildContext context, DelegateStatus status) {
+    final colorScheme = Theme.of(context).colorScheme;
     switch (status) {
       case DelegateStatus.active:
       case DelegateStatus.approved:
-        return Colors.green;
+        return colorScheme.primary;
       case DelegateStatus.suspended:
       case DelegateStatus.rejected:
-        return Theme.of(context).colorScheme.error;
+        return colorScheme.error;
       case DelegateStatus.pending:
-        return Colors.orange;
+        return colorScheme.secondary;
     }
   }
 }
@@ -681,36 +682,43 @@ class _CompactDelegateTile extends StatelessWidget {
   Future<void> _confirmForceLogout(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.logout_rounded, color: Colors.deepOrange),
-            SizedBox(width: 8),
-            Text('تسجيل خروج إجباري'),
+      builder: (ctx) {
+        final colorScheme = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.logout_rounded, color: colorScheme.error),
+              const SizedBox(width: 8),
+              const Text('تسجيل خروج إجباري'),
+            ],
+          ),
+          content: Text(
+            'هل تريد إجبار المندوب "${delegate.fullName}" على تسجيل الخروج؟\n\n'
+            'سيتم إعادته لشاشة تسجيل الدخول لإدخال رقم الهاتف والرقم القومي للتحقق من شركته الحالية وتحديث بياناته.',
+            style: const TextStyle(fontSize: 14, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              icon: const Icon(Icons.logout_rounded, size: 18),
+              label: const Text('تأكيد الخروج الإجباري'),
+            ),
           ],
-        ),
-        content: Text(
-          'هل تريد إجبار المندوب "${delegate.fullName}" على تسجيل الخروج؟\n\n'
-          'سيتم إعادته لشاشة تسجيل الدخول لإدخال رقم الهاتف والرقم القومي للتحقق من شركته الحالية وتحديث بياناته.',
-          style: const TextStyle(fontSize: 14, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.deepOrange),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            icon: const Icon(Icons.logout_rounded, size: 18),
-            label: const Text('تأكيد الخروج الإجباري'),
-          ),
-        ],
-      ),
+        );
+      },
     );
 
     if (confirmed == true && context.mounted) {
+      final colorScheme = Theme.of(context).colorScheme;
       final success = await SessionManagementService.forceLogoutDelegate(
         delegateUid: delegate.uid,
         organizationUID: delegate.organizationUID,
@@ -725,16 +733,19 @@ class _CompactDelegateTile extends StatelessWidget {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('تم تسجيل خروج المندوب "${delegate.fullName}" بنجاح.'),
-              backgroundColor: Colors.green,
+              content: Text(
+                'تم تسجيل خروج المندوب "${delegate.fullName}" بنجاح.',
+                style: TextStyle(color: colorScheme.onPrimaryContainer),
+              ),
+              backgroundColor: colorScheme.primaryContainer,
             ),
           );
           onRefresh?.call();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فشل تنفيذ تسجيل الخروج الإجباري'),
-              backgroundColor: Colors.red,
+            SnackBar(
+              content: const Text('فشل تنفيذ تسجيل الخروج الإجباري'),
+              backgroundColor: colorScheme.error,
             ),
           );
         }
@@ -801,15 +812,16 @@ class _CompactDelegateTile extends StatelessWidget {
   }
 
   Color _getStatusColor(BuildContext context, DelegateStatus status) {
+    final colorScheme = Theme.of(context).colorScheme;
     switch (status) {
       case DelegateStatus.active:
       case DelegateStatus.approved:
-        return Colors.green;
+        return colorScheme.primary;
       case DelegateStatus.suspended:
       case DelegateStatus.rejected:
-        return Theme.of(context).colorScheme.error;
+        return colorScheme.error;
       case DelegateStatus.pending:
-        return Colors.orange;
+        return colorScheme.secondary;
     }
   }
 
@@ -946,12 +958,10 @@ class _CompactDelegateTile extends StatelessWidget {
                 IconButton.filledTonal(
                   visualDensity: VisualDensity.compact,
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.green.withValues(
+                    backgroundColor: theme.colorScheme.primary.withValues(
                       alpha: theme.brightness == Brightness.dark ? 0.25 : 0.15,
                     ),
-                    foregroundColor: theme.brightness == Brightness.dark
-                        ? Colors.greenAccent[200]
-                        : const Color(0xFF1B5E20),
+                    foregroundColor: theme.colorScheme.primary,
                     padding: const EdgeInsets.all(8),
                     minimumSize: const Size(36, 36),
                   ),
@@ -1014,16 +1024,15 @@ class _CompactDelegateTile extends StatelessWidget {
                   tooltip: l10n.viewProfileData,
                   icon: const Icon(Icons.person_search_rounded, size: 18),
                 ),
-                if (adminDelegate?.role == UserRole.superAdmin ||
-                    adminDelegate?.role == UserRole.admin) ...[
+                if (adminDelegate?.role == UserRole.superAdmin) ...[
                   const SizedBox(width: 6),
                   IconButton.filledTonal(
                     visualDensity: VisualDensity.compact,
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.deepOrange.withValues(
+                      backgroundColor: theme.colorScheme.error.withValues(
                         alpha: theme.brightness == Brightness.dark ? 0.25 : 0.15,
                       ),
-                      foregroundColor: Colors.deepOrange,
+                      foregroundColor: theme.colorScheme.error,
                       padding: const EdgeInsets.all(8),
                       minimumSize: const Size(36, 36),
                     ),

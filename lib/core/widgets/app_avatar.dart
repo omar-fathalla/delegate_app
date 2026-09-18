@@ -11,6 +11,7 @@ class AppAvatar extends StatelessWidget {
   final Color? backgroundColor;
   final Color? foregroundColor;
   final Widget? badge;
+  final IconData? fallbackIcon;
 
   const AppAvatar({
     super.key,
@@ -20,6 +21,7 @@ class AppAvatar extends StatelessWidget {
     this.backgroundColor,
     this.foregroundColor,
     this.badge,
+    this.fallbackIcon,
   });
 
   @override
@@ -37,14 +39,20 @@ class AppAvatar extends StatelessWidget {
         height: size,
         color: bg,
         alignment: Alignment.center,
-        child: Text(
-          initial,
-          style: TextStyle(
-            color: fg,
-            fontWeight: FontWeight.bold,
-            fontSize: radius * 0.85,
-          ),
-        ),
+        child: fallbackIcon != null
+            ? Icon(
+                fallbackIcon,
+                color: fg,
+                size: radius * 1.15,
+              )
+            : Text(
+                initial,
+                style: TextStyle(
+                  color: fg,
+                  fontWeight: FontWeight.bold,
+                  fontSize: radius * 0.85,
+                ),
+              ),
       );
     }
 

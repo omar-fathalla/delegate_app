@@ -29,15 +29,16 @@ class _ManageOrganizationsPageState extends State<ManageOrganizationsPage> {
     showDialog(
       context: context,
       builder: (ctx) {
+        final colorScheme = Theme.of(ctx).colorScheme;
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Row(
+              title: Row(
                 children: [
-                  Icon(Icons.add_business_rounded, color: Color(0xFF6B4B00)),
-                  SizedBox(width: 8),
-                  Text(
+                  Icon(Icons.add_business_rounded, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Text(
                     'إضافة منظمة / سلسلة جديدة',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
@@ -79,7 +80,7 @@ class _ManageOrganizationsPageState extends State<ManageOrganizationsPage> {
                         decoration: const InputDecoration(
                           labelText: 'العنوان / المركز الرئيسي',
                           hintText: 'مثال: الإسكندرية، سموحة...',
-                          prefixIcon: Icon(Icons.location_on_outlined),
+                          prefixIcon: Icon(Icons.location_on_rounded),
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -93,9 +94,6 @@ class _ManageOrganizationsPageState extends State<ManageOrganizationsPage> {
                   child: const Text('إلغاء'),
                 ),
                 FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF6B4B00),
-                  ),
                   onPressed: isSaving
                       ? null
                       : () async {
@@ -135,10 +133,10 @@ class _ManageOrganizationsPageState extends State<ManageOrganizationsPage> {
                           }
                         },
                   child: isSaving
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary),
                         )
                       : const Text('حفظ المنظمة'),
                 ),
@@ -214,10 +212,10 @@ class _ManageOrganizationsPageState extends State<ManageOrganizationsPage> {
                 }
 
                 if (filtered.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'لا توجد منظمات مسجلة حتى الآن.',
-                      style: TextStyle(fontSize: 15, color: Colors.grey),
+                      style: TextStyle(fontSize: 15, color: colorScheme.onSurfaceVariant),
                     ),
                   );
                 }
@@ -258,7 +256,9 @@ class _ManageOrganizationsPageState extends State<ManageOrganizationsPage> {
                         trailing: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: isActive ? Colors.green.shade50 : Colors.grey.shade100,
+                            color: isActive
+                                ? colorScheme.primaryContainer.withValues(alpha: 0.5)
+                                : colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -266,7 +266,7 @@ class _ManageOrganizationsPageState extends State<ManageOrganizationsPage> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: isActive ? Colors.green.shade800 : Colors.grey,
+                              color: isActive ? colorScheme.primary : colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -280,8 +280,6 @@ class _ManageOrganizationsPageState extends State<ManageOrganizationsPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF6B4B00),
-        foregroundColor: Colors.white,
         onPressed: _showAddOrganizationDialog,
         icon: const Icon(Icons.add_business_rounded),
         label: const Text(

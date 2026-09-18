@@ -1,5 +1,6 @@
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/notifications/domain/entities/notification_entity.dart';
+import 'package:delegate_app/features/notifications/data/models/notification_model.dart';
 import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -52,7 +53,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            Icon(Icons.delete_outline_rounded, color: colorScheme.error),
+            Icon(Icons.delete_rounded, color: colorScheme.error),
             const SizedBox(width: 8),
             Text(
               'حذف الإشعار',
@@ -109,6 +110,17 @@ class _NotificationListItemState extends State<NotificationListItem> {
     final colorScheme = Theme.of(context).colorScheme;
     final isUnread = !widget.notification.isRead;
 
+    // Sanitize title, body, and resolve sender info
+    final cleanTitle = NotificationModel.sanitizeText(widget.notification.title);
+    final cleanBody = NotificationModel.sanitizeText(widget.notification.body);
+    final rawSenderName = widget.notification.senderName?.trim();
+    final rawSenderRole = widget.notification.senderRole?.trim();
+
+    final displaySenderName = (rawSenderName != null && rawSenderName.isNotEmpty)
+        ? NotificationModel.sanitizeText(rawSenderName)
+        : 'إدارة النظام';
+    final displaySenderRoleArabic = NotificationModel.formatSenderRoleArabic(rawSenderRole);
+
     return Dismissible(
       key: Key(widget.notification.id),
       direction: DismissDirection.endToStart,
@@ -127,7 +139,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.delete_outline_rounded, color: colorScheme.onErrorContainer, size: 26),
+            Icon(Icons.delete_rounded, color: colorScheme.onErrorContainer, size: 24),
             const SizedBox(width: 8),
             Text(
               'حذف',
@@ -147,13 +159,13 @@ class _NotificationListItemState extends State<NotificationListItem> {
           side: BorderSide(
             color: isUnread
                 ? colorScheme.primary.withValues(alpha: 0.35)
-                : colorScheme.outlineVariant.withValues(alpha: 0.5),
-            width: isUnread ? 1.4 : 1,
+                : colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: isUnread ? 1.3 : 0.9,
           ),
         ),
         color: isUnread
-            ? colorScheme.surfaceContainerHigh
-            : colorScheme.surfaceContainerLow,
+            ? colorScheme.surfaceContainerLow
+            : colorScheme.surfaceContainerLowest,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
@@ -194,7 +206,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  widget.notification.title,
+                                  cleanTitle,
                                   style: TextStyle(
                                     fontSize: 14.5,
                                     fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
@@ -230,9 +242,9 @@ class _NotificationListItemState extends State<NotificationListItem> {
                     ),
                     IconButton(
                       icon: Icon(
-                        Icons.delete_outline_rounded,
-                        size: 20,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                        Icons.delete_rounded,
+                        size: 19,
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                       ),
                       tooltip: 'حذف الإشعار',
                       onPressed: _confirmDelete,
@@ -243,11 +255,47 @@ class _NotificationListItemState extends State<NotificationListItem> {
                   ],
                 ),
 
-                const SizedBox(height: 8),
+                // Sender Info Pill
+                Container(
+                  margin: const EdgeInsets.only(top: 8, bottom: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.person_pin_rounded,
+                        size: 13,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'المرسل: $displaySenderName ($displaySenderRoleArabic)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 4),
 
                 // Body text (compact or expanded)
                 Text(
-                  widget.notification.body,
+                  cleanBody,
                   style: TextStyle(
                     fontSize: 13,
                     color: colorScheme.onSurfaceVariant,
@@ -260,7 +308,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                 // Expanded Action Buttons
                 if (_isExpanded) ...[
                   const SizedBox(height: 10),
-                  Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
                   const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -274,7 +322,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                           if (isUnread)
                             TextButton.icon(
                               onPressed: _markAsRead,
-                              icon: Icon(Icons.done_all_rounded, size: 16, color: colorScheme.primary),
+                              icon: Icon(Icons.check_circle_rounded, size: 16, color: colorScheme.primary),
                               label: Text(
                                 'تعليم كمقروء',
                                 style: TextStyle(
@@ -318,6 +366,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
     );
   }
 
+
   IconData _getIcon(String type) {
     switch (type) {
       case 'attendance_check_in':
@@ -340,6 +389,10 @@ class _NotificationListItemState extends State<NotificationListItem> {
       case 'support_alert':
       case 'support_direct':
         return Icons.support_agent_rounded;
+      case 'wallet_allocation':
+        return Icons.account_balance_wallet_rounded;
+      case 'wallet_payout':
+        return Icons.payments_rounded;
       case 'update':
         return Icons.system_update_rounded;
       case 'announcement':
@@ -365,6 +418,9 @@ class _NotificationListItemState extends State<NotificationListItem> {
       case 'subscription_approved':
       case 'task':
         return colorScheme.primary;
+      case 'wallet_allocation':
+      case 'wallet_payout':
+        return Colors.teal.shade700;
       case 'support_alert':
       case 'support_direct':
         return colorScheme.secondary;
@@ -391,6 +447,9 @@ class _NotificationListItemState extends State<NotificationListItem> {
       case 'delegate_subscription_request':
       case 'subscription_approved':
         return colorScheme.primaryContainer;
+      case 'wallet_allocation':
+      case 'wallet_payout':
+        return Colors.teal.shade50;
       case 'task':
         return colorScheme.primaryContainer.withValues(alpha: 0.6);
       case 'support_alert':

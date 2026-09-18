@@ -233,10 +233,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   Future<void> _exportToCSV(List<Map<String, dynamic>> logs) async {
     if (logs.isEmpty) {
       if (mounted) {
+        final colorScheme = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('لا توجد سجلات لتصديرها حالياً'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: const Text('لا توجد سجلات لتصديرها حالياً'),
+            backgroundColor: colorScheme.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -319,7 +320,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             : (ipCity.isNotEmpty ? '$ipCity ($ipIsp)' : '');
         final ipAddress = data['ipAddress']?.toString() ?? '';
         final actionType = data['actionType']?.toString() ?? 'تسجيل حضور/انصراف';
-        const status = 'محظورة ⛔ (Fake GPS)';
+        const status = 'محظورة (Fake GPS)';
 
         buffer.writeln([
           index,
@@ -354,10 +355,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final colorScheme = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('حدث خطأ أثناء تصدير الملف: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: colorScheme.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -376,12 +378,13 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     String? orgId,
     String? compId,
   }) async {
+    final colorScheme = Theme.of(context).colorScheme;
     if (delegateUid.trim().isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تعذر تحديد معرف المندوب'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: const Text('تعذر تحديد معرف المندوب'),
+            backgroundColor: colorScheme.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -393,11 +396,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.phonelink_erase_rounded, color: Colors.amber, size: 28),
-            SizedBox(width: 8),
-            Text('فك ربط الجهاز', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Icon(Icons.phonelink_erase_rounded, color: colorScheme.primary, size: 28),
+            const SizedBox(width: 8),
+            const Text('فك ربط الجهاز', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           ],
         ),
         content: Column(
@@ -409,15 +412,15 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.amber.shade50,
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.shade200),
+                border: Border.all(color: colorScheme.outlineVariant),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
+                  Icon(Icons.info_outline_rounded, color: colorScheme.primary, size: 20),
+                  const SizedBox(width: 8),
+                  const Expanded(
                     child: Text(
                       'سيتمكن المندوب من ربط جهازه الجديد تلقائياً بمجرد تسجيل دخوله القادم.',
                       style: TextStyle(fontSize: 12, height: 1.3),
@@ -433,11 +436,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('إلغاء'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber.shade800,
-              foregroundColor: Colors.white,
-            ),
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('تأكيد فك الربط'),
           ),
@@ -458,7 +457,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('تم فك ربط جهاز المندوب "$delegateName" بنجاح. يستطيع الآن الدخول من هاتفه الجديد.'),
-              backgroundColor: Colors.green,
+              backgroundColor: colorScheme.primary,
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -468,7 +467,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('حدث خطأ أثناء فك الربط: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: colorScheme.error,
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -478,12 +477,13 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   }
 
   Future<void> _deleteAuditLog(BuildContext context, String docId, String delegateName) async {
+    final colorScheme = Theme.of(context).colorScheme;
     if (docId.trim().isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تعذر تحديد معرف السجل الأمني'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: const Text('تعذر تحديد معرف السجل الأمني'),
+            backgroundColor: colorScheme.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -495,11 +495,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.delete_forever_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 8),
-            Text('حذف السجل الأمني', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Icon(Icons.delete_forever_rounded, color: colorScheme.error, size: 28),
+            const SizedBox(width: 8),
+            const Text('حذف السجل الأمني', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           ],
         ),
         content: Text('هل أنت متأكد من حذف سجل المخالفة الأمني للمندوب "$delegateName"؟'),
@@ -508,10 +508,10 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('إلغاء'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('تأكيد الحذف'),
@@ -525,9 +525,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         await FirebaseFirestore.instance.collection('security_audit_logs').doc(docId).delete();
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم حذف السجل الأمني بنجاح'),
-              backgroundColor: Colors.green,
+            SnackBar(
+              content: const Text('تم حذف السجل الأمني بنجاح'),
+              backgroundColor: colorScheme.primary,
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -537,7 +537,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('حدث خطأ أثناء الحذف: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: colorScheme.error,
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -760,7 +760,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: _selectedBranchFilter != 'all'
-                                ? Colors.amber.shade700
+                                ? colorScheme.primary
                                 : colorScheme.outlineVariant.withValues(alpha: 0.5),
                             width: _selectedBranchFilter != 'all' ? 1.5 : 1.0,
                           ),
@@ -775,7 +775,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                             icon: Icon(
                               Icons.arrow_drop_down_rounded,
                               color: _selectedBranchFilter != 'all'
-                                  ? Colors.amber.shade900
+                                  ? colorScheme.primary
                                   : colorScheme.onSurfaceVariant,
                             ),
                             items: [
@@ -819,7 +819,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                                       Icon(
                                         Icons.location_on_rounded,
                                         size: 18,
-                                        color: Colors.amber.shade800,
+                                        color: colorScheme.primary,
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
@@ -831,7 +831,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                                                 : FontWeight.w500,
                                             fontSize: 13,
                                             color: _selectedBranchFilter == branchName
-                                                ? Colors.amber.shade900
+                                                ? colorScheme.primary
                                                 : null,
                                           ),
                                           overflow: TextOverflow.ellipsis,
@@ -897,22 +897,13 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          FilledButton.icon(
+                          IconButton.filled(
                             onPressed: () {
                               setState(() => _searchQuery = _searchController.text.trim());
                               FocusScope.of(context).unfocus();
                             },
-                            icon: const Icon(Icons.search_rounded, size: 18),
-                            label: Text(
-                              isArabic ? 'بحث' : 'Search',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red.shade800,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
+                            icon: const Icon(Icons.search_rounded, size: 20),
+                            tooltip: isArabic ? 'بحث' : 'Search',
                           ),
                         ],
                       ),
@@ -921,13 +912,13 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade50,
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.red.shade200),
+                            border: Border.all(color: colorScheme.outlineVariant),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.filter_alt_rounded, size: 16, color: Colors.red.shade800),
+                              Icon(Icons.filter_alt_rounded, size: 16, color: colorScheme.primary),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
@@ -937,7 +928,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.red.shade900,
+                                    color: colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -954,11 +945,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                                       style: TextStyle(
                                         fontSize: 11.5,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.red.shade700,
+                                        color: colorScheme.error,
                                       ),
                                     ),
                                     const SizedBox(width: 2),
-                                    Icon(Icons.close_rounded, size: 14, color: Colors.red.shade700),
+                                    Icon(Icons.close_rounded, size: 14, color: colorScheme.error),
                                   ],
                                 ),
                               ),
@@ -1013,7 +1004,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                         ),
                       ),
                       if (filteredLogs.isNotEmpty)
-                        FilledButton.tonalIcon(
+                        IconButton.filledTonal(
                           onPressed: _isExporting ? null : () => _exportToCSV(filteredLogs),
                           icon: _isExporting
                               ? const SizedBox(
@@ -1021,20 +1012,8 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                                   height: 16,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Icon(Icons.file_download_rounded, size: 18),
-                          label: Text(
-                            isArabic ? 'تصدير إكسيل' : 'Export Excel',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.green.shade50,
-                            foregroundColor: Colors.green.shade900,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              side: BorderSide(color: Colors.green.shade300),
-                            ),
-                          ),
+                              : const Icon(Icons.file_download_rounded, size: 20),
+                          tooltip: isArabic ? 'تصدير إكسيل' : 'Export Excel',
                         ),
                     ],
                   ),
@@ -1054,7 +1033,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                           Icon(
                             Icons.verified_user_rounded,
                             size: 64,
-                            color: Colors.green.shade400,
+                            color: colorScheme.primary,
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -1107,7 +1086,17 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
 
     if (widget.showAppBar) {
       return Scaffold(
+        backgroundColor: colorScheme.surfaceContainerLowest,
         appBar: AppBar(
+          backgroundColor: colorScheme.surfaceContainer,
+          elevation: 0,
+          scrolledUnderElevation: 2.0,
+          shape: Border(
+            bottom: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              width: 0.8,
+            ),
+          ),
           title: Text(
             isArabic ? 'سجل الأمان وكشف التزييف' : 'Security & Anti-Fraud Logs',
             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1150,25 +1139,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.red.shade900,
-            Colors.red.shade800,
-            Colors.deepOrange.shade900,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.shade900.withValues(alpha: 0.25),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
       ),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1177,13 +1152,13 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: colorScheme.errorContainer,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.security_rounded,
-                  color: Colors.white,
-                  size: 26,
+                  color: colorScheme.onErrorContainer,
+                  size: 24,
                 ),
               ),
               const SizedBox(width: 12),
@@ -1193,9 +1168,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                   children: [
                     Text(
                       isArabic ? 'منظومة كشف التزييف والأمان' : 'Anti-Fraud & Security Monitor',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1205,7 +1180,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                           ? 'رصد محاولات الـ Fake GPS وبصمات الأجهزة المخالفة'
                           : 'Real-time mock GPS & device fingerprint tracking',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: colorScheme.onSurfaceVariant,
                         fontSize: 11,
                       ),
                     ),
@@ -1214,20 +1189,22 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
           const SizedBox(height: 14),
+          Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.4), height: 1),
+          const SizedBox(height: 12),
 
           // Stat row
           Row(
             children: [
               _buildStatBox(
+                colorScheme: colorScheme,
                 title: isArabic ? 'إجمالي المحاولات' : 'Total Attempts',
                 value: '$totalAttempts',
                 icon: Icons.gavel_rounded,
               ),
               const SizedBox(width: 8),
               _buildStatBox(
+                colorScheme: colorScheme,
                 title: isArabic ? 'اليوم' : 'Today',
                 value: '$todayAttempts',
                 icon: Icons.today_rounded,
@@ -1235,12 +1212,14 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               ),
               const SizedBox(width: 8),
               _buildStatBox(
+                colorScheme: colorScheme,
                 title: isArabic ? 'المناديب' : 'Delegates',
                 value: '$uniqueDelegatesCount',
                 icon: Icons.people_outline_rounded,
               ),
               const SizedBox(width: 8),
               _buildStatBox(
+                colorScheme: colorScheme,
                 title: isArabic ? 'الأجهزة' : 'Devices',
                 value: '$uniqueDevicesCount',
                 icon: Icons.phone_android_rounded,
@@ -1253,6 +1232,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   }
 
   Widget _buildStatBox({
+    required ColorScheme colorScheme,
     required String title,
     required String value,
     required IconData icon,
@@ -1263,19 +1243,21 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           color: isHighlight
-              ? Colors.amber.withValues(alpha: 0.25)
-              : Colors.white.withValues(alpha: 0.12),
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(12),
-          border: isHighlight
-              ? Border.all(color: Colors.amber.shade300, width: 1.2)
-              : null,
+          border: Border.all(
+            color: isHighlight
+                ? colorScheme.primary.withValues(alpha: 0.3)
+                : colorScheme.outlineVariant.withValues(alpha: 0.4),
+          ),
         ),
         child: Column(
           children: [
             Text(
               value,
               style: TextStyle(
-                color: isHighlight ? Colors.amber.shade200 : Colors.white,
+                color: isHighlight ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -1284,7 +1266,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             Text(
               title,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
+                color: isHighlight
+                    ? colorScheme.onPrimaryContainer.withValues(alpha: 0.8)
+                    : colorScheme.onSurfaceVariant,
                 fontSize: 10,
               ),
               maxLines: 1,
@@ -1337,10 +1321,10 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
+      elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.red.shade200.withValues(alpha: 0.8)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.7)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -1351,8 +1335,8 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: Colors.red.shade50,
-                  foregroundColor: Colors.red.shade800,
+                  backgroundColor: colorScheme.errorContainer,
+                  foregroundColor: colorScheme.onErrorContainer,
                   radius: 20,
                   child: const Icon(Icons.person_off_rounded, size: 22),
                 ),
@@ -1404,7 +1388,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                   Icon(
                     isApple ? Icons.phone_iphone_rounded : Icons.phone_android_rounded,
                     size: 18,
-                    color: isApple ? Colors.black87 : Colors.teal.shade800,
+                    color: colorScheme.primary,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -1433,21 +1417,21 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.shade300),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.storefront_rounded, size: 15, color: Colors.amber.shade900),
+                      Icon(Icons.storefront_rounded, size: 15, color: colorScheme.primary),
                       const SizedBox(width: 5),
                       Text(
                         'الفرع: $branchName',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.bold,
-                          color: Colors.amber.shade900,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -1498,14 +1482,14 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                   // Attempt Timestamp Row
                   Row(
                     children: [
-                      Icon(Icons.schedule_rounded, size: 16, color: Colors.green.shade700),
+                      Icon(Icons.schedule_rounded, size: 16, color: colorScheme.primary),
                       const SizedBox(width: 6),
                       Text(
                         'توقيت المحاولة: ',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.bold,
-                          color: Colors.green.shade800,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                       Expanded(
@@ -1520,16 +1504,16 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade50,
+                          color: colorScheme.errorContainer,
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.red.shade200),
+                          border: Border.all(color: colorScheme.error.withValues(alpha: 0.3)),
                         ),
                         child: Text(
-                          'محظورة ⛔',
+                          'محظورة',
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
-                            color: Colors.red.shade900,
+                            color: colorScheme.onErrorContainer,
                           ),
                         ),
                       ),
@@ -1549,14 +1533,14 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                           child: Row(
                             children: [
-                              Icon(Icons.location_on_outlined, size: 16, color: Colors.deepOrange.shade700),
+                              Icon(Icons.location_on_rounded, size: 16, color: colorScheme.primary),
                               const SizedBox(width: 6),
                               Text(
                                 'الإحداثيات المرصودة: ',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.deepOrange.shade800,
+                                  color: colorScheme.onSurface,
                                 ),
                               ),
                               Expanded(
@@ -1565,30 +1549,30 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.deepOrange.shade900,
+                                    color: colorScheme.primary,
                                     decoration: TextDecoration.underline,
-                                    decorationColor: Colors.deepOrange.shade300,
+                                    decorationColor: colorScheme.primary.withValues(alpha: 0.5),
                                   ),
                                 ),
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: Colors.deepOrange.shade50,
+                                  color: colorScheme.primaryContainer,
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.deepOrange.shade200),
+                                  border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.map_rounded, size: 12, color: Colors.deepOrange.shade800),
+                                    Icon(Icons.map_rounded, size: 12, color: colorScheme.onPrimaryContainer),
                                     const SizedBox(width: 3),
                                     Text(
                                       'عرض بالخريطة',
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.deepOrange.shade800,
+                                        color: colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                   ],
@@ -1607,14 +1591,14 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.wifi_tethering_rounded, size: 16, color: Colors.blue.shade700),
+                        Icon(Icons.wifi_tethering_rounded, size: 16, color: colorScheme.primary),
                         const SizedBox(width: 6),
                         Text(
                           'اتصال الإنترنت الفعلي: ',
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade800,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                         Expanded(
@@ -1625,7 +1609,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                             style: TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w600,
-                              color: Colors.blue.shade900,
+                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -1638,14 +1622,14 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(Icons.event_note_rounded, size: 16, color: Colors.indigo.shade700),
+                        Icon(Icons.event_note_rounded, size: 16, color: colorScheme.primary),
                         const SizedBox(width: 6),
                         Text(
                           'نوع العملية: ',
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.bold,
-                            color: Colors.indigo.shade800,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                         Text(
@@ -1653,7 +1637,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.indigo.shade900,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -1665,49 +1649,43 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
 
             const SizedBox(height: 12),
 
-            // Action Buttons Bar
+            // Action Buttons Bar (Responsive & Icon-First)
             Row(
               children: [
+                if (lat != null && lng != null)
+                  IconButton.filledTonal(
+                    icon: const Icon(Icons.map_rounded, size: 18),
+                    tooltip: 'عرض الموقع على الخريطة',
+                    onPressed: () => _openLocationOnMap(lat, lng),
+                  ),
                 if (delegatePhone.isNotEmpty) ...[
+                  const SizedBox(width: 6),
                   IconButton.filledTonal(
                     icon: const Icon(Icons.phone_rounded, size: 18),
-                    tooltip: 'اتصال هاتفي بالمندوب',
+                    tooltip: 'اتصال هاتفي',
                     onPressed: () => _makePhoneCall(delegatePhone),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.green.shade50,
-                      foregroundColor: Colors.green.shade800,
-                    ),
                   ),
                   const SizedBox(width: 6),
                   IconButton.filledTonal(
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                    icon: const Icon(Icons.chat_rounded, size: 18),
                     tooltip: 'مراسلة عبر واتساب',
                     onPressed: () => _openWhatsApp(delegatePhone),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.teal.shade50,
-                      foregroundColor: Colors.teal.shade800,
-                    ),
                   ),
-                  const SizedBox(width: 6),
                 ],
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _createPenaltyForDelegate(context, data),
-                    icon: const Icon(Icons.gavel_rounded, size: 16),
-                    label: const Text('تطبيق غرامة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.red.shade50,
-                      foregroundColor: Colors.red.shade900,
-                      side: BorderSide(color: Colors.red.shade300),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
+                const SizedBox(width: 6),
+                IconButton.filledTonal(
+                  style: IconButton.styleFrom(
+                    backgroundColor: colorScheme.errorContainer,
+                    foregroundColor: colorScheme.onErrorContainer,
                   ),
+                  icon: const Icon(Icons.gavel_rounded, size: 18),
+                  tooltip: 'تطبيق مخالفة وغرامة للمندوب',
+                  onPressed: () => _createPenaltyForDelegate(context, data),
                 ),
                 const SizedBox(width: 6),
                 IconButton.filledTonal(
                   icon: const Icon(Icons.phonelink_erase_rounded, size: 18),
-                  tooltip: 'فك ربط جهاز المندوب (إعادة تعيين الجهاز)',
+                  tooltip: 'فك ربط جهاز المندوب',
                   onPressed: () => _resetDelegateDevice(
                     context,
                     data['delegateUid']?.toString() ?? '',
@@ -1715,14 +1693,10 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     orgId: data['organizationUID']?.toString(),
                     compId: data['companyUID']?.toString(),
                   ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.amber.shade50,
-                    foregroundColor: Colors.amber.shade900,
-                  ),
                 ),
-                const SizedBox(width: 6),
+                const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.grey, size: 20),
+                  icon: Icon(Icons.delete_outline_rounded, color: colorScheme.outline, size: 19),
                   tooltip: 'حذف السجل',
                   onPressed: () => _deleteAuditLog(context, docId, delegateName),
                 ),
@@ -1754,7 +1728,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
                   color: _currentTab == 'violations'
-                      ? Colors.red.shade800
+                      ? colorScheme.primary
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1765,7 +1739,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                       Icons.security_rounded,
                       size: 18,
                       color: _currentTab == 'violations'
-                          ? Colors.white
+                          ? colorScheme.onPrimary
                           : colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
@@ -1775,7 +1749,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                         fontSize: 12.5,
                         fontWeight: FontWeight.bold,
                         color: _currentTab == 'violations'
-                            ? Colors.white
+                            ? colorScheme.onPrimary
                             : colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -1794,7 +1768,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
                   color: _currentTab == 'devices'
-                      ? Colors.teal.shade800
+                      ? colorScheme.primary
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1805,7 +1779,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                       Icons.phonelink_lock_rounded,
                       size: 18,
                       color: _currentTab == 'devices'
-                          ? Colors.white
+                          ? colorScheme.onPrimary
                           : colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
@@ -1815,7 +1789,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                         fontSize: 12.5,
                         fontWeight: FontWeight.bold,
                         color: _currentTab == 'devices'
-                            ? Colors.white
+                            ? colorScheme.onPrimary
                             : colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -1904,19 +1878,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.teal.shade900, Colors.teal.shade800, Colors.cyan.shade900],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.teal.shade900.withValues(alpha: 0.25),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1926,28 +1890,28 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: colorScheme.primaryContainer,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.phonelink_lock_rounded, color: Colors.white, size: 22),
+                          child: Icon(Icons.phonelink_lock_rounded, color: colorScheme.onPrimaryContainer, size: 22),
                         ),
                         const SizedBox(width: 10),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'منظومة قفل وربط أجهزة المناديب',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: colorScheme.onSurface,
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              SizedBox(height: 2),
+                              const SizedBox(height: 2),
                               Text(
                                 'حساب كل مندوب مقترن بهاتفه المعتمد لمنع تبادل الحسابات',
-                                style: TextStyle(color: Colors.white70, fontSize: 11),
+                                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
                               ),
                             ],
                           ),
@@ -1958,20 +1922,23 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     Row(
                       children: [
                         _buildStatBox(
+                          colorScheme: colorScheme,
                           title: 'إجمالي المناديب',
                           value: '${delegatesList.length}',
                           icon: Icons.people_outline_rounded,
                         ),
                         const SizedBox(width: 8),
                         _buildStatBox(
-                          title: 'أجهزة مقترنة 🔒',
+                          colorScheme: colorScheme,
+                          title: 'أجهزة مقترنة',
                           value: '$lockedCount',
                           icon: Icons.lock_rounded,
                           isHighlight: lockedCount > 0,
                         ),
                         const SizedBox(width: 8),
                         _buildStatBox(
-                          title: 'متاح للربط 🔓',
+                          colorScheme: colorScheme,
+                          title: 'متاح للربط',
                           value: '$unboundCount',
                           icon: Icons.lock_open_rounded,
                         ),
@@ -2026,22 +1993,13 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  FilledButton.icon(
+                  IconButton.filled(
                     onPressed: () {
                       setState(() => _deviceSearchQuery = _deviceSearchController.text.trim());
                       FocusScope.of(context).unfocus();
                     },
-                    icon: const Icon(Icons.search_rounded, size: 18),
-                    label: Text(
-                      isArabic ? 'بحث' : 'Search',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.teal.shade800,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
+                    icon: const Icon(Icons.search_rounded, size: 20),
+                    tooltip: isArabic ? 'بحث' : 'Search',
                   ),
                 ],
               ),
@@ -2050,13 +2008,13 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.teal.shade50,
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.teal.shade200),
+                    border: Border.all(color: colorScheme.outlineVariant),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.filter_alt_rounded, size: 16, color: Colors.teal.shade800),
+                      Icon(Icons.filter_alt_rounded, size: 16, color: colorScheme.primary),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -2066,7 +2024,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.teal.shade900,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -2083,11 +2041,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                               style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.red.shade700,
+                                color: colorScheme.error,
                               ),
                             ),
                             const SizedBox(width: 2),
-                            Icon(Icons.close_rounded, size: 14, color: Colors.red.shade700),
+                            Icon(Icons.close_rounded, size: 14, color: colorScheme.error),
                           ],
                         ),
                       ),
@@ -2135,11 +2093,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     padding: const EdgeInsets.all(32),
                     child: Column(
                       children: [
-                        Icon(Icons.person_search_rounded, size: 48, color: Colors.grey.shade400),
+                        Icon(Icons.person_search_rounded, size: 48, color: colorScheme.outlineVariant),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'لا يوجد مناديب مطابقين للبحث',
-                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                          style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -2172,11 +2130,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           setState(() => _deviceStatusFilter = key);
         }
       },
-      selectedColor: Colors.teal.shade100,
+      selectedColor: colorScheme.primaryContainer,
       labelStyle: TextStyle(
         fontSize: 11.5,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? Colors.teal.shade900 : colorScheme.onSurface,
+        color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
       ),
     );
   }
@@ -2207,11 +2165,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      elevation: 1.5,
+      elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isLocked ? Colors.teal.shade200 : Colors.amber.shade200,
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
         ),
       ),
       child: Padding(
@@ -2222,8 +2180,8 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: isLocked ? Colors.teal.shade50 : Colors.amber.shade50,
-                  foregroundColor: isLocked ? Colors.teal.shade800 : Colors.amber.shade900,
+                  backgroundColor: isLocked ? colorScheme.primaryContainer : colorScheme.surfaceContainerHighest,
+                  foregroundColor: isLocked ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
                   radius: 18,
                   child: Icon(
                     isLocked ? Icons.phonelink_lock_rounded : Icons.phonelink_setup_rounded,
@@ -2273,13 +2231,13 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.teal.shade50.withValues(alpha: 0.6),
+                  color: colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.teal.shade200),
+                  border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.phone_android_rounded, size: 16, color: Colors.teal.shade800),
+                    Icon(Icons.phone_android_rounded, size: 16, color: colorScheme.primary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
@@ -2290,18 +2248,18 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Colors.teal.shade900,
+                              color: colorScheme.onSurface,
                             ),
                           ),
                           if (boundDateStr.isNotEmpty)
                             Text(
                               'تاريخ الاعتماد: $boundDateStr',
-                              style: TextStyle(fontSize: 10, color: Colors.teal.shade700),
+                              style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
                             ),
                         ],
                       ),
                     ),
-                    FilledButton.tonalIcon(
+                    IconButton.filledTonal(
                       onPressed: () => _resetDelegateDevice(
                         context,
                         delegateUid,
@@ -2309,14 +2267,8 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                         orgId: orgId,
                         compId: compId,
                       ),
-                      icon: const Icon(Icons.phonelink_erase_rounded, size: 16),
-                      label: const Text('فك الربط', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.amber.shade100,
-                        foregroundColor: Colors.amber.shade900,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
+                      icon: const Icon(Icons.phonelink_erase_rounded, size: 18),
+                      tooltip: 'فك ربط الجهاز',
                     ),
                   ],
                 ),
@@ -2326,18 +2278,18 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.amber.shade50.withValues(alpha: 0.5),
+                  color: colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.amber.shade200),
+                  border: Border.all(color: colorScheme.outlineVariant),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.lock_open_rounded, size: 16, color: Colors.amber.shade800),
+                    Icon(Icons.lock_open_rounded, size: 16, color: colorScheme.onSurfaceVariant),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'متاح للربط: سيتم اعتماد أول هاتف يسجل منه المندوب تلقائياً.',
-                        style: TextStyle(fontSize: 11.5, color: Colors.black87),
+                        style: TextStyle(fontSize: 11.5, color: colorScheme.onSurfaceVariant),
                       ),
                     ),
                   ],

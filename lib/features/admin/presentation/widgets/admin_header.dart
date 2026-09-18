@@ -27,14 +27,20 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return AppBar(
-      backgroundColor: colorScheme.surface,
-      surfaceTintColor: colorScheme.surfaceTint,
-      scrolledUnderElevation: 3.0,
+      backgroundColor: colorScheme.surfaceContainer,
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 2.0,
       foregroundColor: colorScheme.onSurface,
       elevation: 0,
+      shape: Border(
+        bottom: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+          width: 0.8,
+        ),
+      ),
       leading: showBackButton
           ? IconButton(
-              icon: const Icon(Icons.arrow_back),
+              icon: const BackButtonIcon(),
               onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
             )
           : null,

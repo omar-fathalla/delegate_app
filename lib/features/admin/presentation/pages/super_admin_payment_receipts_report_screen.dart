@@ -194,10 +194,14 @@ class _SuperAdminPaymentReceiptsReportScreenState
       }
     } catch (e) {
       if (mounted) {
+        final colorScheme = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('فشل في تصدير التقرير، يرجى المحاولة لاحقاً.'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: Text(
+              'فشل في تصدير التقرير، يرجى المحاولة لاحقاً.',
+              style: TextStyle(color: colorScheme.onError),
+            ),
+            backgroundColor: colorScheme.error,
           ),
         );
       }
@@ -269,15 +273,15 @@ class _SuperAdminPaymentReceiptsReportScreenState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.analytics_outlined,
+            Icon(
+              Icons.analytics_rounded,
               size: 64,
-              color: Colors.grey,
+              color: colorScheme.outline,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'لا توجد إيصالات دفع مرفوعة حالياً.',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -296,9 +300,10 @@ class _SuperAdminPaymentReceiptsReportScreenState
                 child: _buildSummaryCard(
                   title: l10n.companiesWithUploads,
                   value: _companyReceipts.length.toString(),
-                  color: Colors.amber.shade100,
+                  color: colorScheme.primaryContainer,
                   icon: Icons.business_rounded,
-                  iconColor: Colors.amber.shade900,
+                  iconColor: colorScheme.onPrimaryContainer,
+                  textColor: colorScheme.onPrimaryContainer,
                 ),
               ),
               const SizedBox(width: 16),
@@ -306,9 +311,10 @@ class _SuperAdminPaymentReceiptsReportScreenState
                 child: _buildSummaryCard(
                   title: l10n.totalUploadedReceipts,
                   value: _totalReceiptsCount.toString(),
-                  color: Colors.orange.shade100,
+                  color: colorScheme.secondaryContainer,
                   icon: Icons.receipt_long_rounded,
-                  iconColor: Colors.orange.shade900,
+                  iconColor: colorScheme.onSecondaryContainer,
+                  textColor: colorScheme.onSecondaryContainer,
                 ),
               ),
             ],
@@ -317,7 +323,7 @@ class _SuperAdminPaymentReceiptsReportScreenState
           // Billing Data Table card
           Card(
             clipBehavior: Clip.antiAlias,
-            elevation: 2,
+            elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
@@ -328,7 +334,7 @@ class _SuperAdminPaymentReceiptsReportScreenState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
                       Expanded(
@@ -343,16 +349,10 @@ class _SuperAdminPaymentReceiptsReportScreenState
                         ),
                       ),
                       const SizedBox(width: 8),
-                      FilledButton.icon(
+                      IconButton.filledTonal(
                         onPressed: _exportToCSV,
-                        icon: const Icon(Icons.file_download_rounded, size: 18),
-                        label: const Text('تصدير Excel', style: TextStyle(fontSize: 12)),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
+                        icon: const Icon(Icons.file_download_rounded),
+                        tooltip: 'تصدير Excel',
                       ),
                     ],
                   ),
@@ -421,6 +421,7 @@ class _SuperAdminPaymentReceiptsReportScreenState
     required Color color,
     required IconData icon,
     required Color iconColor,
+    required Color textColor,
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -439,10 +440,10 @@ class _SuperAdminPaymentReceiptsReportScreenState
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: textColor.withValues(alpha: 0.8),
                   ),
                 ),
               ),
@@ -453,10 +454,10 @@ class _SuperAdminPaymentReceiptsReportScreenState
           const SizedBox(height: 12),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: textColor,
             ),
           ),
         ],

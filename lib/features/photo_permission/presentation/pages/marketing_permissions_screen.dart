@@ -106,7 +106,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم إلغاء تثبيت الفلتر 🔓'),
+            content: Text('تم إلغاء تثبيت الفلتر'),
             behavior: SnackBarBehavior.floating,
             duration: Duration(seconds: 2),
           ),
@@ -117,7 +117,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('يرجى اختيار قسم أو أكثر أولاً لتثبيته كافتراضي 📌'),
+              content: Text('يرجى اختيار قسم أو أكثر أولاً لتثبيته كافتراضي'),
               behavior: SnackBarBehavior.floating,
               duration: Duration(seconds: 2),
             ),
@@ -132,8 +132,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('تم تثبيت (${_selectedDepartments.length}) قسم كفلتر افتراضي 📌'),
-            backgroundColor: Colors.green,
+            content: Text('تم تثبيت (${_selectedDepartments.length}) قسم كفلتر افتراضي'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
           ),
@@ -401,7 +401,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.badge_outlined, size: 18, color: colorScheme.primary),
+                            Icon(Icons.badge_rounded, size: 18, color: colorScheme.primary),
                             const SizedBox(width: 8),
                             Text(
                               'اسم المشرف:',
@@ -419,7 +419,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            Icon(Icons.phone_outlined, size: 18, color: colorScheme.primary),
+                            Icon(Icons.phone_rounded, size: 18, color: colorScheme.primary),
                             const SizedBox(width: 8),
                             Text(
                               'رقم الهاتف:',
@@ -926,9 +926,18 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
         title: const Text('إدارة واعتماد أذونات التصوير'),
         centerTitle: true,
+        backgroundColor: colorScheme.surfaceContainer,
+        elevation: 0,
+        shape: Border(
+          bottom: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: 1,
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
@@ -961,7 +970,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.green,
+                backgroundColor: colorScheme.primary,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -970,7 +979,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.green,
+                backgroundColor: colorScheme.primary,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -1010,7 +1019,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
           // زر خاصية التثبيت
           ActionChip(
             avatar: Icon(
-              _isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+              Icons.push_pin_rounded,
               size: 16,
               color: _isPinned ? Colors.amber.shade900 : colorScheme.onSurfaceVariant,
             ),
@@ -1033,7 +1042,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             selected: _selectedDepartments.isEmpty,
             avatar: _selectedDepartments.isEmpty
                 ? const Icon(Icons.check_circle_rounded, size: 16)
-                : const Icon(Icons.category_outlined, size: 16),
+                : const Icon(Icons.category_rounded, size: 16),
             onSelected: (val) {
               if (val) {
                 setState(() {
@@ -1459,7 +1468,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(Icons.visibility_outlined, size: 14, color: colorScheme.primary),
+                    Icon(Icons.visibility_rounded, size: 14, color: colorScheme.primary),
                   ],
                 ),
               ),
@@ -1672,7 +1681,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(Icons.visibility_outlined, size: 14, color: colorScheme.primary),
+                    Icon(Icons.visibility_rounded, size: 14, color: colorScheme.primary),
                   ],
                 ),
               ),
@@ -1750,10 +1759,10 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       const SizedBox(width: 6),
                       IconButton(
                         onPressed: () => _confirmDeletePermission(context, permission),
-                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                        icon: Icon(Icons.delete_rounded, color: colorScheme.error, size: 20),
                         tooltip: 'حذف الإذن',
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.red.withValues(alpha: 0.1),
+                          backgroundColor: colorScheme.error.withValues(alpha: 0.1),
                           padding: const EdgeInsets.all(8),
                           minimumSize: const Size(36, 36),
                         ),
@@ -1787,6 +1796,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
   }
 
   Widget _buildStatusBadge(PhotoPermission permission) {
+    final colorScheme = Theme.of(context).colorScheme;
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     final status = permission.status.toLowerCase();
@@ -1796,65 +1806,65 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: Colors.orange.withValues(alpha: 0.15),
+          color: colorScheme.tertiaryContainer.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.orange.shade300),
+          border: Border.all(color: colorScheme.tertiary.withValues(alpha: 0.3)),
         ),
-        child: const Text(
-          'في انتظار الاعتماد ⏳',
-          style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold),
+        child: Text(
+          'في انتظار الاعتماد',
+          style: TextStyle(color: colorScheme.onTertiaryContainer, fontSize: 11, fontWeight: FontWeight.bold),
         ),
       );
     } else if (status == 'rejected') {
       badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.15),
+          color: colorScheme.errorContainer.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.red.shade300),
+          border: Border.all(color: colorScheme.error.withValues(alpha: 0.3)),
         ),
-        child: const Text(
-          'مرفوض 🔴',
-          style: TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
+        child: Text(
+          'مرفوض',
+          style: TextStyle(color: colorScheme.onErrorContainer, fontSize: 11, fontWeight: FontWeight.bold),
         ),
       );
     } else if (permission.endDate.isBefore(todayStart)) {
       badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.15),
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.grey.shade400),
+          border: Border.all(color: colorScheme.outlineVariant),
         ),
-        child: const Text(
-          'منتهي 🔴',
-          style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
+        child: Text(
+          'منتهي',
+          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold),
         ),
       );
     } else if (permission.isSupervisorEnabled == false) {
       badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: Colors.amber.withValues(alpha: 0.15),
+          color: colorScheme.secondaryContainer.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.amber.shade400),
+          border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.3)),
         ),
-        child: const Text(
-          'معطل مؤقتاً ⏸️',
-          style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+        child: Text(
+          'معطل مؤقتاً',
+          style: TextStyle(color: colorScheme.onSecondaryContainer, fontSize: 11, fontWeight: FontWeight.bold),
         ),
       );
     } else {
       badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: Colors.green.withValues(alpha: 0.15),
+          color: colorScheme.primaryContainer.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.green.shade300),
+          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
         ),
-        child: const Text(
-          'نشط 🟢',
-          style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
+        child: Text(
+          'نشط',
+          style: TextStyle(color: colorScheme.onPrimaryContainer, fontSize: 11, fontWeight: FontWeight.bold),
         ),
       );
     }

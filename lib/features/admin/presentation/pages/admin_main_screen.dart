@@ -9,7 +9,11 @@ import 'package:delegate_app/features/photo_permission/presentation/pages/superv
 import 'package:delegate_app/features/photo_permission/presentation/pages/marketing_permissions_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/super_admin_permissions_report_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_payment_receipts_report_screen.dart';
+import 'dart:async';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_collections_screen.dart';
+import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
+import 'package:delegate_app/features/wallet/presentation/pages/super_admin_wallets_screen.dart';
+import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_branch_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_branches_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/create_admin_screen.dart';
@@ -19,6 +23,7 @@ import 'package:delegate_app/features/admin/presentation/pages/manage_marketing_
 import 'package:delegate_app/features/admin/presentation/pages/anti_fraud_audit_screen.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_penalties_list_page.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_catalog_page.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
@@ -49,10 +54,26 @@ class AdminMainScreen extends StatefulWidget {
 class _AdminMainScreenState extends State<AdminMainScreen> {
   int _currentIndex = 0;
   late final List<Widget> _screens;
+  StreamSubscription? _walletSubscription;
+  bool _isWalletEnabled = false;
 
   @override
   void initState() {
     super.initState();
+    _walletSubscription = WalletRemoteDataSourceImpl()
+        .streamUserWallet(widget.delegate.uid)
+        .listen(
+      (w) {
+        if (mounted) {
+          setState(() {
+            _isWalletEnabled = w?.isWalletEnabled ?? false;
+          });
+        }
+      },
+      onError: (e) {
+        debugPrint('Wallet stream error: $e');
+      },
+    );
     final delegate = widget.delegate;
     if (isSuperAdmin) {
       _screens = [
@@ -108,6 +129,8 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           organizationUID: delegate.organizationUID,
           currentDelegate: delegate,
           currentUserRole: delegate.role,
+          showAppBar: false,
+          onBack: () => setState(() => _currentIndex = 0),
         ),
       ];
     } else if (isBranchesMarketingManager) {
@@ -166,6 +189,12 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         ),
       ];
     }
+  }
+
+  @override
+  void dispose() {
+    _walletSubscription?.cancel();
+    super.dispose();
   }
 
   void _onMenuSelected(String value) {
@@ -298,6 +327,25 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
         );
         break;
+      case 'wallets_management':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SuperAdminWalletsScreen(adminDelegate: widget.delegate),
+          ),
+        );
+        break;
+      case 'user_wallet':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => UserWalletScreen(
+              targetUserId: widget.delegate.uid,
+              targetUserName: widget.delegate.fullName.isNotEmpty
+                  ? widget.delegate.fullName
+                  : widget.delegate.firstName,
+            ),
+          ),
+        );
+        break;
       case 'penalties_management':
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -305,6 +353,13 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               create: (_) => di.sl<PenaltyBloc>(),
               child: AdminPenaltiesListPage(adminDelegate: widget.delegate),
             ),
+          ),
+        );
+        break;
+      case 'penalty_rules_catalog':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PenaltyRulesCatalogPage(currentDelegate: widget.delegate),
           ),
         );
         break;
@@ -335,7 +390,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         );
         break;
       case 'profile':
-        context.push('/user-profile');
+        context.push('/user-profile', extra: widget.delegate);
         break;
     }
   }
@@ -400,9 +455,12 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               : l10n.photoPermissions);
 
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       appBar: AdminHeader(
         title: headerTitle,
         subtitle: subtitle,
+        showBackButton: _currentIndex != 0,
+        onBackPressed: () => setState(() => _currentIndex = 0),
         actions: [
           BlocProvider(
             create: (_) => di.sl<NotificationBloc>()
@@ -425,7 +483,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   label: Text('$unreadCount'),
                   isLabelVisible: unreadCount > 0,
                   child: IconButton(
-                    icon: const Icon(Icons.notifications_outlined),
+                    icon: const Icon(Icons.notifications_rounded),
                     tooltip: l10n.notifications,
                     onPressed: () {
                       context.push('/notifications', extra: delegate);
@@ -441,7 +499,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           const PopupMenuItem(
             value: 'profile',
             child: ListTile(
-              leading: Icon(Icons.person_outline_rounded),
+              leading: Icon(Icons.person_rounded),
               title: Text('الملف الشخصي'),
               dense: true,
               contentPadding: EdgeInsets.zero,
@@ -541,7 +599,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             PopupMenuItem(
               value: 'manage_feedbacks',
               child: ListTile(
-                leading: const Icon(Icons.feedback_outlined),
+                leading: const Icon(Icons.feedback_rounded),
                 title: const Text('إدارة المقترحات'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
@@ -562,7 +620,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               PopupMenuItem(
                 value: 'permissions_report',
                 child: ListTile(
-                  leading: const Icon(Icons.analytics_outlined),
+                  leading: const Icon(Icons.analytics_rounded),
                   title: const Text('تقرير أذونات التصوير'),
                   dense: true,
                   contentPadding: EdgeInsets.zero,
@@ -582,6 +640,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 child: ListTile(
                   leading: Icon(Icons.request_quote_rounded),
                   title: Text('التحصيلات والفواتير'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'wallets_management',
+                child: ListTile(
+                  leading: Icon(Icons.account_balance_wallet_rounded),
+                  title: Text('إدارة المحافظ والمستحقات'),
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -623,6 +690,29 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             ),
           ],
 
+          // لائحة الغرامات والجزاءات الرسمية
+          PopupMenuItem(
+            value: 'penalty_rules_catalog',
+            child: ListTile(
+              leading: const Icon(Icons.menu_book_rounded),
+              title: Text(isArabic ? 'لائحة الغرامات والجزاءات' : 'Penalty Rules Catalog'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+
+          if (_isWalletEnabled) ...[
+            const PopupMenuItem(
+              value: 'user_wallet',
+              child: ListTile(
+                leading: Icon(Icons.account_balance_wallet_rounded),
+                title: Text('المحفظة والمستحقات'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+
           // الإعدادات دائماً في أسفل القائمة
           PopupMenuItem(
             value: 'settings',
@@ -637,160 +727,171 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         onMenuSelected: _onMenuSelected,
       ),
       body: M3FadeThroughIndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: isSuperAdmin
-          ? NavigationBar(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.home_outlined),
-                  selectedIcon: const Icon(Icons.home_rounded),
-                  label: l10n.home,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.security_outlined),
-                  selectedIcon: const Icon(Icons.security_rounded),
-                  label: isArabic ? 'كشف التزييف' : 'Anti-Fraud',
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.campaign_outlined),
-                  selectedIcon: const Icon(Icons.campaign_rounded),
-                  label: isArabic ? 'إرسال إشعار' : 'Notification',
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.gavel_outlined),
-                  selectedIcon: const Icon(Icons.gavel_rounded),
-                  label: isArabic ? 'الغرامات' : 'Penalties',
-                ),
-              ],
-            )
-          : isTechnicalSupport
-          ? NavigationBar(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.home_outlined),
-                  selectedIcon: const Icon(Icons.home_rounded),
-                  label: l10n.home,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.security_outlined),
-                  selectedIcon: const Icon(Icons.security_rounded),
-                  label: isArabic ? 'كشف التزييف' : 'Anti-Fraud',
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.campaign_outlined),
-                  selectedIcon: const Icon(Icons.campaign_rounded),
-                  label: isArabic ? 'إرسال إشعار' : 'Notification',
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.admin_panel_settings_rounded),
-                  selectedIcon: const Icon(Icons.admin_panel_settings_rounded),
-                  label: l10n.createAdmin,
-                ),
-              ],
-            )
-          : isOrganizationAdmin
-          ? NavigationBar(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.home_outlined),
-                  selectedIcon: const Icon(Icons.home_rounded),
-                  label: l10n.home,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.task_alt_outlined),
-                  selectedIcon: const Icon(Icons.task_alt_rounded),
-                  label: l10n.tasks,
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.photo_library_outlined),
-                  selectedIcon: Icon(Icons.photo_library_rounded),
-                  label: 'أذونات التصوير',
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.gavel_outlined),
-                  selectedIcon: Icon(Icons.gavel_rounded),
-                  label: 'الغرامات',
-                ),
-              ],
-            )
-          : isBranchesMarketingManager
-          ? NavigationBar(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.home_outlined),
-                  selectedIcon: const Icon(Icons.home_rounded),
-                  label: isArabic ? 'الرئيسية' : 'Home',
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.photo_library_outlined),
-                  selectedIcon: Icon(Icons.photo_library_rounded),
-                  label: 'أذونات التصوير',
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.store_outlined),
-                  selectedIcon: const Icon(Icons.store_rounded),
-                  label: isArabic ? 'الفروع' : 'Branches',
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.gavel_outlined),
-                  selectedIcon: Icon(Icons.gavel_rounded),
-                  label: 'الغرامات',
-                ),
-              ],
-            )
-          : NavigationBar(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.home_outlined),
-                  selectedIcon: const Icon(Icons.home_rounded),
-                  label: l10n.home,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.people_outline_rounded),
-                  selectedIcon: const Icon(Icons.people_rounded),
-                  label: l10n.companyDelegates,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.task_alt_outlined),
-                  selectedIcon: const Icon(Icons.task_alt_rounded),
-                  label: l10n.tasks,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.collections_outlined),
-                  selectedIcon: const Icon(Icons.collections_rounded),
-                  label: l10n.photoPermissions,
-                ),
-              ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainer,
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.35),
+              width: 0.8,
             ),
+          ),
+        ),
+        child: isSuperAdmin
+            ? NavigationBar(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+                destinations: [
+                  NavigationDestination(
+                    icon: const Icon(Icons.home_rounded),
+                    selectedIcon: const Icon(Icons.home_rounded),
+                    label: l10n.home,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.security_rounded),
+                    selectedIcon: const Icon(Icons.security_rounded),
+                    label: isArabic ? 'كشف التزييف' : 'Anti-Fraud',
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.campaign_rounded),
+                    selectedIcon: const Icon(Icons.campaign_rounded),
+                    label: isArabic ? 'إرسال إشعار' : 'Notification',
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.gavel_rounded),
+                    selectedIcon: const Icon(Icons.gavel_rounded),
+                    label: isArabic ? 'الغرامات' : 'Penalties',
+                  ),
+                ],
+              )
+            : isTechnicalSupport
+            ? NavigationBar(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+                destinations: [
+                  NavigationDestination(
+                    icon: const Icon(Icons.home_rounded),
+                    selectedIcon: const Icon(Icons.home_rounded),
+                    label: l10n.home,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.security_rounded),
+                    selectedIcon: const Icon(Icons.security_rounded),
+                    label: isArabic ? 'كشف التزييف' : 'Anti-Fraud',
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.campaign_rounded),
+                    selectedIcon: const Icon(Icons.campaign_rounded),
+                    label: isArabic ? 'إرسال إشعار' : 'Notification',
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.admin_panel_settings_rounded),
+                    selectedIcon: const Icon(Icons.admin_panel_settings_rounded),
+                    label: l10n.createAdmin,
+                  ),
+                ],
+              )
+            : isOrganizationAdmin
+            ? NavigationBar(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+                destinations: [
+                  NavigationDestination(
+                    icon: const Icon(Icons.home_rounded),
+                    selectedIcon: const Icon(Icons.home_rounded),
+                    label: l10n.home,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.task_alt_rounded),
+                    selectedIcon: const Icon(Icons.task_alt_rounded),
+                    label: l10n.tasks,
+                  ),
+                  const NavigationDestination(
+                    icon: Icon(Icons.photo_library_rounded),
+                    selectedIcon: Icon(Icons.photo_library_rounded),
+                    label: 'أذونات التصوير',
+                  ),
+                  const NavigationDestination(
+                    icon: Icon(Icons.gavel_rounded),
+                    selectedIcon: Icon(Icons.gavel_rounded),
+                    label: 'الغرامات',
+                  ),
+                ],
+              )
+            : isBranchesMarketingManager
+            ? NavigationBar(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+                destinations: [
+                  NavigationDestination(
+                    icon: const Icon(Icons.home_rounded),
+                    selectedIcon: const Icon(Icons.home_rounded),
+                    label: isArabic ? 'الرئيسية' : 'Home',
+                  ),
+                  const NavigationDestination(
+                    icon: Icon(Icons.photo_library_rounded),
+                    selectedIcon: Icon(Icons.photo_library_rounded),
+                    label: 'أذونات التصوير',
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.store_rounded),
+                    selectedIcon: const Icon(Icons.store_rounded),
+                    label: isArabic ? 'الفروع' : 'Branches',
+                  ),
+                  const NavigationDestination(
+                    icon: Icon(Icons.gavel_rounded),
+                    selectedIcon: Icon(Icons.gavel_rounded),
+                    label: 'الغرامات',
+                  ),
+                ],
+              )
+            : NavigationBar(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+                destinations: [
+                  NavigationDestination(
+                    icon: const Icon(Icons.home_rounded),
+                    selectedIcon: const Icon(Icons.home_rounded),
+                    label: l10n.home,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.people_rounded),
+                    selectedIcon: const Icon(Icons.people_rounded),
+                    label: l10n.companyDelegates,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.task_alt_rounded),
+                    selectedIcon: const Icon(Icons.task_alt_rounded),
+                    label: l10n.tasks,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.collections_rounded),
+                    selectedIcon: const Icon(Icons.collections_rounded),
+                    label: l10n.photoPermissions,
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }

@@ -505,6 +505,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
 
         return StatefulBuilder(
           builder: (dialogContentContext, setDialogState) {
+            final colorScheme = Theme.of(dialogContentContext).colorScheme;
             return Dialog(
               backgroundColor: Colors.transparent,
               insetPadding: const EdgeInsets.all(16),
@@ -533,13 +534,13 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                           Navigator.pop(dialogContext);
                           _confirmDeletePhoto(photo);
                         },
-                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
-                        label: const Text(
+                        icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 18),
+                        label: Text(
                           'حذف الصورة',
-                          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: colorScheme.error, fontWeight: FontWeight.bold),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.redAccent),
+                          side: BorderSide(color: colorScheme.error),
                           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
@@ -564,8 +565,8 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                         isSaving = false;
                                         saveSuccess = success;
                                         statusText = success
-                                            ? '✅ تم حفظ الصورة في الهاتف بنجاح'
-                                            : '⚠️ يرجى منح إذن الوصول للصور من الإعدادات.';
+                                            ? 'تم حفظ الصورة في الهاتف بنجاح'
+                                            : 'يرجى منح إذن الوصول للصور من الإعدادات.';
                                       });
                                     }
                                   } catch (e) {
@@ -573,7 +574,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                       setDialogState(() {
                                         isSaving = false;
                                         saveSuccess = false;
-                                        statusText = '❌ تعذر حفظ الصورة: $e';
+                                        statusText = 'تعذر حفظ الصورة: $e';
                                       });
                                     }
                                   }
@@ -592,12 +593,12 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                             isSaving
                                 ? 'جاري حفظ الصورة...'
                                 : saveSuccess
-                                    ? 'تم الحفظ في الهاتف ✓'
+                                    ? 'تم الحفظ في الهاتف'
                                     : 'حفظ الصورة',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           style: FilledButton.styleFrom(
-                            backgroundColor: saveSuccess ? Colors.green.shade700 : null,
+                            backgroundColor: saveSuccess ? colorScheme.primary : null,
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
@@ -610,12 +611,16 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: saveSuccess ? Colors.green.shade900.withValues(alpha: 0.8) : Colors.amber.shade900.withValues(alpha: 0.8),
+                        color: saveSuccess ? colorScheme.primaryContainer : colorScheme.errorContainer,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         statusText!,
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: saveSuccess ? colorScheme.onPrimaryContainer : colorScheme.onErrorContainer,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),

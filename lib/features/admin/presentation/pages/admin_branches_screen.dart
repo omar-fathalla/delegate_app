@@ -136,7 +136,7 @@ class _AdminBranchesViewState extends State<_AdminBranchesView> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, size: 48, color: colorScheme.error),
+                  Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
                   const SizedBox(height: 16),
                   Text(state.message, textAlign: TextAlign.center),
                   const SizedBox(height: 16),
@@ -588,7 +588,7 @@ class _AdminBranchesViewState extends State<_AdminBranchesView> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
-                    Icons.store_mall_directory_outlined,
+                    Icons.store_mall_directory_rounded,
                     color: colorScheme.onTertiaryContainer,
                     size: 26,
                   ),

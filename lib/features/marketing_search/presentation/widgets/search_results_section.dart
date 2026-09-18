@@ -239,7 +239,7 @@ class SearchResultsSection extends StatelessWidget {
           children: [
             Icon(
               isCompany
-                  ? Icons.business_outlined
+                  ? Icons.business_rounded
                   : Icons.person_outline_rounded,
               size: 48,
               color: colorScheme.outline,

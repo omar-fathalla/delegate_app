@@ -13,6 +13,8 @@ class NotificationEntity extends Equatable {
   final bool isRead;
   final DateTime createdAt;
   final List<String> deletedBy;
+  final String? senderName;
+  final String? senderRole;
 
   const NotificationEntity({
     required this.id,
@@ -27,6 +29,8 @@ class NotificationEntity extends Equatable {
     required this.isRead,
     required this.createdAt,
     this.deletedBy = const [],
+    this.senderName,
+    this.senderRole,
   });
 
   @override
@@ -43,5 +47,7 @@ class NotificationEntity extends Equatable {
         isRead,
         createdAt,
         deletedBy,
+        senderName,
+        senderRole,
       ];
 }

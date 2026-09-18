@@ -6,6 +6,8 @@ import 'package:delegate_app/features/penalties/data/datasources/penalty_remote_
 import 'package:delegate_app/features/penalties/data/models/penalty_model.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
 import 'package:delegate_app/features/penalties/domain/repositories/penalty_repository.dart';
+import 'package:delegate_app/features/penalties/data/models/penalty_rule_model.dart';
+import 'package:delegate_app/features/penalties/domain/entities/penalty_rule_entity.dart';
 
 class PenaltyRepositoryImpl implements PenaltyRepository {
   final PenaltyRemoteDataSource remoteDataSource;
@@ -137,4 +139,69 @@ class PenaltyRepositoryImpl implements PenaltyRepository {
       return const Left(ServerFailure('حدث خطأ عند رفع مستند الإثبات.'));
     }
   }
+
+  @override
+  Future<Either<Failure, List<PenaltyRuleEntity>>> getPenaltyRules() async {
+    try {
+      final list = await remoteDataSource.getPenaltyRules();
+      return Right(list);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ أثناء جلب إعدادات وبنود الغرامات.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> savePenaltyRule(PenaltyRuleEntity rule) async {
+    try {
+      final model = PenaltyRuleModel.fromEntity(rule);
+      await remoteDataSource.savePenaltyRule(model);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ أثناء حفظ بند الغرامة.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> updatePenaltyRuleConfidentiality(
+    String ruleId,
+    bool isConfidential,
+  ) async {
+    try {
+      await remoteDataSource.updatePenaltyRuleConfidentiality(ruleId, isConfidential);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ أثناء تعديل سرية الغرامة.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> deletePenaltyRule(String ruleId) async {
+    try {
+      await remoteDataSource.deletePenaltyRule(ruleId);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ أثناء حذف بند الغرامة.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> seedDefaultPenaltyRules() async {
+    try {
+      await remoteDataSource.seedDefaultPenaltyRules();
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ أثناء استيراد اللائحة الافتراضية.'));
+    }
+  }
 }
+

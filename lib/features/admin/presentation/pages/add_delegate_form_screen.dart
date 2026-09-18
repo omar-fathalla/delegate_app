@@ -3,11 +3,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 import 'package:delegate_app/injection_container.dart';
 
@@ -21,6 +23,8 @@ class AddDelegateFormScreen extends StatefulWidget {
 }
 
 class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
+  static const String _instaPayLink = 'https://ipn.eg/S/fathall/instapay/1VphF7';
+
   final _formKey = GlobalKey<FormState>();
 
   // Text Controllers
@@ -45,6 +49,11 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
 
   // Payment Selection
   SubscriptionPaymentMethod _paymentMethod = SubscriptionPaymentMethod.companyDeduction;
+
+  // Receipt code validation state
+  bool _isCheckingReceiptCode = false;
+  bool? _isReceiptCodeValid;
+  String? _receiptCodeStatusText;
 
   bool _isSubmitting = false;
   final ImagePicker _picker = ImagePicker();
@@ -117,6 +126,68 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
     }
   }
 
+  Future<void> _openInstaPayUrl() async {
+    final uri = Uri.parse(_instaPayLink);
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'تعذر فتح رابط انستاباي تلقائياً.');
+      }
+    }
+  }
+
+  Future<void> _copyInstaPayLink() async {
+    await Clipboard.setData(const ClipboardData(text: _instaPayLink));
+    if (mounted) {
+      AppSnackBar.showSuccess(context, 'تم نسخ رابط حساب انستاباي بنجاح');
+    }
+  }
+
+  Future<void> _checkReceiptCode(String code) async {
+    final clean = code.trim();
+    if (clean.length != 5) {
+      setState(() {
+        _isCheckingReceiptCode = false;
+        _isReceiptCodeValid = null;
+        _receiptCodeStatusText = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingReceiptCode = true;
+      _receiptCodeStatusText = 'جاري التحقق من توفر كود الإيصال...';
+    });
+
+    final repo = sl<DelegateSubscriptionRepository>();
+    final result = await repo.isReceiptCodeUsed(clean);
+
+    if (!mounted) return;
+
+    result.fold(
+      (failure) {
+        setState(() {
+          _isCheckingReceiptCode = false;
+          _isReceiptCodeValid = null;
+          _receiptCodeStatusText = 'تعذر التحقق: ${failure.message}';
+        });
+      },
+      (isUsed) {
+        setState(() {
+          _isCheckingReceiptCode = false;
+          _isReceiptCodeValid = !isUsed;
+          _receiptCodeStatusText = isUsed
+              ? 'عذراً، كود الإيصال ($clean) مستخدم مسبقاً وغير صالح للاستخدام.'
+              : 'كود الإيصال متاح وصالح للاستخدام ✓';
+        });
+      },
+    );
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       AppSnackBar.showError(context, 'يرجى استكمال البيانات المطلوبة وتصحيح الأخطاء.');
@@ -138,19 +209,52 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
       return;
     }
 
-    if (_paymentMethod == SubscriptionPaymentMethod.receipt) {
+    if (_paymentMethod == SubscriptionPaymentMethod.branchReceipt) {
       final code = _receiptCodeController.text.trim();
       if (code.length != 5) {
-        AppSnackBar.showError(context, 'كود الإيصال يجب أن يتكون من 5 أرقام بالضبط.');
+        AppSnackBar.showError(context, 'كود الإيصال الإلكتروني يجب أن يتكون من 5 أرقام بالضبط.');
+        return;
+      }
+      if (_isReceiptCodeValid == false) {
+        AppSnackBar.showError(
+          context,
+          'كود الإيصال الخماسي ($code) مستخدم مسبقاً في النظام، يرجى إدخال كود صالح.',
+        );
         return;
       }
       if (_receiptImage == null) {
-        AppSnackBar.showError(context, 'يرجى إرفاق صورة إيصال الدفع / التحويل.');
+        AppSnackBar.showError(context, 'يرجى إرفاق صورة الإيصال الإلكتروني من تسويق الفرع.');
+        return;
+      }
+    } else if (_paymentMethod == SubscriptionPaymentMethod.instaPay) {
+      if (_receiptImage == null) {
+        AppSnackBar.showError(context, 'يرجى إرفاق صورة إيصال التحويل أو إشعار الدفع من تطبيق انستاباي.');
         return;
       }
     }
 
     setState(() => _isSubmitting = true);
+
+    // Hard pre-validation check against duplicate receipt code before uploading files
+    if (_paymentMethod == SubscriptionPaymentMethod.branchReceipt) {
+      final code = _receiptCodeController.text.trim();
+      final repo = sl<DelegateSubscriptionRepository>();
+      final checkResult = await repo.isReceiptCodeUsed(code);
+      final isUsed = checkResult.fold((_) => false, (used) => used);
+      if (isUsed) {
+        if (!mounted) return;
+        setState(() {
+          _isSubmitting = false;
+          _isReceiptCodeValid = false;
+          _receiptCodeStatusText = 'عذراً، كود الإيصال ($code) مستخدم مسبقاً وغير صالح للاستخدام.';
+        });
+        AppSnackBar.showError(
+          context,
+          'كود الإيصال الخماسي ($code) مستخدم مسبقاً في النظام ولا يمكن تكراره.',
+        );
+        return;
+      }
+    }
 
     final remainingMonths = SubscriptionCycleHelper.getRemainingMonthsInCycle();
     final fee = SubscriptionCycleHelper.getProratedSubscriptionFee();
@@ -175,10 +279,10 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
       paymentMethod: _paymentMethod,
       fee: fee,
       remainingMonths: remainingMonths,
-      receiptCode: _paymentMethod == SubscriptionPaymentMethod.receipt
+      receiptCode: _paymentMethod == SubscriptionPaymentMethod.branchReceipt
           ? _receiptCodeController.text.trim()
           : null,
-      receiptImage: _paymentMethod == SubscriptionPaymentMethod.receipt
+      receiptImage: _paymentMethod != SubscriptionPaymentMethod.companyDeduction
           ? _receiptImage
           : null,
     );
@@ -201,11 +305,11 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: Colors.green, size: 26),
-                SizedBox(width: 10),
-                Text('تم إرسال الطلب بنجاح', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Icon(Icons.check_circle_rounded, color: Theme.of(ctx).colorScheme.primary, size: 26),
+                const SizedBox(width: 10),
+                const Text('تم إرسال الطلب بنجاح', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ],
             ),
             content: const Text(
@@ -218,10 +322,6 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                 child: const Text('العودة للمناديب'),
               ),
               FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFB8860B),
-                  foregroundColor: Colors.white,
-                ),
                 onPressed: () => Navigator.pop(ctx, true),
                 icon: const Icon(Icons.how_to_reg_rounded, size: 18),
                 label: const Text('عرض شاشة الاعتمادات'),
@@ -280,7 +380,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                       const SizedBox(height: 16),
 
                       // 3. Personal Information
-                      _buildSectionHeader('البيانات الشخصية للمندوب', Icons.badge_outlined),
+                      _buildSectionHeader('البيانات الشخصية للمندوب', Icons.badge_rounded),
                       const SizedBox(height: 8),
                       _buildPersonalInfoCard(colorScheme),
                       const SizedBox(height: 16),
@@ -294,7 +394,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                       // 5. Payment Method & Subscription
                       _buildSectionHeader(
                         'طريقة دفع الاشتراك (${SubscriptionCycleHelper.getRemainingMonthsInCycle()} أشهر - ${SubscriptionCycleHelper.getProratedSubscriptionFee().toInt()} ج.م)',
-                        Icons.payments_outlined,
+                        Icons.payments_rounded,
                       ),
                       const SizedBox(height: 8),
                       _buildPaymentCard(colorScheme),
@@ -314,12 +414,12 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                           ),
                           onPressed: _isSubmitting ? null : _submit,
                           icon: _isSubmitting
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 22,
                                   height: 22,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.5,
-                                    color: Colors.white,
+                                    color: colorScheme.onPrimary,
                                   ),
                                 )
                               : const Icon(Icons.send_rounded, size: 22),
@@ -361,7 +461,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
               color: colorScheme.primary,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.date_range_rounded, color: Colors.white, size: 20),
+            child: Icon(Icons.date_range_rounded, color: colorScheme.onPrimary, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -641,7 +741,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
         ),
         if (file != null)
           IconButton(
-            icon: const Icon(Icons.close_rounded, color: Colors.red, size: 20),
+            icon: Icon(Icons.close_rounded, color: colorScheme.error, size: 20),
             onPressed: onRemove,
             tooltip: 'حذف',
           )
@@ -694,9 +794,9 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                       color: colorScheme.primary,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.price_check_rounded,
-                      color: Colors.white,
+                      color: colorScheme.onPrimary,
                       size: 20,
                     ),
                   ),
@@ -728,8 +828,8 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                               ),
                               child: Text(
                                 '${fee.toInt()} ج.م',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: colorScheme.onPrimary,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                 ),
@@ -756,91 +856,512 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
             ),
             const SizedBox(height: 14),
 
+            // Payment Option Cards with Nested Expandable Details
             RadioGroup<SubscriptionPaymentMethod>(
               groupValue: _paymentMethod,
               onChanged: (val) {
-                if (val != null) setState(() => _paymentMethod = val);
+                if (val != null) {
+                  setState(() {
+                    _paymentMethod = val;
+                    if (val == SubscriptionPaymentMethod.companyDeduction) {
+                      _receiptImage = null;
+                      _receiptCodeController.clear();
+                      _isReceiptCodeValid = null;
+                      _receiptCodeStatusText = null;
+                    }
+                  });
+                }
               },
               child: Column(
                 children: [
-                  // Radio 1: Company Deduction
-                  RadioListTile<SubscriptionPaymentMethod>(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      'خصم من حساب الشركة (${fee.toInt()} ج.م)',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                    ),
-                    subtitle: Text(
-                      'يتم قيد قيمة الاشتراك المستحقة (${fee.toInt()} ج.م) على الفاتورة الدورية لشركتكم مباشرة.',
-                      style: const TextStyle(fontSize: 11.5),
-                    ),
-                    value: SubscriptionPaymentMethod.companyDeduction,
-                  ),
-                  const Divider(),
-
-                  // Radio 2: Bank Receipt / Transfer
-                  RadioListTile<SubscriptionPaymentMethod>(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      'إيصال دفع / تحويل بنكي (${fee.toInt()} ج.م)',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                    ),
-                    subtitle: Text(
-                      'تحويل مبلغ ${fee.toInt()} ج.م ورفع صورة إيصال الدفع وإدخال كود الإيصال الخماسي (5 أرقام).',
-                      style: const TextStyle(fontSize: 11.5),
-                    ),
-                    value: SubscriptionPaymentMethod.receipt,
-                  ),
-                ],
-              ),
-            ),
-
-            if (_paymentMethod == SubscriptionPaymentMethod.receipt) ...[
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: _receiptCodeController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(5),
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: 'كود الإيصال / العملية (5 أرقام) *',
-                        hintText: 'مثال: 54821',
-                        prefixIcon: Icon(Icons.tag_rounded),
-                        border: OutlineInputBorder(),
+                  // Option 1: Company Deduction Card
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _paymentMethod = SubscriptionPaymentMethod.companyDeduction;
+                        _receiptImage = null;
+                        _receiptCodeController.clear();
+                        _isReceiptCodeValid = null;
+                        _receiptCodeStatusText = null;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: AnimatedContainer(
+                      duration: AppMotionDurations.short4,
+                      curve: AppMotionCurves.standard,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _paymentMethod == SubscriptionPaymentMethod.companyDeduction
+                            ? colorScheme.primaryContainer.withValues(alpha: 0.15)
+                            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _paymentMethod == SubscriptionPaymentMethod.companyDeduction
+                              ? colorScheme.primary
+                              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          width: _paymentMethod == SubscriptionPaymentMethod.companyDeduction ? 1.5 : 1.0,
+                        ),
                       ),
-                      validator: (v) {
-                        if (_paymentMethod == SubscriptionPaymentMethod.receipt) {
-                          if (v == null || v.trim().isEmpty) return 'يرجى إدخال كود الإيصال';
-                          if (v.trim().length != 5) return 'كود الإيصال يتكون من 5 أرقام';
-                        }
-                        return null;
-                      },
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Radio<SubscriptionPaymentMethod>(
+                            value: SubscriptionPaymentMethod.companyDeduction,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'خصم من حساب الشركة (${fee.toInt()} ج.م)',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'يتم قيد قيمة الاشتراك المستحقة (${fee.toInt()} ج.م) على الفاتورة الدورية لشركتكم مباشرة.',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: colorScheme.onSurfaceVariant,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    _buildImagePickerTile(
-                      title: 'صورة إيصال الدفع *',
-                      subtitle: 'صورة واضحة لإيصال التحويل البنكي أو فوري',
-                      icon: Icons.receipt_long_rounded,
-                      file: _receiptImage,
-                      onPick: () => _pickImage((f) => _receiptImage = f),
-                      onRemove: () => setState(() => _receiptImage = null),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+
+                // Option 2: InstaPay Card (with Nested Details)
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _paymentMethod = SubscriptionPaymentMethod.instaPay;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: AnimatedContainer(
+                    duration: AppMotionDurations.short4,
+                    curve: AppMotionCurves.standard,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _paymentMethod == SubscriptionPaymentMethod.instaPay
+                          ? const Color(0xFF6B21A8).withValues(alpha: 0.08)
+                          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _paymentMethod == SubscriptionPaymentMethod.instaPay
+                            ? const Color(0xFF9333EA)
+                            : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        width: _paymentMethod == SubscriptionPaymentMethod.instaPay ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Radio<SubscriptionPaymentMethod>(
+                              value: SubscriptionPaymentMethod.instaPay,
+                              activeColor: const Color(0xFF9333EA),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'تحويل عبر انستاباي - InstaPay (${fee.toInt()} ج.م)',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                        ),
+                                      ),
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: Colors.purple.shade200),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: Image.asset(
+                                            'assets/images/instapay_logo.png',
+                                            fit: BoxFit.contain,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'الدفع المباشر عبر حساب انستاباي ورفع صورة إيصال التحويل أو إشعار الدفع.',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: colorScheme.onSurfaceVariant,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // Animated Expansion directly inside the InstaPay Card!
+                        AnimatedSize(
+                          duration: AppMotionDurations.medium3,
+                          curve: AppMotionCurves.emphasized,
+                          alignment: Alignment.topCenter,
+                          child: _paymentMethod == SubscriptionPaymentMethod.instaPay
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.surface,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: const Color(0xFF9333EA).withValues(alpha: 0.35),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(
+                                              width: 32,
+                                              height: 32,
+                                              padding: const EdgeInsets.all(3),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                shape: BoxShape.circle,
+                                                border: Border.all(color: Colors.purple.shade200),
+                                              ),
+                                              child: ClipOval(
+                                                child: Image.asset(
+                                                  'assets/images/instapay_logo.png',
+                                                  fit: BoxFit.contain,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'الدفع عبر تطبيق انستاباي (InstaPay)',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13,
+                                                      color: colorScheme.onSurface,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    'المبلغ المطلوب: ${fee.toInt()} ج.م',
+                                                    style: const TextStyle(
+                                                      fontSize: 11.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFF9333EA),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        // Link Box with Copy Button
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.link_rounded, size: 18, color: Color(0xFF9333EA)),
+                                              const SizedBox(width: 8),
+                                              const Expanded(
+                                                child: SelectableText(
+                                                  _instaPayLink,
+                                                  style: TextStyle(
+                                                    fontFamily: 'monospace',
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                              IconButton(
+                                                tooltip: 'نسخ الرابط',
+                                                icon: const Icon(Icons.copy_rounded, size: 16),
+                                                visualDensity: VisualDensity.compact,
+                                                onPressed: _copyInstaPayLink,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        // Action Button to Launch Link
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: FilledButton.icon(
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: const Color(0xFF6B21A8),
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(vertical: 10),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                            icon: Container(
+                                              width: 22,
+                                              height: 22,
+                                              padding: const EdgeInsets.all(2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(5),
+                                              ),
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(3),
+                                                child: Image.asset(
+                                                  'assets/images/instapay_logo.png',
+                                                  fit: BoxFit.contain,
+                                                ),
+                                              ),
+                                            ),
+                                            label: const Text(
+                                              'اضغط للدفع عبر انستاباي',
+                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            ),
+                                            onPressed: _openInstaPayUrl,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        // Screenshot picker
+                                        _buildImagePickerTile(
+                                          title: 'صورة إيصال التحويل من انستاباي *',
+                                          subtitle: 'صورة واضحة أو لقطة شاشة لإشعار نجاح التحويل',
+                                          icon: Icons.receipt_long_rounded,
+                                          file: _receiptImage,
+                                          onPick: () => _pickImage((f) => _receiptImage = f),
+                                          onRemove: () => setState(() => _receiptImage = null),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Option 3: Branch Electronic Receipt Card (with Nested Details)
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _paymentMethod = SubscriptionPaymentMethod.branchReceipt;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: AnimatedContainer(
+                    duration: AppMotionDurations.short4,
+                    curve: AppMotionCurves.standard,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _paymentMethod == SubscriptionPaymentMethod.branchReceipt
+                          ? colorScheme.primaryContainer.withValues(alpha: 0.15)
+                          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _paymentMethod == SubscriptionPaymentMethod.branchReceipt
+                            ? colorScheme.primary
+                            : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        width: _paymentMethod == SubscriptionPaymentMethod.branchReceipt ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Radio<SubscriptionPaymentMethod>(
+                              value: SubscriptionPaymentMethod.branchReceipt,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'إيصال إلكتروني من تسويق الفرع (${fee.toInt()} ج.م)',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'إدخال كود الإيصال الخماسي (5 أرقام) ورفع صورة الإيصال الصادر من تسويق الفرع.',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: colorScheme.onSurfaceVariant,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // Animated Expansion directly inside Branch Receipt Card!
+                        AnimatedSize(
+                          duration: AppMotionDurations.medium3,
+                          curve: AppMotionCurves.emphasized,
+                          alignment: Alignment.topCenter,
+                          child: _paymentMethod == SubscriptionPaymentMethod.branchReceipt
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.surface,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: colorScheme.primary.withValues(alpha: 0.35),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(7),
+                                              decoration: BoxDecoration(
+                                                color: colorScheme.primaryContainer,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Icon(
+                                                Icons.receipt_long_rounded,
+                                                size: 18,
+                                                color: colorScheme.onPrimaryContainer,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'بيانات الإيصال الإلكتروني من تسويق الفرع',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13,
+                                                      color: colorScheme.onSurface,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    'المبلغ المطلوب: ${fee.toInt()} ج.م',
+                                                    style: TextStyle(
+                                                      fontSize: 11.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: colorScheme.primary,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _receiptCodeController,
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter.digitsOnly,
+                                            LengthLimitingTextInputFormatter(5),
+                                          ],
+                                          onChanged: (val) {
+                                            _checkReceiptCode(val);
+                                          },
+                                          decoration: InputDecoration(
+                                            labelText: 'كود الإيصال / العملية (5 أرقام) *',
+                                            hintText: 'مثال: 54821',
+                                            prefixIcon: const Icon(Icons.tag_rounded),
+                                            suffixIcon: _isCheckingReceiptCode
+                                                ? const SizedBox(
+                                                    width: 20,
+                                                    height: 20,
+                                                    child: Padding(
+                                                      padding: EdgeInsets.all(12),
+                                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                                    ),
+                                                  )
+                                                : _isReceiptCodeValid == true
+                                                    ? const Icon(Icons.check_circle_rounded, color: Colors.green)
+                                                    : _isReceiptCodeValid == false
+                                                        ? const Icon(Icons.error_rounded, color: Colors.red)
+                                                        : null,
+                                            border: const OutlineInputBorder(),
+                                            helperText: _receiptCodeStatusText,
+                                            helperStyle: TextStyle(
+                                              color: _isReceiptCodeValid == true
+                                                  ? Colors.green
+                                                  : _isReceiptCodeValid == false
+                                                      ? Colors.red
+                                                      : colorScheme.onSurfaceVariant,
+                                              fontWeight: _isReceiptCodeValid != null ? FontWeight.bold : FontWeight.normal,
+                                              fontSize: 11.5,
+                                            ),
+                                          ),
+                                          validator: (v) {
+                                            if (_paymentMethod == SubscriptionPaymentMethod.branchReceipt) {
+                                              if (v == null || v.trim().isEmpty) return 'يرجى إدخال كود الإيصال';
+                                              if (v.trim().length != 5) return 'كود الإيصال يتكون من 5 أرقام بالضبط';
+                                              if (_isReceiptCodeValid == false) return 'كود الإيصال مستخدم مسبقاً';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _buildImagePickerTile(
+                                          title: 'صورة الإيصال الإلكتروني *',
+                                          subtitle: 'صورة واضحة للإيصال الصادر من تسويق الفرع',
+                                          icon: Icons.receipt_long_rounded,
+                                          file: _receiptImage,
+                                          onPick: () => _pickImage((f) => _receiptImage = f),
+                                          onRemove: () => setState(() => _receiptImage = null),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           ],
         ),
       ),

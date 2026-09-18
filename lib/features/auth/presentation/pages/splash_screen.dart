@@ -63,12 +63,6 @@ class _SplashScreenState extends State<SplashScreen>
       listener: (context, state) {
         if (state is AuthAuthenticated) {
           final delegate = state.delegate;
-          // Initialize FCM with delegate UID for token storage
-          sl<PushNotificationService>().initialize(delegate.uid).catchError((
-            e,
-          ) {
-            debugPrint('FCM Init Error: $e');
-          });
           if (delegate.role == UserRole.superAdmin ||
               delegate.role == UserRole.admin ||
               delegate.role == UserRole.organizationAdmin ||
@@ -81,6 +75,15 @@ class _SplashScreenState extends State<SplashScreen>
           } else {
             context.go('/home', extra: delegate);
           }
+
+          // تهيئة الإشعارات في الخلفية بعد اكتمال الانتقال
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            sl<PushNotificationService>().initialize(delegate.uid).catchError((
+              e,
+            ) {
+              debugPrint('FCM Init Error: $e');
+            });
+          });
         } else if (state is AuthDeviceMismatchState) {
           context.go('/login');
           WidgetsBinding.instance.addPostFrameCallback((_) {

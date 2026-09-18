@@ -156,16 +156,23 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
     // Show error if no organization UID
     if (_actualOrganizationUID == null) {
       return Scaffold(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: colorScheme.surfaceContainerLowest,
         appBar: AppBar(
           title: const Text('البحث'),
-          backgroundColor: colorScheme.surface,
+          backgroundColor: colorScheme.surfaceContainer,
+          elevation: 0,
+          shape: Border(
+            bottom: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              width: 1,
+            ),
+          ),
         ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 64, color: colorScheme.error),
+              Icon(Icons.error_outline_rounded, size: 64, color: colorScheme.error),
               const SizedBox(height: 16),
               Text(
                 'لم يتم العثور على معرف المنظمة',
@@ -187,7 +194,7 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
     }
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
         title: Text(
           'البحث',
@@ -196,10 +203,16 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: colorScheme.surface,
+        backgroundColor: colorScheme.surfaceContainer,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        scrolledUnderElevation: 1,
+        shape: Border(
+          bottom: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: 1,
+          ),
+        ),
+        scrolledUnderElevation: 0,
         iconTheme: IconThemeData(color: colorScheme.onSurface),
         actions: [
           // زر مسح البحث

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// الشاشة الرئيسية لمسؤول تسويق الفروع (Branch Marketing Dashboard)
 /// تعرض الترحيب بالاسم، وتفاصيل المهام الثلاث اليومية، وكروت الوصول السريع، والملخص الميداني
@@ -94,23 +96,11 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primary,
-            colorScheme.primary.withValues(alpha: 0.85),
-            colorScheme.secondary.withValues(alpha: 0.9),
-          ],
-          begin: AlignmentDirectional.topStart,
-          end: AlignmentDirectional.bottomEnd,
+        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.18),
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -125,11 +115,11 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isArabic ? 'أهلاً بك، $displayName 👋' : 'Welcome, $displayName 👋',
-                      style: const TextStyle(
+                      isArabic ? 'أهلاً بك، $displayName' : 'Welcome, $displayName',
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: colorScheme.onSurface,
                         letterSpacing: 0.3,
                       ),
                     ),
@@ -141,7 +131,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                           Icon(
                             Icons.corporate_fare_rounded,
                             size: 14,
-                            color: Colors.white.withValues(alpha: 0.85),
+                            color: colorScheme.primary,
                           ),
                           const SizedBox(width: 6),
                           Flexible(
@@ -150,7 +140,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white.withValues(alpha: 0.95),
+                                color: colorScheme.onSurfaceVariant,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -166,28 +156,28 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color: colorScheme.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: colorScheme.primary.withValues(alpha: 0.25),
                           width: 1,
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.storefront_rounded,
                             size: 14,
-                            color: Colors.white,
+                            color: colorScheme.primary,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             isArabic ? 'مسؤول تسويق الفروع' : 'Branch Marketing',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: colorScheme.primary,
                             ),
                           ),
                         ],
@@ -196,32 +186,53 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                   ],
                 ),
               ),
-              // أيقونة بروفايل دائرية
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: Colors.white.withValues(alpha: 0.22),
-                child: const Icon(
-                  Icons.campaign_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
+              // صورة الأفاتار الدائرية لمسؤول التسويق
+              Builder(
+                builder: (context) {
+                  final photoUrl = widget.delegate.personalPhotoUrl ??
+                      (widget.delegate.documents
+                          .where((d) =>
+                              d.documentKey == DocumentKey.personalPhoto &&
+                              d.documentURL.isNotEmpty)
+                          .firstOrNull
+                          ?.documentURL) ??
+                      FirebaseAuth.instance.currentUser?.photoURL;
+
+                  return Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: colorScheme.primary.withValues(alpha: 0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: AppAvatar(
+                      imageUrl: photoUrl,
+                      fallbackText: widget.delegate.firstName,
+                      radius: 26,
+                      backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
+                      foregroundColor: colorScheme.primary,
+                      fallbackIcon: Icons.campaign_rounded,
+                    ),
+                  );
+                },
               ),
             ],
           ),
 
           const SizedBox(height: 16),
-          Divider(color: Colors.white.withValues(alpha: 0.25), height: 1),
+          Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.35), height: 1),
           const SizedBox(height: 14),
 
           // عنوان دليل المهام والمسؤوليات
           Text(
             isArabic
-                ? '📋 دليل المهام والمسؤوليات اليومية لفرعك:'
-                : '📋 Your Daily Branch Responsibilities:',
-            style: const TextStyle(
+                ? 'دليل المهام والمسؤوليات اليومية لفرعك:'
+                : 'Your Daily Branch Responsibilities:',
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 10),
@@ -235,6 +246,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
             desc: isArabic
                 ? 'المرور على أقسام الفرع والتأكد من تواجد مناديب الشركات ومطابقة تسجيل حضورهم الفعلي.'
                 : 'Inspect branch aisles, check vendor delegates attendance, and ensure physical presence.',
+            colorScheme: colorScheme,
           ),
 
           const SizedBox(height: 8),
@@ -248,6 +260,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
             desc: isArabic
                 ? 'التحقق من تصاريح التصوير الممنوحة للشركات داخل الفرع واعتمادها قبل بدء أي جلسة تصوير ترويجي.'
                 : 'Review, approve, and verify vendor marketing photo permits before capturing displays.',
+            colorScheme: colorScheme,
           ),
 
           const SizedBox(height: 8),
@@ -261,6 +274,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
             desc: isArabic
                 ? 'رصد التجاوزات الميدانية (عدم الالتزام بالزي، التواجد بدون تصريح، مخالفة التعليمات) وتوثيق الغرامة فورياً.'
                 : 'Record field violations on delegates or companies instantly according to official penalty regulations.',
+            colorScheme: colorScheme,
           ),
         ],
       ),
@@ -271,12 +285,16 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
     required IconData icon,
     required String title,
     required String desc,
+    required ColorScheme colorScheme,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.12),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,10 +302,10 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
           Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: colorScheme.primary.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 14, color: Colors.white),
+            child: Icon(icon, size: 14, color: colorScheme.primary),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -296,10 +314,10 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -307,7 +325,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                   desc,
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: colorScheme.onSurfaceVariant,
                     height: 1.35,
                   ),
                 ),
@@ -379,9 +397,9 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
         _buildActionCard(
           context: context,
           icon: Icons.person_search_rounded,
-          iconColor: Colors.teal.shade700,
-          cardColor: Colors.teal.withValues(alpha: 0.12),
-          borderColor: Colors.teal.withValues(alpha: 0.3),
+          iconColor: colorScheme.secondary,
+          cardColor: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+          borderColor: colorScheme.secondary.withValues(alpha: 0.25),
           title: isArabic ? 'البحث والتحقق' : 'Search & Verify',
           subtitle: isArabic
               ? 'ملفات المناديب والشركات'
@@ -540,12 +558,12 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: pendingCount > 0
-                            ? Colors.orange.withValues(alpha: 0.12)
+                            ? colorScheme.tertiaryContainer.withValues(alpha: 0.5)
                             : colorScheme.surface,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: pendingCount > 0
-                              ? Colors.orange.withValues(alpha: 0.35)
+                              ? colorScheme.tertiary.withValues(alpha: 0.35)
                               : colorScheme.outlineVariant,
                         ),
                       ),
@@ -554,7 +572,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                           Icon(
                             Icons.pending_actions_rounded,
                             color: pendingCount > 0
-                                ? Colors.orange.shade800
+                                ? colorScheme.tertiary
                                 : colorScheme.onSurfaceVariant,
                             size: 22,
                           ),
@@ -569,7 +587,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: pendingCount > 0
-                                        ? Colors.orange.shade900
+                                        ? colorScheme.onTertiaryContainer
                                         : colorScheme.onSurface,
                                   ),
                                 ),

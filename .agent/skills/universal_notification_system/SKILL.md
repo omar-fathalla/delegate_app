@@ -97,3 +97,12 @@ if (delegateUid == 'super-admin-login' || delegateUid.contains('super')) {
   ```
 - **Outbox Integrity**:
   The central broadcast log in `sent_notifications/{broadcastId}` remains untouched, preserving full delivery metrics and read receipts for technical support and administrators.
+
+---
+
+### 5. Google Cloud & Firebase Functions Deployment Isolation
+- **Targeted Deployment Only**: The GCP project (`practice-firebase-72df1` / `Tashil`) hosts 22+ active production Cloud Run / Functions for the Web portal and external systems.
+- **Codebase Scope**: In `firebase.json`, notifications must be encapsulated under `codebase: "tashil-mobile-notifications"`.
+- **Safe Command**: Always deploy using targeted codebase or function names:
+  `firebase deploy --only functions:tashil-mobile-notifications`
+  Never execute broad unscoped `firebase deploy --only functions` to prevent deleting or altering existing web services.

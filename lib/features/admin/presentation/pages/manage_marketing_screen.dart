@@ -86,7 +86,7 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
         subtitle: isArabic ? 'إدارة المستخدمين والتسويق' : l10n.manageMarketing,
         showBackButton: true,
       ),
-      backgroundColor: colorScheme.surface,
+      backgroundColor: colorScheme.surfaceContainerLowest,
       body: BlocConsumer<ManageMarketingBloc, ManageMarketingState>(
         listener: (context, state) {
           if (state is ManageMarketingError) {
@@ -248,7 +248,7 @@ class _SearchFilterBar extends StatelessWidget {
         color: theme.colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: theme.colorScheme.shadow.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -371,7 +371,7 @@ class _EmptyView extends StatelessWidget {
             ),
             child: Icon(
               allEmpty
-                  ? Icons.campaign_outlined
+                  ? Icons.campaign_rounded
                   : Icons.search_off_rounded,
               size: 40,
               color: theme.colorScheme.outline,
@@ -424,165 +424,220 @@ class _EmployeeCard extends StatelessWidget {
       elevation: 0,
       color: isSuspended
           ? colorScheme.errorContainer.withValues(alpha: 0.2)
-          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
+          : colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _showActionsSheet(context),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // Avatar
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: isSuspended
-                    ? colorScheme.error.withValues(alpha: 0.12)
-                    : colorScheme.primaryContainer,
-                child: Icon(
-                  Icons.campaign_rounded,
-                  color: isSuspended
-                      ? colorScheme.error
-                      : colorScheme.onPrimaryContainer,
-                  size: 22,
+        side: BorderSide(
+          color: isSuspended
+              ? colorScheme.error.withValues(alpha: 0.3)
+              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Avatar
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: isSuspended
+                      ? colorScheme.errorContainer
+                      : colorScheme.primaryContainer,
+                  child: Icon(
+                    Icons.campaign_rounded,
+                    color: isSuspended
+                        ? colorScheme.onErrorContainer
+                        : colorScheme.onPrimaryContainer,
+                    size: 22,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
+                const SizedBox(width: 12),
 
-              // Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
+                // Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Text(
                             employee.displayName,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: colorScheme.onSurface,
                             ),
                           ),
-                        ),
-                        _buildRoleBadge(context, employee.role),
-                        const SizedBox(width: 6),
-                        if (isSuspended)
+                          _buildRoleBadge(context, employee.role),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 3,
+                              horizontal: 8,
+                              vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: colorScheme.error.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
+                              color: isSuspended
+                                  ? colorScheme.errorContainer
+                                  : colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              l10n.suspended,
+                              isSuspended ? l10n.suspended : l10n.active,
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: colorScheme.error,
-                              ),
-                            ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              l10n.active,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.green,
+                                color: isSuspended
+                                    ? colorScheme.onErrorContainer
+                                    : colorScheme.onPrimaryContainer,
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.phone_outlined,
-                          size: 14,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          employee.phoneNumber,
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.phone_rounded,
+                            size: 14,
                             color: colorScheme.onSurfaceVariant,
                           ),
+                          const SizedBox(width: 4),
+                          Text(
+                            employee.phoneNumber,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (employee.email.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.email_rounded,
+                              size: 14,
+                              color: colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                employee.email,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.7),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                    if (employee.email.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.email_outlined,
-                            size: 14,
-                            color: colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.7),
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              employee.email,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.7),
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                      if (employee.organizationUID != null &&
+                          employee.organizationUID!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.corporate_fare_rounded,
+                              size: 14,
+                              color: colorScheme.primary.withValues(alpha: 0.7),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (employee.organizationUID != null &&
-                        employee.organizationUID!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.business_outlined,
-                            size: 14,
-                            color: colorScheme.primary.withValues(alpha: 0.7),
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              employee.organizationUID!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.primary
-                                    .withValues(alpha: 0.8),
-                                fontWeight: FontWeight.w500,
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                employee.organizationUID!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                Icons.more_vert_rounded,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 4),
+            // Inline compact action buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  tooltip: l10n.editMarketingEmployee,
+                  icon: Icon(Icons.edit_rounded, color: colorScheme.primary, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    final bloc = context.read<ManageMarketingBloc>();
+                    _showEditDialog(context, bloc);
+                  },
+                ),
+                IconButton(
+                  tooltip: isSuspended
+                      ? l10n.activateMarketingEmployee
+                      : l10n.suspendMarketingEmployee,
+                  icon: Icon(
+                    isSuspended
+                        ? Icons.play_arrow_rounded
+                        : Icons.pause_circle_rounded,
+                    color: isSuspended
+                        ? colorScheme.primary
+                        : colorScheme.tertiary,
+                    size: 20,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    final bloc = context.read<ManageMarketingBloc>();
+                    bloc.add(
+                      SuspendMarketingEmployeeRequested(
+                        employeeId: employee.uid,
+                        suspend: !isSuspended,
+                      ),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isSuspended
+                              ? l10n.employeeActivated
+                              : l10n.employeeSuspended,
+                          style: TextStyle(
+                            color: isSuspended
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onTertiaryContainer,
+                          ),
+                        ),
+                        backgroundColor: isSuspended
+                            ? colorScheme.primaryContainer
+                            : colorScheme.tertiaryContainer,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  tooltip: l10n.deleteMarketingEmployee,
+                  icon: Icon(Icons.delete_rounded, color: colorScheme.error, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    final bloc = context.read<ManageMarketingBloc>();
+                    _showDeleteConfirmation(context, bloc);
+                  },
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -590,182 +645,65 @@ class _EmployeeCard extends StatelessWidget {
 
   Widget _buildRoleBadge(BuildContext context, String role) {
     final isArabic = localeProvider.isArabic;
+    final colorScheme = Theme.of(context).colorScheme;
     String label;
     IconData icon;
-    Color color;
+    Color bg;
+    Color fg;
 
     switch (role) {
       case 'marketing':
         label = isArabic ? 'تسويق الفروع' : 'Branch Marketing';
         icon = Icons.campaign_rounded;
-        color = Colors.orange;
+        bg = colorScheme.secondaryContainer;
+        fg = colorScheme.onSecondaryContainer;
         break;
       case 'marketing_promotion':
         label = isArabic ? 'تسويق العروض' : 'Marketing Promotion';
         icon = Icons.photo_library_rounded;
-        color = Colors.purple;
+        bg = colorScheme.tertiaryContainer;
+        fg = colorScheme.onTertiaryContainer;
         break;
       case 'company-admin':
         label = isArabic ? 'مدير قطاع' : 'Company Admin';
         icon = Icons.business_rounded;
-        color = Colors.blue;
+        bg = colorScheme.primaryContainer;
+        fg = colorScheme.onPrimaryContainer;
         break;
       case 'organization-admin':
         label = isArabic ? 'مدير عام' : 'Organization Admin';
         icon = Icons.corporate_fare_rounded;
-        color = Colors.teal;
+        bg = colorScheme.surfaceContainerHighest;
+        fg = colorScheme.primary;
         break;
       default:
         label = role;
         icon = Icons.person_rounded;
-        color = Colors.grey;
+        bg = colorScheme.surfaceContainerHighest;
+        fg = colorScheme.onSurfaceVariant;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: color),
+          Icon(icon, size: 13, color: fg),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: color,
+              color: fg,
             ),
           ),
         ],
       ),
-    );
-  }
-
-  void _showActionsSheet(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final bloc = context.read<ManageMarketingBloc>();
-    final isSuspended = !employee.isActive;
-
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Employee header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: colorScheme.primaryContainer,
-                      child: Icon(
-                        Icons.campaign_rounded,
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            employee.displayName,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          Text(
-                            employee.phoneNumber,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-
-              // Edit
-              ListTile(
-                leading: Icon(Icons.edit_rounded, color: colorScheme.primary),
-                title: Text(l10n.editMarketingEmployee),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _showEditDialog(context, bloc);
-                },
-              ),
-
-              // Suspend / Activate
-              ListTile(
-                leading: Icon(
-                  isSuspended
-                      ? Icons.play_arrow_rounded
-                      : Icons.pause_rounded,
-                  color: isSuspended ? Colors.green : Colors.orange,
-                ),
-                title: Text(
-                  isSuspended
-                      ? l10n.activateMarketingEmployee
-                      : l10n.suspendMarketingEmployee,
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  bloc.add(
-                    SuspendMarketingEmployeeRequested(
-                      employeeId: employee.uid,
-                      suspend: !isSuspended,
-                    ),
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isSuspended
-                            ? l10n.employeeActivated
-                            : l10n.employeeSuspended,
-                      ),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-              ),
-
-              // Delete
-              ListTile(
-                leading:
-                    Icon(Icons.delete_rounded, color: colorScheme.error),
-                title: Text(
-                  l10n.deleteMarketingEmployee,
-                  style: TextStyle(color: colorScheme.error),
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _showDeleteConfirmation(context, bloc);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
     );
   }
 
@@ -795,7 +733,7 @@ class _EmployeeCard extends StatelessWidget {
                   controller: nameController,
                   decoration: InputDecoration(
                     labelText: l10n.employeeName,
-                    prefixIcon: const Icon(Icons.person_outline_rounded),
+                    prefixIcon: const Icon(Icons.person_rounded),
                     border: const OutlineInputBorder(),
                   ),
                   validator: (v) => v == null || v.trim().isEmpty
@@ -807,7 +745,7 @@ class _EmployeeCard extends StatelessWidget {
                   controller: phoneController,
                   decoration: InputDecoration(
                     labelText: l10n.employeePhone,
-                    prefixIcon: const Icon(Icons.phone_outlined),
+                    prefixIcon: const Icon(Icons.phone_rounded),
                     border: const OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.phone,
@@ -820,7 +758,7 @@ class _EmployeeCard extends StatelessWidget {
                   controller: emailController,
                   decoration: InputDecoration(
                     labelText: l10n.employeeEmail,
-                    prefixIcon: const Icon(Icons.email_outlined),
+                    prefixIcon: const Icon(Icons.email_rounded),
                     border: const OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.emailAddress,

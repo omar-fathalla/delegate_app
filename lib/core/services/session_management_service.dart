@@ -161,20 +161,40 @@ class SessionManagementService {
     required String companyUID,
   }) async {
     final orgId = organizationUID.isNotEmpty ? organizationUID : defaultOrgId;
-    if (delegateUid.isEmpty || companyUID.isEmpty) return;
+    if (delegateUid.isEmpty) return;
 
     try {
-      await _firestore
-          .collection('organizations')
-          .doc(orgId)
-          .collection('companies')
-          .doc(companyUID)
-          .collection('delegates')
-          .doc(delegateUid)
-          .update({
-        'requireReLogin': false,
-        'reLoginCompletedAt': FieldValue.serverTimestamp(),
-      });
+      // 1. التحقق وتحديث مستند المندوب في شركته إذا كان موجوداً
+      if (companyUID.isNotEmpty) {
+        final delegateDocRef = _firestore
+            .collection('organizations')
+            .doc(orgId)
+            .collection('companies')
+            .doc(companyUID)
+            .collection('delegates')
+            .doc(delegateUid);
+
+        final docSnap =
+            await delegateDocRef.get().timeout(const Duration(seconds: 3));
+        if (docSnap.exists) {
+          await delegateDocRef.update({
+            'requireReLogin': false,
+            'reLoginCompletedAt': FieldValue.serverTimestamp(),
+          }).timeout(const Duration(seconds: 3));
+          return;
+        }
+      }
+
+      // 2. التحقق وتحديث مستند المستخدم في users (للمديرين والمشرفين والدعم الفني)
+      final userDocRef = _firestore.collection('users').doc(delegateUid);
+      final userSnap =
+          await userDocRef.get().timeout(const Duration(seconds: 3));
+      if (userSnap.exists) {
+        await userDocRef.update({
+          'requireReLogin': false,
+          'reLoginCompletedAt': FieldValue.serverTimestamp(),
+        }).timeout(const Duration(seconds: 3));
+      }
     } catch (e) {
       debugPrint('Error in clearReLoginFlag: $e');
     }

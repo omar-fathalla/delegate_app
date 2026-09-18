@@ -46,20 +46,7 @@ class NotificationLocalDataSourceImpl implements NotificationLocalDataSource {
       final cached = await getCachedNotifications(userKey);
       final updated = cached.map((n) {
         if (n.id == notificationId) {
-          return NotificationModel(
-            id: n.id,
-            delegateUid: n.delegateUid,
-            organizationId: n.organizationId,
-            companyId: n.companyId,
-            title: n.title,
-            body: n.body,
-            type: n.type,
-            taskId: n.taskId,
-            penaltyId: n.penaltyId,
-            isRead: true,
-            createdAt: n.createdAt,
-            deletedBy: n.deletedBy,
-          );
+          return n.copyWith(isRead: true);
         }
         return n;
       }).toList();
@@ -71,22 +58,7 @@ class NotificationLocalDataSourceImpl implements NotificationLocalDataSource {
   Future<void> markAllAsReadInCache(String userKey) async {
     try {
       final cached = await getCachedNotifications(userKey);
-      final updated = cached.map((n) {
-        return NotificationModel(
-          id: n.id,
-          delegateUid: n.delegateUid,
-          organizationId: n.organizationId,
-          companyId: n.companyId,
-          title: n.title,
-          body: n.body,
-          type: n.type,
-          taskId: n.taskId,
-          penaltyId: n.penaltyId,
-          isRead: true,
-          createdAt: n.createdAt,
-          deletedBy: n.deletedBy,
-        );
-      }).toList();
+      final updated = cached.map((n) => n.copyWith(isRead: true)).toList();
       await cacheNotifications(userKey, updated);
     } catch (_) {}
   }

@@ -26,6 +26,7 @@ class PenaltyModel extends PenaltyEntity {
     super.targetDelegateId,
     super.targetDelegateName,
     super.isRepeated = false,
+    super.isConfidential = false,
     required super.createdAt,
     required super.updatedAt,
   });
@@ -77,6 +78,7 @@ class PenaltyModel extends PenaltyEntity {
       targetDelegateId: data['targetDelegateId'],
       targetDelegateName: data['targetDelegateName'],
       isRepeated: data['isRepeated'] ?? false,
+      isConfidential: data['isConfidential'] ?? false,
       createdAt: parseTimestamp(data['createdAt']),
       updatedAt: parseTimestamp(data['updatedAt']),
     );
@@ -111,6 +113,7 @@ class PenaltyModel extends PenaltyEntity {
       if (targetDelegateId != null) 'targetDelegateId': targetDelegateId,
       if (targetDelegateName != null) 'targetDelegateName': targetDelegateName,
       'isRepeated': isRepeated,
+      'isConfidential': isConfidential,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -141,6 +144,7 @@ class PenaltyModel extends PenaltyEntity {
       targetDelegateId: entity.targetDelegateId,
       targetDelegateName: entity.targetDelegateName,
       isRepeated: entity.isRepeated,
+      isConfidential: entity.isConfidential,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     );

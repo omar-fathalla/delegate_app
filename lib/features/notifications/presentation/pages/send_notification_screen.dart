@@ -207,6 +207,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           'isRead': false,
           'createdAt': FieldValue.serverTimestamp(),
           'senderName': widget.senderDelegate.fullName,
+          'senderRole': widget.senderDelegate.role.name,
           'senderUid': widget.senderDelegate.uid,
           'broadcastId': broadcastId,
         });
@@ -232,6 +233,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
               'isRead': false,
               'createdAt': FieldValue.serverTimestamp(),
               'senderName': widget.senderDelegate.fullName,
+              'senderRole': widget.senderDelegate.role.name,
               'senderUid': widget.senderDelegate.uid,
               'broadcastId': broadcastId,
             });
@@ -276,6 +278,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
               'isRead': false,
               'createdAt': FieldValue.serverTimestamp(),
               'senderName': widget.senderDelegate.fullName,
+              'senderRole': widget.senderDelegate.role.name,
               'senderUid': widget.senderDelegate.uid,
               'broadcastId': broadcastId,
             });
@@ -309,6 +312,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             'isRead': false,
             'createdAt': FieldValue.serverTimestamp(),
             'senderName': widget.senderDelegate.fullName,
+            'senderRole': widget.senderDelegate.role.name,
             'senderUid': widget.senderDelegate.uid,
             'broadcastId': broadcastId,
           });
@@ -330,6 +334,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             'isRead': false,
             'createdAt': FieldValue.serverTimestamp(),
             'senderName': widget.senderDelegate.fullName,
+            'senderRole': widget.senderDelegate.role.name,
             'senderUid': widget.senderDelegate.uid,
             'broadcastId': broadcastId,
           });
@@ -339,17 +344,20 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
       // Record Sent Log Entry in sent_notifications
       await sentLogRef.set({
-        'id': broadcastId,
+        'broadcastId': broadcastId,
         'title': title,
         'body': body,
+        'senderUid': widget.senderDelegate.uid,
+        'senderName': widget.senderDelegate.fullName,
+        'senderRole': widget.senderDelegate.role.name,
         'targetAudience': _targetAudience,
         'targetName': targetName,
         'targetDetails': targetDetails,
         'targetUid': targetUid,
-        'senderName': widget.senderDelegate.fullName,
-        'senderUid': widget.senderDelegate.uid,
+        'targetPhone': _targetAudience == 'user' ? _phoneController.text.trim() : null,
+        'targetOrgId': _targetAudience == 'org' ? _selectedOrgUID : null,
         'sentCount': sentCount,
-        'createdAt': FieldValue.serverTimestamp(),
+        'sentAt': FieldValue.serverTimestamp(),
       });
 
       // Trigger local test notification on device
@@ -383,8 +391,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ تم إرسال الإشعار بنجاح إلى $targetName'),
-            backgroundColor: Colors.green,
+            content: Text('تم إرسال الإشعار بنجاح إلى $targetName'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -396,8 +404,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ حدث خطأ أثناء إرسال الإشعار: $e'),
-            backgroundColor: Colors.red,
+            content: Text('حدث خطأ أثناء إرسال الإشعار: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -431,9 +439,16 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     if (!widget.showAppBar) {
       return Column(
         children: [
-          Material(
-            color: colorScheme.surface,
-            elevation: 1,
+          Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainer,
+              border: Border(
+                bottom: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  width: 0.8,
+                ),
+              ),
+            ),
             child: tabBar,
           ),
           Expanded(
@@ -691,7 +706,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
                 keyboardType: TextInputType.phone,
                 decoration: InputDecoration(
                   hintText: 'مثال: 01012345678',
-                  prefixIcon: const Icon(Icons.phone_outlined),
+                  prefixIcon: const Icon(Icons.phone_rounded),
                   filled: true,
                   fillColor: colorScheme.surfaceContainerHighest.withValues(
                     alpha: 0.5,
@@ -720,11 +735,11 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
                 onPressed: _isSending ? null : _sendNotification,
                 icon:
                     _isSending
-                        ? const SizedBox(
+                        ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                            color: Colors.white,
+                            color: colorScheme.onPrimary,
                             strokeWidth: 2,
                           ),
                         )
@@ -825,6 +840,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
               .orderBy('createdAt', descending: true)
               .snapshots(),
       builder: (context, snapshot) {
+        final colorScheme = Theme.of(context).colorScheme;
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -833,7 +849,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           return Center(
             child: Text(
               'حدث خطأ في تحميل السجل: ${snapshot.error}',
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: colorScheme.error),
             ),
           );
         }
@@ -847,7 +863,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
                 Icon(
                   Icons.outbox_rounded,
                   size: 64,
-                  color: Colors.grey.shade400,
+                  color: colorScheme.outlineVariant,
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -855,9 +871,9 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'أي إشعار ستقوم بإرساله سيظهر هنا مع إحصائيات القراءة والتسليم.',
-                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                  style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -964,7 +980,7 @@ class _SentNotificationCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             side: BorderSide(
               color: isUserRead || isAllRead
-                  ? Colors.blue.withValues(alpha: 0.3)
+                  ? colorScheme.primary.withValues(alpha: 0.3)
                   : colorScheme.outlineVariant.withValues(alpha: 0.4),
             ),
           ),
@@ -987,7 +1003,7 @@ class _SentNotificationCard extends StatelessWidget {
                     height: 40,
                     decoration: BoxDecoration(
                       color: isUserRead || isAllRead
-                          ? Colors.blue.shade50
+                          ? colorScheme.primaryContainer
                           : colorScheme.primaryContainer.withValues(alpha: 0.6),
                       shape: BoxShape.circle,
                     ),
@@ -995,7 +1011,7 @@ class _SentNotificationCard extends StatelessWidget {
                       child: Icon(
                         _getAudienceIcon(targetAudience),
                         color: isUserRead || isAllRead
-                            ? Colors.blue.shade700
+                            ? colorScheme.primary
                             : colorScheme.primary,
                         size: 20,
                       ),
@@ -1024,6 +1040,7 @@ class _SentNotificationCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 6),
                             _buildCompactReadBadge(
+                              colorScheme: colorScheme,
                               isSingleUser: isSingleUser,
                               isUserRead: isUserRead,
                               readCount: readCount,
@@ -1124,7 +1141,7 @@ class _SentNotificationCard extends StatelessWidget {
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.all(6),
                         ),
-                        icon: const Icon(Icons.visibility_outlined, size: 17),
+                        icon: const Icon(Icons.visibility_rounded, size: 17),
                         tooltip: 'عرض التفاصيل',
                         onPressed: () => _showNotificationDetails(
                           context,
@@ -1146,6 +1163,7 @@ class _SentNotificationCard extends StatelessWidget {
   }
 
   Widget _buildCompactReadBadge({
+    required ColorScheme colorScheme,
     required bool isSingleUser,
     required bool isUserRead,
     required int readCount,
@@ -1162,14 +1180,14 @@ class _SentNotificationCard extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
           decoration: BoxDecoration(
-            color: Colors.blue.shade50,
+            color: colorScheme.primaryContainer.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: Colors.blue.shade200, width: 0.7),
+            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3), width: 0.7),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.done_all_rounded, size: 12, color: Colors.blue.shade700),
+              Icon(Icons.done_all_rounded, size: 12, color: colorScheme.primary),
               if (timeStr.isNotEmpty) ...[
                 const SizedBox(width: 2),
                 Text(
@@ -1177,7 +1195,7 @@ class _SentNotificationCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade800,
+                    color: colorScheme.primary,
                   ),
                 ),
               ],
@@ -1188,21 +1206,21 @@ class _SentNotificationCard extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
           decoration: BoxDecoration(
-            color: Colors.orange.shade50,
+            color: colorScheme.secondaryContainer.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: Colors.orange.shade200, width: 0.7),
+            border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.3), width: 0.7),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.hourglass_empty_rounded, size: 11, color: Colors.orange.shade800),
+              Icon(Icons.hourglass_empty_rounded, size: 11, color: colorScheme.secondary),
               const SizedBox(width: 2),
               Text(
                 'في الانتظار',
                 style: TextStyle(
                   fontSize: 9.5,
                   fontWeight: FontWeight.bold,
-                  color: Colors.orange.shade900,
+                  color: colorScheme.secondary,
                 ),
               ),
             ],
@@ -1213,10 +1231,14 @@ class _SentNotificationCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
         decoration: BoxDecoration(
-          color: isAllRead ? Colors.green.shade50 : Colors.blue.shade50,
+          color: isAllRead
+              ? colorScheme.primaryContainer.withValues(alpha: 0.6)
+              : colorScheme.secondaryContainer.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: isAllRead ? Colors.green.shade200 : Colors.blue.shade200,
+            color: isAllRead
+                ? colorScheme.primary.withValues(alpha: 0.3)
+                : colorScheme.secondary.withValues(alpha: 0.3),
             width: 0.7,
           ),
         ),
@@ -1224,9 +1246,9 @@ class _SentNotificationCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isAllRead ? Icons.done_all_rounded : Icons.people_outline_rounded,
+              isAllRead ? Icons.done_all_rounded : Icons.people_rounded,
               size: 11,
-              color: isAllRead ? Colors.green.shade700 : Colors.blue.shade700,
+              color: isAllRead ? colorScheme.primary : colorScheme.secondary,
             ),
             const SizedBox(width: 2),
             Text(
@@ -1234,7 +1256,7 @@ class _SentNotificationCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 9.5,
                 fontWeight: FontWeight.bold,
-                color: isAllRead ? Colors.green.shade800 : Colors.blue.shade800,
+                color: isAllRead ? colorScheme.primary : colorScheme.secondary,
               ),
             ),
           ],
@@ -1279,9 +1301,9 @@ class _SentNotificationCard extends StatelessWidget {
           ),
           title: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.mark_email_read_rounded,
-                color: Colors.deepPurple,
+                color: Theme.of(ctx).colorScheme.primary,
               ),
               const SizedBox(width: 8),
               const Expanded(
@@ -1297,11 +1319,12 @@ class _SentNotificationCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildDetailRow('العنوان', data['title'] ?? ''),
+                _buildDetailRow(ctx, 'العنوان', data['title'] ?? ''),
                 const Divider(),
-                _buildDetailRow('المحتوى', data['body'] ?? ''),
+                _buildDetailRow(ctx, 'المحتوى', data['body'] ?? ''),
                 const Divider(),
                 _buildDetailRow(
+                  ctx,
                   'المستهدف',
                   (data['targetDetails'] as String? ??
                           data['targetName'] as String? ??
@@ -1311,13 +1334,14 @@ class _SentNotificationCard extends StatelessWidget {
                       .trim(),
                 ),
                 const Divider(),
-                _buildDetailRow('حالة القراءة', readStatusText),
+                _buildDetailRow(ctx, 'حالة القراءة', readStatusText),
                 const Divider(),
-                _buildDetailRow('المرسل', data['senderName'] ?? ''),
+                _buildDetailRow(ctx, 'المرسل', data['senderName'] ?? ''),
                 const Divider(),
-                _buildDetailRow('تاريخ الإرسال', dateStr),
+                _buildDetailRow(ctx, 'تاريخ الإرسال', dateStr),
                 const Divider(),
                 _buildDetailRow(
+                  ctx,
                   'إجمالي المستلمين',
                   '${data['sentCount'] ?? 1} مستخدم',
                 ),
@@ -1335,7 +1359,7 @@ class _SentNotificationCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Column(
@@ -1343,10 +1367,10 @@ class _SentNotificationCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 12,
-              color: Colors.grey,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 2),

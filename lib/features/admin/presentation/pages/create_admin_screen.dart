@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,12 +11,16 @@ class CreateAdminScreen extends StatelessWidget {
   final String organizationUID;
   final Delegate? currentDelegate;
   final UserRole? currentUserRole;
+  final bool showAppBar;
+  final VoidCallback? onBack;
 
   const CreateAdminScreen({
     super.key,
     required this.organizationUID,
     this.currentDelegate,
     this.currentUserRole,
+    this.showAppBar = true,
+    this.onBack,
   });
 
   @override
@@ -27,6 +32,8 @@ class CreateAdminScreen extends StatelessWidget {
         organizationUID: organizationUID,
         currentDelegate: currentDelegate,
         currentUserRole: currentUserRole,
+        showAppBar: showAppBar,
+        onBack: onBack,
       ),
     );
   }
@@ -36,11 +43,15 @@ class _CreateAdminView extends StatefulWidget {
   final String organizationUID;
   final Delegate? currentDelegate;
   final UserRole? currentUserRole;
+  final bool showAppBar;
+  final VoidCallback? onBack;
 
   const _CreateAdminView({
     required this.organizationUID,
     this.currentDelegate,
     this.currentUserRole,
+    this.showAppBar = true,
+    this.onBack,
   });
 
   @override
@@ -137,8 +148,11 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(l10n.adminCreatedSuccessfully),
-              backgroundColor: Colors.green,
+              content: Text(
+                l10n.adminCreatedSuccessfully,
+                style: TextStyle(color: colorScheme.onPrimaryContainer),
+              ),
+              backgroundColor: colorScheme.primaryContainer,
             ),
           );
         } else if (state is CreateAdminError) {
@@ -153,9 +167,42 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
       builder: (context, state) {
         final isLoading = state is CreateAdminLoading;
 
+        void handleBack() {
+          if (widget.onBack != null) {
+            widget.onBack!();
+          } else if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else if (widget.currentDelegate != null) {
+            context.go('/admin/home', extra: widget.currentDelegate);
+          }
+        }
+
         return Scaffold(
-          backgroundColor: colorScheme.surface,
+          backgroundColor: colorScheme.surfaceContainerLowest,
+          appBar: widget.showAppBar
+              ? AppBar(
+                  backgroundColor: colorScheme.surfaceContainer,
+                  surfaceTintColor: Colors.transparent,
+                  elevation: 0,
+                  scrolledUnderElevation: 2.0,
+                  shape: Border(
+                    bottom: BorderSide(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                      width: 0.8,
+                    ),
+                  ),
+                  leading: BackButton(
+                    onPressed: handleBack,
+                  ),
+                  title: Text(
+                    l10n.createAdmin,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  centerTitle: true,
+                )
+              : null,
           body: SafeArea(
+            top: !widget.showAppBar,
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(
                 horizontal: 24.0,
@@ -166,34 +213,46 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (!widget.showAppBar && widget.onBack != null) ...[
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: IconButton.filledTonal(
+                          icon: const BackButtonIcon(),
+                          onPressed: widget.onBack,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     // Header icon
                     Center(
                       child: Container(
-                        width: 80,
-                        height: 80,
+                        width: 72,
+                        height: 72,
                         decoration: BoxDecoration(
                           color: colorScheme.primaryContainer,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.admin_panel_settings_rounded,
-                          size: 40,
+                          size: 36,
                           color: colorScheme.onPrimaryContainer,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: Text(
-                        l10n.createAdmin,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
-                            ),
+                    if (!widget.showAppBar) ...[
+                      const SizedBox(height: 16),
+                      Center(
+                        child: Text(
+                          l10n.createAdmin,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 32),
+                    ],
+                    const SizedBox(height: 24),
 
                     // Display Name
                     TextFormField(
@@ -202,7 +261,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                       decoration: InputDecoration(
                         labelText: l10n.adminName,
                         prefixIcon: Icon(
-                          Icons.person_outline,
+                          Icons.person_rounded,
                           color: colorScheme.onSurfaceVariant,
                         ),
                         filled: true,
@@ -231,7 +290,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                       decoration: InputDecoration(
                         labelText: l10n.adminPhone,
                         prefixIcon: Icon(
-                          Icons.phone_outlined,
+                          Icons.phone_rounded,
                           color: colorScheme.onSurfaceVariant,
                         ),
                         filled: true,
@@ -266,7 +325,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                       decoration: InputDecoration(
                         labelText: l10n.adminEmail,
                         prefixIcon: Icon(
-                          Icons.email_outlined,
+                          Icons.email_rounded,
                           color: colorScheme.onSurfaceVariant,
                         ),
                         filled: true,
@@ -464,7 +523,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                       height: 54,
                       child: FilledButton.icon(
                         onPressed: isLoading ? null : _submitForm,
-                        icon: const Icon(Icons.person_add_outlined),
+                        icon: const Icon(Icons.person_add_rounded),
                         label: isLoading
                             ? SizedBox(
                                 height: 20,

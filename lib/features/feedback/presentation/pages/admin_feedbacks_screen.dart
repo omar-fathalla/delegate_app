@@ -35,7 +35,7 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list_rounded),
             onPressed: () => _showFilterDialog(context, isArabic),
           ),
         ],
@@ -52,7 +52,7 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.error_outline,
+                    Icons.error_outline_rounded,
                     size: 64,
                     color: theme.colorScheme.error,
                   ),
@@ -69,7 +69,7 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
                         const LoadAllFeedbacksEvent(),
                       );
                     },
-                    icon: const Icon(Icons.refresh),
+                    icon: const Icon(Icons.refresh_rounded),
                     label: Text(isArabic ? 'إعادة المحاولة' : 'Retry'),
                   ),
                 ],
@@ -98,7 +98,7 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.feedback_outlined,
+                      Icons.feedback_rounded,
                       size: 64,
                       color: theme.colorScheme.primary.withValues(alpha: 0.5),
                     ),
@@ -194,31 +194,31 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
             _buildStatItem(
               isArabic ? 'معلق' : 'Pending',
               pending.toString(),
-              Colors.orange,
+              theme.colorScheme.tertiary,
             ),
             const SizedBox(width: 20),
             _buildStatItem(
               isArabic ? 'مراجَع' : 'Reviewed',
               reviewed.toString(),
-              Colors.blue,
+              theme.colorScheme.secondary,
             ),
             const SizedBox(width: 20),
             _buildStatItem(
               isArabic ? 'قيد التنفيذ' : 'In Progress',
               inProgress.toString(),
-              Colors.purple,
+              theme.colorScheme.primary,
             ),
             const SizedBox(width: 20),
             _buildStatItem(
               isArabic ? 'تم الحل' : 'Resolved',
               resolved.toString(),
-              Colors.green,
+              theme.colorScheme.outline,
             ),
             const SizedBox(width: 20),
             _buildStatItem(
               isArabic ? 'مرفوض' : 'Rejected',
               rejected.toString(),
-              Colors.red,
+              theme.colorScheme.error,
             ),
           ],
         ),
@@ -470,33 +470,33 @@ class _AdminFeedbackCard extends StatelessWidget {
     this.onDelete,
   });
 
-  Color _getStatusColor(FeedbackStatus status) {
+  (Color bg, Color fg) _getStatusColors(ColorScheme colorScheme, FeedbackStatus status) {
     switch (status) {
       case FeedbackStatus.pending:
-        return Colors.orange;
+        return (colorScheme.tertiaryContainer, colorScheme.onTertiaryContainer);
       case FeedbackStatus.reviewed:
-        return Colors.blue;
+        return (colorScheme.secondaryContainer, colorScheme.onSecondaryContainer);
       case FeedbackStatus.inProgress:
-        return Colors.purple;
+        return (colorScheme.primaryContainer, colorScheme.onPrimaryContainer);
       case FeedbackStatus.resolved:
-        return Colors.green;
+        return (colorScheme.surfaceContainerHighest, colorScheme.primary);
       case FeedbackStatus.rejected:
-        return Colors.red;
+        return (colorScheme.errorContainer, colorScheme.onErrorContainer);
     }
   }
 
   IconData _getTypeIcon(FeedbackType type) {
     switch (type) {
       case FeedbackType.featureRequest:
-        return Icons.lightbulb_outline;
+        return Icons.lightbulb_rounded;
       case FeedbackType.bugReport:
-        return Icons.bug_report_outlined;
+        return Icons.bug_report_rounded;
       case FeedbackType.generalQuestion:
-        return Icons.help_outline;
+        return Icons.help_rounded;
       case FeedbackType.improvement:
-        return Icons.star_outline;
+        return Icons.star_rounded;
       case FeedbackType.other:
-        return Icons.chat_bubble_outline;
+        return Icons.chat_bubble_rounded;
     }
   }
 
@@ -504,12 +504,21 @@ class _AdminFeedbackCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dateFormat = DateFormat('dd/MM/yyyy - HH:mm');
+    final (statusBg, statusFg) = _getStatusColors(theme.colorScheme, feedback.status);
 
     return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -536,9 +545,7 @@ class _AdminFeedbackCard extends StatelessWidget {
                         Text(
                           feedback.userName,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
-                            ),
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -550,19 +557,13 @@ class _AdminFeedbackCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: _getStatusColor(
-                        feedback.status,
-                      ).withValues(alpha: 0.1),
+                      color: statusBg,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _getStatusColor(feedback.status),
-                        width: 1,
-                      ),
                     ),
                     child: Text(
                       feedback.status.getLabel(isArabic),
                       style: TextStyle(
-                        color: _getStatusColor(feedback.status),
+                        color: statusFg,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
@@ -574,7 +575,7 @@ class _AdminFeedbackCard extends StatelessWidget {
                       icon: Icon(
                         Icons.delete_outline_rounded,
                         size: 20,
-                        color: theme.colorScheme.error.withValues(alpha: 0.8),
+                        color: theme.colorScheme.error,
                       ),
                       tooltip: isArabic ? 'حذف المقترح' : 'Delete Feedback',
                       onPressed: onDelete,
@@ -595,21 +596,21 @@ class _AdminFeedbackCard extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    Icons.access_time,
+                    Icons.access_time_rounded,
                     size: 14,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     dateFormat.format(feedback.createdAt),
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   if (feedback.screenshotUrl != null) ...[
                     const SizedBox(width: 12),
                     Icon(
-                      Icons.image,
+                      Icons.image_rounded,
                       size: 14,
                       color: theme.colorScheme.primary,
                     ),
@@ -896,12 +897,16 @@ class _FeedbackDetailsSheetState extends State<_FeedbackDetailsSheet> {
                                       widget.isArabic
                                           ? 'تم تحديث المقترح بنجاح'
                                           : 'Feedback updated successfully',
+                                      style: TextStyle(
+                                        color: theme.colorScheme.onPrimaryContainer,
+                                      ),
                                     ),
-                                    backgroundColor: Colors.green,
+                                    backgroundColor:
+                                        theme.colorScheme.primaryContainer,
                                   ),
                                 );
                               },
-                              icon: const Icon(Icons.save),
+                              icon: const Icon(Icons.save_rounded),
                               label: Text(
                                 widget.isArabic ? 'حفظ التغييرات' : 'Save Changes',
                               ),
@@ -929,15 +934,15 @@ class _FeedbackDetailsSheetState extends State<_FeedbackDetailsSheet> {
   IconData _getTypeIcon(FeedbackType type) {
     switch (type) {
       case FeedbackType.featureRequest:
-        return Icons.lightbulb_outline;
+        return Icons.lightbulb_rounded;
       case FeedbackType.bugReport:
-        return Icons.bug_report_outlined;
+        return Icons.bug_report_rounded;
       case FeedbackType.generalQuestion:
-        return Icons.help_outline;
+        return Icons.help_rounded;
       case FeedbackType.improvement:
-        return Icons.star_outline;
+        return Icons.star_rounded;
       case FeedbackType.other:
-        return Icons.chat_bubble_outline;
+        return Icons.chat_bubble_rounded;
     }
   }
 }

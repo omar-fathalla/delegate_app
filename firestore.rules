@@ -122,8 +122,11 @@ service cloud.firestore {
       allow read, create, update, delete: if isAuthenticated();
     }
 
-    // ==================== DELEGATE SUBSCRIPTION REQUESTS ====================
+    // ==================== DELEGATE SUBSCRIPTION REQUESTS & USED CODES ====================
     match /delegate_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /used_receipt_codes/{code} {
       allow read, write: if isAuthenticated();
     }
 
@@ -487,6 +490,12 @@ service cloud.firestore {
     match /penalties/{penaltyId} {
       allow read, write: if true;
     }
+    match /penalty_rules/{ruleId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/penalty_rules/{ruleId} {
+      allow read, write: if true;
+    }
 
     // ==================== NOTIFICATIONS COLLECTIONS ====================
     match /notifications/{notificationId} {
@@ -496,8 +505,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // ==================== DELEGATE SUBSCRIPTION REQUESTS ====================
+    // ==================== DELEGATE SUBSCRIPTION REQUESTS & USED CODES ====================
     match /delegate_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /used_receipt_codes/{code} {
       allow read, write: if isAuthenticated();
     }
 
@@ -508,11 +520,29 @@ service cloud.firestore {
       match /transactions/{transactionId} {
         allow read, write: if true;
       }
+      match /allocations/{allocationId} {
+        allow read, write: if true;
+      }
     }
     match /{path=**}/monthly_collections/{periodId} {
       allow read, write: if true;
     }
     match /{path=**}/transactions/{transactionId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/allocations/{allocationId} {
+      allow read, write: if true;
+    }
+
+    // ==================== USER WALLETS & ALLOCATIONS ====================
+    // User wallets and financial dues allocations
+    match /user_wallets/{userId} {
+      allow read, write: if true;
+      match /transactions/{transactionId} {
+        allow read, write: if true;
+      }
+    }
+    match /{path=**}/user_wallets/{userId} {
       allow read, write: if true;
     }
 
