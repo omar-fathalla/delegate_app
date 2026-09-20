@@ -48,6 +48,44 @@ void main() {
       final result = AdminUserModel.fromFirestore(mockDoc);
       expect(result, tAdminUserModel);
     });
+
+    test('should parse delegate data with fullName, phone, and status fallback', () {
+      final mockDoc = MockDocumentSnapshot();
+      when(() => mockDoc.id).thenReturn('del_123');
+      when(() => mockDoc.data()).thenReturn({
+        'phone': '01012345678',
+        'fullName': 'Mohamed Ali',
+        'role': 'delegate',
+        'organizationId': 'org_alpha',
+        'organizationName': 'Alpha Org',
+        'status': 'Approved',
+      });
+
+      final result = AdminUserModel.fromFirestore(mockDoc);
+      expect(result.uid, 'del_123');
+      expect(result.displayName, 'Mohamed Ali');
+      expect(result.phoneNumber, '01012345678');
+      expect(result.role, 'delegate');
+      expect(result.organizationUID, 'org_alpha');
+      expect(result.organizationName, 'Alpha Org');
+      expect(result.isActive, true);
+    });
+
+    test('should infer supervisor role when position is supervisor', () {
+      final mockDoc = MockDocumentSnapshot();
+      when(() => mockDoc.id).thenReturn('sup_123');
+      when(() => mockDoc.data()).thenReturn({
+        'name': 'Supervisor Sami',
+        'position': 'supervisor',
+        'status': 'suspended',
+      });
+
+      final result = AdminUserModel.fromFirestore(mockDoc);
+      expect(result.uid, 'sup_123');
+      expect(result.displayName, 'Supervisor Sami');
+      expect(result.role, 'supervisor');
+      expect(result.isActive, false);
+    });
   });
 
   group('toMap', () {

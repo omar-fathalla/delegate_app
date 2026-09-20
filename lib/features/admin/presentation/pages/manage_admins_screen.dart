@@ -29,6 +29,7 @@ class _ManageAdminsView extends StatefulWidget {
 class _ManageAdminsViewState extends State<_ManageAdminsView> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedStatusFilter = 'all'; // 'all', 'active', 'suspended'
+  String _selectedRoleFilter = 'all'; // 'all', 'technical_support', 'super_admin', 'organization_admin', 'company_admin', 'marketing', 'supervisor'
 
   @override
   void dispose() {
@@ -36,7 +37,65 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
     super.dispose();
   }
 
-  List<AdminUser> _filterAdmins(List<AdminUser> admins) {
+  static (String label, IconData icon, Color Function(ColorScheme) bgColor, Color Function(ColorScheme) fgColor) getRoleInfo(String rawRole, bool isArabic) {
+    final norm = rawRole.toLowerCase().replaceAll('-', '_');
+    if (norm.contains('technical') || norm.contains('support')) {
+      return (
+        isArabic ? 'الدعم الفني' : 'Technical Support',
+        Icons.support_agent_rounded,
+        (cs) => cs.tertiaryContainer,
+        (cs) => cs.onTertiaryContainer,
+      );
+    }
+    if (norm.contains('super')) {
+      return (
+        isArabic ? 'المشرف العام' : 'Super Admin',
+        Icons.verified_user_rounded,
+        (cs) => cs.primaryContainer,
+        (cs) => cs.onPrimaryContainer,
+      );
+    }
+    if (norm.contains('organization')) {
+      return (
+        isArabic ? 'مدير عام' : 'Organization Admin',
+        Icons.corporate_fare_rounded,
+        (cs) => cs.secondaryContainer,
+        (cs) => cs.onSecondaryContainer,
+      );
+    }
+    if (norm == 'company_admin' || norm == 'admin') {
+      return (
+        isArabic ? 'مشرف شركة' : 'Company Admin',
+        Icons.business_rounded,
+        (cs) => cs.surfaceContainerHighest,
+        (cs) => cs.onSurfaceVariant,
+      );
+    }
+    if (norm.contains('marketing')) {
+      return (
+        isArabic ? 'تسويق' : 'Marketing',
+        Icons.campaign_rounded,
+        (cs) => cs.surfaceContainerHighest,
+        (cs) => cs.onSurfaceVariant,
+      );
+    }
+    if (norm == 'supervisor') {
+      return (
+        isArabic ? 'مشرف' : 'Supervisor',
+        Icons.supervisor_account_rounded,
+        (cs) => cs.surfaceContainerHighest,
+        (cs) => cs.onSurfaceVariant,
+      );
+    }
+    return (
+      rawRole,
+      Icons.person_rounded,
+      (cs) => cs.surfaceContainerHighest,
+      (cs) => cs.onSurfaceVariant,
+    );
+  }
+
+  List<AdminUser> _filterAdmins(List<AdminUser> admins, bool isArabic) {
     final query = _searchController.text.trim().toLowerCase();
 
     return admins.where((admin) {
@@ -44,20 +103,47 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
       final matchesPhone = admin.phoneNumber.toLowerCase().contains(query);
       final matchesEmail = admin.email.toLowerCase().contains(query);
       final matchesRole = admin.role.toLowerCase().contains(query);
+      final roleInfo = getRoleInfo(admin.role, isArabic);
+      final matchesRoleLabel = roleInfo.$1.toLowerCase().contains(query);
 
       final matchesQuery =
           query.isEmpty ||
           matchesName ||
           matchesPhone ||
           matchesEmail ||
-          matchesRole;
+          matchesRole ||
+          matchesRoleLabel;
 
       final matchesStatus =
           _selectedStatusFilter == 'all' ||
           (_selectedStatusFilter == 'active' && admin.isActive) ||
           (_selectedStatusFilter == 'suspended' && !admin.isActive);
 
-      return matchesQuery && matchesStatus;
+      final normRole = admin.role.toLowerCase().replaceAll('-', '_');
+      final matchesRoleFilter = () {
+        if (_selectedRoleFilter == 'all') return true;
+        if (_selectedRoleFilter == 'technical_support') {
+          return normRole.contains('technical') || normRole.contains('support');
+        }
+        if (_selectedRoleFilter == 'super_admin') {
+          return normRole.contains('super');
+        }
+        if (_selectedRoleFilter == 'organization_admin') {
+          return normRole.contains('organization');
+        }
+        if (_selectedRoleFilter == 'company_admin') {
+          return normRole == 'company_admin' || normRole == 'admin';
+        }
+        if (_selectedRoleFilter == 'marketing') {
+          return normRole.contains('marketing');
+        }
+        if (_selectedRoleFilter == 'supervisor') {
+          return normRole == 'supervisor';
+        }
+        return true;
+      }();
+
+      return matchesQuery && matchesStatus && matchesRoleFilter;
     }).toList();
   }
 
@@ -88,10 +174,11 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
 
           if (state is ManageAdminsLoaded) {
             final allAdmins = state.admins;
-            final filteredAdmins = _filterAdmins(allAdmins);
+            final filteredAdmins = _filterAdmins(allAdmins, isArabic);
             final isSearchingOrFiltering =
                 _searchController.text.isNotEmpty ||
-                _selectedStatusFilter != 'all';
+                _selectedStatusFilter != 'all' ||
+                _selectedRoleFilter != 'all';
 
             return Column(
               children: [
@@ -115,8 +202,8 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
                       SearchBar(
                         controller: _searchController,
                         hintText: isArabic
-                            ? 'البحث باسم المستخدم، الاسم، أو رقم الموبايل...'
-                            : 'Search by username, name, or phone...',
+                            ? 'البحث بالاسم، الدعم الفني، الرقم، أو البريد...'
+                            : 'Search by name, technical support, phone, email...',
                         elevation: WidgetStateProperty.all(0),
                         backgroundColor: WidgetStateProperty.all(
                           colorScheme.surfaceContainerHighest.withValues(
@@ -142,7 +229,7 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Filter Chips
+                      // Status & Role Filter Chips
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -170,6 +257,87 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
                                   () => _selectedStatusFilter = 'suspended'),
                               selectedColor: colorScheme.errorContainer,
                               checkmarkColor: colorScheme.error,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Role Filter Chips Row
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            FilterChip(
+                              label: Text(isArabic ? 'جميع الأدوار' : 'All Roles'),
+                              selected: _selectedRoleFilter == 'all',
+                              onSelected: (_) => setState(() => _selectedRoleFilter = 'all'),
+                            ),
+                            const SizedBox(width: 8),
+                            FilterChip(
+                              avatar: Icon(
+                                Icons.support_agent_rounded,
+                                size: 16,
+                                color: _selectedRoleFilter == 'technical_support'
+                                    ? colorScheme.onTertiaryContainer
+                                    : colorScheme.tertiary,
+                              ),
+                              label: Text(isArabic ? 'الدعم الفني' : 'Technical Support'),
+                              selected: _selectedRoleFilter == 'technical_support',
+                              onSelected: (_) => setState(() => _selectedRoleFilter = 'technical_support'),
+                              selectedColor: colorScheme.tertiaryContainer,
+                              checkmarkColor: colorScheme.onTertiaryContainer,
+                            ),
+                            const SizedBox(width: 8),
+                            FilterChip(
+                              avatar: Icon(
+                                Icons.verified_user_rounded,
+                                size: 16,
+                                color: _selectedRoleFilter == 'super_admin'
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.primary,
+                              ),
+                              label: Text(isArabic ? 'المشرف العام' : 'Super Admin'),
+                              selected: _selectedRoleFilter == 'super_admin',
+                              onSelected: (_) => setState(() => _selectedRoleFilter = 'super_admin'),
+                              selectedColor: colorScheme.primaryContainer,
+                              checkmarkColor: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            FilterChip(
+                              avatar: Icon(
+                                Icons.corporate_fare_rounded,
+                                size: 16,
+                                color: _selectedRoleFilter == 'organization_admin'
+                                    ? colorScheme.onSecondaryContainer
+                                    : colorScheme.secondary,
+                              ),
+                              label: Text(isArabic ? 'مدير عام' : 'Org Admin'),
+                              selected: _selectedRoleFilter == 'organization_admin',
+                              onSelected: (_) => setState(() => _selectedRoleFilter = 'organization_admin'),
+                              selectedColor: colorScheme.secondaryContainer,
+                              checkmarkColor: colorScheme.secondary,
+                            ),
+                            const SizedBox(width: 8),
+                            FilterChip(
+                              avatar: const Icon(Icons.business_rounded, size: 16),
+                              label: Text(isArabic ? 'مشرف شركة' : 'Company Admin'),
+                              selected: _selectedRoleFilter == 'company_admin',
+                              onSelected: (_) => setState(() => _selectedRoleFilter = 'company_admin'),
+                            ),
+                            const SizedBox(width: 8),
+                            FilterChip(
+                              avatar: const Icon(Icons.campaign_rounded, size: 16),
+                              label: Text(isArabic ? 'تسويق' : 'Marketing'),
+                              selected: _selectedRoleFilter == 'marketing',
+                              onSelected: (_) => setState(() => _selectedRoleFilter = 'marketing'),
+                            ),
+                            const SizedBox(width: 8),
+                            FilterChip(
+                              avatar: const Icon(Icons.supervisor_account_rounded, size: 16),
+                              label: Text(isArabic ? 'مشرف' : 'Supervisor'),
+                              selected: _selectedRoleFilter == 'supervisor',
+                              onSelected: (_) => setState(() => _selectedRoleFilter = 'supervisor'),
                             ),
                           ],
                         ),
@@ -208,7 +376,10 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
                             ),
                             onPressed: () {
                               _searchController.clear();
-                              setState(() => _selectedStatusFilter = 'all');
+                              setState(() {
+                                _selectedStatusFilter = 'all';
+                                _selectedRoleFilter = 'all';
+                              });
                             },
                             icon: const Icon(Icons.refresh_rounded, size: 16),
                             label: Text(
@@ -282,8 +453,10 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
     Widget build(BuildContext context) {
       final colorScheme = Theme.of(context).colorScheme;
       final l10n = AppLocalizations.of(context)!;
+      final isArabic = localeProvider.isArabic;
       final isSuspended = !admin.isActive;
       final bloc = context.read<ManageAdminsBloc>();
+      final roleInfo = _ManageAdminsViewState.getRoleInfo(admin.role, isArabic);
 
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
@@ -306,12 +479,12 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
               CircleAvatar(
                 backgroundColor: isSuspended
                     ? colorScheme.error.withValues(alpha: 0.15)
-                    : colorScheme.primaryContainer,
+                    : roleInfo.$3(colorScheme),
                 child: Icon(
-                  Icons.person_rounded,
+                  isSuspended ? Icons.person_off_rounded : roleInfo.$2,
                   color: isSuspended
                       ? colorScheme.error
-                      : colorScheme.onPrimaryContainer,
+                      : roleInfo.$4(colorScheme),
                 ),
               ),
               const SizedBox(width: 12),
@@ -333,7 +506,7 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (isSuspended)
+                        if (isSuspended) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 6,
@@ -352,6 +525,37 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 6),
+                        ],
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: roleInfo.$3(colorScheme).withValues(alpha: isSuspended ? 0.35 : 0.9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: roleInfo.$4(colorScheme).withValues(alpha: 0.25),
+                              width: 0.6,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(roleInfo.$2, size: 11, color: roleInfo.$4(colorScheme)),
+                              const SizedBox(width: 4),
+                              Text(
+                                roleInfo.$1,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: roleInfo.$4(colorScheme),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 2),

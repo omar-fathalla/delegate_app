@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/injection_container.dart' as di;
@@ -32,47 +34,117 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
   String? _selectedOrganizationUID;
   String _selectedRoleFilter = 'all';
 
+  Map<String, String> _organizationNamesMap = {};
+  List<_OrgOption> _liveOrganizations = [];
+  StreamSubscription<QuerySnapshot>? _orgsSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeToOrganizations();
+  }
+
+  void _subscribeToOrganizations() {
+    _orgsSubscription = FirebaseFirestore.instance
+        .collection('organizations')
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      final map = <String, String>{};
+      final options = <_OrgOption>[];
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>? ?? {};
+        final uid = (data['uid'] ?? data['organizationUID'] ?? doc.id).toString().trim();
+        final name = (data['name'] ?? data['title'] ?? '').toString().trim();
+
+        if (name.isNotEmpty) {
+          map[doc.id] = name;
+          if (uid.isNotEmpty) {
+            map[uid] = name;
+          }
+          final actualUid = uid.isNotEmpty ? uid : doc.id;
+          options.add(_OrgOption(uid: actualUid, name: name));
+        }
+      }
+
+      options.sort((a, b) => a.name.compareTo(b.name));
+
+      setState(() {
+        _organizationNamesMap = map;
+        _liveOrganizations = options;
+      });
+    }, onError: (_) {});
+  }
+
   @override
   void dispose() {
+    _orgsSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  List<AdminUser> _filterEmployees(List<AdminUser> employees) {
+  void _resetFilters() {
+    _searchController.clear();
+    setState(() {
+      _selectedRoleFilter = 'all';
+      _selectedOrganizationUID = null;
+    });
+  }
+
+  List<AdminUser> _filterEmployees(List<AdminUser> employees, BuildContext context) {
     final query = _searchController.text.trim().toLowerCase();
     return employees.where((e) {
+      final roleInfo = _getRoleInfo(context, e.role);
+      final orgName = (e.organizationName != null && e.organizationName!.isNotEmpty)
+          ? e.organizationName!
+          : (_organizationNamesMap[e.organizationUID] ?? '');
       final matchesPhone = e.phoneNumber.toLowerCase().contains(query);
       final matchesName = e.displayName.toLowerCase().contains(query);
       final matchesEmail = e.email.toLowerCase().contains(query);
-      final matchesRoleQuery = e.role.toLowerCase().contains(query);
+      final matchesRoleQuery = e.role.toLowerCase().contains(query) ||
+          roleInfo.label.toLowerCase().contains(query);
+      final matchesOrgQuery = (e.organizationUID?.toLowerCase().contains(query) ?? false) ||
+          orgName.toLowerCase().contains(query);
+      final matchesCompanyQuery = (e.companyUID?.toLowerCase().contains(query) ?? false) ||
+          (e.companyName?.toLowerCase().contains(query) ?? false);
 
       final matchesQuery = query.isEmpty ||
           matchesPhone ||
           matchesName ||
           matchesEmail ||
-          matchesRoleQuery;
+          matchesRoleQuery ||
+          matchesOrgQuery ||
+          matchesCompanyQuery;
 
       final matchesOrg = _selectedOrganizationUID == null ||
           e.organizationUID == _selectedOrganizationUID;
 
-      final matchesRole = _selectedRoleFilter == 'all' ||
-          e.role == _selectedRoleFilter;
+      final matchesRole = _matchesRole(e.role, _selectedRoleFilter);
 
       return matchesQuery && matchesOrg && matchesRole;
     }).toList();
   }
 
-  /// Extract unique organizations from employees for the filter
+  /// Combine live organizations from Firestore with any found in employees
   List<_OrgOption> _extractOrganizations(List<AdminUser> employees) {
-    final orgMap = <String, String>{};
+    final map = Map<String, String>.from(_organizationNamesMap);
+    final list = List<_OrgOption>.from(_liveOrganizations);
+
     for (final e in employees) {
-      if (e.organizationUID != null && e.organizationUID!.isNotEmpty) {
-        orgMap.putIfAbsent(e.organizationUID!, () => e.organizationUID!);
+      final uid = e.organizationUID?.trim();
+      if (uid != null && uid.isNotEmpty && !map.containsKey(uid)) {
+        final name = (e.organizationName != null && e.organizationName!.isNotEmpty)
+            ? e.organizationName!.trim()
+            : null;
+        if (name != null && name.isNotEmpty) {
+          map[uid] = name;
+          list.add(_OrgOption(uid: uid, name: name));
+        }
       }
     }
-    return orgMap.entries
-        .map((e) => _OrgOption(uid: e.key, name: e.value))
-        .toList();
+    list.sort((a, b) => a.name.compareTo(b.name));
+    return list;
   }
 
   @override
@@ -85,6 +157,17 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
       appBar: AdminHeader(
         subtitle: isArabic ? 'إدارة المستخدمين والتسويق' : l10n.manageMarketing,
         showBackButton: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: isArabic ? 'تحديث البيانات' : 'Refresh Data',
+            onPressed: () {
+              context
+                  .read<ManageMarketingBloc>()
+                  .add(LoadMarketingEmployeesRequested());
+            },
+          ),
+        ],
       ),
       backgroundColor: colorScheme.surfaceContainerLowest,
       body: BlocConsumer<ManageMarketingBloc, ManageMarketingState>(
@@ -105,7 +188,7 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
 
           if (state is ManageMarketingLoaded) {
             final allEmployees = state.employees;
-            final filteredEmployees = _filterEmployees(allEmployees);
+            final filteredEmployees = _filterEmployees(allEmployees, context);
             final organizations = _extractOrganizations(allEmployees);
 
             return Column(
@@ -127,6 +210,7 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
                   onRoleFilterChanged: (role) {
                     setState(() => _selectedRoleFilter = role);
                   },
+                  onResetFilters: _resetFilters,
                 ),
 
                 // ── Results Count ──
@@ -169,28 +253,56 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
 
                 // ── Employee List ──
                 Expanded(
-                  child: filteredEmployees.isEmpty
-                      ? _EmptyView(
-                          isFiltering: _searchController.text.isNotEmpty ||
-                              _selectedOrganizationUID != null ||
-                              _selectedRoleFilter != 'all',
-                          allEmpty: allEmployees.isEmpty,
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.only(
-                            left: 16,
-                            right: 16,
-                            top: 4,
-                            bottom: 88,
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      context
+                          .read<ManageMarketingBloc>()
+                          .add(LoadMarketingEmployeesRequested());
+                    },
+                    child: filteredEmployees.isEmpty
+                        ? LayoutBuilder(
+                            builder: (context, constraints) =>
+                                SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: constraints.maxHeight,
+                                ),
+                                child: _EmptyView(
+                                  isFiltering: _searchController.text.isNotEmpty ||
+                                      _selectedOrganizationUID != null ||
+                                      _selectedRoleFilter != 'all',
+                                  allEmpty: allEmployees.isEmpty,
+                                  onResetFilters: _resetFilters,
+                                  onRefresh: () {
+                                    context
+                                        .read<ManageMarketingBloc>()
+                                        .add(LoadMarketingEmployeesRequested());
+                                  },
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(
+                              left: 16,
+                              right: 16,
+                              top: 4,
+                              bottom: 88,
+                            ),
+                            itemCount: filteredEmployees.length,
+                            separatorBuilder: (ctx, i) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final employee = filteredEmployees[index];
+                              return _EmployeeCard(
+                                employee: employee,
+                                resolvedOrgName: _organizationNamesMap[employee.organizationUID],
+                              );
+                            },
                           ),
-                          itemCount: filteredEmployees.length,
-                          separatorBuilder: (ctx, i) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final employee = filteredEmployees[index];
-                            return _EmployeeCard(employee: employee);
-                          },
-                        ),
+                  ),
                 ),
               ],
             );
@@ -201,6 +313,181 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Role & Filter Helpers
+// ─────────────────────────────────────────────────────────────
+
+class _RoleDropdownItem {
+  final String key;
+  final String label;
+  final IconData icon;
+
+  const _RoleDropdownItem({
+    required this.key,
+    required this.label,
+    required this.icon,
+  });
+}
+
+class _RoleInfo {
+  final String label;
+  final IconData icon;
+  final Color bg;
+  final Color fg;
+
+  const _RoleInfo({
+    required this.label,
+    required this.icon,
+    required this.bg,
+    required this.fg,
+  });
+}
+
+bool _matchesRole(String userRole, String selectedFilter) {
+  if (selectedFilter == 'all') return true;
+  final norm = userRole.toLowerCase().trim().replaceAll('-', '_').replaceAll(' ', '_');
+  switch (selectedFilter) {
+    case 'super_admin':
+      return norm == 'super_admin' || norm == 'superadmin' || norm.contains('super');
+    case 'technical_support':
+      return norm == 'technical_support' ||
+          norm == 'technicalsupport' ||
+          norm == 'tech_support' ||
+          norm == 'techsupport' ||
+          norm.contains('technical') ||
+          norm.contains('support');
+    case 'organization_admin':
+      return norm == 'organization_admin' ||
+          norm == 'organizationadmin' ||
+          norm == 'org_admin' ||
+          norm.contains('organization');
+    case 'company_admin':
+      return norm == 'company_admin' ||
+          norm == 'companyadmin' ||
+          norm == 'admin' ||
+          norm.contains('company');
+    case 'branches_marketing':
+      return norm == 'branches_marketing' ||
+          norm == 'branches_marketing_manager' ||
+          norm == 'branchesmarketing' ||
+          norm == 'branchesmarketingmanager' ||
+          norm.contains('branches');
+    case 'marketing':
+      return norm == 'marketing' ||
+          norm == 'branch_marketing' ||
+          norm == 'branchmarketing' ||
+          (norm.contains('marketing') &&
+              !norm.contains('promotion') &&
+              !norm.contains('branches'));
+    case 'marketing_promotion':
+      return norm == 'marketing_promotion' ||
+          norm == 'marketingpromotion' ||
+          norm.contains('promotion');
+    case 'supervisor':
+      return norm == 'supervisor' || norm.contains('supervisor');
+    case 'delegate':
+      return norm == 'delegate' ||
+          norm == 'promoter' ||
+          norm.contains('delegate') ||
+          norm.contains('promoter');
+    default:
+      return norm == selectedFilter.toLowerCase().trim().replaceAll('-', '_').replaceAll(' ', '_');
+  }
+}
+
+_RoleInfo _getRoleInfo(BuildContext context, String role) {
+  final isArabic = localeProvider.isArabic;
+  final colorScheme = Theme.of(context).colorScheme;
+  final norm = role.toLowerCase().trim().replaceAll('-', '_').replaceAll(' ', '_');
+
+  if (norm.contains('tech') || norm.contains('support')) {
+    return _RoleInfo(
+      label: isArabic ? 'دعم فني' : 'Technical Support',
+      icon: Icons.support_agent_rounded,
+      bg: colorScheme.secondaryContainer,
+      fg: colorScheme.onSecondaryContainer,
+    );
+  }
+  if (norm.contains('super')) {
+    return _RoleInfo(
+      label: isArabic ? 'مشرف عام' : 'Super Admin',
+      icon: Icons.verified_user_rounded,
+      bg: colorScheme.tertiaryContainer,
+      fg: colorScheme.onTertiaryContainer,
+    );
+  }
+  if (norm.contains('organization') || norm.contains('org_admin')) {
+    return _RoleInfo(
+      label: isArabic ? 'مدير عام' : 'Organization Admin',
+      icon: Icons.corporate_fare_rounded,
+      bg: colorScheme.surfaceContainerHighest,
+      fg: colorScheme.primary,
+    );
+  }
+  if (norm.contains('branches')) {
+    return _RoleInfo(
+      label: isArabic ? 'مدير تسويق فروع' : 'Branches Marketing Mgr',
+      icon: Icons.storefront_rounded,
+      bg: colorScheme.tertiaryContainer,
+      fg: colorScheme.onTertiaryContainer,
+    );
+  }
+  if (norm.contains('promotion')) {
+    return _RoleInfo(
+      label: isArabic ? 'تسويق عروض' : 'Marketing Promotion',
+      icon: Icons.photo_library_rounded,
+      bg: colorScheme.surfaceContainerHighest,
+      fg: colorScheme.tertiary,
+    );
+  }
+  if (norm.contains('company') || norm == 'admin') {
+    return _RoleInfo(
+      label: isArabic ? 'مدير قطاع' : 'Company Admin',
+      icon: Icons.business_rounded,
+      bg: colorScheme.primaryContainer,
+      fg: colorScheme.onPrimaryContainer,
+    );
+  }
+  if (norm.contains('marketing')) {
+    return _RoleInfo(
+      label: isArabic ? 'تسويق فروع' : 'Branch Marketing',
+      icon: Icons.campaign_rounded,
+      bg: colorScheme.secondaryContainer,
+      fg: colorScheme.onSecondaryContainer,
+    );
+  }
+  if (norm.contains('supervisor')) {
+    return _RoleInfo(
+      label: isArabic ? 'مشرف' : 'Supervisor',
+      icon: Icons.supervisor_account_rounded,
+      bg: colorScheme.primaryContainer.withValues(alpha: 0.8),
+      fg: colorScheme.primary,
+    );
+  }
+  if (norm.contains('promoter')) {
+    return _RoleInfo(
+      label: isArabic ? 'بروموتر' : 'Promoter',
+      icon: Icons.badge_rounded,
+      bg: colorScheme.secondaryContainer.withValues(alpha: 0.8),
+      fg: colorScheme.secondary,
+    );
+  }
+  if (norm.contains('delegate')) {
+    return _RoleInfo(
+      label: isArabic ? 'مندوب' : 'Delegate',
+      icon: Icons.badge_rounded,
+      bg: colorScheme.secondaryContainer.withValues(alpha: 0.8),
+      fg: colorScheme.secondary,
+    );
+  }
+  return _RoleInfo(
+    label: role,
+    icon: Icons.person_rounded,
+    bg: colorScheme.surfaceContainerHighest,
+    fg: colorScheme.onSurfaceVariant,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -216,6 +503,7 @@ class _SearchFilterBar extends StatelessWidget {
   final VoidCallback onSearchCleared;
   final ValueChanged<String?> onOrganizationChanged;
   final ValueChanged<String> onRoleFilterChanged;
+  final VoidCallback onResetFilters;
 
   const _SearchFilterBar({
     required this.searchController,
@@ -226,21 +514,71 @@ class _SearchFilterBar extends StatelessWidget {
     required this.onSearchCleared,
     required this.onOrganizationChanged,
     required this.onRoleFilterChanged,
+    required this.onResetFilters,
   });
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isArabic = localeProvider.isArabic;
 
-    final roles = [
-      {'key': 'all', 'label': isArabic ? 'الكل' : 'All'},
-      {'key': 'marketing', 'label': isArabic ? 'تسويق الفروع' : 'Branch Marketing'},
-      {'key': 'marketing_promotion', 'label': isArabic ? 'تسويق العروض' : 'Marketing Promotion'},
-      {'key': 'company-admin', 'label': isArabic ? 'مدير قطاع' : 'Company Admin'},
-      {'key': 'organization-admin', 'label': isArabic ? 'مدير عام' : 'Organization Admin'},
+    final roleOptions = [
+      _RoleDropdownItem(
+        key: 'all',
+        label: isArabic ? 'جميع المستخدمين (الكل)' : 'All Users',
+        icon: Icons.people_alt_rounded,
+      ),
+      _RoleDropdownItem(
+        key: 'super_admin',
+        label: isArabic ? 'المشرف العام (Super Admin)' : 'Super Admin',
+        icon: Icons.verified_user_rounded,
+      ),
+      _RoleDropdownItem(
+        key: 'technical_support',
+        label: isArabic ? 'الدعم الفني (Tech Support)' : 'Technical Support',
+        icon: Icons.support_agent_rounded,
+      ),
+      _RoleDropdownItem(
+        key: 'organization_admin',
+        label: isArabic ? 'مدير عام (Organization Admin)' : 'Organization Admin',
+        icon: Icons.corporate_fare_rounded,
+      ),
+      _RoleDropdownItem(
+        key: 'company_admin',
+        label: isArabic ? 'مدير قطاع / مشرف شركة' : 'Company Admin',
+        icon: Icons.business_rounded,
+      ),
+      _RoleDropdownItem(
+        key: 'branches_marketing',
+        label: isArabic ? 'مدير تسويق الفروع' : 'Branches Marketing Manager',
+        icon: Icons.storefront_rounded,
+      ),
+      _RoleDropdownItem(
+        key: 'marketing',
+        label: isArabic ? 'تسويق الفروع' : 'Branch Marketing',
+        icon: Icons.campaign_rounded,
+      ),
+      _RoleDropdownItem(
+        key: 'marketing_promotion',
+        label: isArabic ? 'تسويق العروض' : 'Marketing Promotion',
+        icon: Icons.photo_library_rounded,
+      ),
+      _RoleDropdownItem(
+        key: 'supervisor',
+        label: isArabic ? 'مشرف' : 'Supervisor',
+        icon: Icons.supervisor_account_rounded,
+      ),
+      _RoleDropdownItem(
+        key: 'delegate',
+        label: isArabic ? 'مندوب / بروموتر' : 'Delegate / Promoter',
+        icon: Icons.badge_rounded,
+      ),
     ];
+
+    final hasActiveFilters = searchController.text.isNotEmpty ||
+        selectedRoleFilter != 'all' ||
+        selectedOrganizationUID != null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -282,58 +620,228 @@ class _SearchFilterBar extends StatelessWidget {
             ),
             onChanged: onSearchChanged,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          // Role Filter Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: roles.map((role) {
-                final key = role['key'] as String;
-                final label = role['label'] as String;
-                final isSelected = selectedRoleFilter == key;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(label),
-                    selected: isSelected,
-                    onSelected: (_) => onRoleFilterChanged(key),
-                    selectedColor: theme.colorScheme.primaryContainer,
-                    checkmarkColor: theme.colorScheme.onPrimaryContainer,
-                  ),
-                );
-              }).toList(),
+          // Role Dropdown Menu
+          DropdownButtonFormField<String>(
+            key: ValueKey('role_filter_$selectedRoleFilter'),
+            initialValue: selectedRoleFilter,
+            isExpanded: true,
+            dropdownColor: colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(16),
+            menuMaxHeight: 380,
+            alignment: AlignmentDirectional.centerStart,
+            icon: Icon(
+              Icons.arrow_drop_down_rounded,
+              color: colorScheme.primary,
             ),
+            decoration: InputDecoration(
+              labelText: isArabic ? 'نوع المستخدم' : 'User Role',
+              labelStyle: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
+              prefixIcon: Icon(
+                Icons.badge_rounded,
+                size: 20,
+                color: colorScheme.primary,
+              ),
+              filled: true,
+              fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: colorScheme.primary,
+                  width: 1.5,
+                ),
+              ),
+            ),
+            items: roleOptions.map((opt) {
+              final isSelected = selectedRoleFilter == opt.key;
+              return DropdownMenuItem<String>(
+                value: opt.key,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      opt.icon,
+                      size: 18,
+                      color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        opt.label,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) {
+                onRoleFilterChanged(val);
+              }
+            },
           ),
 
           if (organizations.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            // Organization Filter Chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  FilterChip(
-                    avatar: const Icon(Icons.business_rounded, size: 18),
-                    label: Text(l10n.allOrganizations),
-                    selected: selectedOrganizationUID == null,
-                    onSelected: (_) => onOrganizationChanged(null),
-                  ),
-                  const SizedBox(width: 8),
-                  ...organizations.map((org) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(org.name),
-                        selected: selectedOrganizationUID == org.uid,
-                        onSelected: (_) => onOrganizationChanged(org.uid),
-                        selectedColor: theme.colorScheme.secondaryContainer,
-                        checkmarkColor: theme.colorScheme.onSecondaryContainer,
-                      ),
-                    );
-                  }),
-                ],
+            const SizedBox(height: 10),
+            // Organization Dropdown Menu
+            DropdownButtonFormField<String?>(
+              key: ValueKey('org_filter_$selectedOrganizationUID'),
+              initialValue: selectedOrganizationUID,
+              isExpanded: true,
+              dropdownColor: colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(16),
+              menuMaxHeight: 350,
+              alignment: AlignmentDirectional.centerStart,
+              icon: Icon(
+                Icons.arrow_drop_down_rounded,
+                color: colorScheme.primary,
               ),
+              decoration: InputDecoration(
+                labelText: isArabic ? 'المنظمة' : 'Organization',
+                labelStyle: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                ),
+                prefixIcon: Icon(
+                  Icons.corporate_fare_rounded,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                filled: true,
+                fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: colorScheme.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+              items: [
+                DropdownMenuItem<String?>(
+                  value: null,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.domain_rounded,
+                        size: 18,
+                        color: selectedOrganizationUID == null
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        isArabic ? 'جميع المنظمات' : 'All Organizations',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: selectedOrganizationUID == null
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: selectedOrganizationUID == null
+                              ? colorScheme.primary
+                              : colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ...organizations.map((org) {
+                  final isSelected = selectedOrganizationUID == org.uid;
+                  return DropdownMenuItem<String?>(
+                    value: org.uid,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.business_rounded,
+                          size: 18,
+                          color: isSelected
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            org.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: isSelected
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+              onChanged: (val) {
+                onOrganizationChanged(val);
+              },
+            ),
+          ],
+
+          if (hasActiveFilters) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: onResetFilters,
+                  icon: const Icon(Icons.filter_alt_off_rounded, size: 16),
+                  label: Text(
+                    isArabic ? 'إعادة ضبط الفلاتر' : 'Reset Filters',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: colorScheme.error,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -349,56 +857,85 @@ class _SearchFilterBar extends StatelessWidget {
 class _EmptyView extends StatelessWidget {
   final bool isFiltering;
   final bool allEmpty;
+  final VoidCallback? onResetFilters;
+  final VoidCallback? onRefresh;
 
-  const _EmptyView({required this.isFiltering, required this.allEmpty});
+  const _EmptyView({
+    required this.isFiltering,
+    required this.allEmpty,
+    this.onResetFilters,
+    this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final isArabic = localeProvider.isArabic;
 
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.5),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              allEmpty
-                  ? Icons.campaign_rounded
-                  : Icons.search_off_rounded,
-              size: 40,
-              color: theme.colorScheme.outline,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            allEmpty
-                ? l10n.noMarketingEmployeesFound
-                : l10n.noDelegateSearchResults,
-            style: TextStyle(
-              fontSize: 16,
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          if (!allEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              l10n.searchByPhone,
-              style: TextStyle(
-                fontSize: 13,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                allEmpty
+                    ? Icons.campaign_rounded
+                    : Icons.search_off_rounded,
+                size: 40,
                 color: theme.colorScheme.outline,
               ),
             ),
+            const SizedBox(height: 16),
+            Text(
+              allEmpty
+                  ? l10n.noMarketingEmployeesFound
+                  : l10n.noDelegateSearchResults,
+              style: TextStyle(
+                fontSize: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (!allEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                l10n.searchByPhone,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ],
+            if (isFiltering && onResetFilters != null) ...[
+              const SizedBox(height: 16),
+              FilledButton.tonalIcon(
+                onPressed: onResetFilters,
+                icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
+                label: Text(isArabic ? 'إعادة ضبط الفلاتر' : 'Reset Filters'),
+              ),
+            ],
+            if (onRefresh != null) ...[
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: Text(isArabic ? 'تحديث البيانات من السيرفر' : 'Refresh from Server'),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -410,8 +947,12 @@ class _EmptyView extends StatelessWidget {
 
 class _EmployeeCard extends StatelessWidget {
   final AdminUser employee;
+  final String? resolvedOrgName;
 
-  const _EmployeeCard({required this.employee});
+  const _EmployeeCard({
+    required this.employee,
+    this.resolvedOrgName,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -419,6 +960,13 @@ class _EmployeeCard extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final isSuspended = !employee.isActive;
+    final roleInfo = _getRoleInfo(context, employee.role);
+    final orgDisplay = (employee.organizationName != null &&
+            employee.organizationName!.isNotEmpty)
+        ? employee.organizationName!
+        : (resolvedOrgName != null && resolvedOrgName!.isNotEmpty)
+            ? resolvedOrgName!
+            : '';
 
     return Card(
       elevation: 0,
@@ -440,17 +988,17 @@ class _EmployeeCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar
+                // Avatar with role-based styling
                 CircleAvatar(
                   radius: 22,
                   backgroundColor: isSuspended
                       ? colorScheme.errorContainer
-                      : colorScheme.primaryContainer,
+                      : roleInfo.bg,
                   child: Icon(
-                    Icons.campaign_rounded,
+                    roleInfo.icon,
                     color: isSuspended
                         ? colorScheme.onErrorContainer
-                        : colorScheme.onPrimaryContainer,
+                        : roleInfo.fg,
                     size: 22,
                   ),
                 ),
@@ -467,7 +1015,11 @@ class _EmployeeCard extends StatelessWidget {
                         runSpacing: 4,
                         children: [
                           Text(
-                            employee.displayName,
+                            employee.displayName.isNotEmpty
+                                ? employee.displayName
+                                : (employee.email.isNotEmpty
+                                    ? employee.email
+                                    : employee.phoneNumber),
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: colorScheme.onSurface,
@@ -498,23 +1050,25 @@ class _EmployeeCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.phone_rounded,
-                            size: 14,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            employee.phoneNumber,
-                            style: theme.textTheme.bodyMedium?.copyWith(
+                      if (employee.phoneNumber.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.phone_rounded,
+                              size: 14,
                               color: colorScheme.onSurfaceVariant,
                             ),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 4),
+                            Text(
+                              employee.phoneNumber,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       if (employee.email.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Row(
@@ -539,8 +1093,7 @@ class _EmployeeCard extends StatelessWidget {
                           ],
                         ),
                       ],
-                      if (employee.organizationUID != null &&
-                          employee.organizationUID!.isNotEmpty) ...[
+                      if (orgDisplay.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Row(
                           children: [
@@ -552,10 +1105,33 @@ class _EmployeeCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
-                                employee.organizationUID!,
+                                orgDisplay,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: colorScheme.primary,
                                   fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (employee.companyName != null &&
+                          employee.companyName!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.business_rounded,
+                              size: 14,
+                              color: colorScheme.outline,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                employee.companyName!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.outline,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -644,62 +1220,25 @@ class _EmployeeCard extends StatelessWidget {
   }
 
   Widget _buildRoleBadge(BuildContext context, String role) {
-    final isArabic = localeProvider.isArabic;
-    final colorScheme = Theme.of(context).colorScheme;
-    String label;
-    IconData icon;
-    Color bg;
-    Color fg;
-
-    switch (role) {
-      case 'marketing':
-        label = isArabic ? 'تسويق الفروع' : 'Branch Marketing';
-        icon = Icons.campaign_rounded;
-        bg = colorScheme.secondaryContainer;
-        fg = colorScheme.onSecondaryContainer;
-        break;
-      case 'marketing_promotion':
-        label = isArabic ? 'تسويق العروض' : 'Marketing Promotion';
-        icon = Icons.photo_library_rounded;
-        bg = colorScheme.tertiaryContainer;
-        fg = colorScheme.onTertiaryContainer;
-        break;
-      case 'company-admin':
-        label = isArabic ? 'مدير قطاع' : 'Company Admin';
-        icon = Icons.business_rounded;
-        bg = colorScheme.primaryContainer;
-        fg = colorScheme.onPrimaryContainer;
-        break;
-      case 'organization-admin':
-        label = isArabic ? 'مدير عام' : 'Organization Admin';
-        icon = Icons.corporate_fare_rounded;
-        bg = colorScheme.surfaceContainerHighest;
-        fg = colorScheme.primary;
-        break;
-      default:
-        label = role;
-        icon = Icons.person_rounded;
-        bg = colorScheme.surfaceContainerHighest;
-        fg = colorScheme.onSurfaceVariant;
-    }
+    final roleInfo = _getRoleInfo(context, role);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: bg,
+        color: roleInfo.bg,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: fg),
+          Icon(roleInfo.icon, size: 13, color: roleInfo.fg),
           const SizedBox(width: 4),
           Text(
-            label,
+            roleInfo.label,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: fg,
+              color: roleInfo.fg,
             ),
           ),
         ],
@@ -784,7 +1323,9 @@ class _EmployeeCard extends StatelessWidget {
                       displayName: nameController.text.trim(),
                       role: employee.role,
                       organizationUID: employee.organizationUID,
+                      organizationName: employee.organizationName,
                       companyUID: employee.companyUID,
+                      companyName: employee.companyName,
                       createdAt: employee.createdAt,
                       createdBy: employee.createdBy,
                       temporaryPassword: employee.temporaryPassword,

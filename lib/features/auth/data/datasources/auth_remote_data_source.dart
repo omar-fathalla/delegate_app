@@ -123,13 +123,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           final roleB = b.data()['role'] as String? ?? '';
           
           int getRoleWeight(String role) {
-            if (role == 'super-admin' || role == 'super_admin') return 100;
-            if (role == 'technical_support') return 90;
-            if (role == 'organization-admin' || role == 'organization_admin') return 80;
-            if (role == 'company-admin' || role == 'admin') return 70;
-            if (role == 'branches_marketing' || role == 'branches-marketing' || role == 'branches_marketing_manager') return 65;
-            if (role == 'Supervisor') return 60;
-            if (role == 'marketing' || role == 'marketing_promotion') return 50;
+            final norm = role.toLowerCase().replaceAll('-', '_');
+            if (norm == 'super_admin' || norm == 'superadmin') return 100;
+            if (norm == 'technical_support' || norm == 'technicalsupport' || norm == 'tech_support' || norm == 'techsupport') return 90;
+            if (norm == 'organization_admin' || norm == 'organizationadmin') return 80;
+            if (norm == 'company_admin' || norm == 'companyadmin' || norm == 'admin') return 70;
+            if (norm == 'branches_marketing' || norm == 'branches_marketing_manager' || norm == 'branchesmarketingmanager') return 65;
+            if (norm == 'supervisor') return 60;
+            if (norm == 'marketing' || norm == 'marketing_promotion' || norm == 'marketingpromotion') return 50;
             return 0;
           }
           
@@ -139,37 +140,44 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         for (final userDoc in docs) {
           final userData = userDoc.data();
           final userRole = userData['role'] as String? ?? '';
-          if (userRole == 'company-admin' ||
-              userRole == 'organization-admin' ||
-              userRole == 'Supervisor' ||
-              userRole == 'super-admin' ||
-              userRole == 'super_admin' ||
-              userRole == 'marketing' ||
-              userRole == 'marketing_promotion' ||
-              userRole == 'technical_support' ||
-              userRole == 'technical-support' ||
-              userRole == 'tech_support' ||
-              userRole == 'branches_marketing' ||
-              userRole == 'branches-marketing' ||
-              userRole == 'branches_marketing_manager') {
+          final normRole = userRole.toLowerCase().replaceAll('-', '_');
+          final isSuperAdmin = normRole == 'super_admin' || normRole == 'superadmin';
+          final isTechSupport = normRole == 'technical_support' ||
+              normRole == 'technicalsupport' ||
+              normRole == 'tech_support' ||
+              normRole == 'techsupport';
+          final isOrgAdmin = normRole == 'organization_admin' || normRole == 'organizationadmin';
+          final isCompanyAdmin = normRole == 'company_admin' || normRole == 'companyadmin' || normRole == 'admin';
+          final isSupervisor = normRole == 'supervisor';
+          final isMarketing = normRole == 'marketing';
+          final isMarketingPromotion = normRole == 'marketing_promotion' || normRole == 'marketingpromotion';
+          final isBranchesMarketing = normRole == 'branches_marketing' ||
+              normRole == 'branches_marketing_manager' ||
+              normRole == 'branchesmarketingmanager';
+
+          if (isSuperAdmin ||
+              isTechSupport ||
+              isOrgAdmin ||
+              isCompanyAdmin ||
+              isSupervisor ||
+              isMarketing ||
+              isMarketingPromotion ||
+              isBranchesMarketing) {
             // Get admin email from Firestore
             final adminEmail = userData['email'] as String? ?? '';
 
             // Determine the correct UserRole
-            final mappedRole = userRole == 'marketing'
+            final mappedRole = isMarketing
                 ? UserRole.marketing
-                : userRole == 'marketing_promotion'
+                : isMarketingPromotion
                     ? UserRole.marketingPromotion
-                    : userRole == 'organization-admin'
+                    : isOrgAdmin
                         ? UserRole.organizationAdmin
-                        : (userRole == 'technical_support' ||
-                                userRole == 'technical-support' ||
-                                userRole == 'tech_support')
+                        : isTechSupport
                             ? UserRole.technicalSupport
-                            : (userRole == 'super_admin' ||
-                                    userRole == 'super-admin')
+                            : isSuperAdmin
                                 ? UserRole.superAdmin
-                                : (userRole == 'branches_marketing' || userRole == 'branches-marketing' || userRole == 'branches_marketing_manager')
+                                : isBranchesMarketing
                                     ? UserRole.branchesMarketingManager
                                     : UserRole.admin;
 
@@ -179,14 +187,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 userData['tempPassword'] != null;
 
             final nationalityMark = (hasStoredPassword ||
-                    userRole == 'marketing' ||
-                    userRole == 'marketing_promotion' ||
-                    userRole == 'technical_support' ||
-                    userRole == 'technical-support' ||
-                    userRole == 'tech_support' ||
-                    userRole == 'branches_marketing' ||
-                    userRole == 'branches-marketing' ||
-                    userRole == 'branches_marketing_manager')
+                    isMarketing ||
+                    isMarketingPromotion ||
+                    isTechSupport ||
+                    isBranchesMarketing)
                 ? '__phone_auth__:$normalizedPhone'
                 : (adminEmail.isNotEmpty)
                     ? '__firebase_auth__:$adminEmail'

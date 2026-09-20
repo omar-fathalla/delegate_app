@@ -295,6 +295,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
               'superAdmin',
               'technicalSupport',
               'technical-support',
+              'technical_support',
             ])
             .get();
 

@@ -220,6 +220,9 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
               'super-admin',
               'marketing',
               'marketing_promotion',
+              'technical_support',
+              'technicalSupport',
+              'tech_support',
             ],
           )
           .get();

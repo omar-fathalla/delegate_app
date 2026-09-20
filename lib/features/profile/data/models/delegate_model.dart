@@ -101,6 +101,7 @@ class DelegateModel extends Delegate {
         case 'technical-support':
         case 'tech_support':
         case 'techsupport':
+        case 'technicalsupport':
           return UserRole.technicalSupport;
         case 'branches_marketing':
         case 'branches-marketing':

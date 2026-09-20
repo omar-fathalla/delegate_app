@@ -1413,6 +1413,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       builder: (_) => BranchPickerBottomSheet(
         userId: widget.marketingUser.uid,
         organizationId: widget.marketingUser.organizationUID,
+        userRole: widget.marketingUser.role,
         currentFavorites: _favoriteBranches,
         onBranchSelected: (branchName) {
           bloc.add(AddFavoriteBranch(
@@ -1536,6 +1537,7 @@ class _BranchSectionSkeleton extends StatelessWidget {
 class BranchPickerBottomSheet extends StatefulWidget {
   final String userId;
   final String organizationId;
+  final UserRole? userRole;
   final List<String> currentFavorites;
   final void Function(String branchName) onBranchSelected;
 
@@ -1543,6 +1545,7 @@ class BranchPickerBottomSheet extends StatefulWidget {
     super.key,
     required this.userId,
     required this.organizationId,
+    this.userRole,
     required this.currentFavorites,
     required this.onBranchSelected,
   });
@@ -1556,13 +1559,24 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _allBranches = [];
   List<Map<String, dynamic>> _filtered = [];
+  List<Map<String, String>> _organizations = [];
+  String? _selectedOrgUID;
   bool _loading = true;
   String? _error;
+
+  bool get isSuperAdminOrTechSupport {
+    final r = widget.userRole;
+    if (r == null) return false;
+    return r == UserRole.superAdmin ||
+        r == UserRole.technicalSupport ||
+        r.name.toLowerCase().contains('super') ||
+        r.name.toLowerCase().contains('technical');
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadBranches();
+    _loadData();
   }
 
   @override
@@ -1571,29 +1585,67 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     super.dispose();
   }
 
-  Future<void> _loadBranches() async {
+  Future<void> _loadData() async {
     try {
-      final snapshot = await di.sl<FirebaseFirestore>()
-          .collection('branches')
-          .get();
+      final firestore = di.sl<FirebaseFirestore>();
+
+      // 1. Fetch organizations if Super Admin or Tech Support
+      final List<Map<String, String>> orgs = [];
+      try {
+        final orgSnapshot = await firestore.collection('organizations').get();
+        for (final doc in orgSnapshot.docs) {
+          final d = doc.data();
+          final name = (d['name'] ?? d['title'] ?? '').toString().trim();
+          final uid = (d['uid'] ?? d['organizationUID'] ?? doc.id).toString().trim();
+          if (name.isNotEmpty) {
+            orgs.add({'uid': uid.isNotEmpty ? uid : doc.id, 'name': name});
+          }
+        }
+      } catch (_) {}
+
+      // Ensure Fathalla Market exists and is placed at the top as default
+      final hasFathalla = orgs.any((o) =>
+          (o['name'] ?? '').toLowerCase().contains('fathalla') ||
+          o['uid'] == 'PiioBFgxaHAeuRdjlDgj');
+      if (!hasFathalla) {
+        orgs.insert(0, {'uid': 'PiioBFgxaHAeuRdjlDgj', 'name': 'fathalla market'});
+      } else {
+        final fIndex = orgs.indexWhere((o) =>
+            (o['name'] ?? '').toLowerCase().contains('fathalla') ||
+            o['uid'] == 'PiioBFgxaHAeuRdjlDgj');
+        if (fIndex > 0) {
+          final item = orgs.removeAt(fIndex);
+          orgs.insert(0, item);
+        }
+      }
+
+      _selectedOrgUID = orgs.first['uid'];
+
+      // 2. Fetch all branches
+      final snapshot = await firestore.collection('branches').get();
+      final docs = snapshot.docs.map((d) {
+        final data = d.data();
+        final name = (data['branchName'] as String?) ??
+            (data['name'] as String?) ??
+            (data['title'] as String?) ??
+            '';
+        return {
+          'id': d.id,
+          'branchName': name,
+          'organizationUID': (data['organizationUID'] ?? data['organizationId'] ?? data['orgId'] ?? '').toString().trim(),
+          'organizationName': (data['organizationName'] ?? data['orgName'] ?? data['organization_name'] ?? '').toString().trim(),
+        };
+      }).where((b) => (b['branchName'] as String).isNotEmpty).toList();
+
+      docs.sort((a, b) =>
+          (a['branchName'] ?? '').compareTo(b['branchName'] ?? ''));
+
       if (mounted) {
-        final docs = snapshot.docs.map((d) {
-          final data = d.data();
-          final name = (data['branchName'] as String?) ??
-              (data['name'] as String?) ??
-              (data['title'] as String?) ??
-              '';
-          return {
-            'id': d.id,
-            'branchName': name,
-          };
-        }).where((b) => (b['branchName'] as String).isNotEmpty).toList();
-        docs.sort((a, b) =>
-            (a['branchName'] ?? '').compareTo(b['branchName'] ?? ''));
         setState(() {
+          _organizations = orgs;
           _allBranches = docs;
-          _filtered = _allBranches;
           _loading = false;
+          _applyFilter();
         });
       }
     } catch (e) {
@@ -1606,15 +1658,105 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     }
   }
 
+  bool _matchesOrg(Map<String, dynamic> branch, String targetOrgUID, String targetOrgName) {
+    final bOrgUID = (branch['organizationUID'] ?? '').toString().trim();
+    final bOrgName = (branch['organizationName'] ?? '').toString().trim().toLowerCase();
+    final bName = (branch['branchName'] ?? '').toString().trim().toLowerCase();
+    final tOrgName = targetOrgName.trim().toLowerCase();
+
+    // 1. Direct UID match
+    if (targetOrgUID.isNotEmpty && bOrgUID.isNotEmpty && bOrgUID == targetOrgUID) {
+      return true;
+    }
+
+    // 2. Direct Name match
+    if (tOrgName.isNotEmpty && bOrgName.isNotEmpty && bOrgName == tOrgName) {
+      return true;
+    }
+
+    // 3. Name contains or branchName contains org name
+    if (tOrgName.isNotEmpty && bName.contains(tOrgName)) {
+      return true;
+    }
+
+    // 4. If target is Fathalla Market:
+    if (tOrgName.contains('fathalla') || targetOrgUID == 'PiioBFgxaHAeuRdjlDgj') {
+      if (bOrgUID.isEmpty && bOrgName.isEmpty) {
+        final isOtherOrg = bName.contains('جملة') ||
+            bName.contains('زهران') ||
+            bName.contains('كارفور') ||
+            bName.contains('بيت الجملة');
+        if (!isOtherOrg) return true;
+      }
+    }
+
+    // 5. If target is Gomla Market:
+    if (tOrgName.contains('جملة') || tOrgName.contains('gomla') || targetOrgUID == '5DE6702w6hFwycJfZyqM') {
+      if (bName.contains('جملة') || bOrgName.contains('جملة') || bOrgUID == '5DE6702w6hFwycJfZyqM') {
+        return true;
+      }
+    }
+
+    // 6. If target is Zahran Market:
+    if (tOrgName.contains('زهران') || tOrgName.contains('zahran') || targetOrgUID == 'bKmvQOGNjYnfkzuGWq55') {
+      if (bName.contains('زهران') || bOrgName.contains('زهران') || bOrgUID == 'bKmvQOGNjYnfkzuGWq55') {
+        return true;
+      }
+    }
+
+    // 7. If target is Carrefour:
+    if (tOrgName.contains('كارفور') || tOrgName.contains('carrefour') || targetOrgUID == 'TjdANTbys7alTSahTyb7') {
+      if (bName.contains('كارفور') || bOrgName.contains('كارفور') || bOrgUID == 'TjdANTbys7alTSahTyb7') {
+        return true;
+      }
+    }
+
+    // 8. If target is Beit El Gomla:
+    if (tOrgName.contains('بيت الجملة') || targetOrgUID == 'tLU900K8StXVFcn6AgDn') {
+      if (bName.contains('بيت الجملة') || bOrgName.contains('بيت الجملة') || bOrgUID == 'tLU900K8StXVFcn6AgDn') {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  void _applyFilter() {
+    final q = _searchController.text.trim().toLowerCase();
+
+    String targetOrgName = 'fathalla market';
+    String targetOrgUID = 'PiioBFgxaHAeuRdjlDgj';
+
+    if (isSuperAdminOrTechSupport) {
+      if (_selectedOrgUID != null) {
+        targetOrgUID = _selectedOrgUID!;
+        final found = _organizations.firstWhere(
+          (o) => o['uid'] == _selectedOrgUID,
+          orElse: () => {'uid': targetOrgUID, 'name': 'fathalla market'},
+        );
+        targetOrgName = found['name'] ?? 'fathalla market';
+      }
+    } else {
+      // For all regular users: strictly locked to fathalla market
+      targetOrgName = 'fathalla market';
+      targetOrgUID = 'PiioBFgxaHAeuRdjlDgj';
+    }
+
+    final orgBranches = _allBranches.where((b) {
+      return _matchesOrg(b, targetOrgUID, targetOrgName);
+    }).toList();
+
+    _filtered = q.isEmpty
+        ? orgBranches
+        : orgBranches.where((b) {
+            final name = (b['branchName'] as String? ?? '').toLowerCase();
+            return name.contains(q);
+          }).toList();
+  }
+
   void _onSearch(String query) {
-    final q = query.trim().toLowerCase();
     setState(() {
-      _filtered = q.isEmpty
-          ? _allBranches
-          : _allBranches
-              .where((b) =>
-                  (b['branchName'] as String? ?? '').toLowerCase().contains(q))
-              .toList();
+      _applyFilter();
     });
   }
 
@@ -1624,9 +1766,9 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
 
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.65,
-      maxChildSize: 0.92,
-      minChildSize: 0.4,
+      initialChildSize: 0.70,
+      maxChildSize: 0.94,
+      minChildSize: 0.45,
       builder: (context, scrollController) => Column(
         children: [
           const SizedBox(height: 12),
@@ -1640,6 +1782,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
             ),
           ),
           const SizedBox(height: 16),
+          // Header Row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
@@ -1650,9 +1793,121 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                   'إضافة فرع',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
+                if (!isSuperAdminOrTechSupport) ...[
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.business_rounded,
+                          size: 14,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'fathalla market',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
+
+          // For Super Admin and Technical Support: Dropdown Menu for Organizations
+          if (isSuperAdminOrTechSupport && _organizations.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('branch_picker_org_$_selectedOrgUID'),
+                initialValue: _selectedOrgUID,
+                isExpanded: true,
+                dropdownColor: colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(16),
+                decoration: InputDecoration(
+                  labelText: 'اختر السلسلة / المنظمة',
+                  labelStyle: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.corporate_fare_rounded,
+                    color: colorScheme.primary,
+                    size: 20,
+                  ),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: colorScheme.primary,
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+                items: _organizations.map((org) {
+                  final isSelected = org['uid'] == _selectedOrgUID;
+                  return DropdownMenuItem<String>(
+                    value: org['uid'],
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.business_rounded,
+                          size: 18,
+                          color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          org['name']!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (uid) {
+                  if (uid != null && uid != _selectedOrgUID) {
+                    setState(() {
+                      _selectedOrgUID = uid;
+                      _applyFilter();
+                    });
+                  }
+                },
+              ),
+            ),
+          ],
+
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1699,7 +1954,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                                   _loading = true;
                                   _error = null;
                                 });
-                                _loadBranches();
+                                _loadData();
                               },
                               child: const Text('إعادة المحاولة'),
                             ),
@@ -1707,7 +1962,15 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                         ),
                       )
                     : _filtered.isEmpty
-                        ? const Center(child: Text('لا توجد فروع مطابقة'))
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(24.0),
+                              child: Text(
+                                'لا توجد فروع مطابقة لهذه السلسلة',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          )
                         : ListView.builder(
                             controller: scrollController,
                             itemCount: _filtered.length,

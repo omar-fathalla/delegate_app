@@ -22,6 +22,7 @@ import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_settings_page.dart';
 import 'package:delegate_app/features/wallet/presentation/pages/super_admin_wallets_screen.dart';
+import 'manage_admins_screen.dart';
 
 class SuperAdminDashboardScreen extends StatefulWidget {
   final Delegate delegate;
@@ -739,6 +740,17 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                       builder: (_) => SuperAdminWalletsScreen(
                         adminDelegate: widget.delegate,
                       ),
+                    ),
+                  );
+                },
+              ),
+              _buildActionButton(
+                label: 'إدارة المديرين والدعم الفني',
+                icon: Icons.manage_accounts_rounded,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ManageAdminsScreen(),
                     ),
                   );
                 },
