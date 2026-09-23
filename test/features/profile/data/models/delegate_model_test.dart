@@ -88,5 +88,30 @@ void main() {
       expect(delegate.updatedAt, DateTime(2026, 1, 13, 17, 48, 35));
       expect(delegate.version, 1);
     });
+
+    test('should parse and serialize accountant role correctly', () {
+      final jsonAccountant = {
+        "uid": "acc_123",
+        "firstName": "أحمد",
+        "middleName": "",
+        "lastName": "المحاسب",
+        "fullName": "أحمد المحاسب",
+        "phoneNumber": "01001989360",
+        "role": "accountant",
+        "birthDate": "2026-01-01T00:00:00.000",
+        "createdAt": "2026-01-01T00:00:00.000",
+      };
+
+      final delegate = DelegateModel.fromJson(jsonAccountant, "acc_123");
+      expect(delegate.role, UserRole.accountant);
+      expect(DelegateModel.roleToString(delegate.role), 'accountant');
+
+      final jsonAccounting = {
+        ...jsonAccountant,
+        "role": "accounting",
+      };
+      final delegate2 = DelegateModel.fromJson(jsonAccounting, "acc_123");
+      expect(delegate2.role, UserRole.accountant);
+    });
   });
 }

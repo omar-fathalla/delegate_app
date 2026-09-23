@@ -12,7 +12,10 @@ class UserWalletModel extends UserWalletEntity {
     super.currentBalance = 0.0,
     super.totalAllocated = 0.0,
     super.totalPaid = 0.0,
+    super.monthlyAllocation = 0.0,
     super.isWalletEnabled = false,
+    super.isInternalOnly = true,
+    super.notes = '',
     super.lastPeriodKey,
     super.updatedAt,
     super.updatedBy,
@@ -43,7 +46,10 @@ class UserWalletModel extends UserWalletEntity {
       currentBalance: (map['currentBalance'] as num?)?.toDouble() ?? 0.0,
       totalAllocated: (map['totalAllocated'] as num?)?.toDouble() ?? 0.0,
       totalPaid: (map['totalPaid'] as num?)?.toDouble() ?? 0.0,
+      monthlyAllocation: (map['monthlyAllocation'] as num?)?.toDouble() ?? 0.0,
       isWalletEnabled: (map['isWalletEnabled'] as bool?) ?? false,
+      isInternalOnly: (map['isInternalOnly'] as bool?) ?? true,
+      notes: map['notes']?.toString() ?? '',
       lastPeriodKey: map['lastPeriodKey']?.toString(),
       updatedAt: updated,
       updatedBy: map['updatedBy']?.toString(),
@@ -61,7 +67,10 @@ class UserWalletModel extends UserWalletEntity {
       'currentBalance': currentBalance,
       'totalAllocated': totalAllocated,
       'totalPaid': totalPaid,
+      'monthlyAllocation': monthlyAllocation,
       'isWalletEnabled': isWalletEnabled,
+      'isInternalOnly': isInternalOnly,
+      'notes': notes,
       'lastPeriodKey': lastPeriodKey,
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedBy': updatedBy,
@@ -79,7 +88,10 @@ class UserWalletModel extends UserWalletEntity {
       currentBalance: entity.currentBalance,
       totalAllocated: entity.totalAllocated,
       totalPaid: entity.totalPaid,
+      monthlyAllocation: entity.monthlyAllocation,
       isWalletEnabled: entity.isWalletEnabled,
+      isInternalOnly: entity.isInternalOnly,
+      notes: entity.notes,
       lastPeriodKey: entity.lastPeriodKey,
       updatedAt: entity.updatedAt,
       updatedBy: entity.updatedBy,
@@ -118,9 +130,14 @@ class WalletTransactionModel extends WalletTransactionEntity {
     }
 
     final typeStr = map['type']?.toString().toLowerCase() ?? 'allocation';
-    final type = typeStr == 'payout'
-        ? WalletTransactionType.payout
-        : WalletTransactionType.allocation;
+    WalletTransactionType type = WalletTransactionType.allocation;
+    if (typeStr == 'payout') {
+      type = WalletTransactionType.payout;
+    } else if (typeStr == 'adjustment') {
+      type = WalletTransactionType.adjustment;
+    } else if (typeStr == 'monthlyrenewal' || typeStr == 'monthly_renewal') {
+      type = WalletTransactionType.monthlyRenewal;
+    }
 
     return WalletTransactionModel(
       id: docId,
@@ -138,9 +155,25 @@ class WalletTransactionModel extends WalletTransactionEntity {
   }
 
   Map<String, dynamic> toMap() {
+    String typeStr = 'allocation';
+    switch (type) {
+      case WalletTransactionType.payout:
+        typeStr = 'payout';
+        break;
+      case WalletTransactionType.adjustment:
+        typeStr = 'adjustment';
+        break;
+      case WalletTransactionType.monthlyRenewal:
+        typeStr = 'monthlyRenewal';
+        break;
+      case WalletTransactionType.allocation:
+        typeStr = 'allocation';
+        break;
+    }
+
     return {
       'userId': userId,
-      'type': type == WalletTransactionType.payout ? 'payout' : 'allocation',
+      'type': typeStr,
       'amount': amount,
       'balanceBefore': balanceBefore,
       'balanceAfter': balanceAfter,

@@ -8,6 +8,28 @@ abstract class WalletRemoteDataSource {
   Stream<List<UserWalletModel>> streamAllWallets();
   Stream<List<WalletTransactionModel>> streamUserTransactions(String userId);
   Future<void> toggleWalletStatus({required String userId, required bool isEnabled});
+  Future<void> deleteWallet({required String userId});
+  Future<void> updateMonthlyAllocation({
+    required String userId,
+    required double monthlyAllocation,
+    String? notes,
+    required String adminUid,
+  });
+  Future<void> adjustBalance({
+    required String userId,
+    required double deltaAmount,
+    required String reason,
+    required String adminUid,
+    required String adminName,
+  });
+  Future<void> applyMonthlyRenewal({
+    required String userId,
+    required String periodKey,
+    required String adminUid,
+    required String adminName,
+    String? notes,
+    double? customAmount,
+  });
   Future<void> allocateBalance({
     required String userId,
     required String userName,
@@ -20,6 +42,8 @@ abstract class WalletRemoteDataSource {
     required String note,
     required String adminUid,
     required String adminName,
+    double? monthlyAllocation,
+    bool isInternalOnly = true,
   });
   Future<void> recordPayout({
     required String userId,
@@ -27,6 +51,7 @@ abstract class WalletRemoteDataSource {
     required String note,
     required String adminUid,
     required String adminName,
+    bool? isInternalOnly,
   });
   Stream<double> streamMonthlyAllocationsTotal(String periodKey);
   Future<List<Map<String, String>>> searchUsers(String query);
@@ -83,6 +108,140 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
   }
 
   @override
+  Future<void> deleteWallet({required String userId}) async {
+    final transSnap = await _walletsRef.doc(userId).collection('transactions').get();
+    final batch = _firestore.batch();
+    for (var doc in transSnap.docs) {
+      batch.delete(doc.reference);
+    }
+    batch.delete(_walletsRef.doc(userId));
+    await batch.commit();
+  }
+
+  @override
+  Future<void> updateMonthlyAllocation({
+    required String userId,
+    required double monthlyAllocation,
+    String? notes,
+    required String adminUid,
+  }) async {
+    final updates = <String, dynamic>{
+      'monthlyAllocation': monthlyAllocation,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedBy': adminUid,
+    };
+    if (notes != null) {
+      updates['notes'] = notes;
+    }
+    await _walletsRef.doc(userId).set(updates, SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> adjustBalance({
+    required String userId,
+    required double deltaAmount,
+    required String reason,
+    required String adminUid,
+    required String adminName,
+  }) async {
+    final walletDocRef = _walletsRef.doc(userId);
+
+    await _firestore.runTransaction((transaction) async {
+      final docSnapshot = await transaction.get(walletDocRef);
+      if (!docSnapshot.exists) {
+        throw Exception('المحفظة غير موجودة');
+      }
+
+      final data = docSnapshot.data() as Map<String, dynamic>;
+      final currentBalance = (data['currentBalance'] as num?)?.toDouble() ?? 0.0;
+      final newBalance = (currentBalance + deltaAmount).clamp(0.0, double.infinity);
+
+      // 1. Update wallet balance
+      transaction.update(walletDocRef, {
+        'currentBalance': newBalance,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedBy': adminUid,
+      });
+
+      // 2. Add adjustment transaction
+      final transRef = walletDocRef.collection('transactions').doc();
+      transaction.set(transRef, {
+        'userId': userId,
+        'type': 'adjustment',
+        'amount': deltaAmount,
+        'balanceBefore': currentBalance,
+        'balanceAfter': newBalance,
+        'notes': reason.trim().isNotEmpty
+            ? reason.trim()
+            : (deltaAmount >= 0 ? 'تعديل يدوي بالزيادة' : 'تعديل يدوي بالإنقاص'),
+        'createdBy': adminUid,
+        'createdByName': adminName,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  @override
+  Future<void> applyMonthlyRenewal({
+    required String userId,
+    required String periodKey,
+    required String adminUid,
+    required String adminName,
+    String? notes,
+    double? customAmount,
+  }) async {
+    final walletDocRef = _walletsRef.doc(userId);
+
+    await _firestore.runTransaction((transaction) async {
+      final docSnapshot = await transaction.get(walletDocRef);
+      if (!docSnapshot.exists) {
+        throw Exception('المحفظة غير موجودة');
+      }
+
+      final data = docSnapshot.data() as Map<String, dynamic>;
+      final monthlyAllocation = (data['monthlyAllocation'] as num?)?.toDouble() ?? 0.0;
+      final renewalAmount = (customAmount != null && customAmount > 0)
+          ? customAmount
+          : monthlyAllocation;
+      if (renewalAmount <= 0) {
+        throw Exception('يرجى إدخال مبلغ صحيح للإضافة أو تحديد الاستحقاق الشهري بالمحفظة أولاً');
+      }
+
+      final currentBalance = (data['currentBalance'] as num?)?.toDouble() ?? 0.0;
+      final totalAllocated = (data['totalAllocated'] as num?)?.toDouble() ?? 0.0;
+      final newBalance = currentBalance + renewalAmount;
+      final newTotalAllocated = totalAllocated + renewalAmount;
+
+      // 1. Update wallet balance
+      transaction.update(walletDocRef, {
+        'currentBalance': newBalance,
+        'totalAllocated': newTotalAllocated,
+        'lastPeriodKey': periodKey,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedBy': adminUid,
+      });
+
+      // 2. Add monthlyRenewal transaction
+      final transRef = walletDocRef.collection('transactions').doc();
+      final renewalNote = notes?.trim().isNotEmpty == true
+          ? notes!.trim()
+          : 'تغذية الاستحقاق الشهري الدوري ($periodKey)';
+      transaction.set(transRef, {
+        'userId': userId,
+        'type': 'monthlyRenewal',
+        'amount': renewalAmount,
+        'balanceBefore': currentBalance,
+        'balanceAfter': newBalance,
+        'periodKey': periodKey,
+        'notes': renewalNote,
+        'createdBy': adminUid,
+        'createdByName': adminName,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  @override
   Future<void> allocateBalance({
     required String userId,
     required String userName,
@@ -95,6 +254,8 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
     required String note,
     required String adminUid,
     required String adminName,
+    double? monthlyAllocation,
+    bool isInternalOnly = true,
   }) async {
     final walletDocRef = _walletsRef.doc(userId);
     final allocationDocRef = _firestore
@@ -108,16 +269,19 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
       double currentBalance = 0.0;
       double totalAllocated = 0.0;
       double totalPaid = 0.0;
+      double existingMonthly = 0.0;
 
       if (docSnapshot.exists) {
         final data = docSnapshot.data() as Map<String, dynamic>;
         currentBalance = (data['currentBalance'] as num?)?.toDouble() ?? 0.0;
         totalAllocated = (data['totalAllocated'] as num?)?.toDouble() ?? 0.0;
         totalPaid = (data['totalPaid'] as num?)?.toDouble() ?? 0.0;
+        existingMonthly = (data['monthlyAllocation'] as num?)?.toDouble() ?? 0.0;
       }
 
       final newBalance = currentBalance + amount;
       final newTotalAllocated = totalAllocated + amount;
+      final finalMonthly = monthlyAllocation ?? (existingMonthly > 0 ? existingMonthly : amount);
 
       // 1. Update user wallet document
       transaction.set(
@@ -132,7 +296,9 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
           'currentBalance': newBalance,
           'totalAllocated': newTotalAllocated,
           'totalPaid': totalPaid,
+          'monthlyAllocation': finalMonthly,
           'isWalletEnabled': true, // Auto-enable upon allocation
+          'isInternalOnly': isInternalOnly,
           'lastPeriodKey': periodKey,
           'updatedAt': FieldValue.serverTimestamp(),
           'updatedBy': adminUid,
@@ -167,35 +333,37 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
       });
     });
 
-    // 4. Send targeted in-app & push notification to the specific user only
-    try {
-      final formattedAmt = NumberFormat('#,##0.00', 'en_US').format(amount);
-      final notifTitle = 'إيداع رصيد في محفظتك';
-      final notifBody = note.trim().isNotEmpty
-          ? 'تم تخصيص $formattedAmt ج.م في محفظتك المالية ($note).'
-          : 'تم تخصيص $formattedAmt ج.م في محفظتك المالية بواسطة الإدارة.';
+    // 4. Send targeted notification ONLY if this is NOT an internal-only secret wallet
+    if (!isInternalOnly) {
+      try {
+        final formattedAmt = NumberFormat('#,##0.00', 'en_US').format(amount);
+        final notifTitle = 'إيداع رصيد في محفظتك';
+        final notifBody = note.trim().isNotEmpty
+            ? 'تم تخصيص $formattedAmt ج.م في محفظتك المالية ($note).'
+            : 'تم تخصيص $formattedAmt ج.م في محفظتك المالية بواسطة الإدارة.';
 
-      await _firestore.collection('notifications').add({
-        'delegateUid': userId, // Target ONLY this specific user
-        'phoneNumber': userPhone,
-        'organizationId': companyUID,
-        'companyId': companyUID,
-        'companyName': companyName,
-        'title': notifTitle,
-        'body': notifBody,
-        'type': 'wallet_allocation',
-        'amount': amount,
-        'periodKey': periodKey,
-        'isRead': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'createdBy': adminUid,
-        'createdByName': adminName,
-        'senderName': adminName,
-        'senderRole': 'superAdmin',
-      });
-      debugPrint('Targeted wallet notification sent to $userId ($userPhone)');
-    } catch (e) {
-      debugPrint('Error sending wallet allocation notification: $e');
+        await _firestore.collection('notifications').add({
+          'delegateUid': userId, // Target ONLY this specific user
+          'phoneNumber': userPhone,
+          'organizationId': companyUID,
+          'companyId': companyUID,
+          'companyName': companyName,
+          'title': notifTitle,
+          'body': notifBody,
+          'type': 'wallet_allocation',
+          'amount': amount,
+          'periodKey': periodKey,
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+          'createdBy': adminUid,
+          'createdByName': adminName,
+          'senderName': adminName,
+          'senderRole': 'superAdmin',
+        });
+        debugPrint('Targeted wallet notification sent to $userId ($userPhone)');
+      } catch (e) {
+        debugPrint('Error sending wallet allocation notification: $e');
+      }
     }
   }
 
@@ -206,8 +374,10 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
     required String note,
     required String adminUid,
     required String adminName,
+    bool? isInternalOnly,
   }) async {
     final walletDocRef = _walletsRef.doc(userId);
+    bool shouldSendNotification = false;
 
     await _firestore.runTransaction((transaction) async {
       final docSnapshot = await transaction.get(walletDocRef);
@@ -218,6 +388,10 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
       final data = docSnapshot.data() as Map<String, dynamic>;
       final currentBalance = (data['currentBalance'] as num?)?.toDouble() ?? 0.0;
       final totalPaid = (data['totalPaid'] as num?)?.toDouble() ?? 0.0;
+      final docInternalOnly = (data['isInternalOnly'] as bool?) ?? true;
+
+      // Only notify if explicitly told or if doc is not internal only
+      shouldSendNotification = !(isInternalOnly ?? docInternalOnly);
 
       if (amount <= 0 || amount > currentBalance) {
         throw Exception('المبلغ المطلوب صرفه غير صالح أو أكبر من رصيد المحفظة الحالي ($currentBalance ج.م)');
@@ -249,30 +423,32 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
       });
     });
 
-    // 3. Send targeted notification to the specific user for payout
-    try {
-      final formattedAmt = NumberFormat('#,##0.00', 'en_US').format(amount);
-      final notifTitle = 'تسوية وصرف مستحقات';
-      final notifBody = note.trim().isNotEmpty
-          ? 'تم تسجيل صرف مبلغ $formattedAmt ج.م من محفظتك المالية ($note).'
-          : 'تم تسجيل صرف مبلغ $formattedAmt ج.م من محفظتك المالية.';
+    // 3. Send targeted notification ONLY if not internal only
+    if (shouldSendNotification) {
+      try {
+        final formattedAmt = NumberFormat('#,##0.00', 'en_US').format(amount);
+        final notifTitle = 'تسوية وصرف مستحقات';
+        final notifBody = note.trim().isNotEmpty
+            ? 'تم تسجيل صرف مبلغ $formattedAmt ج.م من محفظتك المالية ($note).'
+            : 'تم تسجيل صرف مبلغ $formattedAmt ج.م من محفظتك المالية.';
 
-      await _firestore.collection('notifications').add({
-        'delegateUid': userId, // Target ONLY this specific user
-        'title': notifTitle,
-        'body': notifBody,
-        'type': 'wallet_payout',
-        'amount': amount,
-        'isRead': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'createdBy': adminUid,
-        'createdByName': adminName,
-        'senderName': adminName,
-        'senderRole': 'superAdmin',
-      });
-      debugPrint('Targeted payout notification sent to $userId');
-    } catch (e) {
-      debugPrint('Error sending wallet payout notification: $e');
+        await _firestore.collection('notifications').add({
+          'delegateUid': userId, // Target ONLY this specific user
+          'title': notifTitle,
+          'body': notifBody,
+          'type': 'wallet_payout',
+          'amount': amount,
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+          'createdBy': adminUid,
+          'createdByName': adminName,
+          'senderName': adminName,
+          'senderRole': 'superAdmin',
+        });
+        debugPrint('Targeted payout notification sent to $userId');
+      } catch (e) {
+        debugPrint('Error sending wallet payout notification: $e');
+      }
     }
   }
 

@@ -101,8 +101,9 @@ class _SuperAdminSubscriptionFinancialReportScreenState
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Strict Role Access Control: Super Admin ONLY
-    if (widget.adminDelegate.role != UserRole.superAdmin) {
+    // Strict Role Access Control: Super Admin and Accountant
+    if (widget.adminDelegate.role != UserRole.superAdmin &&
+        widget.adminDelegate.role != UserRole.accountant) {
       return Scaffold(
         appBar: AppBar(title: const Text('غير مصرح')),
         body: Center(

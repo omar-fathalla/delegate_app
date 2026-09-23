@@ -21,6 +21,8 @@ import '../../../photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_settings_page.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/admin_penalties_list_page.dart';
+import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/wallet/presentation/pages/super_admin_wallets_screen.dart';
 import 'manage_admins_screen.dart';
 
@@ -1001,6 +1003,20 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 label: 'إضافة فرع',
                 icon: Icons.add_location_alt_rounded,
                 onTap: widget.onNavigateToAddBranch,
+              ),
+              _buildActionButton(
+                label: 'سجل الغرامات والمخالفات',
+                icon: Icons.receipt_long_rounded,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider(
+                        create: (_) => di.sl<PenaltyBloc>(),
+                        child: AdminPenaltiesListPage(adminDelegate: widget.delegate),
+                      ),
+                    ),
+                  );
+                },
               ),
               _buildActionButton(
                 label: 'إعدادات الغرامات',

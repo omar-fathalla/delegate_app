@@ -110,6 +110,9 @@ class _LoginScreenState extends State<LoginScreen>
                   delegate.role == UserRole.branchesMarketingManager) {
                 debugPrint('🚀 LoginScreen: Navigating to /admin/home');
                 context.go('/admin/home', extra: delegate);
+              } else if (delegate.role == UserRole.accountant) {
+                debugPrint('🚀 LoginScreen: Navigating to /accountant/home');
+                context.go('/accountant/home', extra: delegate);
               } else if (delegate.role == UserRole.marketing ||
                   delegate.role == UserRole.marketingPromotion) {
                 debugPrint('🚀 LoginScreen: Navigating to /marketing/home');

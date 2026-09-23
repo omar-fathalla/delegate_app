@@ -547,6 +547,14 @@
     "@editName": {
         "description": "Button to edit the branch name."
     },
+    "editBranch": "Edit Branch",
+    "@editBranch": {
+        "description": "Button to edit the branch details."
+    },
+    "branchUpdatedSuccessfully": "Branch updated successfully.",
+    "@branchUpdatedSuccessfully": {
+        "description": "Success message after updating a branch."
+    },
     "deleteBranch": "Delete Branch",
     "@deleteBranch": {
         "description": "Button to delete the branch."
@@ -1157,5 +1165,29 @@
     "receiptsReport": "Receipts Report",
     "@receiptsReport": {
         "description": "Receipts report menu item text"
+    },
+    "accountant": "Financial Accountant",
+    "@accountant": {
+        "description": "Accountant role title"
+    },
+    "accountantDashboard": "Financial Management Dashboard",
+    "@accountantDashboard": {
+        "description": "Accountant dashboard title"
+    },
+    "financialReports": "Financial Reports",
+    "@financialReports": {
+        "description": "Financial reports label"
+    },
+    "paymentReceipts": "Payment Receipts",
+    "@paymentReceipts": {
+        "description": "Payment receipts label"
+    },
+    "subscriptionRequests": "Subscription Requests",
+    "@subscriptionRequests": {
+        "description": "Subscription requests label"
+    },
+    "walletsManagement": "Wallets Management",
+    "@walletsManagement": {
+        "description": "Wallets management label"
     }
 }

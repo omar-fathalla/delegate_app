@@ -393,6 +393,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get editName => 'تعديل الاسم';
 
   @override
+  String get editBranch => 'تعديل الفرع';
+
+  @override
+  String get branchUpdatedSuccessfully => 'تم تعديل الفرع بنجاح.';
+
+  @override
   String get deleteBranch => 'مسح الفرع';
 
   @override
@@ -847,4 +853,22 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get receiptsReport => 'تقرير إيصالات الدفع الإلكتروني';
+
+  @override
+  String get accountant => 'إدارة الحسابات';
+
+  @override
+  String get accountantDashboard => 'لوحة تحكم الحسابات والماليات';
+
+  @override
+  String get financialReports => 'التقارير المالية';
+
+  @override
+  String get paymentReceipts => 'إيصالات السداد';
+
+  @override
+  String get subscriptionRequests => 'طلبات الاشتراك';
+
+  @override
+  String get walletsManagement => 'إدارة المحافظ';
 }

@@ -14,6 +14,7 @@ import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evi
 import 'package:delegate_app/features/penalties/presentation/utils/penalty_creator_helper.dart';
 import 'admin_create_penalty_page.dart';
 import 'penalty_rules_settings_page.dart';
+import 'package:delegate_app/features/penalties/domain/entities/standard_violation.dart';
 
 class AdminPenaltiesListPage extends StatefulWidget {
   final Delegate adminDelegate;
@@ -40,11 +41,17 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
   String _searchQuery = '';
   String _selectedStatusFilter = 'all'; // all, pending, issued, deducted, rejected
 
+  // Violation type / rule filter & pin state
+  String? _selectedViolationTitle;
+  String? _pinnedViolationTitle;
+  List<PenaltyEntity> _latestPenalties = [];
+
   @override
   void initState() {
     super.initState();
     _loadData();
     _loadBranchesAndPinned();
+    _loadPinnedViolation();
   }
 
   @override
@@ -184,6 +191,349 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
     }
   }
 
+  Future<void> _loadPinnedViolation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keyPinned = 'pinned_penalty_violation_title_${widget.adminDelegate.uid}';
+      final pinnedTitle = prefs.getString(keyPinned);
+      if (pinnedTitle != null && pinnedTitle.isNotEmpty && pinnedTitle != 'all') {
+        if (!mounted) return;
+        setState(() {
+          _pinnedViolationTitle = pinnedTitle;
+          _selectedViolationTitle = pinnedTitle;
+        });
+      }
+    } catch (_) {}
+  }
+
+  bool get _isCurrentViolationPinned {
+    if (_selectedViolationTitle == null || _selectedViolationTitle == 'all') return false;
+    return _selectedViolationTitle == _pinnedViolationTitle;
+  }
+
+  Future<void> _togglePinCurrentViolation() async {
+    if (_selectedViolationTitle == null || _selectedViolationTitle == 'all') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى اختيار نوع مخالفة محدد من القائمة لتثبيته كبند افتراضي'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final keyPinned = 'pinned_penalty_violation_title_${widget.adminDelegate.uid}';
+
+    if (_isCurrentViolationPinned) {
+      // Unpin
+      await prefs.remove(keyPinned);
+      if (!mounted) return;
+      setState(() {
+        _pinnedViolationTitle = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إلغاء تثبيت نوع الغرامة الافتراضي'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      // Pin
+      await prefs.setString(keyPinned, _selectedViolationTitle!);
+      if (!mounted) return;
+      setState(() {
+        _pinnedViolationTitle = _selectedViolationTitle;
+      });
+
+      final colorScheme = Theme.of(context).colorScheme;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '📌 تم تثبيت "$_selectedViolationTitle" كبند افتراضي لسجل المخالفات',
+            style: TextStyle(color: colorScheme.onPrimaryContainer),
+          ),
+          backgroundColor: colorScheme.primaryContainer,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _openViolationTypePickerSheet() {
+    final Map<String, int> titleCounts = {};
+    for (final p in _latestPenalties) {
+      final t = p.title.trim();
+      if (t.isNotEmpty) {
+        titleCounts[t] = (titleCounts[t] ?? 0) + 1;
+      }
+    }
+
+    final Set<String> allTitlesSet = {};
+    allTitlesSet.addAll(titleCounts.keys);
+    for (final sv in officialViolationsSchedule) {
+      allTitlesSet.add(sv.title.trim());
+    }
+
+    final allTitlesList = allTitlesSet.toList()
+      ..sort((a, b) {
+        final countA = titleCounts[a] ?? 0;
+        final countB = titleCounts[b] ?? 0;
+        if (countA != countB) {
+          return countB.compareTo(countA);
+        }
+        return a.compareTo(b);
+      });
+
+    final searchController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final theme = Theme.of(context);
+            final colorScheme = theme.colorScheme;
+            final query = searchController.text.trim().toLowerCase();
+
+            final filteredList = allTitlesList.where((title) {
+              if (query.isEmpty) return true;
+              return title.toLowerCase().contains(query);
+            }).toList();
+
+            final isAllSelected = _selectedViolationTitle == null || _selectedViolationTitle == 'all';
+
+            return Material(
+              color: colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              clipBehavior: Clip.antiAlias,
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.78,
+                child: Column(
+                children: [
+                  // Drag Handle
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 6),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.gavel_rounded, color: colorScheme.primary, size: 24),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'تحديد نوع الغرامة / البند',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                isAllSelected
+                                    ? 'يتم عرض جميع البنود حالياً (${_latestPenalties.length} مخالفة)'
+                                    : 'البند المختار: $_selectedViolationTitle',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!isAllSelected)
+                          TextButton.icon(
+                            onPressed: () {
+                              Navigator.pop(sheetContext);
+                              setState(() {
+                                _selectedViolationTitle = 'all';
+                              });
+                            },
+                            icon: const Icon(Icons.clear_all_rounded, size: 18),
+                            label: const Text('عرض الكل'),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const Divider(height: 1),
+
+                  // Search + Quick Actions
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: searchController,
+                          onChanged: (_) => setSheetState(() {}),
+                          style: const TextStyle(fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'بحث باسم المخالفة أو البند...',
+                            prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                            suffixIcon: searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded, size: 18),
+                                    onPressed: () {
+                                      searchController.clear();
+                                      setSheetState(() {});
+                                    },
+                                  )
+                                : null,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            ActionChip(
+                              avatar: Icon(
+                                isAllSelected
+                                    ? Icons.check_circle_rounded
+                                    : Icons.radio_button_unchecked_rounded,
+                                size: 16,
+                                color: isAllSelected ? colorScheme.primary : null,
+                              ),
+                              label: Text('جميع البنود (${_latestPenalties.length})',
+                                  style: const TextStyle(fontSize: 12)),
+                              backgroundColor: isAllSelected
+                                  ? colorScheme.primaryContainer
+                                  : colorScheme.surfaceContainerHigh,
+                              onPressed: () {
+                                Navigator.pop(sheetContext);
+                                setState(() {
+                                  _selectedViolationTitle = 'all';
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Violations List
+                  Expanded(
+                    child: filteredList.isEmpty
+                        ? Center(
+                            child: Text(
+                              'لا توجد بنود مخالفات مطابقة للبحث',
+                              style: TextStyle(color: colorScheme.onSurfaceVariant),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: filteredList.length,
+                            itemBuilder: (context, index) {
+                              final title = filteredList[index];
+                              final isSelected = !isAllSelected && _selectedViolationTitle == title;
+                              final isPinned = _pinnedViolationTitle == title;
+                              final count = titleCounts[title] ?? 0;
+
+                              return ListTile(
+                                leading: Icon(
+                                  isSelected
+                                      ? Icons.check_circle_rounded
+                                      : Icons.radio_button_unchecked_rounded,
+                                  color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                  size: 20,
+                                ),
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        title,
+                                        style: TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                          color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isPinned) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.secondaryContainer.withValues(alpha: 0.6),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'المثبت 📌',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: colorScheme.onSecondaryContainer,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                subtitle: Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: count > 0
+                                              ? colorScheme.primaryContainer.withValues(alpha: 0.5)
+                                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Text(
+                                          count > 0 ? '$count مخالفة مسجلة' : 'غير مسجلة حالياً',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: count > 0 ? FontWeight.bold : FontWeight.normal,
+                                            color: count > 0 ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(sheetContext);
+                                  setState(() {
+                                    _selectedViolationTitle = title;
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          );
+          },
+        );
+      },
+    );
+  }
+
   void _openMultiBranchPickerSheet() {
     final tempSelection = Set<String>.from(_selectedBranchIds);
     final searchController = TextEditingController();
@@ -209,13 +559,13 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                 (tempSelection.length == _availableBranches.length &&
                     _availableBranches.isNotEmpty);
 
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.78,
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              child: Column(
+            return Material(
+              color: colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              clipBehavior: Clip.antiAlias,
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.78,
+                child: Column(
                 children: [
                   // Drag Handle
                   Container(
@@ -459,7 +809,8 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                   ),
                 ],
               ),
-            );
+            ),
+          );
           },
         );
       },
@@ -557,7 +908,20 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
         }
       }
 
-      // 3. Search query
+      // 3. Violation Type / Rule Item filter
+      if (_selectedViolationTitle != null &&
+          _selectedViolationTitle != 'all' &&
+          _selectedViolationTitle!.trim().isNotEmpty) {
+        final targetTitle = _selectedViolationTitle!.trim().toLowerCase();
+        final penaltyTitle = p.title.trim().toLowerCase();
+        if (penaltyTitle != targetTitle &&
+            !penaltyTitle.contains(targetTitle) &&
+            !targetTitle.contains(penaltyTitle)) {
+          return false;
+        }
+      }
+
+      // 4. Search query
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         final matchTitle = p.title.toLowerCase().contains(q);
@@ -778,6 +1142,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                 }
 
                 if (state is PenaltyLoadedState) {
+                  _latestPenalties = state.penalties;
                   final filteredList = _filterPenalties(state.penalties);
 
                   // Statistics summary calculations
@@ -801,6 +1166,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                           onRefresh: () async {
                             _loadData();
                             await _loadBranchesAndPinned();
+                            await _loadPinnedViolation();
                           },
                           child: filteredList.isEmpty
                               ? SingleChildScrollView(
@@ -1061,9 +1427,129 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
             ),
           ],
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
-          // 3. Search Box
+          // 3. Violation Type / Rule Selector Bar + Pin Action
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: _openViolationTypePickerSheet,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _isCurrentViolationPinned
+                            ? colorScheme.secondary
+                            : (_selectedViolationTitle != null && _selectedViolationTitle != 'all'
+                                ? colorScheme.primary
+                                : colorScheme.outlineVariant.withValues(alpha: 0.6)),
+                        width: (_isCurrentViolationPinned ||
+                                (_selectedViolationTitle != null && _selectedViolationTitle != 'all'))
+                            ? 1.5
+                            : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.gavel_rounded,
+                          size: 20,
+                          color: _isCurrentViolationPinned
+                              ? colorScheme.secondary
+                              : (_selectedViolationTitle != null && _selectedViolationTitle != 'all'
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _selectedViolationTitle == null || _selectedViolationTitle == 'all'
+                                    ? 'نوع الغرامة: جميع البنود (الكل)'
+                                    : 'البند: $_selectedViolationTitle',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (_isCurrentViolationPinned)
+                                Text(
+                                  'البند الافتراضي المثبت 📌',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.secondary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (_selectedViolationTitle != null && _selectedViolationTitle != 'all')
+                          GestureDetector(
+                            onTap: () => setState(() => _selectedViolationTitle = 'all'),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 18,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        Icon(
+                          Icons.arrow_drop_down_rounded,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Pin Violation Button
+              IconButton.filledTonal(
+                tooltip: _isCurrentViolationPinned
+                    ? 'إلغاء تثبيت البند الافتراضي'
+                    : 'تثبيت البند المحدد كافتراضي عند فتح السجل',
+                style: IconButton.styleFrom(
+                  backgroundColor: _isCurrentViolationPinned
+                      ? colorScheme.secondaryContainer
+                      : colorScheme.surfaceContainerHigh,
+                  foregroundColor: _isCurrentViolationPinned
+                      ? colorScheme.onSecondaryContainer
+                      : colorScheme.onSurfaceVariant,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: _isCurrentViolationPinned
+                          ? colorScheme.secondary
+                          : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                icon: Icon(
+                  Icons.push_pin_rounded,
+                  size: 20,
+                  color: _isCurrentViolationPinned ? colorScheme.secondary : null,
+                ),
+                onPressed: _togglePinCurrentViolation,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          // 4. Search Box
           TextFormField(
             controller: _searchController,
             onChanged: (v) => setState(() => _searchQuery = v.trim()),
@@ -1104,57 +1590,108 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
 
           const SizedBox(height: 8),
 
-          // 4. Quick Status Filter Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildStatusChip('الكل', 'all', colorScheme),
-                const SizedBox(width: 6),
-                _buildStatusChip('بانتظار الموافقة ⏳', 'pending', colorScheme),
-                const SizedBox(width: 6),
-                _buildStatusChip('معتمدة ومحررة ✅', 'issued', colorScheme),
-                const SizedBox(width: 6),
-                _buildStatusChip('تم الخصم 💸', 'deducted', colorScheme),
-                const SizedBox(width: 6),
-                _buildStatusChip('مرفوضة / ملغاة ❌', 'rejected', colorScheme),
-              ],
-            ),
-          ),
+          // 5. Penalty Status Dropdown Menu (قائمة منسدلة لحالات الغرامات)
+          _buildStatusDropdown(colorScheme),
         ],
       ),
     );
   }
 
-  Widget _buildStatusChip(String label, String key, ColorScheme colorScheme) {
-    final isSelected = _selectedStatusFilter == key;
-    return ChoiceChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
-        ),
-      ),
-      selected: isSelected,
-      onSelected: (val) {
-        if (val) {
-          setState(() => _selectedStatusFilter = key);
-        }
-      },
-      selectedColor: colorScheme.primaryContainer,
-      backgroundColor: colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: isSelected
+  Widget _buildStatusDropdown(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _selectedStatusFilter != 'all'
               ? colorScheme.primary
-              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+              : colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: _selectedStatusFilter != 'all' ? 1.5 : 1.0,
         ),
       ),
-      visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedStatusFilter,
+          isExpanded: true,
+          icon: Icon(Icons.arrow_drop_down_rounded, color: colorScheme.onSurfaceVariant),
+          borderRadius: BorderRadius.circular(14),
+          items: [
+            DropdownMenuItem(
+              value: 'all',
+              child: Row(
+                children: [
+                  Icon(Icons.filter_list_rounded, size: 18, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'حالة الغرامة: جميع الحالات (الكل)',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+            DropdownMenuItem(
+              value: 'pending',
+              child: Row(
+                children: [
+                  const Icon(Icons.hourglass_top_rounded, size: 18, color: Colors.amber),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'حالة الغرامة: بانتظار الموافقة ⏳',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+            DropdownMenuItem(
+              value: 'issued',
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, size: 18, color: Colors.green),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'حالة الغرامة: معتمدة ومحررة ✅',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+            DropdownMenuItem(
+              value: 'deducted',
+              child: Row(
+                children: [
+                  const Icon(Icons.paid_rounded, size: 18, color: Colors.teal),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'حالة الغرامة: تم الخصم 💸',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+            DropdownMenuItem(
+              value: 'rejected',
+              child: Row(
+                children: [
+                  const Icon(Icons.cancel_rounded, size: 18, color: Colors.red),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'حالة الغرامة: مرفوضة / ملغاة ❌',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                _selectedStatusFilter = val;
+              });
+            }
+          },
+        ),
+      ),
     );
   }
 

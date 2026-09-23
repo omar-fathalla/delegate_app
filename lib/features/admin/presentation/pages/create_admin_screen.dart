@@ -511,6 +511,20 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                                 setState(() => _selectedRole = 'technical_support');
                               },
                             ),
+                            Divider(
+                              height: 1,
+                              color: colorScheme.outline.withValues(alpha: 0.3),
+                            ),
+                            _RoleTile(
+                              title: 'محاسب / إدارة الحسابات',
+                              subtitle: 'Accountant - الرقابة والتقارير المالية',
+                              icon: Icons.account_balance_wallet_rounded,
+                              value: 'accountant',
+                              isSelected: _selectedRole == 'accountant',
+                              onTap: () {
+                                setState(() => _selectedRole = 'accountant');
+                              },
+                            ),
                           ],
                         ],
                       ),

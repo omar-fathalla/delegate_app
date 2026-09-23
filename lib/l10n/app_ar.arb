@@ -555,6 +555,14 @@
     "@editName": {
         "description": "Button to edit the branch name."
     },
+    "editBranch": "تعديل الفرع",
+    "@editBranch": {
+        "description": "زر تعديل بيانات الفرع."
+    },
+    "branchUpdatedSuccessfully": "تم تعديل الفرع بنجاح.",
+    "@branchUpdatedSuccessfully": {
+        "description": "رسالة نجاح عند تعديل بيانات الفرع."
+    },
     "deleteBranch": "مسح الفرع",
     "@deleteBranch": {
         "description": "Button to delete the branch."
@@ -1157,5 +1165,29 @@
     "receiptsReport": "تقرير إيصالات الدفع الإلكتروني",
     "@receiptsReport": {
         "description": "Receipts report menu item text"
+    },
+    "accountant": "إدارة الحسابات",
+    "@accountant": {
+        "description": "Accountant role title"
+    },
+    "accountantDashboard": "لوحة تحكم الحسابات والماليات",
+    "@accountantDashboard": {
+        "description": "Accountant dashboard title"
+    },
+    "financialReports": "التقارير المالية",
+    "@financialReports": {
+        "description": "Financial reports label"
+    },
+    "paymentReceipts": "إيصالات السداد",
+    "@paymentReceipts": {
+        "description": "Payment receipts label"
+    },
+    "subscriptionRequests": "طلبات الاشتراك",
+    "@subscriptionRequests": {
+        "description": "Subscription requests label"
+    },
+    "walletsManagement": "إدارة المحافظ",
+    "@walletsManagement": {
+        "description": "Wallets management label"
     }
 }

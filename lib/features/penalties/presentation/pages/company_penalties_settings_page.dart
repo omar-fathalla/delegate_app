@@ -190,13 +190,13 @@ class _CompanyPenaltiesSettingsPageState
                 (tempSelection.length == _availableBranches.length &&
                     _availableBranches.isNotEmpty);
 
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.78,
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              child: Column(
+            return Material(
+              color: colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              clipBehavior: Clip.antiAlias,
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.78,
+                child: Column(
                 children: [
                   Container(
                     margin: const EdgeInsets.only(top: 10, bottom: 6),
@@ -431,7 +431,8 @@ class _CompanyPenaltiesSettingsPageState
                   ),
                 ],
               ),
-            );
+            ),
+          );
           },
         );
       },

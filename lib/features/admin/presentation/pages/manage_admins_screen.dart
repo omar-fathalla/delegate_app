@@ -47,6 +47,14 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
         (cs) => cs.onTertiaryContainer,
       );
     }
+    if (norm.contains('accountant') || norm.contains('accounting')) {
+      return (
+        isArabic ? 'إدارة الحسابات' : 'Accountant',
+        Icons.account_balance_wallet_rounded,
+        (cs) => cs.primaryContainer,
+        (cs) => cs.onPrimaryContainer,
+      );
+    }
     if (norm.contains('super')) {
       return (
         isArabic ? 'المشرف العام' : 'Super Admin',

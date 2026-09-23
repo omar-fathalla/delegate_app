@@ -671,57 +671,62 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'إرفاق إيصال / مستند المخالفة',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                  child: Icon(Icons.camera_alt_rounded, color: Theme.of(context).colorScheme.onPrimaryContainer),
+      builder: (ctx) => Material(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'إرفاق إيصال / مستند المخالفة',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-                title: const Text('التقاط صورة بالكاميرا'),
-                subtitle: const Text('تصوير الإيصال أو الواقعة مباشرة'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final photo = await _picker.pickImage(source: ImageSource.camera);
-                  if (photo != null && mounted) {
-                    setState(() {
-                      _attachedFiles.add(File(photo.path));
-                    });
-                  }
-                },
-              ),
-              const Divider(),
-              ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                  child: Icon(Icons.photo_library_rounded, color: Theme.of(context).colorScheme.onSecondaryContainer),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                    child: Icon(Icons.camera_alt_rounded, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                  ),
+                  title: const Text('التقاط صورة بالكاميرا'),
+                  subtitle: const Text('تصوير الإيصال أو الواقعة مباشرة'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final photo = await _picker.pickImage(source: ImageSource.camera);
+                    if (photo != null && mounted) {
+                      setState(() {
+                        _attachedFiles.add(File(photo.path));
+                      });
+                    }
+                  },
                 ),
-                title: const Text('اختيار من المعرض'),
-                subtitle: const Text('تحديد صورة أو إيصال محفوظ بالجهاز'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final images = await _picker.pickMultiImage();
-                  if (images.isNotEmpty && mounted) {
-                    setState(() {
-                      for (var img in images) {
-                        _attachedFiles.add(File(img.path));
-                      }
-                    });
-                  }
-                },
-              ),
-            ],
+                const Divider(),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                    child: Icon(Icons.photo_library_rounded, color: Theme.of(context).colorScheme.onSecondaryContainer),
+                  ),
+                  title: const Text('اختيار من المعرض'),
+                  subtitle: const Text('تحديد صورة أو إيصال محفوظ بالجهاز'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final images = await _picker.pickMultiImage();
+                    if (images.isNotEmpty && mounted) {
+                      setState(() {
+                        for (var img in images) {
+                          _attachedFiles.add(File(img.path));
+                        }
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1822,11 +1827,14 @@ class _CompanySearchBottomSheetState
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final mediaQuery = MediaQuery.of(context);
-
-    return Container(
-      height: mediaQuery.size.height * 0.75,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Column(
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        height: mediaQuery.size.height * 0.75,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Column(
         children: [
           Container(
             width: 40,
@@ -1938,6 +1946,7 @@ class _CompanySearchBottomSheetState
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

@@ -138,4 +138,17 @@ class BranchModel extends Branch {
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
+
+  Map<String, dynamic> toUpdateMap() {
+    return {
+      'branchName': branchName,
+      'location': {'latitude': latitude, 'longitude': longitude},
+      'geofenceRadius': geofenceRadius,
+      if (organizationUID != null && organizationUID!.isNotEmpty)
+        'organizationUID': organizationUID,
+      if (organizationName != null && organizationName!.isNotEmpty)
+        'organizationName': organizationName,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+  }
 }

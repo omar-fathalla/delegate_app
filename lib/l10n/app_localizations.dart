@@ -812,6 +812,18 @@ abstract class AppLocalizations {
   /// **'Edit Name'**
   String get editName;
 
+  /// Button to edit the branch details.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Branch'**
+  String get editBranch;
+
+  /// Success message after updating a branch.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch updated successfully.'**
+  String get branchUpdatedSuccessfully;
+
   /// Button to delete the branch.
   ///
   /// In en, this message translates to:
@@ -1681,6 +1693,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Receipts Report'**
   String get receiptsReport;
+
+  /// Accountant role title
+  ///
+  /// In en, this message translates to:
+  /// **'Financial Accountant'**
+  String get accountant;
+
+  /// Accountant dashboard title
+  ///
+  /// In en, this message translates to:
+  /// **'Financial Management Dashboard'**
+  String get accountantDashboard;
+
+  /// Financial reports label
+  ///
+  /// In en, this message translates to:
+  /// **'Financial Reports'**
+  String get financialReports;
+
+  /// Payment receipts label
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Receipts'**
+  String get paymentReceipts;
+
+  /// Subscription requests label
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription Requests'**
+  String get subscriptionRequests;
+
+  /// Wallets management label
+  ///
+  /// In en, this message translates to:
+  /// **'Wallets Management'**
+  String get walletsManagement;
 }
 
 class _AppLocalizationsDelegate

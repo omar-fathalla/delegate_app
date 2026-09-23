@@ -3,6 +3,8 @@ import 'package:equatable/equatable.dart';
 enum WalletTransactionType {
   allocation, // إيداع / تخصيص رصيد من المستحقات
   payout, // صرف / تسوية مستحقات نقدية
+  adjustment, // تعديل رصيد يدوي (زيادة أو إنقاص)
+  monthlyRenewal, // تغذية المستحق الشهري الدوري
 }
 
 extension WalletTransactionTypeX on WalletTransactionType {
@@ -12,11 +14,17 @@ extension WalletTransactionTypeX on WalletTransactionType {
         return 'إيداع وتخصيص مستحقات';
       case WalletTransactionType.payout:
         return 'صرف وتسوية نقدية';
+      case WalletTransactionType.adjustment:
+        return 'تعديل رصيد يدوي';
+      case WalletTransactionType.monthlyRenewal:
+        return 'تغذية المستحق الشهري';
     }
   }
 
   bool get isAllocation => this == WalletTransactionType.allocation;
   bool get isPayout => this == WalletTransactionType.payout;
+  bool get isAdjustment => this == WalletTransactionType.adjustment;
+  bool get isMonthlyRenewal => this == WalletTransactionType.monthlyRenewal;
 }
 
 class UserWalletEntity extends Equatable {
@@ -29,7 +37,10 @@ class UserWalletEntity extends Equatable {
   final double currentBalance;
   final double totalAllocated;
   final double totalPaid;
+  final double monthlyAllocation;
   final bool isWalletEnabled;
+  final bool isInternalOnly;
+  final String notes;
   final String? lastPeriodKey;
   final DateTime? updatedAt;
   final String? updatedBy;
@@ -44,7 +55,10 @@ class UserWalletEntity extends Equatable {
     this.currentBalance = 0.0,
     this.totalAllocated = 0.0,
     this.totalPaid = 0.0,
+    this.monthlyAllocation = 0.0,
     this.isWalletEnabled = false,
+    this.isInternalOnly = true,
+    this.notes = '',
     this.lastPeriodKey,
     this.updatedAt,
     this.updatedBy,
@@ -60,7 +74,10 @@ class UserWalletEntity extends Equatable {
     double? currentBalance,
     double? totalAllocated,
     double? totalPaid,
+    double? monthlyAllocation,
     bool? isWalletEnabled,
+    bool? isInternalOnly,
+    String? notes,
     String? lastPeriodKey,
     DateTime? updatedAt,
     String? updatedBy,
@@ -75,7 +92,10 @@ class UserWalletEntity extends Equatable {
       currentBalance: currentBalance ?? this.currentBalance,
       totalAllocated: totalAllocated ?? this.totalAllocated,
       totalPaid: totalPaid ?? this.totalPaid,
+      monthlyAllocation: monthlyAllocation ?? this.monthlyAllocation,
       isWalletEnabled: isWalletEnabled ?? this.isWalletEnabled,
+      isInternalOnly: isInternalOnly ?? this.isInternalOnly,
+      notes: notes ?? this.notes,
       lastPeriodKey: lastPeriodKey ?? this.lastPeriodKey,
       updatedAt: updatedAt ?? this.updatedAt,
       updatedBy: updatedBy ?? this.updatedBy,
@@ -93,7 +113,10 @@ class UserWalletEntity extends Equatable {
         currentBalance,
         totalAllocated,
         totalPaid,
+        monthlyAllocation,
         isWalletEnabled,
+        isInternalOnly,
+        notes,
         lastPeriodKey,
         updatedAt,
         updatedBy,

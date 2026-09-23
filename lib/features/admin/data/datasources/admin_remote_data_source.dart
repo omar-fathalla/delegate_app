@@ -116,7 +116,7 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   @override
   Future<BranchModel> updateBranch(BranchModel branch) async {
     try {
-      final data = branch.toMap();
+      final data = branch.toUpdateMap();
       await _branches.doc(branch.id).update(data);
 
       if (branch.organizationUID != null && branch.organizationUID!.isNotEmpty) {
@@ -223,6 +223,8 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
               'technical_support',
               'technicalSupport',
               'tech_support',
+              'accountant',
+              'accounting',
             ],
           )
           .get();

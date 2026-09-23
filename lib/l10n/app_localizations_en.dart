@@ -394,6 +394,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editName => 'Edit Name';
 
   @override
+  String get editBranch => 'Edit Branch';
+
+  @override
+  String get branchUpdatedSuccessfully => 'Branch updated successfully.';
+
+  @override
   String get deleteBranch => 'Delete Branch';
 
   @override
@@ -849,4 +855,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get receiptsReport => 'Receipts Report';
+
+  @override
+  String get accountant => 'Financial Accountant';
+
+  @override
+  String get accountantDashboard => 'Financial Management Dashboard';
+
+  @override
+  String get financialReports => 'Financial Reports';
+
+  @override
+  String get paymentReceipts => 'Payment Receipts';
+
+  @override
+  String get subscriptionRequests => 'Subscription Requests';
+
+  @override
+  String get walletsManagement => 'Wallets Management';
 }

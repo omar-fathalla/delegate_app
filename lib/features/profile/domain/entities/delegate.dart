@@ -27,6 +27,7 @@ enum UserRole {
   organizationAdmin,
   technicalSupport,
   branchesMarketingManager,
+  accountant,
 }
 
 class Delegate extends Equatable {

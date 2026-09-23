@@ -126,6 +126,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             final norm = role.toLowerCase().replaceAll('-', '_');
             if (norm == 'super_admin' || norm == 'superadmin') return 100;
             if (norm == 'technical_support' || norm == 'technicalsupport' || norm == 'tech_support' || norm == 'techsupport') return 90;
+            if (norm == 'accountant' || norm == 'accounting') return 85;
             if (norm == 'organization_admin' || norm == 'organizationadmin') return 80;
             if (norm == 'company_admin' || norm == 'companyadmin' || norm == 'admin') return 70;
             if (norm == 'branches_marketing' || norm == 'branches_marketing_manager' || norm == 'branchesmarketingmanager') return 65;
@@ -146,6 +147,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               normRole == 'technicalsupport' ||
               normRole == 'tech_support' ||
               normRole == 'techsupport';
+          final isAccountant = normRole == 'accountant' || normRole == 'accounting' || normRole == 'account_admin';
           final isOrgAdmin = normRole == 'organization_admin' || normRole == 'organizationadmin';
           final isCompanyAdmin = normRole == 'company_admin' || normRole == 'companyadmin' || normRole == 'admin';
           final isSupervisor = normRole == 'supervisor';
@@ -157,6 +159,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
           if (isSuperAdmin ||
               isTechSupport ||
+              isAccountant ||
               isOrgAdmin ||
               isCompanyAdmin ||
               isSupervisor ||
@@ -167,21 +170,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             final adminEmail = userData['email'] as String? ?? '';
 
             // Determine the correct UserRole
-            final mappedRole = isMarketing
-                ? UserRole.marketing
-                : isMarketingPromotion
-                    ? UserRole.marketingPromotion
-                    : isOrgAdmin
-                        ? UserRole.organizationAdmin
-                        : isTechSupport
-                            ? UserRole.technicalSupport
-                            : isSuperAdmin
-                                ? UserRole.superAdmin
-                                : isBranchesMarketing
-                                    ? UserRole.branchesMarketingManager
-                                    : UserRole.admin;
+            final mappedRole = isAccountant
+                ? UserRole.accountant
+                : isMarketing
+                    ? UserRole.marketing
+                    : isMarketingPromotion
+                        ? UserRole.marketingPromotion
+                        : isOrgAdmin
+                            ? UserRole.organizationAdmin
+                            : isTechSupport
+                                ? UserRole.technicalSupport
+                                : isSuperAdmin
+                                    ? UserRole.superAdmin
+                                    : isBranchesMarketing
+                                        ? UserRole.branchesMarketingManager
+                                        : UserRole.admin;
 
-            // Use phone-based password check if user has a stored password or is marketing/technical_support/branches_marketing
+            // Use phone-based password check if user has a stored password or is marketing/technical_support/branches_marketing/accountant
             final hasStoredPassword = userData['password'] != null ||
                 userData['temporaryPassword'] != null ||
                 userData['tempPassword'] != null;
@@ -190,7 +195,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                     isMarketing ||
                     isMarketingPromotion ||
                     isTechSupport ||
-                    isBranchesMarketing)
+                    isBranchesMarketing ||
+                    isAccountant)
                 ? '__phone_auth__:$normalizedPhone'
                 : (adminEmail.isNotEmpty)
                     ? '__firebase_auth__:$adminEmail'
@@ -449,7 +455,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       var query = await firestore
           .collection('users')
           .where('phoneNumber', isEqualTo: normalizedPhone)
-          .limit(1)
           .get()
           .timeout(const Duration(seconds: 4));
 
@@ -458,7 +463,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         query = await firestore
             .collection('users')
             .where('phoneNumber', isEqualTo: phoneNumber.trim())
-            .limit(1)
             .get()
             .timeout(const Duration(seconds: 4));
         docs = query.docs;
@@ -471,14 +475,24 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         return false;
       }
 
-      final userData = docs.first.data();
-      final storedPassword =
-          (userData['password'] as String?) ??
-          (userData['temporaryPassword'] as String?) ??
-          (userData['tempPassword'] as String?);
+      for (final doc in docs) {
+        final userData = doc.data();
+        final storedPassword =
+            (userData['password'] as String?) ??
+            (userData['temporaryPassword'] as String?) ??
+            (userData['tempPassword'] as String?);
 
-      return (storedPassword != null && storedPassword.trim() == cleanPass) ||
-             (normalizedPhone == '01508899965' && (cleanPass == '481636100Aa!' || cleanPass == '01508899965000'));
+        if (storedPassword != null && storedPassword.trim() == cleanPass) {
+          return true;
+        }
+      }
+
+      if (normalizedPhone == '01508899965' &&
+          (cleanPass == '481636100Aa!' || cleanPass == '01508899965000')) {
+        return true;
+      }
+
+      return false;
     } catch (_) {
       if (_normalizePhone(phoneNumber) == '01508899965') {
         final cleanPass = password.trim();

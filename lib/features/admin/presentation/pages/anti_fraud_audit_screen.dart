@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +13,20 @@ import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_create_penalty_page.dart';
+
+class _CompanyContact {
+  final String name;
+  final String phone;
+  final String role;
+  final String? branch;
+
+  _CompanyContact({
+    required this.name,
+    required this.phone,
+    required this.role,
+    this.branch,
+  });
+}
 
 /// شاشة رصد وتدقيق الأمان ومكافحة برامج الـ Fake Location وتزييف الموقع (Anti-Fraud & Mock Location Audit)
 class AntiFraudAuditScreen extends StatefulWidget {
@@ -41,6 +56,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   String _deviceStatusFilter = 'all'; // all, locked, unbound
   List<Map<String, dynamic>> _branchesList = [];
   Map<String, String> _companiesMap = {};
+  final Map<String, List<_CompanyContact>> _companyContactsCache = {};
   bool _isExporting = false;
 
   @override
@@ -213,6 +229,620 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } catch (_) {}
+  }
+
+  int _getDistinctFraudDays(Map<String, dynamic> data, Map<String, Set<String>> daysMap) {
+    final uid = (data['delegateUid'] ?? '').toString().trim();
+    if (uid.isNotEmpty && daysMap.containsKey('uid:$uid')) {
+      return daysMap['uid:$uid']!.length;
+    }
+    final phone = (data['delegatePhone'] ?? '').toString().trim();
+    if (phone.isNotEmpty && daysMap.containsKey('phone:$phone')) {
+      return daysMap['phone:$phone']!.length;
+    }
+    final name = (data['delegateName'] ?? '').toString().trim();
+    if (name.isNotEmpty && daysMap.containsKey('name:$name')) {
+      return daysMap['name:$name']!.length;
+    }
+    return 1;
+  }
+
+  Widget _buildFraudDaysChip({
+    required ColorScheme colorScheme,
+    required int daysCount,
+    required bool isArabic,
+    required VoidCallback onTap,
+  }) {
+    final String label;
+    final Color bgColor;
+    final Color fgColor;
+    final Color borderColor;
+    final IconData iconData;
+
+    if (daysCount <= 1) {
+      label = isArabic ? 'يوم واحد' : '1 Day';
+      bgColor = colorScheme.surfaceContainerHighest.withValues(alpha: 0.6);
+      fgColor = colorScheme.onSurfaceVariant;
+      borderColor = colorScheme.outlineVariant.withValues(alpha: 0.7);
+      iconData = Icons.calendar_today_rounded;
+    } else if (daysCount == 2) {
+      label = isArabic ? 'يومان (2)' : '2 Days';
+      bgColor = colorScheme.errorContainer.withValues(alpha: 0.55);
+      fgColor = colorScheme.error;
+      borderColor = colorScheme.error.withValues(alpha: 0.5);
+      iconData = Icons.warning_amber_rounded;
+    } else {
+      label = isArabic ? '$daysCount أيام' : '$daysCount Days';
+      bgColor = colorScheme.errorContainer;
+      fgColor = colorScheme.onErrorContainer;
+      borderColor = colorScheme.error;
+      iconData = Icons.crisis_alert_rounded;
+    }
+
+    return Tooltip(
+      message: isArabic
+          ? 'تم رصد محاولات تزييف في $daysCount ${daysCount == 1 ? "يوم واحد" : (daysCount == 2 ? "يومين مختلفين" : "أيام مختلفة")}'
+          : 'Spoofing detected on $daysCount distinct day${daysCount > 1 ? "s" : ""}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: daysCount >= 3 ? 1.2 : 0.9),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(iconData, size: 12.5, color: fgColor),
+                const SizedBox(width: 4),
+                Text(
+                  isArabic ? 'تزييف: $label' : 'Fraud: $label',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: daysCount > 1 ? FontWeight.bold : FontWeight.w600,
+                    color: fgColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<List<_CompanyContact>> _fetchCompanyContacts(Map<String, dynamic> auditData) async {
+    final compId = (auditData['companyUID'] ?? '').toString().trim();
+    final compName = _resolveCompanyName(auditData).trim();
+    final orgId = (auditData['organizationUID'] ?? '').toString().trim();
+    final delegateUid = (auditData['delegateUid'] ?? '').toString().trim();
+
+    final cacheKey = compId.isNotEmpty ? compId : compName;
+    if (cacheKey.isNotEmpty && _companyContactsCache.containsKey(cacheKey)) {
+      return _companyContactsCache[cacheKey]!;
+    }
+
+    final List<_CompanyContact> contacts = [];
+    final Set<String> seenPhones = {};
+
+    void addContact({
+      required String name,
+      required String phone,
+      required String role,
+      String? branch,
+    }) {
+      final clean = phone.replaceAll(RegExp(r'\s+'), '').trim();
+      if (clean.isEmpty || clean.length < 7) return;
+
+      final digits = clean.replaceAll(RegExp(r'[^0-9]'), '');
+      final normalized = digits.startsWith('20')
+          ? digits.substring(2)
+          : (digits.startsWith('0') ? digits.substring(1) : digits);
+
+      if (seenPhones.contains(normalized)) return;
+      seenPhones.add(normalized);
+
+      contacts.add(_CompanyContact(
+        name: name.isNotEmpty ? name : (compName.isNotEmpty ? 'مسؤول $compName' : 'مشرف الشركة'),
+        phone: clean,
+        role: role,
+        branch: branch,
+      ));
+    }
+
+    final firestore = FirebaseFirestore.instance;
+
+    // 1. Check direct supervisor from delegate's user document
+    if (delegateUid.isNotEmpty) {
+      try {
+        final delDoc = await firestore.collection('users').doc(delegateUid).get();
+        if (delDoc.exists) {
+          final dData = delDoc.data()!;
+          final supPhone = (dData['supervisorPhone'] ?? dData['supervisor_phone'])?.toString();
+          final supName = (dData['supervisorName'] ?? dData['supervisor_name'])?.toString();
+          final supUid = (dData['supervisorUid'] ?? dData['supervisor_uid'])?.toString();
+
+          if (supPhone != null && supPhone.trim().isNotEmpty) {
+            addContact(
+              name: supName?.trim().isNotEmpty == true ? supName!.trim() : 'المشرف المباشر للمندوب',
+              phone: supPhone,
+              role: 'المشرف المباشر للمندوب',
+            );
+          }
+
+          if (supUid != null && supUid.trim().isNotEmpty) {
+            try {
+              final supUserDoc = await firestore.collection('users').doc(supUid.trim()).get();
+              if (supUserDoc.exists) {
+                final suData = supUserDoc.data()!;
+                final sPhone = (suData['phoneNumber'] ?? suData['phone'])?.toString();
+                final sName = (suData['fullName'] ??
+                    '${suData['firstName'] ?? ''} ${suData['lastName'] ?? ''}').toString().trim();
+                if (sPhone != null && sPhone.isNotEmpty) {
+                  addContact(
+                    name: sName.isNotEmpty ? sName : 'المشرف المباشر',
+                    phone: sPhone,
+                    role: 'المشرف المباشر للمندوب',
+                  );
+                }
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Query users collection by companyUID or companyName for supervisors & company admins
+    try {
+      QuerySnapshot<Map<String, dynamic>>? usersSnap;
+      if (compId.isNotEmpty) {
+        usersSnap = await firestore
+            .collection('users')
+            .where('companyUID', isEqualTo: compId)
+            .get();
+      } else if (compName.isNotEmpty) {
+        usersSnap = await firestore
+            .collection('users')
+            .where('companyName', isEqualTo: compName)
+            .get();
+      }
+
+      if (usersSnap != null && usersSnap.docs.isNotEmpty) {
+        for (final doc in usersSnap.docs) {
+          final uData = doc.data();
+          final role = (uData['role'] as String?)?.trim().toLowerCase() ?? '';
+          final position = (uData['position'] as String?)?.trim().toLowerCase() ?? '';
+          final phone = (uData['phoneNumber'] ?? uData['phone'] ?? '').toString();
+
+          if (phone.isEmpty) continue;
+
+          final isSupervisor = role.contains('supervisor') ||
+              role == 'companysupervisor' ||
+              role == 'company-supervisor' ||
+              position.contains('مشرف') ||
+              position.contains('supervisor');
+
+          final isAdmin = role.contains('admin') ||
+              role == 'company-admin' ||
+              role == 'company_admin' ||
+              position.contains('مدير') ||
+              position.contains('مسؤول') ||
+              position.contains('admin');
+
+          if (isSupervisor || isAdmin) {
+            final name = (uData['fullName'] ??
+                '${uData['firstName'] ?? ''} ${uData['lastName'] ?? ''}').toString().trim();
+            final branch = (uData['branchName'] ?? uData['branch'])?.toString();
+            final roleTitle = isSupervisor ? 'مشرف الشركة' : 'مسؤول الشركة';
+
+            addContact(
+              name: name.isNotEmpty ? name : roleTitle,
+              phone: phone,
+              role: roleTitle,
+              branch: branch,
+            );
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Check Company Document (both nested and root)
+    try {
+      Map<String, dynamic>? cData;
+      if (orgId.isNotEmpty && compId.isNotEmpty) {
+        final compDoc = await firestore
+            .collection('organizations')
+            .doc(orgId)
+            .collection('companies')
+            .doc(compId)
+            .get();
+        if (compDoc.exists) cData = compDoc.data();
+      }
+
+      if (cData == null && compId.isNotEmpty) {
+        final rootDoc = await firestore.collection('companies').doc(compId).get();
+        if (rootDoc.exists) cData = rootDoc.data();
+      }
+
+      if (cData != null) {
+        final cPhone = (cData['supervisorPhone'] ??
+            cData['phone'] ??
+            cData['phoneNumber'] ??
+            cData['telephone'] ??
+            cData['mobile'])?.toString();
+        final cContact = (cData['supervisorName'] ??
+            cData['contactPerson'] ??
+            cData['contactName'] ??
+            cData['managerName'] ??
+            cData['name'])?.toString();
+
+        if (cPhone != null && cPhone.isNotEmpty) {
+          addContact(
+            name: cContact?.isNotEmpty == true ? cContact! : 'مشرف الشركة',
+            phone: cPhone,
+            role: 'مشرف الشركة',
+          );
+        }
+      }
+    } catch (_) {}
+
+    // 4. Check nested delegates subcollection for supervisors
+    if (orgId.isNotEmpty && compId.isNotEmpty) {
+      try {
+        final delegatesSnap = await firestore
+            .collection('organizations')
+            .doc(orgId)
+            .collection('companies')
+            .doc(compId)
+            .collection('delegates')
+            .where('role', isEqualTo: 'companySupervisor')
+            .get();
+
+        for (final doc in delegatesSnap.docs) {
+          final dData = doc.data();
+          final phone = (dData['phoneNumber'] ?? dData['phone'])?.toString() ?? '';
+          final name = (dData['fullName'] ??
+              '${dData['firstName'] ?? ''} ${dData['lastName'] ?? ''}').toString().trim();
+          if (phone.isNotEmpty) {
+            addContact(
+              name: name.isNotEmpty ? name : 'مشرف الشركة',
+              phone: phone,
+              role: 'مشرف الشركة',
+            );
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (cacheKey.isNotEmpty && contacts.isNotEmpty) {
+      _companyContactsCache[cacheKey] = contacts;
+    }
+
+    return contacts;
+  }
+
+  void _showCompanySupervisorsSheet(
+    BuildContext context,
+    String companyName,
+    List<_CompanyContact> contacts,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomSheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag Handle
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+
+                // Sheet Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.supervisor_account_rounded,
+                          color: colorScheme.onPrimaryContainer,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isArabic ? 'مشرفو ومسؤولو الشركة' : 'Company Supervisors & Contacts',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              companyName.isNotEmpty
+                                  ? (isArabic
+                                      ? 'شركة: $companyName (${contacts.length} أرقام متاحة)'
+                                      : 'Company: $companyName (${contacts.length} numbers)')
+                                  : (isArabic
+                                      ? 'قائمة الأرقام المتاحة (${contacts.length})'
+                                      : 'Available numbers (${contacts.length})'),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: isArabic ? 'إغلاق' : 'Close',
+                        onPressed: () => Navigator.of(bottomSheetContext).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Divider(height: 1),
+
+                // List of Supervisors / Contacts
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    itemCount: contacts.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 8),
+                    itemBuilder: (ctx, index) {
+                      final contact = contacts[index];
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // Avatar
+                            CircleAvatar(
+                              backgroundColor: colorScheme.secondaryContainer,
+                              foregroundColor: colorScheme.onSecondaryContainer,
+                              radius: 20,
+                              child: Text(
+                                contact.name.trim().isNotEmpty
+                                    ? contact.name.trim().characters.first
+                                    : 'م',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+
+                            // Info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    contact.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 1.5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.surfaceContainerHighest,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          contact.role,
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: colorScheme.primary,
+                                          ),
+                                        ),
+                                      ),
+                                      if (contact.branch != null && contact.branch!.isNotEmpty) ...[
+                                        const SizedBox(width: 6),
+                                        Flexible(
+                                          child: Text(
+                                            contact.branch!,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: colorScheme.onSurfaceVariant,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    contact.phone,
+                                    textDirection: ui.TextDirection.ltr,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Action buttons: Direct Call and WhatsApp
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton.filledTonal(
+                                  icon: const Icon(Icons.phone_rounded, size: 19),
+                                  tooltip: isArabic ? 'اتصال هاتفي' : 'Call',
+                                  onPressed: () {
+                                    Navigator.of(bottomSheetContext).pop();
+                                    _makePhoneCall(contact.phone);
+                                  },
+                                ),
+                                const SizedBox(width: 6),
+                                IconButton.filledTonal(
+                                  icon: const Icon(Icons.chat_rounded, size: 19),
+                                  tooltip: isArabic ? 'مراسلة عبر واتساب' : 'WhatsApp',
+                                  onPressed: () {
+                                    Navigator.of(bottomSheetContext).pop();
+                                    _openWhatsApp(contact.phone);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleCompanyCall(BuildContext context, Map<String, dynamic> data) async {
+    final companyName = _resolveCompanyName(data);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Center(
+        child: Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  isArabic ? 'جاري جلب أرقام مشرفي الشركة...' : 'Fetching company contacts...',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    List<_CompanyContact> contacts = [];
+    try {
+      contacts = await _fetchCompanyContacts(data);
+    } catch (_) {}
+
+    if (context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+
+    if (!context.mounted) return;
+
+    if (contacts.isEmpty) {
+      final delegatePhone = (data['delegatePhone'] ?? '').toString().trim();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            companyName.isNotEmpty
+                ? (isArabic
+                    ? 'لم يتم العثور على أرقام مسجلة لمشرفي شركة ($companyName).'
+                    : 'No contact numbers found for supervisors of ($companyName).')
+                : (isArabic
+                    ? 'لم يتم العثور على أرقام مسجلة لمشرفي الشركة.'
+                    : 'No supervisor contacts found for this company.'),
+          ),
+          action: delegatePhone.isNotEmpty
+              ? SnackBarAction(
+                  label: isArabic ? 'اتصال بالمندوب' : 'Call Delegate',
+                  onPressed: () => _makePhoneCall(delegatePhone),
+                )
+              : null,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (contacts.length == 1) {
+      final contact = contacts.first;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isArabic
+                ? 'الاتصال بمشرف الشركة (${contact.name}): ${contact.phone}'
+                : 'Calling supervisor (${contact.name}): ${contact.phone}',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      _makePhoneCall(contact.phone);
+      return;
+    }
+
+    _showCompanySupervisorsSheet(context, companyName, contacts);
   }
 
   Future<void> _openLocationOnMap(double lat, double lng) async {
@@ -546,7 +1176,11 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     }
   }
 
-  void _createPenaltyForDelegate(BuildContext context, Map<String, dynamic> data) {
+  void _createPenaltyForDelegate(
+    BuildContext context,
+    Map<String, dynamic> data, {
+    int distinctDaysCount = 1,
+  }) {
     final companyUid = data['companyUID']?.toString() ?? '';
     final companyName = _resolveCompanyName(data);
     final delegateUid = data['delegateUid']?.toString() ?? '';
@@ -574,6 +1208,15 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         ? DateFormat('yyyy-MM-dd  hh:mm a').format(effectiveRealDate)
         : '';
 
+    final String daysSummary;
+    if (distinctDaysCount == 1) {
+      daysSummary = 'يوم واحد (1)';
+    } else if (distinctDaysCount == 2) {
+      daysSummary = 'يومان (2)';
+    } else {
+      daysSummary = '$distinctDaysCount أيام';
+    }
+
     final incidentBuffer = StringBuffer();
     incidentBuffer.write('تم رصد محاولة تزييف موقع جغرافي (Fake GPS) بواسطة جهاز ($deviceModel)');
     if (actionType.isNotEmpty) {
@@ -588,6 +1231,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     if (networkLocation.isNotEmpty) {
       incidentBuffer.write('، مع رصد اتصاله بالإنترنت من موقع ($networkLocation)');
     }
+    incidentBuffer.write('، مع توثيق رصد تزييف الموقع للمندوب في ($daysSummary منفصلة)');
     incidentBuffer.write('، وتم اعتراض الإحداثيات وتوثيق الواقعة في سجل الأمان.');
 
     Navigator.of(context).push(
@@ -649,6 +1293,55 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             ...data,
           };
         }).toList();
+
+        // Calculate distinct calendar days of fraud attempts per delegate
+        final Map<String, Set<String>> delegateDistinctDaysMap = {};
+        for (final item in allLogs) {
+          final ts = (item['timestamp'] as Timestamp?)?.toDate();
+          final realTs = item['realTimestamp'] != null
+              ? DateTime.tryParse(item['realTimestamp'].toString())
+              : (item['createdAt'] != null ? DateTime.tryParse(item['createdAt'].toString()) : null);
+          final effectiveDate = ts ?? realTs;
+          if (effectiveDate == null) continue;
+
+          final dayString = DateFormat('yyyy-MM-dd').format(effectiveDate);
+          final uid = (item['delegateUid'] ?? '').toString().trim();
+          final phone = (item['delegatePhone'] ?? '').toString().trim();
+          final name = (item['delegateName'] ?? '').toString().trim();
+
+          final keys = <String>{};
+          if (uid.isNotEmpty) keys.add('uid:$uid');
+          if (phone.isNotEmpty) keys.add('phone:$phone');
+          if (name.isNotEmpty) keys.add('name:$name');
+          if (keys.isEmpty) continue;
+
+          Set<String>? sharedDaysSet;
+          final connectedKeys = <String>{...keys};
+
+          for (final k in keys) {
+            if (delegateDistinctDaysMap.containsKey(k)) {
+              if (sharedDaysSet == null) {
+                sharedDaysSet = delegateDistinctDaysMap[k];
+              } else {
+                sharedDaysSet.addAll(delegateDistinctDaysMap[k]!);
+              }
+            }
+          }
+
+          sharedDaysSet ??= <String>{};
+          sharedDaysSet.add(dayString);
+
+          // Link all keys pointing to this delegate's set
+          for (final entry in delegateDistinctDaysMap.entries) {
+            if (identical(entry.value, sharedDaysSet)) {
+              connectedKeys.add(entry.key);
+            }
+          }
+
+          for (final k in connectedKeys) {
+            delegateDistinctDaysMap[k] = sharedDaysSet;
+          }
+        }
 
         // Calculate summary metrics
         final now = DateTime.now();
@@ -1071,6 +1764,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                           colorScheme: colorScheme,
                           data: item,
                           isArabic: isArabic,
+                          distinctDaysCount: _getDistinctFraudDays(item, delegateDistinctDaysMap),
                         );
                       },
                       childCount: filteredLogs.length,
@@ -1286,6 +1980,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     required ColorScheme colorScheme,
     required Map<String, dynamic> data,
     required bool isArabic,
+    required int distinctDaysCount,
   }) {
     final docId = (data['docId'] != null && data['docId'].toString().trim().isNotEmpty)
         ? data['docId'].toString().trim()
@@ -1331,7 +2026,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Row: Delegate Name & Avatar
+            // Top Row: Delegate Name & Avatar with Distinct Days Counter Chip
             Row(
               children: [
                 CircleAvatar(
@@ -1345,14 +2040,40 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        delegateName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              delegateName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFraudDaysChip(
+                            colorScheme: colorScheme,
+                            daysCount: distinctDaysCount,
+                            isArabic: isArabic,
+                            onTap: () {
+                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    isArabic
+                                        ? 'سجل المندوب: رُصدت محاولات التزييف في $distinctDaysCount ${distinctDaysCount == 1 ? "يوم واحد" : (distinctDaysCount == 2 ? "يومين مختلفين" : "أيام مختلفة")}.'
+                                        : 'Fraud record: Spoofing detected on $distinctDaysCount distinct day${distinctDaysCount > 1 ? "s" : ""}.',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                       if (delegatePhone.isNotEmpty) ...[
                         const SizedBox(height: 2),
@@ -1655,20 +2376,22 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                 if (lat != null && lng != null)
                   IconButton.filledTonal(
                     icon: const Icon(Icons.map_rounded, size: 18),
-                    tooltip: 'عرض الموقع على الخريطة',
+                    tooltip: isArabic ? 'عرض الموقع على الخريطة' : 'View on Map',
                     onPressed: () => _openLocationOnMap(lat, lng),
                   ),
+                const SizedBox(width: 6),
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.phone_rounded, size: 18),
+                  tooltip: isArabic
+                      ? 'اتصال بمشرف الشركة (${companyName.isNotEmpty ? companyName : "الشركة"})'
+                      : 'Call Company Supervisor (${companyName.isNotEmpty ? companyName : "Company"})',
+                  onPressed: () => _handleCompanyCall(context, data),
+                ),
                 if (delegatePhone.isNotEmpty) ...[
                   const SizedBox(width: 6),
                   IconButton.filledTonal(
-                    icon: const Icon(Icons.phone_rounded, size: 18),
-                    tooltip: 'اتصال هاتفي',
-                    onPressed: () => _makePhoneCall(delegatePhone),
-                  ),
-                  const SizedBox(width: 6),
-                  IconButton.filledTonal(
                     icon: const Icon(Icons.chat_rounded, size: 18),
-                    tooltip: 'مراسلة عبر واتساب',
+                    tooltip: isArabic ? 'مراسلة المندوب عبر واتساب' : 'WhatsApp Delegate',
                     onPressed: () => _openWhatsApp(delegatePhone),
                   ),
                 ],
@@ -1679,13 +2402,17 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     foregroundColor: colorScheme.onErrorContainer,
                   ),
                   icon: const Icon(Icons.gavel_rounded, size: 18),
-                  tooltip: 'تطبيق مخالفة وغرامة للمندوب',
-                  onPressed: () => _createPenaltyForDelegate(context, data),
+                  tooltip: isArabic ? 'تطبيق مخالفة وغرامة للمندوب' : 'Issue Penalty',
+                  onPressed: () => _createPenaltyForDelegate(
+                    context,
+                    data,
+                    distinctDaysCount: distinctDaysCount,
+                  ),
                 ),
                 const SizedBox(width: 6),
                 IconButton.filledTonal(
                   icon: const Icon(Icons.phonelink_erase_rounded, size: 18),
-                  tooltip: 'فك ربط جهاز المندوب',
+                  tooltip: isArabic ? 'فك ربط جهاز المندوب' : 'Unbind Device',
                   onPressed: () => _resetDelegateDevice(
                     context,
                     data['delegateUid']?.toString() ?? '',
@@ -1697,7 +2424,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                 const Spacer(),
                 IconButton(
                   icon: Icon(Icons.delete_outline_rounded, color: colorScheme.outline, size: 19),
-                  tooltip: 'حذف السجل',
+                  tooltip: isArabic ? 'حذف السجل' : 'Delete Log',
                   onPressed: () => _deleteAuditLog(context, docId, delegateName),
                 ),
               ],

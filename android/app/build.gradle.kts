@@ -50,6 +50,15 @@ android {
             storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
             storePassword = keystoreProperties.getProperty("storePassword")
         }
+        getByName("debug") {
+            val uploadKeystoreFile = file("upload-keystore.jks")
+            if (uploadKeystoreFile.exists()) {
+                storeFile = uploadKeystoreFile
+                storePassword = "android"
+                keyAlias = "upload"
+                keyPassword = "android"
+            }
+        }
     }
 
     buildTypes {

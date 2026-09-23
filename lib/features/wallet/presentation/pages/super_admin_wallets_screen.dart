@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
 import 'package:delegate_app/features/wallet/data/models/user_wallet_model.dart';
@@ -30,6 +33,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
   String _selectedFilter = 'all'; // all, enabled, disabled, positive_balance
   late String _currentPeriodKey;
   late double _remainingCollectionsBalance;
+  List<UserWalletModel> _lastLoadedWallets = [];
 
   @override
   void initState() {
@@ -70,6 +74,11 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.download_rounded),
+              tooltip: 'تصدير تقرير المحافظ CSV',
+              onPressed: () => _exportWalletsCsv(_lastLoadedWallets),
+            ),
             IconButton(
               icon: const Icon(Icons.help_outline_rounded),
               tooltip: 'دليل استخدام المحفظة',
@@ -122,6 +131,10 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
             );
             final activeWalletsCount =
                 allWallets.where((w) => w.isWalletEnabled).length;
+            final positiveBalanceCount =
+                allWallets.where((w) => w.currentBalance > 0).length;
+            final disabledWalletsCount =
+                allWallets.where((w) => !w.isWalletEnabled).length;
             final netFreeRemaining = (_remainingCollectionsBalance - totalAllocated)
                 .clamp(0.0, double.infinity);
 
@@ -152,6 +165,8 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
               return true;
             }).toList();
 
+            _lastLoadedWallets = filteredWallets;
+
             return CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
@@ -170,7 +185,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                   ),
                 ),
 
-                // 2. Search Box and Filter Chips
+                // 2. Search Box and Filter Dropdown
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -206,18 +221,77 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                           },
                         ),
                         const SizedBox(height: 10),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _buildFilterChip('all', 'الكل (${allWallets.length})'),
-                              const SizedBox(width: 8),
-                              _buildFilterChip('enabled', 'المفعلة 🟢 ($activeWalletsCount)'),
-                              const SizedBox(width: 8),
-                              _buildFilterChip('positive_balance', 'ذات رصيد مستحق 💰'),
-                              const SizedBox(width: 8),
-                              _buildFilterChip('disabled', 'المعطلة ⚪'),
-                            ],
+                        // Dropdown Filter Menu with ONLY Google Icons (No emojis)
+                        Container(
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedFilter,
+                              isExpanded: true,
+                              dropdownColor: colorScheme.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(14),
+                              icon: Icon(Icons.arrow_drop_down_rounded, color: colorScheme.primary, size: 26),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface,
+                                fontFamily: theme.textTheme.bodyMedium?.fontFamily,
+                              ),
+                              items: [
+                                DropdownMenuItem(
+                                  value: 'all',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.format_list_bulleted_rounded, size: 18, color: colorScheme.primary),
+                                      const SizedBox(width: 10),
+                                      Text('جميع المحافظ (${allWallets.length})'),
+                                    ],
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'enabled',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.check_circle_outline_rounded, size: 18, color: colorScheme.primary),
+                                      const SizedBox(width: 10),
+                                      Text('المحافظ المفعلة ($activeWalletsCount)'),
+                                    ],
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'positive_balance',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.account_balance_wallet_outlined, size: 18, color: colorScheme.tertiary),
+                                      const SizedBox(width: 10),
+                                      Text('محافظ ذات رصيد مستحق ($positiveBalanceCount)'),
+                                    ],
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'disabled',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.pause_circle_outline_rounded, size: 18, color: colorScheme.outline),
+                                      const SizedBox(width: 10),
+                                      Text('المحافظ المعطلة ($disabledWalletsCount)'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _selectedFilter = val);
+                                }
+                              },
+                            ),
                           ),
                         ),
                       ],
@@ -225,16 +299,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                   ),
                 ),
 
-                // 3. Wallets Table Header
-                if (filteredWallets.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                      child: _buildTableHeader(colorScheme),
-                    ),
-                  ),
-
-                // 4. Wallets List
+                // 3. Wallets Cards List
                 if (filteredWallets.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
@@ -265,12 +330,12 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           final wallet = filteredWallets[index];
-                          return _buildWalletRow(
+                          return _buildWalletCard(
                             wallet: wallet,
                             theme: theme,
                             colorScheme: colorScheme,
@@ -285,25 +350,6 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
           },
         ),
       ),
-    );
-  }
-
-  Widget _buildFilterChip(String key, String label) {
-    final isSelected = _selectedFilter == key;
-    return FilterChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          fontSize: 12,
-        ),
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
-        if (selected) {
-          setState(() => _selectedFilter = key);
-        }
-      },
     );
   }
 
@@ -452,8 +498,8 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
             value,
             style: TextStyle(
               color: color,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
-              fontSize: 12.5,
             ),
           ),
         ),
@@ -461,82 +507,8 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
     );
   }
 
-  /// رأس جدول المحافظ (Table Header)
-  Widget _buildTableHeader(ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          // Column 1: User
-          Expanded(
-            flex: 5,
-            child: Row(
-              children: [
-                Icon(Icons.person_outline_rounded,
-                    size: 15, color: colorScheme.onSurfaceVariant),
-                const SizedBox(width: 5),
-                Text(
-                  'المستخدم',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Column 2: Due Balance
-          Expanded(
-            flex: 3,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.payments_rounded,
-                    size: 15, color: colorScheme.onSurfaceVariant),
-                const SizedBox(width: 4),
-                Text(
-                  'المستحق',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Column 3: Actions & M3 Switch
-          Expanded(
-            flex: 4,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Icon(Icons.tune_rounded,
-                    size: 15, color: colorScheme.onSurfaceVariant),
-                const SizedBox(width: 4),
-                Text(
-                  'التحكم / صرف',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// صف المحفظة المدمج بنظام الجدول (Compact Table Row)
-  Widget _buildWalletRow({
+  /// كارت المحفظة المتطور والمريح بصرياً (Material Design 3 Card)
+  Widget _buildWalletCard({
     required UserWalletModel wallet,
     required ThemeData theme,
     required ColorScheme colorScheme,
@@ -544,13 +516,13 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
     final hasBalance = wallet.currentBalance > 0;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
       color: wallet.isWalletEnabled
           ? colorScheme.surfaceContainerLow
           : colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: wallet.isWalletEnabled
               ? colorScheme.primary.withValues(alpha: 0.3)
@@ -558,256 +530,405 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
           width: wallet.isWalletEnabled ? 1.2 : 0.8,
         ),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => UserWalletScreen(
-                targetUserId: wallet.userId,
-                targetUserName: wallet.userName,
-                isReadOnlyView: false,
-              ),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Row(
-            children: [
-              // 1. Column 1: User (Avatar + Name + Role Badge) - NO phone number
-              Expanded(
-                flex: 5,
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundColor: wallet.isWalletEnabled
-                          ? colorScheme.primaryContainer
-                          : colorScheme.surfaceContainerHighest,
-                      foregroundColor: wallet.isWalletEnabled
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onSurfaceVariant,
-                      child: Text(
-                        wallet.userName.isNotEmpty
-                            ? wallet.userName[0].toUpperCase()
-                            : 'U',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Header: Avatar + User Info + Internal Badge + Switch + More Options
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: wallet.isWalletEnabled
+                      ? colorScheme.primaryContainer
+                      : colorScheme.surfaceContainerHighest,
+                  foregroundColor: wallet.isWalletEnabled
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.onSurfaceVariant,
+                  child: Text(
+                    wallet.userName.isNotEmpty
+                        ? wallet.userName[0].toUpperCase()
+                        : 'U',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Text(
-                            wallet.userName,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: wallet.isWalletEnabled
-                                  ? null
-                                  : colorScheme.outline,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (wallet.userRole.isNotEmpty ||
-                              wallet.companyName.isNotEmpty) ...[
-                            const SizedBox(height: 1),
-                            Text(
-                              wallet.userRole.isNotEmpty
-                                  ? wallet.userRole
-                                  : wallet.companyName,
+                          Expanded(
+                            child: Text(
+                              wallet.userName,
                               style: TextStyle(
-                                fontSize: 9.5,
-                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: wallet.isWalletEnabled ? null : colorScheme.outline,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                          ),
+                          if (wallet.isInternalOnly) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: colorScheme.tertiaryContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'حسابات داخلية',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onTertiaryContainer,
+                                ),
+                              ),
+                            ),
                           ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          if (wallet.userRole.isNotEmpty) wallet.userRole,
+                          if (wallet.companyName.isNotEmpty) wallet.companyName,
+                        ].join(' • '),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                // Switch for instant enable/disable
+                Transform.scale(
+                  scale: 0.8,
+                  child: Switch(
+                    value: wallet.isWalletEnabled,
+                    thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
+                      if (states.contains(WidgetState.selected)) {
+                        return Icon(Icons.check_rounded,
+                            size: 14, color: colorScheme.onPrimary);
+                      }
+                      return Icon(Icons.close_rounded,
+                          size: 14, color: colorScheme.outline);
+                    }),
+                    activeTrackColor: colorScheme.primary,
+                    activeThumbColor: colorScheme.onPrimary,
+                    onChanged: (val) async {
+                      HapticFeedback.mediumImpact();
+                      await _dataSource.toggleWalletStatus(
+                        userId: wallet.userId,
+                        isEnabled: val,
+                      );
+                    },
+                  ),
+                ),
+                // More Popup Menu
+                PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  tooltip: 'خيارات المحفظة',
+                  onSelected: (val) {
+                    if (val == 'edit_monthly') {
+                      _showEditMonthlyAllocationDialog(context, wallet);
+                    } else if (val == 'adjust') {
+                      _showAdjustBalanceDialog(context, wallet);
+                    } else if (val == 'renewal') {
+                      _showApplyMonthlyRenewalDialog(context, wallet);
+                    } else if (val == 'delete') {
+                      _showDeleteWalletDialog(context, wallet);
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'edit_monthly',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_calendar_rounded, size: 18),
+                          SizedBox(width: 8),
+                          Text('تعديل الاستحقاق الشهري'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'adjust',
+                      child: Row(
+                        children: [
+                          Icon(Icons.tune_rounded, size: 18),
+                          SizedBox(width: 8),
+                          Text('تعديل الرصيد (+ / -)'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'renewal',
+                      enabled: wallet.monthlyAllocation > 0,
+                      child: const Row(
+                        children: [
+                          Icon(Icons.autorenew_rounded, size: 18),
+                          SizedBox(width: 8),
+                          Text('تغذية الاستحقاق الشهري'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_forever_rounded, size: 18, color: colorScheme.error),
+                          const SizedBox(width: 8),
+                          Text('حذف المحفظة نهائياً', style: TextStyle(color: colorScheme.error, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
                   ],
                 ),
-              ),
+              ],
+            ),
 
-              // 2. Column 2: Due Balance (Google Icons + Amount) - NO long text
-              Expanded(
-                flex: 3,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: hasBalance
-                            ? colorScheme.primaryContainer.withValues(alpha: 0.5)
-                            : colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: hasBalance
-                              ? colorScheme.primary.withValues(alpha: 0.3)
-                              : Colors.transparent,
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+
+            // 2. Financial Metrics: Due Balance + Monthly Allocation + Total Paid
+            Row(
+              children: [
+                // الرصيد المستحق
+                Expanded(
+                  flex: 5,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: hasBalance
+                          ? colorScheme.primaryContainer.withValues(alpha: 0.4)
+                          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'الرصيد المستحق',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              hasBalance
-                                  ? Icons.account_balance_wallet_rounded
-                                  : Icons.wallet_rounded,
-                              size: 13,
+                        const SizedBox(height: 2),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _formatCurrency(wallet.currentBalance),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
                               color: hasBalance
                                   ? colorScheme.primary
                                   : colorScheme.outline,
                             ),
-                            const SizedBox(width: 3),
-                            Text(
-                              _formatAmountOnly(wallet.currentBalance),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12.5,
-                                color: hasBalance
-                                    ? colorScheme.primary
-                                    : colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    if (wallet.totalPaid > 0) ...[
-                      const SizedBox(height: 2),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.check_rounded,
-                                size: 10, color: colorScheme.outline),
-                            const SizedBox(width: 2),
-                            Text(
-                              _formatAmountOnly(wallet.totalPaid),
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: colorScheme.outline,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
 
-              // 3. Column 3: Actions (Payout + History + Material 3 Switch)
-              Expanded(
-                flex: 4,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Payout Google Icon
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
-                      icon: Icon(
-                        hasBalance
-                            ? Icons.price_check_rounded
-                            : Icons.check_circle_outline_rounded,
-                        size: 20,
-                        color: hasBalance
-                            ? colorScheme.primary
-                            : colorScheme.outlineVariant,
-                      ),
-                      tooltip:
-                          hasBalance ? 'تسجيل صرف / سداد' : 'تمت التسوية بالكامل',
-                      onPressed: hasBalance
-                          ? () => _showPayoutDialog(context, wallet)
-                          : null,
+                // الاستحقاق الشهري
+                Expanded(
+                  flex: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-
-                    // History Google Icon
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
-                      icon: Icon(
-                        Icons.history_rounded,
-                        size: 19,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      tooltip: 'سجل الحركات',
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => UserWalletScreen(
-                              targetUserId: wallet.userId,
-                              targetUserName: wallet.userName,
-                              isReadOnlyView: false,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'الاستحقاق الشهري',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            wallet.monthlyAllocation > 0
+                                ? _formatCurrency(wallet.monthlyAllocation)
+                                : 'غير محدد',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
-
-                    // Material 3 Switch with check/close Thumb Icons
-                    Transform.scale(
-                      scale: 0.75,
-                      child: Switch(
-                        value: wallet.isWalletEnabled,
-                        thumbIcon:
-                            WidgetStateProperty.resolveWith<Icon?>((states) {
-                          if (states.contains(WidgetState.selected)) {
-                            return Icon(Icons.check_rounded,
-                                size: 14, color: colorScheme.onPrimary);
-                          }
-                          return Icon(Icons.close_rounded,
-                              size: 14, color: colorScheme.outline);
-                        }),
-                        activeTrackColor: colorScheme.primary,
-                        activeThumbColor: colorScheme.onPrimary,
-                        inactiveThumbColor: colorScheme.outline,
-                        inactiveTrackColor:
-                            colorScheme.surfaceContainerHighest,
-                        trackOutlineColor:
-                            WidgetStateProperty.resolveWith<Color?>((states) {
-                          if (states.contains(WidgetState.selected)) {
-                            return Colors.transparent;
-                          }
-                          return colorScheme.outlineVariant;
-                        }),
-                        onChanged: (val) async {
-                          HapticFeedback.mediumImpact();
-                          await _dataSource.toggleWalletStatus(
-                            userId: wallet.userId,
-                            isEnabled: val,
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
+                const SizedBox(width: 8),
+
+                // إجمالي المنصرف
+                Expanded(
+                  flex: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'إجمالي المنصرف',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _formatCurrency(wallet.totalPaid),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.secondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            if (wallet.notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'بيان: ${wallet.notes}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colorScheme.onSurfaceVariant,
+                  fontStyle: FontStyle.italic,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
-          ),
+
+            const SizedBox(height: 12),
+
+            // 3. Action Buttons (Wrap - Overflow Free)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                // 1. زر إرسال دفعة
+                FilledButton.icon(
+                  onPressed: hasBalance
+                      ? () => _showPayoutDialog(context, wallet)
+                      : null,
+                  icon: const Icon(Icons.price_check_rounded, size: 16),
+                  label: const Text(
+                    'إرسال دفعة',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+
+                // 2. زر تحصيل / خصم
+                OutlinedButton.icon(
+                  onPressed: () => _showAdjustBalanceDialog(context, wallet),
+                  icon: const Icon(Icons.tune_rounded, size: 15),
+                  label: const Text(
+                    'تحصيل / خصم',
+                    style: TextStyle(fontSize: 11.5),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+
+                // 3. زر تغذية الاستحقاق الدوري
+                OutlinedButton.icon(
+                  onPressed: () => _showApplyMonthlyRenewalDialog(context, wallet),
+                  icon: const Icon(Icons.autorenew_rounded, size: 15),
+                  label: const Text(
+                    'تغذية الشهر',
+                    style: TextStyle(fontSize: 11.5),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+
+                // 4. زر السجل
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => UserWalletScreen(
+                          targetUserId: wallet.userId,
+                          targetUserName: wallet.userName,
+                          isReadOnlyView: false,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.history_rounded, size: 15),
+                  label: const Text(
+                    'السجل',
+                    style: TextStyle(fontSize: 11.5),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -816,12 +937,14 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
   // --- Dialog 1: Allocate Balance to User ---
   void _showAllocateBalanceDialog(BuildContext context) {
     final amountController = TextEditingController();
+    final monthlyAllocationController = TextEditingController();
     final noteController = TextEditingController(
       text: 'تخصيص مستحقات شهر ${_currentPeriodKey.replaceAll('_', '/')}',
     );
 
     Map<String, String>? selectedUser;
     bool isLoadingUsers = false;
+    bool isInternalOnly = false;
     List<Map<String, String>> searchResults = [];
 
     showModalBottomSheet(
@@ -835,109 +958,133 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
         return StatefulBuilder(
           builder: (modalContext, setModalState) {
             final colorScheme = Theme.of(modalContext).colorScheme;
-            void performSearch(String query) async {
-              if (query.trim().isEmpty) {
-                setModalState(() => searchResults = []);
-                return;
-              }
-              setModalState(() => isLoadingUsers = true);
-              final results = await _dataSource.searchUsers(query);
-              setModalState(() {
-                searchResults = results;
-                isLoadingUsers = false;
-              });
-            }
 
             return Directionality(
               textDirection: TextDirection.rtl,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 20,
-                  right: 20,
-                  top: 20,
-                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.add_card_rounded,
-                                  color: colorScheme.primary, size: 22),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'تخصيص رصيد محفظة لمستخدم',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 16,
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.add_card_rounded,
+                                    color: colorScheme.primary, size: 24),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'تخصيص رصيد مستحق لمستخدم',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close_rounded),
-                            onPressed: () => Navigator.pop(ctx),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 16),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => Navigator.pop(ctx),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 16),
 
-                      // Step 1: Select User
-                      const Text(
-                        '1. اختيار المستخدم المستهدف:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      const SizedBox(height: 6),
-                      if (selectedUser == null) ...[
+                        // Step 1: User Picker
+                        const Text(
+                          '1. اختر المستخدم المستحق:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        const SizedBox(height: 6),
                         TextField(
                           decoration: InputDecoration(
-                            hintText: 'ابحث بالاسم، الهاتف، أو الشركة...',
-                            prefixIcon: const Icon(Icons.search_rounded),
+                            hintText: 'ابحث بالاسم، رقم الهاتف، أو المسمى...',
+                            prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                            suffixIcon: isLoadingUsers
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: Center(
+                                      child: CircularProgressIndicator.adaptive(
+                                          strokeWidth: 2),
+                                    ),
+                                  )
+                                : null,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 10),
                           ),
-                          onChanged: performSearch,
+                          onChanged: (query) async {
+                            if (query.trim().length < 2) {
+                              setModalState(() => searchResults = []);
+                              return;
+                            }
+                            setModalState(() => isLoadingUsers = true);
+                            try {
+                              final users = await _dataSource.searchUsers(query);
+                              setModalState(() {
+                                searchResults = users;
+                                isLoadingUsers = false;
+                              });
+                            } catch (_) {
+                              setModalState(() => isLoadingUsers = false);
+                            }
+                          },
                         ),
-                        if (isLoadingUsers)
-                          const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: Center(
-                                child: CircularProgressIndicator.adaptive()),
-                          )
-                        else if (searchResults.isNotEmpty)
+                        if (searchResults.isNotEmpty && selectedUser == null)
                           Container(
                             constraints: const BoxConstraints(maxHeight: 180),
-                            margin: const EdgeInsets.only(top: 6),
+                            margin: const EdgeInsets.only(top: 4),
                             decoration: BoxDecoration(
-                              border: Border.all(
-                                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                              ),
+                              color: colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant
+                                    .withValues(alpha: 0.4),
+                              ),
                             ),
-                            child: ListView.separated(
+                            child: ListView.builder(
                               shrinkWrap: true,
                               itemCount: searchResults.length,
-                              separatorBuilder: (context, index) =>
-                                   Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
                               itemBuilder: (c, i) {
-                                final user = searchResults[i];
+                                final u = searchResults[i];
                                 return ListTile(
                                   dense: true,
+                                  leading: CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: colorScheme.primaryContainer,
+                                    child: Text(
+                                      u['name']!.isNotEmpty
+                                          ? u['name']![0].toUpperCase()
+                                          : 'U',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ),
                                   title: Text(
-                                    user['name'] ?? '',
+                                    u['name']!,
                                     style: const TextStyle(
-                                        fontWeight: FontWeight.bold),
+                                        fontWeight: FontWeight.bold, fontSize: 13),
                                   ),
                                   subtitle: Text(
-                                    '${user['phone']} • ${user['companyName']} (${user['role']})',
+                                    '${u['role']} • ${u['companyName']}',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: colorScheme.onSurfaceVariant,
@@ -945,7 +1092,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                                   ),
                                   onTap: () {
                                     setModalState(() {
-                                      selectedUser = user;
+                                      selectedUser = u;
                                       searchResults = [];
                                     });
                                   },
@@ -953,184 +1100,336 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                               },
                             ),
                           ),
-                      ] else ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: colorScheme.primary.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: colorScheme.primary,
-                                foregroundColor: colorScheme.onPrimary,
-                                child: Text(
-                                  selectedUser!['name']!.isNotEmpty
-                                      ? selectedUser!['name']![0]
-                                      : 'U',
+
+                        if (selectedUser != null) ...[
+                          const SizedBox(height: 8),
+                          Builder(
+                            builder: (context) {
+                              final existingWallet = _lastLoadedWallets
+                                  .where((w) => w.userId == selectedUser!['uid'])
+                                  .firstOrNull;
+
+                              if (existingWallet == null) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer
+                                        .withValues(alpha: 0.3),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: colorScheme.primary.withValues(alpha: 0.4),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.check_circle_rounded,
+                                          color: colorScheme.primary, size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'المستخدم المحدد: ${selectedUser!['name']} (${selectedUser!['role']})',
+                                          style: TextStyle(
+                                            color: colorScheme.onPrimaryContainer,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12.5,
+                                          ),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => setModalState(
+                                            () => selectedUser = null),
+                                        child: const Text('تغيير',
+                                            style: TextStyle(fontSize: 12)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+
+                              return Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.tertiaryContainer.withValues(alpha: 0.35),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: colorScheme.tertiary,
+                                    width: 1.2,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.warning_amber_rounded,
+                                            color: colorScheme.tertiary, size: 20),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'هذا المستخدم يمتلك محفظة قائمة بالفعل:',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12.5,
+                                              color: colorScheme.onTertiaryContainer,
+                                            ),
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => setModalState(
+                                              () => selectedUser = null),
+                                          child: const Text('تغيير'),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
                                     Text(
-                                      selectedUser!['name'] ?? '',
+                                      '• الرصيد القائم حالياً: ${_formatCurrency(existingWallet.currentBalance)}\n'
+                                      '• الاستحقاق الشهري: ${_formatCurrency(existingWallet.monthlyAllocation)}\n'
+                                      '• إجمالي المسدد: ${_formatCurrency(existingWallet.totalPaid)}',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: colorScheme.onSurface,
+                                        fontSize: 11.5,
+                                        color: colorScheme.onSurfaceVariant,
+                                        height: 1.4,
                                       ),
                                     ),
-                                    Text(
-                                      '${selectedUser!['phone']} • ${selectedUser!['companyName']}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: OutlinedButton.icon(
+                                            onPressed: () {
+                                              Navigator.pop(ctx);
+                                              _showEditMonthlyAllocationDialog(
+                                                  context, existingWallet);
+                                            },
+                                            icon: const Icon(Icons.edit_calendar_rounded,
+                                                size: 15),
+                                            label: const Text('تعديل الاستحقاق',
+                                                style: TextStyle(fontSize: 11)),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: OutlinedButton.icon(
+                                            onPressed: () {
+                                              Navigator.pop(ctx);
+                                              _showDeleteWalletDialog(
+                                                  context, existingWallet);
+                                            },
+                                            icon: Icon(
+                                                Icons.delete_forever_rounded,
+                                                size: 15,
+                                                color: colorScheme.error),
+                                            label: Text('حذف المحفظة',
+                                                style: TextStyle(
+                                                    fontSize: 11, color: colorScheme.error)),
+                                            style: OutlinedButton.styleFrom(
+                                              side: BorderSide(color: colorScheme.error),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  setModalState(() => selectedUser = null);
-                                },
-                                child: const Text('تغيير'),
-                              ),
-                            ],
+                              );
+                            },
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
+                        ],
+                        const SizedBox(height: 16),
 
-                      // Step 2: Amount
-                      const Text(
-                        '2. المبلغ المراد تخصيصه (ج.م):',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: amountController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: InputDecoration(
-                          hintText: 'مثال: 15000',
-                          suffixText: 'ج.م',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Step 3: Notes / Purpose
-                      const Text(
-                        '3. بيان وملاحظات التخصيص:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: noteController,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          hintText: 'اكتب سبب أو بيان التخصيص للمستخدم...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          contentPadding: const EdgeInsets.all(12),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Action Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: FilledButton.icon(
-                          onPressed: () async {
-                            if (selectedUser == null) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                    content: Text('يرجى اختيار المستخدم أولاً')),
-                              );
-                              return;
-                            }
-
-                            final amt =
-                                double.tryParse(amountController.text.trim()) ??
-                                    0.0;
-                            if (amt <= 0) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                    content: Text('يرجى إدخال مبلغ صحيح')),
-                              );
-                              return;
-                            }
-
-                            Navigator.pop(ctx);
-
-                            try {
-                              await _dataSource.allocateBalance(
-                                userId: selectedUser!['id']!,
-                                userName: selectedUser!['name']!,
-                                userPhone: selectedUser!['phone'] ?? '',
-                                userRole: selectedUser!['role'] ?? '',
-                                companyName: selectedUser!['companyName'] ?? '',
-                                companyUID: selectedUser!['companyUID'] ?? '',
-                                amount: amt,
-                                periodKey: _currentPeriodKey,
-                                note: noteController.text.trim(),
-                                adminUid: widget.adminDelegate.uid,
-                                adminName: widget.adminDelegate.fullName.isNotEmpty
-                                    ? widget.adminDelegate.fullName
-                                    : widget.adminDelegate.firstName,
-                              );
-
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'تم تخصيص ${_formatCurrency(amt)} لمحفظة ${selectedUser!['name']} بنجاح وتفعيلها في حسابه!',
-                                    style: TextStyle(
-                                      color: colorScheme.onPrimaryContainer,
-                                    ),
-                                  ),
-                                  backgroundColor: colorScheme.primaryContainer,
-                                ),
-                              );
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('حدث خطأ: $e')),
-                              );
-                            }
+                        // Step 2: Amount
+                        Builder(
+                          builder: (context) {
+                            final existing = selectedUser != null
+                                ? _lastLoadedWallets
+                                    .where((w) => w.userId == selectedUser!['uid'])
+                                    .firstOrNull
+                                : null;
+                            return Text(
+                              existing != null
+                                  ? '2. إضافة مبلغ للرصيد القائم بالمحفظة (ج.م):'
+                                  : '2. المبلغ المراد تخصيصه كرصيد أولي (ج.م):',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13),
+                            );
                           },
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
-                            shape: RoundedRectangleBorder(
+                        ),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: amountController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: InputDecoration(
+                            hintText: 'مثال: 15000',
+                            suffixText: 'ج.م',
+                            border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
                           ),
-                          icon: const Icon(Icons.check_circle_outline_rounded),
-                          label: const Text(
-                            'تأكيد وتخصيص الرصيد',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Step 3: Monthly Recurring Quota
+                        const Text(
+                          '3. الاستحقاق الشهري الدوري (ج.م) [اختياري]:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: monthlyAllocationController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: InputDecoration(
+                            hintText: 'مثال: 5000 (للتغذية الشهرية الدورية)',
+                            suffixText: 'ج.م / شهر',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Step 4: Notes / Purpose
+                        const Text(
+                          '4. بيان وملاحظات التخصيص:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: noteController,
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            hintText: 'اكتب سبب أو بيان التخصيص للمستخدم...',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Step 5: Internal Secrecy Toggle
+                        Container(
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: SwitchListTile(
+                            value: isInternalOnly,
+                            onChanged: (v) => setModalState(() => isInternalOnly = v),
+                            title: const Text(
+                              'محفظة حسابات داخلية وسرية',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            subtitle: const Text(
+                              'لن تظهر المحفظة للمستخدم في تطبيقه ولن تصله أي إشعارات (تظهر للإدارة والمحاسب فقط).',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Action Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: FilledButton.icon(
+                            onPressed: () async {
+                              if (selectedUser == null) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('يرجى اختيار المستخدم أولاً')),
+                                );
+                                return;
+                              }
+
+                              final amt =
+                                  double.tryParse(amountController.text.trim()) ??
+                                      0.0;
+                              final monthlyAmt = double.tryParse(
+                                      monthlyAllocationController.text.trim()) ??
+                                  0.0;
+
+                              if (amt <= 0) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                      content:
+                                          Text('يرجى إدخال مبلغ صحيح أكبر من صفر')),
+                                );
+                                return;
+                              }
+
+                              Navigator.pop(ctx);
+
+                              try {
+                                await _dataSource.allocateBalance(
+                                  userId: selectedUser!['uid']!,
+                                  userName: selectedUser!['name'] ?? '',
+                                  userPhone: selectedUser!['phone'] ?? '',
+                                  userRole: selectedUser!['role'] ?? '',
+                                  companyName: selectedUser!['companyName'] ?? '',
+                                  companyUID: selectedUser!['companyUID'] ?? '',
+                                  amount: amt,
+                                  periodKey: _currentPeriodKey,
+                                  note: noteController.text.trim(),
+                                  adminUid: widget.adminDelegate.uid,
+                                  adminName: widget.adminDelegate.fullName.isNotEmpty
+                                      ? widget.adminDelegate.fullName
+                                      : widget.adminDelegate.firstName,
+                                  monthlyAllocation: monthlyAmt > 0 ? monthlyAmt : null,
+                                  isInternalOnly: isInternalOnly,
+                                );
+
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'تم تخصيص ${_formatCurrency(amt)} لمحفظة ${selectedUser!['name']} بنجاح!',
+                                      style: TextStyle(
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                    backgroundColor: colorScheme.primaryContainer,
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('حدث خطأ: $e')),
+                                );
+                              }
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: colorScheme.primary,
+                              foregroundColor: colorScheme.onPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              elevation: 2,
+                            ),
+                            icon: const Icon(Icons.check_circle_outline_rounded),
+                            label: const Text(
+                              'تأكيد وتخصيص الرصيد',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1154,6 +1453,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1163,13 +1463,596 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
             final colorScheme = Theme.of(modalContext).colorScheme;
             return Directionality(
               textDirection: TextDirection.rtl,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 20,
-                  right: 20,
-                  top: 20,
-                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 16,
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.payments_rounded,
+                                    color: colorScheme.primary, size: 22),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'تسجيل صرف / تسوية مستحقات',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => Navigator.pop(ctx),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 16),
+
+                        // User Info
+                        Text(
+                          'المستفيد: ${wallet.userName}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'الرصيد المستحق الحالي: ${_formatCurrency(wallet.currentBalance)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Quick Toggle: Full or Partial
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Center(child: Text('سداد كامل (تصفير)')),
+                                selected: isFullSettlement,
+                                selectedColor: colorScheme.primaryContainer,
+                                onSelected: (val) {
+                                  setModalState(() {
+                                    isFullSettlement = true;
+                                    payoutAmountController.text =
+                                        wallet.currentBalance.toStringAsFixed(2);
+                                    noteController.text =
+                                        'تسوية وصرف مستحقات نقدية (تم التحصيل بالكامل)';
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Center(child: Text('سداد جزئي')),
+                                selected: !isFullSettlement,
+                                selectedColor: colorScheme.primaryContainer,
+                                onSelected: (val) {
+                                  setModalState(() {
+                                    isFullSettlement = false;
+                                    payoutAmountController.text = '';
+                                    noteController.text =
+                                        'تسوية وصرف جزئي من المستحقات';
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Payout Amount Field
+                        TextField(
+                          controller: payoutAmountController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          enabled: !isFullSettlement,
+                          decoration: InputDecoration(
+                            labelText: 'المبلغ المسدد المنصرف',
+                            suffixText: 'ج.م',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Note Field
+                        TextField(
+                          controller: noteController,
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            labelText: 'بيان وسند الصرف',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Confirm Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: FilledButton.icon(
+                            onPressed: () async {
+                              final amt = double.tryParse(
+                                      payoutAmountController.text.trim()) ??
+                                  0.0;
+                              if (amt <= 0 || amt > wallet.currentBalance) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'المبلغ يجب أن يكون بين 1 و ${_formatAmountOnly(wallet.currentBalance)} ج.م',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              Navigator.pop(ctx);
+
+                              try {
+                                await _dataSource.recordPayout(
+                                  userId: wallet.userId,
+                                  amount: amt,
+                                  note: noteController.text.trim(),
+                                  adminUid: widget.adminDelegate.uid,
+                                  adminName: widget.adminDelegate.fullName.isNotEmpty
+                                      ? widget.adminDelegate.fullName
+                                      : widget.adminDelegate.firstName,
+                                );
+
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'تم تسجيل صرف ${_formatCurrency(amt)} وتحديث رصيد المحفظة بنجاح!',
+                                      style: TextStyle(
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                    backgroundColor: colorScheme.primaryContainer,
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('حدث خطأ: $e')),
+                                );
+                              }
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: colorScheme.primary,
+                              foregroundColor: colorScheme.onPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              elevation: 2,
+                            ),
+                            icon: const Icon(Icons.check_circle_outline_rounded),
+                            label: const Text(
+                              'تأكيد السداد والخصم',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
                 ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- Dialog 3: Adjust Balance (Add / Deduct) with Theme Derived Colors ---
+  void _showAdjustBalanceDialog(BuildContext context, UserWalletModel wallet) {
+    bool isAddition = true;
+    final amountController = TextEditingController();
+    final reasonController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final colorScheme = Theme.of(modalCtx).colorScheme;
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 16,
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.tune_rounded, color: colorScheme.primary, size: 22),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'تعديل رصيد - ${wallet.userName}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => Navigator.pop(ctx),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('الرصيد الحالي بالمحفظة:', style: TextStyle(fontSize: 12)),
+                              Text(
+                                _formatCurrency(wallet.currentBalance),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        const Text('نوع التعديل:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ChoiceChip(
+                                avatar: Icon(
+                                  Icons.add_circle_outline_rounded,
+                                  size: 18,
+                                  color: isAddition ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+                                ),
+                                label: Center(
+                                  child: Text(
+                                    'إضافة للرصيد (+)',
+                                    style: TextStyle(
+                                      fontWeight: isAddition ? FontWeight.bold : FontWeight.normal,
+                                      color: isAddition ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                selected: isAddition,
+                                selectedColor: colorScheme.primaryContainer,
+                                backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                                side: BorderSide(
+                                  color: isAddition
+                                      ? colorScheme.primary
+                                      : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                                ),
+                                onSelected: (v) => setModalState(() => isAddition = true),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ChoiceChip(
+                                avatar: Icon(
+                                  Icons.remove_circle_outline_rounded,
+                                  size: 18,
+                                  color: !isAddition ? colorScheme.onErrorContainer : colorScheme.onSurfaceVariant,
+                                ),
+                                label: Center(
+                                  child: Text(
+                                    'خصم / إنقاص (-)',
+                                    style: TextStyle(
+                                      fontWeight: !isAddition ? FontWeight.bold : FontWeight.normal,
+                                      color: !isAddition ? colorScheme.onErrorContainer : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                selected: !isAddition,
+                                selectedColor: colorScheme.errorContainer,
+                                backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                                side: BorderSide(
+                                  color: !isAddition
+                                      ? colorScheme.error
+                                      : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                                ),
+                                onSelected: (v) => setModalState(() => isAddition = false),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        const Text('المبلغ (ج.م):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: amountController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            hintText: 'مثال: 1000',
+                            suffixText: 'ج.م',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('سبب وبيان التعديل (إلزامي):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: reasonController,
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            hintText: 'اكتب سبب التعديل ليتم توثيقه في السجل المالي...',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: FilledButton.icon(
+                            onPressed: () async {
+                              final amt = double.tryParse(amountController.text.trim()) ?? 0.0;
+                              final reason = reasonController.text.trim();
+                              if (amt <= 0) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(content: Text('يرجى إدخال مبلغ صحيح')),
+                                );
+                                return;
+                              }
+                              if (reason.isEmpty) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(content: Text('يرجى كتابة سبب التعديل')),
+                                );
+                                return;
+                              }
+                              if (!isAddition && amt > wallet.currentBalance) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(content: Text('مبلغ الخصم أكبر من الرصيد الحالي للمحفظة')),
+                                );
+                                return;
+                              }
+
+                              Navigator.pop(ctx);
+                              final delta = isAddition ? amt : -amt;
+                              try {
+                                await _dataSource.adjustBalance(
+                                  userId: wallet.userId,
+                                  deltaAmount: delta,
+                                  reason: reason,
+                                  adminUid: widget.adminDelegate.uid,
+                                  adminName: widget.adminDelegate.fullName.isNotEmpty
+                                      ? widget.adminDelegate.fullName
+                                      : widget.adminDelegate.firstName,
+                                );
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('تم تعديل رصيد ${wallet.userName} بمقدار ${_formatCurrency(amt)} بنجاح!'),
+                                    backgroundColor: colorScheme.primaryContainer,
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('حدث خطأ: $e')),
+                                );
+                              }
+                            },
+                            icon: Icon(
+                              isAddition ? Icons.check_circle_outline_rounded : Icons.remove_circle_outline_rounded,
+                              size: 20,
+                            ),
+                            label: Text(
+                              isAddition ? 'تأكيد إضافة الرصيد' : 'تأكيد خصم الرصيد',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: isAddition ? colorScheme.primary : colorScheme.error,
+                              foregroundColor: isAddition ? colorScheme.onPrimary : colorScheme.onError,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              elevation: 2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- Dialog 4: Apply Monthly Renewal ---
+  void _showApplyMonthlyRenewalDialog(BuildContext context, UserWalletModel wallet) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final amountController = TextEditingController(
+      text: wallet.monthlyAllocation > 0 ? wallet.monthlyAllocation.toStringAsFixed(2) : '',
+    );
+    final noteController = TextEditingController(
+      text: 'تغذية الاستحقاق الشهري الدوري (${_currentPeriodKey.replaceAll('_', '/')})',
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.autorenew_rounded, color: colorScheme.primary, size: 24),
+              const SizedBox(width: 8),
+              const Text('تغذية الاستحقاق الشهري'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'المستفيد: ${wallet.userName}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'المبلغ المقرر إضافته للمحفظة',
+                  hintText: 'مثال: 5000',
+                  suffixText: 'ج.م',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                decoration: InputDecoration(
+                  labelText: 'البيان وملاحظات الإضافة',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                final amt = double.tryParse(amountController.text.trim()) ?? 0.0;
+                if (amt <= 0) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('يرجى إدخال مبلغ صحيح أكبر من صفر')),
+                  );
+                  return;
+                }
+
+                Navigator.pop(ctx);
+                try {
+                  await _dataSource.applyMonthlyRenewal(
+                    userId: wallet.userId,
+                    periodKey: _currentPeriodKey,
+                    customAmount: amt,
+                    notes: noteController.text.trim(),
+                    adminUid: widget.adminDelegate.uid,
+                    adminName: widget.adminDelegate.fullName.isNotEmpty
+                        ? widget.adminDelegate.fullName
+                        : widget.adminDelegate.firstName,
+                  );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('تمت تغذية محفظة ${wallet.userName} بمبلغ ${_formatCurrency(amt)} بنجاح!'),
+                      backgroundColor: colorScheme.primaryContainer,
+                    ),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('حدث خطأ: $e')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('تأكيد الإضافة'),
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Dialog 5: Edit Monthly Allocation ---
+  void _showEditMonthlyAllocationDialog(BuildContext context, UserWalletModel wallet) {
+    final allocationController = TextEditingController(
+      text: wallet.monthlyAllocation > 0 ? wallet.monthlyAllocation.toStringAsFixed(2) : '',
+    );
+    final notesController = TextEditingController(text: wallet.notes);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final colorScheme = Theme.of(ctx).colorScheme;
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1179,13 +2062,11 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.payments_rounded,
-                                color: colorScheme.primary, size: 22),
+                            Icon(Icons.edit_calendar_rounded, color: colorScheme.primary, size: 22),
                             const SizedBox(width: 8),
-                            const Text(
-                              'تسجيل صرف / تسوية مستحقات',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16),
+                            Text(
+                              'تعديل الاستحقاق الشهري - ${wallet.userName}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                             ),
                           ],
                         ),
@@ -1196,135 +2077,63 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                       ],
                     ),
                     const Divider(height: 16),
-
-                    // User Info
-                    Text(
-                      'المستفيد: ${wallet.userName}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 14),
+                    const Text(
+                      'قيمة الاستحقاق الشهري الدوري (ج.م):',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'الرصيد المستحق الحالي: ${_formatCurrency(wallet.currentBalance)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Quick Toggle: Full or Partial
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Center(child: Text('سداد كامل (تصفير)')),
-                            selected: isFullSettlement,
-                            onSelected: (val) {
-                              setModalState(() {
-                                isFullSettlement = true;
-                                payoutAmountController.text =
-                                    wallet.currentBalance.toStringAsFixed(2);
-                                noteController.text =
-                                    'تسوية وصرف مستحقات نقدية (تم التحصيل بالكامل)';
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Center(child: Text('سداد جزئي')),
-                            selected: !isFullSettlement,
-                            onSelected: (val) {
-                              setModalState(() {
-                                isFullSettlement = false;
-                                payoutAmountController.text = '';
-                                noteController.text =
-                                    'تسوية وصرف جزئي من المستحقات';
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Payout Amount Field
+                    const SizedBox(height: 6),
                     TextField(
-                      controller: payoutAmountController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
-                      enabled: !isFullSettlement,
+                      controller: allocationController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
-                        labelText: 'المبلغ المسدد المنصرف',
-                        suffixText: 'ج.م',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
+                        hintText: 'مثال: 5000',
+                        suffixText: 'ج.م / شهر',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                     ),
                     const SizedBox(height: 12),
-
-                    // Notes Field
+                    const Text(
+                      'ملاحظات / طبيعة الاستحقاق:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
                     TextField(
-                      controller: noteController,
+                      controller: notesController,
                       maxLines: 2,
                       decoration: InputDecoration(
-                        labelText: 'بيان وسند الصرف',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        hintText: 'مثال: بدل انتقال ومصاريف تشغيل شهرية...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         contentPadding: const EdgeInsets.all(12),
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Confirm Button
                     SizedBox(
                       width: double.infinity,
-                      height: 48,
+                      height: 52,
                       child: FilledButton.icon(
                         onPressed: () async {
-                          final amt = double.tryParse(
-                                  payoutAmountController.text.trim()) ??
-                              0.0;
-                          if (amt <= 0 || amt > wallet.currentBalance) {
+                          final val = double.tryParse(allocationController.text.trim()) ?? 0.0;
+                          if (val < 0) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'المبلغ يجب أن يكون بين 1 و ${_formatAmountOnly(wallet.currentBalance)} ج.م',
-                                ),
-                              ),
+                              const SnackBar(content: Text('يرجى إدخال قيمة صحيحة')),
                             );
                             return;
                           }
 
                           Navigator.pop(ctx);
-
                           try {
-                            await _dataSource.recordPayout(
+                            await _dataSource.updateMonthlyAllocation(
                               userId: wallet.userId,
-                              amount: amt,
-                              note: noteController.text.trim(),
+                              monthlyAllocation: val,
+                              notes: notesController.text.trim(),
                               adminUid: widget.adminDelegate.uid,
-                              adminName: widget.adminDelegate.fullName.isNotEmpty
-                                  ? widget.adminDelegate.fullName
-                                  : widget.adminDelegate.firstName,
                             );
 
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(
-                                  'تم تسجيل صرف ${_formatCurrency(amt)} وتحديث رصيد المحفظة بنجاح!',
-                                  style: TextStyle(
-                                    color: colorScheme.onPrimaryContainer,
-                                  ),
-                                ),
+                                content: Text('تم تحديث الاستحقاق الشهري لـ ${wallet.userName} بنجاح!'),
                                 backgroundColor: colorScheme.primaryContainer,
                               ),
                             );
@@ -1335,31 +2144,142 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                             );
                           }
                         },
+                        icon: const Icon(Icons.check_rounded),
+                        label: const Text('حفظ التعديل', style: TextStyle(fontWeight: FontWeight.bold)),
                         style: FilledButton.styleFrom(
                           backgroundColor: colorScheme.primary,
                           foregroundColor: colorScheme.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: const Icon(Icons.check_circle_outline_rounded),
-                        label: const Text(
-                          'تأكيد السداد والخصم',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          elevation: 2,
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
+  }
+
+  // --- Dialog 6: Delete Wallet Permanently ---
+  void _showDeleteWalletDialog(BuildContext context, UserWalletModel wallet) {
+    final colorScheme = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.delete_forever_rounded, color: colorScheme.error, size: 26),
+              const SizedBox(width: 8),
+              const Text('تأكيد حذف المحفظة نهائياً'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'هل أنت متأكد من حذف محفظة المستفيد "${wallet.userName}" نهائياً؟',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '• الرصيد المتبقي الحالي: ${_formatCurrency(wallet.currentBalance)}\n'
+                '• إجمالي المستحق: ${_formatCurrency(wallet.totalAllocated)}\n'
+                '• سيتم مسح كافة سجلات الحركات المرتبطة بهذه المحفظة نهائياً من النظام ولا يمكن التراجع عن هذا الإجراء.',
+                style: TextStyle(fontSize: 12, color: colorScheme.error, height: 1.5),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  await _dataSource.deleteWallet(userId: wallet.userId);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('تم حذف محفظة ${wallet.userName} بنجاح'),
+                      backgroundColor: colorScheme.error,
+                    ),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('حدث خطأ أثناء الحذف: $e')),
+                  );
+                }
+              },
+              icon: Icon(Icons.delete_forever_rounded),
+              label: Text('حذف نهائي'),
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Export Wallets CSV ---
+  Future<void> _exportWalletsCsv(List<UserWalletModel> wallets) async {
+    if (wallets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا توجد بيانات محافظ للتصدير')),
+      );
+      return;
+    }
+
+    try {
+      final csvHeader = '\uFEFFاسم المستفيد,المسمى الوظيفي,الشركة,رقم الهاتف,الرصيد الحالي,إجمالي المستحق,إجمالي المنصرف,الاستحقاق الشهري,حالة المحفظة,ملاحظات\n';
+      final csvRows = wallets.map((w) {
+        final name = w.userName.replaceAll(',', ' ');
+        final role = w.userRole.replaceAll(',', ' ');
+        final company = w.companyName.replaceAll(',', ' ');
+        final phone = w.userPhone;
+        final currentBal = w.currentBalance.toStringAsFixed(2);
+        final totalAlloc = w.totalAllocated.toStringAsFixed(2);
+        final totalPaid = w.totalPaid.toStringAsFixed(2);
+        final monthly = w.monthlyAllocation.toStringAsFixed(2);
+        final status = w.isWalletEnabled ? 'مفعلة' : 'معطلة';
+        final notes = w.notes.replaceAll(',', ' ').replaceAll('\n', ' ');
+        return '$name,$role,$company,$phone,$currentBal,$totalAlloc,$totalPaid,$monthly,$status,$notes';
+      }).join('\n');
+
+      final csvContent = '$csvHeader$csvRows';
+      final directory = await getTemporaryDirectory();
+      final nowStr = DateFormat('yyyy_MM_dd_HHmm').format(DateTime.now());
+      final file = File('${directory.path}/wallets_report_$nowStr.csv');
+      await file.writeAsString(csvContent);
+
+      if (mounted) {
+        // ignore: deprecated_member_use
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'تقرير كشف حسابات ومحافظ المستحقات المالية',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ أثناء تصدير الملف: $e')),
+        );
+      }
+    }
   }
 
   void _showInfoDialog() {
@@ -1374,7 +2294,12 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
               children: [
                 Icon(Icons.info_outline_rounded, color: colorScheme.primary),
                 const SizedBox(width: 8),
-                const Text('عن نظام المحافظ والمستحقات'),
+                const Expanded(
+                  child: Text(
+                    'عن نظام المحافظ والمستحقات',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ],
             ),
             content: const SingleChildScrollView(

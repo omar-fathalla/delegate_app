@@ -69,6 +69,8 @@ class _SplashScreenState extends State<SplashScreen>
               delegate.role == UserRole.technicalSupport ||
               delegate.role == UserRole.branchesMarketingManager) {
             context.go('/admin/home', extra: delegate);
+          } else if (delegate.role == UserRole.accountant) {
+            context.go('/accountant/home', extra: delegate);
           } else if (delegate.role == UserRole.marketing ||
               delegate.role == UserRole.marketingPromotion) {
             context.go('/marketing/home', extra: delegate);
