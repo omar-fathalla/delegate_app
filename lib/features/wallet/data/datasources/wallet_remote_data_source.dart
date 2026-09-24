@@ -469,67 +469,268 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
     });
   }
 
+  String _normalizePhone(String phone) {
+    const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    String normalized = phone.trim();
+    normalized = normalized.replaceAll(RegExp(r'[^\d+٠-٩]'), '');
+    for (int i = 0; i < arabic.length; i++) {
+      normalized = normalized.replaceAll(arabic[i], english[i]);
+    }
+    if (normalized.startsWith('+20')) {
+      normalized = '0${normalized.substring(3)}';
+    } else if (normalized.startsWith('+2')) {
+      normalized = normalized.substring(2);
+    } else if (normalized.startsWith('0020')) {
+      normalized = '0${normalized.substring(4)}';
+    } else if (normalized.startsWith('002')) {
+      normalized = normalized.substring(3);
+    }
+    if (normalized.length == 10 && RegExp(r'^1[0125]').hasMatch(normalized)) {
+      normalized = '0$normalized';
+    }
+    return normalized;
+  }
+
   @override
   Future<List<Map<String, String>>> searchUsers(String query) async {
-    final cleanQuery = query.trim().toLowerCase();
+    final cleanQuery = query.trim();
+    if (cleanQuery.isEmpty) return [];
+
     final resultsMap = <String, Map<String, String>>{};
 
-    try {
-      // 1. Query top-level users collection
-      final usersSnap = await _firestore.collection('users').limit(100).get();
-      for (var doc in usersSnap.docs) {
-        final d = doc.data();
-        final name = (d['displayName'] ?? d['fullName'] ?? d['name'] ?? '').toString();
-        final phone = (d['phoneNumber'] ?? d['phone'] ?? '').toString();
-        final role = (d['role'] ?? '').toString();
-        final company = (d['companyName'] ?? '').toString();
-        final companyId = (d['companyUID'] ?? '').toString();
+    // إضافة مستخدم للنتائج مع ضمان توفير كل من id و uid
+    void addUserDoc(String id, Map<String, dynamic> data, {String defaultRole = ''}) {
+      if (resultsMap.containsKey(id)) return;
+      final name = (data['displayName'] ??
+              data['fullName'] ??
+              data['name'] ??
+              '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}')
+          .toString()
+          .trim();
+      final phone = (data['phoneNumber'] ?? data['phone'] ?? data['mobile'] ?? '').toString().trim();
+      final role = (data['role'] ?? data['position'] ?? defaultRole).toString().trim();
+      final company = (data['companyName'] ?? data['organizationName'] ?? '').toString().trim();
+      final companyId = (data['companyUID'] ?? data['organizationUID'] ?? '').toString().trim();
 
-        if (cleanQuery.isEmpty ||
-            name.toLowerCase().contains(cleanQuery) ||
-            phone.contains(cleanQuery) ||
-            company.toLowerCase().contains(cleanQuery) ||
-            role.toLowerCase().contains(cleanQuery)) {
-          resultsMap[doc.id] = {
-            'id': doc.id,
-            'name': name.isNotEmpty ? name : doc.id,
-            'phone': phone,
-            'role': role,
-            'companyName': company,
-            'companyUID': companyId,
-          };
+      resultsMap[id] = {
+        'id': id,
+        'uid': id,
+        'name': name.isNotEmpty ? name : (phone.isNotEmpty ? phone : id),
+        'phone': phone,
+        'role': role.isNotEmpty ? role : 'مستخدم',
+        'companyName': company,
+        'companyUID': companyId,
+      };
+    }
+
+    try {
+      // ── الاستراتيجية 1: البحث المباشر والفوري برقم الهاتف ──
+      final digits = cleanQuery.replaceAll(RegExp(r'[^\d]'), '');
+      if (digits.length >= 3) {
+        final normalizedPhone = _normalizePhone(cleanQuery);
+        final normalizedDigits = normalizedPhone.replaceAll(RegExp(r'[^\d]'), '');
+
+        String core10 = '';
+        if (normalizedDigits.length == 10 && RegExp(r'^1[0125]').hasMatch(normalizedDigits)) {
+          core10 = normalizedDigits;
+        } else if (normalizedDigits.length == 11 && normalizedDigits.startsWith('0')) {
+          core10 = normalizedDigits.substring(1);
+        } else if (normalizedDigits.length >= 12 && normalizedDigits.startsWith('20')) {
+          core10 = normalizedDigits.substring(2);
+        } else if (normalizedDigits.length >= 14 && normalizedDigits.startsWith('0020')) {
+          core10 = normalizedDigits.substring(4);
+        } else if (digits.length >= 10) {
+          final stripped = digits.replaceFirst(RegExp(r'^(0020|20|\+20|\+2|0)'), '');
+          if (stripped.length == 10) {
+            core10 = stripped;
+          }
+        }
+
+        final phoneCandidates = <String>{
+          cleanQuery,
+          digits,
+          normalizedPhone,
+          normalizedDigits,
+        };
+
+        if (core10.isNotEmpty) {
+          phoneCandidates.addAll([
+            core10,
+            '0$core10',
+            '+20$core10',
+            '20$core10',
+            '0020$core10',
+            '+2$core10',
+          ]);
+        }
+
+        final phoneFutures = <Future>[];
+        for (final p in phoneCandidates) {
+          if (p.isEmpty) continue;
+
+          // 1. users: phoneNumber
+          phoneFutures.add(_firestore
+              .collection('users')
+              .where('phoneNumber', isEqualTo: p)
+              .limit(5)
+              .get()
+              .then((snap) {
+            for (var doc in snap.docs) {
+              addUserDoc(doc.id, doc.data());
+            }
+          }).catchError((_) => null));
+
+          // 2. users: phone
+          phoneFutures.add(_firestore
+              .collection('users')
+              .where('phone', isEqualTo: p)
+              .limit(5)
+              .get()
+              .then((snap) {
+            for (var doc in snap.docs) {
+              addUserDoc(doc.id, doc.data());
+            }
+          }).catchError((_) => null));
+
+          // 3. delegates (collectionGroup): phoneNumber
+          phoneFutures.add(_firestore
+              .collectionGroup('delegates')
+              .where('phoneNumber', isEqualTo: p)
+              .limit(5)
+              .get()
+              .then((snap) {
+            for (var doc in snap.docs) {
+              addUserDoc(doc.id, doc.data(), defaultRole: 'delegate');
+            }
+          }).catchError((_) => null));
+
+          // 4. delegates (collectionGroup): phone
+          phoneFutures.add(_firestore
+              .collectionGroup('delegates')
+              .where('phone', isEqualTo: p)
+              .limit(5)
+              .get()
+              .then((snap) {
+            for (var doc in snap.docs) {
+              addUserDoc(doc.id, doc.data(), defaultRole: 'delegate');
+            }
+          }).catchError((_) => null));
+
+          // 5. top-level delegates: phoneNumber
+          phoneFutures.add(_firestore
+              .collection('delegates')
+              .where('phoneNumber', isEqualTo: p)
+              .limit(5)
+              .get()
+              .then((snap) {
+            for (var doc in snap.docs) {
+              addUserDoc(doc.id, doc.data(), defaultRole: 'delegate');
+            }
+          }).catchError((_) => null));
+
+          // 6. top-level delegates: phone
+          phoneFutures.add(_firestore
+              .collection('delegates')
+              .where('phone', isEqualTo: p)
+              .limit(5)
+              .get()
+              .then((snap) {
+            for (var doc in snap.docs) {
+              addUserDoc(doc.id, doc.data(), defaultRole: 'delegate');
+            }
+          }).catchError((_) => null));
+        }
+
+        await Future.wait(phoneFutures);
+      }
+
+      // ── الاستراتيجية 2: البحث ببادئة الاسم إذا كان الإدخال نصياً ──
+      if (resultsMap.length < 20 && cleanQuery.length >= 2) {
+        final queryEnd = '$cleanQuery\uf8ff';
+
+        final nameQueries = [
+          _firestore
+              .collection('users')
+              .where('displayName', isGreaterThanOrEqualTo: cleanQuery)
+              .where('displayName', isLessThanOrEqualTo: queryEnd)
+              .limit(10)
+              .get(),
+          _firestore
+              .collection('users')
+              .where('fullName', isGreaterThanOrEqualTo: cleanQuery)
+              .where('fullName', isLessThanOrEqualTo: queryEnd)
+              .limit(10)
+              .get(),
+          _firestore
+              .collection('users')
+              .where('name', isGreaterThanOrEqualTo: cleanQuery)
+              .where('name', isLessThanOrEqualTo: queryEnd)
+              .limit(10)
+              .get(),
+          _firestore
+              .collectionGroup('delegates')
+              .where('fullName', isGreaterThanOrEqualTo: cleanQuery)
+              .where('fullName', isLessThanOrEqualTo: queryEnd)
+              .limit(10)
+              .get(),
+          _firestore
+              .collectionGroup('delegates')
+              .where('firstName', isGreaterThanOrEqualTo: cleanQuery)
+              .where('firstName', isLessThanOrEqualTo: queryEnd)
+              .limit(10)
+              .get(),
+        ];
+
+        final responses = await Future.wait(
+          nameQueries.map((q) => q.catchError((_) => null as dynamic)),
+        );
+        for (final dynamic resp in responses) {
+          if (resp is QuerySnapshot<Map<String, dynamic>>) {
+            for (var doc in resp.docs) {
+              addUserDoc(doc.id, doc.data());
+            }
+          }
         }
       }
 
-      // 2. Query collectionGroup delegates if needed
-      if (resultsMap.length < 50) {
-        final delSnap = await _firestore.collectionGroup('delegates').limit(100).get();
-        for (var doc in delSnap.docs) {
+      // ── الاستراتيجية 3: بحث احتياطي شامل في الذاكرة ──
+      if (resultsMap.isEmpty) {
+        final lowerQuery = cleanQuery.toLowerCase();
+        final usersSnap = await _firestore.collection('users').limit(150).get();
+        for (var doc in usersSnap.docs) {
           final d = doc.data();
-          final name = (d['displayName'] ?? d['fullName'] ?? d['name'] ?? '').toString();
+          final name = (d['displayName'] ?? d['fullName'] ?? d['name'] ?? '').toString().toLowerCase();
           final phone = (d['phoneNumber'] ?? d['phone'] ?? '').toString();
-          final company = (d['companyName'] ?? '').toString();
-          final companyId = (d['companyUID'] ?? '').toString();
+          final role = (d['role'] ?? '').toString().toLowerCase();
+          final company = (d['companyName'] ?? '').toString().toLowerCase();
 
-          if (cleanQuery.isEmpty ||
-              name.toLowerCase().contains(cleanQuery) ||
+          if (name.contains(lowerQuery) ||
               phone.contains(cleanQuery) ||
-              company.toLowerCase().contains(cleanQuery)) {
-            if (!resultsMap.containsKey(doc.id)) {
-              resultsMap[doc.id] = {
-                'id': doc.id,
-                'name': name.isNotEmpty ? name : doc.id,
-                'phone': phone,
-                'role': 'delegate',
-                'companyName': company,
-                'companyUID': companyId,
-              };
+              role.contains(lowerQuery) ||
+              company.contains(lowerQuery)) {
+            addUserDoc(doc.id, d);
+          }
+        }
+
+        if (resultsMap.length < 20) {
+          final delSnap = await _firestore.collectionGroup('delegates').limit(150).get();
+          for (var doc in delSnap.docs) {
+            final d = doc.data();
+            final name = (d['displayName'] ?? d['fullName'] ?? d['name'] ?? '').toString().toLowerCase();
+            final phone = (d['phoneNumber'] ?? d['phone'] ?? '').toString();
+            final company = (d['companyName'] ?? '').toString().toLowerCase();
+
+            if (name.contains(lowerQuery) ||
+                phone.contains(cleanQuery) ||
+                company.contains(lowerQuery)) {
+              addUserDoc(doc.id, d, defaultRole: 'delegate');
             }
           }
         }
       }
     } catch (e) {
-      // Ignore query errors
+      debugPrint('Error searching users in wallet datasource: $e');
     }
 
     final list = resultsMap.values.toList();

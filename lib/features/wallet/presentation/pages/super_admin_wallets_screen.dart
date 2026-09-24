@@ -8,6 +8,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
 import 'package:delegate_app/features/wallet/data/models/user_wallet_model.dart';
 import 'user_wallet_screen.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 
 class SuperAdminWalletsScreen extends StatefulWidget {
   final Delegate adminDelegate;
@@ -943,8 +944,11 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
     );
 
     Map<String, String>? selectedUser;
+    final userSearchController = TextEditingController();
     bool isLoadingUsers = false;
     bool isInternalOnly = false;
+    bool isSubmitting = false;
+    bool hasSearched = false;
     List<Map<String, String>> searchResults = [];
 
     showModalBottomSheet(
@@ -1008,6 +1012,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                         ),
                         const SizedBox(height: 6),
                         TextField(
+                          controller: userSearchController,
                           decoration: InputDecoration(
                             hintText: 'ابحث بالاسم، رقم الهاتف، أو المسمى...',
                             prefixIcon: const Icon(Icons.search_rounded, size: 20),
@@ -1020,7 +1025,19 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                                           strokeWidth: 2),
                                     ),
                                   )
-                                : null,
+                                : (userSearchController.text.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear_rounded, size: 18),
+                                        onPressed: () {
+                                          setModalState(() {
+                                            userSearchController.clear();
+                                            searchResults = [];
+                                            selectedUser = null;
+                                            hasSearched = false;
+                                          });
+                                        },
+                                      )
+                                    : null),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -1029,10 +1046,16 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                           ),
                           onChanged: (query) async {
                             if (query.trim().length < 2) {
-                              setModalState(() => searchResults = []);
+                              setModalState(() {
+                                searchResults = [];
+                                hasSearched = false;
+                              });
                               return;
                             }
-                            setModalState(() => isLoadingUsers = true);
+                            setModalState(() {
+                              isLoadingUsers = true;
+                              hasSearched = true;
+                            });
                             try {
                               final users = await _dataSource.searchUsers(query);
                               setModalState(() {
@@ -1044,6 +1067,27 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                             }
                           },
                         ),
+                        if (hasSearched &&
+                            searchResults.isEmpty &&
+                            !isLoadingUsers &&
+                            userSearchController.text.trim().length >= 2 &&
+                            selectedUser == null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 4),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline_rounded,
+                                    size: 16, color: colorScheme.onSurfaceVariant),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'لم يتم العثور على مستخدم مطابق لهذا الرقم أو الاسم',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: colorScheme.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          ),
                         if (searchResults.isNotEmpty && selectedUser == null)
                           Container(
                             constraints: const BoxConstraints(maxHeight: 180),
@@ -1093,6 +1137,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                                   onTap: () {
                                     setModalState(() {
                                       selectedUser = u;
+                                      userSearchController.text = u['name'] ?? '';
                                       searchResults = [];
                                     });
                                   },
@@ -1343,87 +1388,121 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                         SizedBox(
                           width: double.infinity,
                           height: 52,
-                          child: FilledButton.icon(
-                            onPressed: () async {
-                              if (selectedUser == null) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('يرجى اختيار المستخدم أولاً')),
-                                );
-                                return;
-                              }
+                          child: FilledButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () async {
+                                    if (selectedUser == null) {
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        const SnackBar(
+                                            content: Text('يرجى اختيار المستخدم أولاً')),
+                                      );
+                                      return;
+                                    }
 
-                              final amt =
-                                  double.tryParse(amountController.text.trim()) ??
-                                      0.0;
-                              final monthlyAmt = double.tryParse(
-                                      monthlyAllocationController.text.trim()) ??
-                                  0.0;
+                                    final amt = double.tryParse(amountController.text.trim()) ?? 0.0;
+                                    final monthlyAmt = double.tryParse(monthlyAllocationController.text.trim()) ?? 0.0;
 
-                              if (amt <= 0) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  const SnackBar(
-                                      content:
-                                          Text('يرجى إدخال مبلغ صحيح أكبر من صفر')),
-                                );
-                                return;
-                              }
+                                    if (amt <= 0) {
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        const SnackBar(
+                                            content: Text('يرجى إدخال مبلغ صحيح أكبر من صفر')),
+                                      );
+                                      return;
+                                    }
 
-                              Navigator.pop(ctx);
+                                    final targetUid = selectedUser!['uid'] ?? selectedUser!['id'];
+                                    if (targetUid == null || targetUid.isEmpty) {
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        const SnackBar(content: Text('معرف المستخدم غير صالح')),
+                                      );
+                                      return;
+                                    }
 
-                              try {
-                                await _dataSource.allocateBalance(
-                                  userId: selectedUser!['uid']!,
-                                  userName: selectedUser!['name'] ?? '',
-                                  userPhone: selectedUser!['phone'] ?? '',
-                                  userRole: selectedUser!['role'] ?? '',
-                                  companyName: selectedUser!['companyName'] ?? '',
-                                  companyUID: selectedUser!['companyUID'] ?? '',
-                                  amount: amt,
-                                  periodKey: _currentPeriodKey,
-                                  note: noteController.text.trim(),
-                                  adminUid: widget.adminDelegate.uid,
-                                  adminName: widget.adminDelegate.fullName.isNotEmpty
-                                      ? widget.adminDelegate.fullName
-                                      : widget.adminDelegate.firstName,
-                                  monthlyAllocation: monthlyAmt > 0 ? monthlyAmt : null,
-                                  isInternalOnly: isInternalOnly,
-                                );
+                                    setModalState(() => isSubmitting = true);
 
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'تم تخصيص ${_formatCurrency(amt)} لمحفظة ${selectedUser!['name']} بنجاح!',
-                                      style: TextStyle(
-                                        color: colorScheme.onPrimaryContainer,
-                                      ),
-                                    ),
-                                    backgroundColor: colorScheme.primaryContainer,
-                                  ),
-                                );
-                              } catch (e) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('حدث خطأ: $e')),
-                                );
-                              }
-                            },
+                                    try {
+                                      await _dataSource.allocateBalance(
+                                        userId: targetUid,
+                                        userName: selectedUser!['name'] ?? '',
+                                        userPhone: selectedUser!['phone'] ?? '',
+                                        userRole: selectedUser!['role'] ?? '',
+                                        companyName: selectedUser!['companyName'] ?? '',
+                                        companyUID: selectedUser!['companyUID'] ?? '',
+                                        amount: amt,
+                                        periodKey: _currentPeriodKey,
+                                        note: noteController.text.trim(),
+                                        adminUid: widget.adminDelegate.uid,
+                                        adminName: widget.adminDelegate.fullName.isNotEmpty
+                                            ? widget.adminDelegate.fullName
+                                            : widget.adminDelegate.firstName,
+                                        monthlyAllocation: monthlyAmt > 0 ? monthlyAmt : null,
+                                        isInternalOnly: isInternalOnly,
+                                      );
+
+                                      if (!ctx.mounted) return;
+                                      Navigator.pop(ctx);
+
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'تم تخصيص ${_formatCurrency(amt)} لمحفظة ${selectedUser!['name']} بنجاح!',
+                                            style: TextStyle(
+                                              color: colorScheme.onPrimaryContainer,
+                                            ),
+                                          ),
+                                          backgroundColor: colorScheme.primaryContainer,
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      setModalState(() => isSubmitting = false);
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('حدث خطأ: $e')),
+                                      );
+                                    }
+                                  },
                             style: FilledButton.styleFrom(
                               backgroundColor: colorScheme.primary,
                               foregroundColor: colorScheme.onPrimary,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               elevation: 2,
                             ),
-                            icon: const Icon(Icons.check_circle_outline_rounded),
-                            label: const Text(
-                              'تأكيد وتخصيص الرصيد',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
+                            child: AnimatedSwitcher(
+                              duration: AppMotionDurations.short3,
+                              switchInCurve: AppMotionCurves.standardDecelerate,
+                              switchOutCurve: AppMotionCurves.standardAccelerate,
+                              child: isSubmitting
+                                  ? SizedBox(
+                                      key: const ValueKey('alloc_submitting_spinner'),
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                        color: colorScheme.onPrimary,
+                                      ),
+                                    )
+                                  : const Row(
+                                      key: ValueKey('alloc_confirm_btn_content'),
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, size: 20),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'تأكيد',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                             ),
                           ),
                         ),
