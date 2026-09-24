@@ -23,6 +23,7 @@ import 'package:delegate_app/features/admin/presentation/pages/manage_organizati
 import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
 import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 
@@ -73,6 +74,49 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void _showLogoutDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.logout_rounded, color: colorScheme.error, size: 24),
+            const SizedBox(width: 8),
+            Text(l10n.logout),
+          ],
+        ),
+        content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              l10n.cancel,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.go('/login');
+            },
+            child: Text(l10n.logout),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -82,244 +126,211 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
-      appBar: AppBar(
-        backgroundColor: colorScheme.surfaceContainer,
-        foregroundColor: colorScheme.onSurface,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        shape: Border(
-          bottom: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-            width: 0.8,
-          ),
-        ),
-        title: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.helloUser(delegate.firstName),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              delegate.organizationName,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    // Notification Bell with Badge
-                    BlocProvider(
-                      create: (_) => di.sl<NotificationBloc>()
-                        ..add(
-                          SubscribeToUnreadCount(
-                            delegateUid: delegate.uid,
-                            organizationId: delegate.organizationUID,
-                            phoneNumber: delegate.phoneNumber,
-                            userRole: delegate.role.name,
-                            accountCreatedAt: delegate.createdAt,
-                          ),
-                        ),
-                      child: BlocBuilder<NotificationBloc, NotificationState>(
-                        builder: (context, state) {
-                          final unreadCount = state is NotificationLoaded
-                              ? state.unreadCount
-                              : 0;
-
-                          return Badge(
-                            label: Text('$unreadCount'),
-                            isLabelVisible: unreadCount > 0,
-                            child: IconButton(
-                              icon: const Icon(Icons.notifications_rounded),
-                              tooltip: l10n.notifications,
-                              onPressed: () {
-                                context.push('/notifications', extra: delegate);
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    // Header Menu (Profile, Settings, Org Switcher)
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.menu_rounded),
-                      tooltip: isArabic ? 'القائمة' : 'Menu',
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      onSelected: (value) {
-                        if (value == 'profile') {
-                          context.push('/profile', extra: delegate);
-                        } else if (value == 'wallet') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => UserWalletScreen(
-                                targetUserId: delegate.uid,
-                                targetUserName: delegate.fullName.isNotEmpty
-                                    ? delegate.fullName
-                                    : delegate.firstName,
-                              ),
-                            ),
-                          );
-                        } else if (value == 'settings') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => SettingsScreen(
-                                delegate: delegate,
-                                showAppBar: true,
-                              ),
-                            ),
-                          );
-                        } else if (value == 'penalties') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => BlocProvider(
-                                create: (_) => di.sl<PenaltyBloc>()
-                                  ..add(LoadDelegatePenaltiesEvent(delegate)),
-                                child: CompanyPenaltiesSettingsPage(
-                                  delegate: delegate,
-                                  showAppBar: true,
-                                ),
-                              ),
-                            ),
-                          );
-                        } else if (value == 'penalty_rules_catalog') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => PenaltyRulesCatalogPage(
-                                currentDelegate: delegate,
-                              ),
-                            ),
-                          );
-                        } else if (value == 'delegate_subscriptions') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => DelegateSubscriptionRequestsPage(
-                                currentAdmin: delegate,
-                              ),
-                            ),
-                          );
-                        } else if (value == 'manage_organizations') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ManageOrganizationsPage(),
-                            ),
-                          );
-                        } else if (value == 'org_switch') {
-                          _showOrgSwitcher(context, colorScheme);
-                        }
-                      },
-                      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                        PopupMenuItem<String>(
-                          value: 'profile',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.person_rounded),
-                              const SizedBox(width: 12),
-                              Text(l10n.profile),
-                            ],
-                          ),
-                        ),
-                        if (_isWalletEnabled) ...[
-                          PopupMenuItem<String>(
-                            value: 'wallet',
-                            child: Row(
-                              children: [
-                                Icon(Icons.account_balance_wallet_rounded, color: colorScheme.primary),
-                                const SizedBox(width: 12),
-                                const Text('المحفظة والمستحقات'),
-                              ],
-                            ),
-                          ),
-                        ],
-                        PopupMenuItem<String>(
-                          value: 'penalties',
-                          child: Row(
-                            children: [
-                              Icon(Icons.gavel_rounded, color: colorScheme.error),
-                              const SizedBox(width: 12),
-                              const Text('المخالفات والغرامات'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem<String>(
-                          value: 'penalty_rules_catalog',
-                          child: Row(
-                            children: [
-                              Icon(Icons.menu_book_rounded, color: colorScheme.primary),
-                              const SizedBox(width: 12),
-                              const Text('لائحة الغرامات'),
-                            ],
-                          ),
-                        ),
-                        if (delegate.role == UserRole.superAdmin) ...[
-                          PopupMenuItem<String>(
-                            value: 'manage_organizations',
-                            child: Row(
-                              children: [
-                                Icon(Icons.corporate_fare_rounded, color: colorScheme.primary),
-                                const SizedBox(width: 12),
-                                const Text('إدارة المنظمات والسلاسل'),
-                              ],
-                            ),
-                          ),
-                        ],
-                        if (delegate.role == UserRole.superAdmin ||
-                            delegate.role == UserRole.technicalSupport ||
-                            delegate.role == UserRole.organizationAdmin) ...[
-                          PopupMenuItem<String>(
-                            value: 'delegate_subscriptions',
-                            child: Row(
-                              children: [
-                                Icon(Icons.how_to_reg_rounded, color: colorScheme.tertiary),
-                                const SizedBox(width: 12),
-                                const Text('اشتراكات واعتماد المناديب'),
-                              ],
-                            ),
-                          ),
-                        ],
-                        if (_allDelegates.length > 1) ...[
-                          const PopupMenuDivider(),
-                          PopupMenuItem<String>(
-                            value: 'org_switch',
-                            child: Row(
-                              children: [
-                                const Icon(Icons.swap_horiz_rounded),
-                                const SizedBox(width: 12),
-                                Text(isArabic ? 'تبديل المنظمة' : 'Switch Organization'),
-                              ],
-                            ),
-                          ),
-                        ],
-                        // الإعدادات دائماً في أسفل القائمة
-                        PopupMenuItem<String>(
-                          value: 'settings',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.settings_rounded),
-                              const SizedBox(width: 12),
-                              Text(l10n.settings),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 8),
-                  ],
+      appBar: UniversalAppHeader(
+        delegate: delegate,
+        extraActions: [
+          // Notification Bell with Badge
+          BlocProvider(
+            create: (_) => di.sl<NotificationBloc>()
+              ..add(
+                SubscribeToUnreadCount(
+                  delegateUid: delegate.uid,
+                  organizationId: delegate.organizationUID,
+                  phoneNumber: delegate.phoneNumber,
+                  userRole: delegate.role.name,
+                  accountCreatedAt: delegate.createdAt,
                 ),
+              ),
+            child: BlocBuilder<NotificationBloc, NotificationState>(
+              builder: (context, state) {
+                final unreadCount = state is NotificationLoaded
+                    ? state.unreadCount
+                    : 0;
+
+                return Badge(
+                  label: Text('$unreadCount'),
+                  isLabelVisible: unreadCount > 0,
+                  child: IconButton(
+                    icon: const Icon(Icons.notifications_rounded),
+                    tooltip: l10n.notifications,
+                    onPressed: () {
+                      context.push('/notifications', extra: delegate);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+        onMenuSelected: (value) {
+          if (value == 'profile') {
+            context.push('/user-profile', extra: delegate);
+          } else if (value == 'wallet') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => UserWalletScreen(
+                  targetUserId: delegate.uid,
+                  targetUserName: delegate.fullName.isNotEmpty
+                      ? delegate.fullName
+                      : delegate.firstName,
+                ),
+              ),
+            );
+          } else if (value == 'penalties') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => BlocProvider(
+                  create: (_) => di.sl<PenaltyBloc>()
+                    ..add(LoadDelegatePenaltiesEvent(delegate)),
+                  child: CompanyPenaltiesSettingsPage(
+                    delegate: delegate,
+                    showAppBar: true,
+                  ),
+                ),
+              ),
+            );
+          } else if (value == 'penalty_rules_catalog') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PenaltyRulesCatalogPage(
+                  currentDelegate: delegate,
+                ),
+              ),
+            );
+          } else if (value == 'delegate_subscriptions') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => DelegateSubscriptionRequestsPage(
+                  currentAdmin: delegate,
+                ),
+              ),
+            );
+          } else if (value == 'manage_organizations') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const ManageOrganizationsPage(),
+              ),
+            );
+          } else if (value == 'org_switch') {
+            _showOrgSwitcher(context, colorScheme);
+          } else if (value == 'logout') {
+            _showLogoutDialog(context);
+          } else if (value == 'settings') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SettingsScreen(
+                  delegate: delegate,
+                  showAppBar: true,
+                ),
+              ),
+            );
+          }
+        },
+        menuItems: [
+          PopupMenuItem<String>(
+            value: 'profile',
+            child: Row(
+              children: [
+                const Icon(Icons.person_rounded),
+                const SizedBox(width: 12),
+                Text(l10n.profile),
+              ],
+            ),
+          ),
+          if (_isWalletEnabled) ...[
+            PopupMenuItem<String>(
+              value: 'wallet',
+              child: Row(
+                children: [
+                  Icon(Icons.account_balance_wallet_rounded, color: colorScheme.primary),
+                  const SizedBox(width: 12),
+                  const Text('المحفظة والمستحقات'),
+                ],
+              ),
+            ),
+          ],
+          PopupMenuItem<String>(
+            value: 'penalties',
+            child: Row(
+              children: [
+                Icon(Icons.gavel_rounded, color: colorScheme.error),
+                const SizedBox(width: 12),
+                const Text('المخالفات والغرامات'),
+              ],
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'penalty_rules_catalog',
+            child: Row(
+              children: [
+                Icon(Icons.menu_book_rounded, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                const Text('لائحة الغرامات'),
+              ],
+            ),
+          ),
+          if (delegate.role == UserRole.superAdmin) ...[
+            PopupMenuItem<String>(
+              value: 'manage_organizations',
+              child: Row(
+                children: [
+                  Icon(Icons.corporate_fare_rounded, color: colorScheme.primary),
+                  const SizedBox(width: 12),
+                  const Text('إدارة المنظمات والسلاسل'),
+                ],
+              ),
+            ),
+          ],
+          if (delegate.role == UserRole.superAdmin ||
+              delegate.role == UserRole.technicalSupport ||
+              delegate.role == UserRole.organizationAdmin) ...[
+            PopupMenuItem<String>(
+              value: 'delegate_subscriptions',
+              child: Row(
+                children: [
+                  Icon(Icons.how_to_reg_rounded, color: colorScheme.tertiary),
+                  const SizedBox(width: 12),
+                  const Text('اشتراكات واعتماد المناديب'),
+                ],
+              ),
+            ),
+          ],
+          if (_allDelegates.length > 1) ...[
+            PopupMenuItem<String>(
+              value: 'org_switch',
+              child: Row(
+                children: [
+                  const Icon(Icons.swap_horiz_rounded),
+                  const SizedBox(width: 12),
+                  Text(isArabic ? 'تبديل المنظمة' : 'Switch Organization'),
+                ],
+              ),
+            ),
+          ],
+          PopupMenuItem<String>(
+            value: 'logout',
+            child: Row(
+              children: [
+                Icon(Icons.logout_rounded, color: colorScheme.error),
+                const SizedBox(width: 12),
+                Text(l10n.logout, style: TextStyle(color: colorScheme.error)),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          // الإعدادات دائماً في أسفل القائمة
+          PopupMenuItem<String>(
+            value: 'settings',
+            child: Row(
+              children: [
+                const Icon(Icons.settings_rounded),
+                const SizedBox(width: 12),
+                Text(l10n.settings),
+              ],
+            ),
+          ),
+        ],
+      ),
           body: _buildBody(delegate),
           bottomNavigationBar: Container(
             decoration: BoxDecoration(

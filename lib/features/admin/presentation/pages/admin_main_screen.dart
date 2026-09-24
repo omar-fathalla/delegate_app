@@ -27,7 +27,7 @@ import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
-import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
+import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
@@ -379,6 +379,9 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
         );
         break;
+      case 'logout':
+        _showLogoutDialog(context);
+        break;
       case 'settings':
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -393,6 +396,49 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         context.push('/user-profile', extra: widget.delegate);
         break;
     }
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.logout_rounded, color: colorScheme.error, size: 24),
+            const SizedBox(width: 8),
+            Text(l10n.logout),
+          ],
+        ),
+        content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'إلغاء',
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.go('/login');
+            },
+            child: Text(l10n.logout),
+          ),
+        ],
+      ),
+    );
   }
 
   bool get isSuperAdmin => widget.delegate.role == UserRole.superAdmin;
@@ -456,12 +502,17 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
-      appBar: AdminHeader(
-        title: headerTitle,
-        subtitle: subtitle,
+      appBar: UniversalAppHeader(
+        delegate: delegate,
+        customTitle: _currentIndex == 0 ? null : subtitle,
+        customSubtitle: _currentIndex == 0
+            ? null
+            : (headerTitle != null && headerTitle != subtitle
+                ? headerTitle
+                : null),
         showBackButton: _currentIndex != 0,
         onBackPressed: () => setState(() => _currentIndex = 0),
-        actions: [
+        extraActions: [
           BlocProvider(
             create: (_) => di.sl<NotificationBloc>()
               ..add(
@@ -713,6 +764,22 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             ),
           ],
 
+          PopupMenuItem(
+            value: 'logout',
+            child: ListTile(
+              leading: Icon(
+                Icons.logout_rounded,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: Text(
+                l10n.logout,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          const PopupMenuDivider(),
           // الإعدادات دائماً في أسفل القائمة
           PopupMenuItem(
             value: 'settings',

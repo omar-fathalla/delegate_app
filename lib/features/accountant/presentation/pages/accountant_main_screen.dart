@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_subscription_financial_report_screen.dart';
 import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
 import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
+import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'accountant_beneficiary_wallets_tab.dart';
 
@@ -72,6 +72,8 @@ class _AccountantMainScreenState extends State<AccountantMainScreen> {
             ),
           ),
         );
+      case 'logout':
+        _showLogoutDialog(context);
         break;
       case 'settings':
         // Policy: Settings MUST always be the last item in the menu
@@ -135,130 +137,55 @@ class _AccountantMainScreenState extends State<AccountantMainScreen> {
     final l10n = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
     final delegate = widget.delegate;
-    final photoUrl = delegate.documents
-        .where((d) =>
-            d.documentKey == DocumentKey.personalPhoto &&
-            d.documentURL.isNotEmpty)
-        .firstOrNull
-        ?.documentURL;
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
-      appBar: AppBar(
-        backgroundColor: colorScheme.surfaceContainer,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 2.0,
-        shape: Border(
-          bottom: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-            width: 0.8,
-          ),
-        ),
-        title: Row(
-          children: [
-            AppAvatar(
-              imageUrl: photoUrl,
-              fallbackText: delegate.firstName.isNotEmpty ? delegate.firstName : 'ح',
-              radius: 20,
+      appBar: UniversalAppHeader(
+        delegate: delegate,
+        onMenuSelected: _onMenuSelected,
+        menuItems: [
+          PopupMenuItem(
+            value: 'profile',
+            child: Row(
+              children: [
+                Icon(Icons.person_outline_rounded, color: colorScheme.primary, size: 20),
+                const SizedBox(width: 12),
+                Text(l10n.profile),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+          ),
+          if (_isWalletEnabled)
+            PopupMenuItem(
+              value: 'user_wallet',
+              child: Row(
                 children: [
-                  Text(
-                    delegate.fullName.isNotEmpty ? delegate.fullName : delegate.firstName,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          l10n.accountant,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
-                      if (delegate.organizationName.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            delegate.organizationName,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                  Icon(Icons.wallet_rounded, color: colorScheme.primary, size: 20),
+                  const SizedBox(width: 12),
+                  const Text('محفظتي الشخصية'),
                 ],
               ),
             ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: l10n.logout,
-            onPressed: () => _showLogoutDialog(context),
+          PopupMenuItem(
+            value: 'logout',
+            child: Row(
+              children: [
+                Icon(Icons.logout_rounded, color: colorScheme.error, size: 20),
+                const SizedBox(width: 12),
+                Text(l10n.logout, style: TextStyle(color: colorScheme.error)),
+              ],
+            ),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded),
-            onSelected: _onMenuSelected,
-            itemBuilder: (ctx) => [
-              PopupMenuItem(
-                value: 'profile',
-                child: Row(
-                  children: [
-                    Icon(Icons.person_outline_rounded, color: colorScheme.primary, size: 20),
-                    const SizedBox(width: 12),
-                    Text(l10n.profile),
-                  ],
-                ),
-              ),
-              if (_isWalletEnabled)
-                PopupMenuItem(
-                  value: 'user_wallet',
-                  child: Row(
-                    children: [
-                      Icon(Icons.wallet_rounded, color: colorScheme.primary, size: 20),
-                      const SizedBox(width: 12),
-                      const Text('محفظتي الشخصية'),
-                    ],
-                  ),
-                ),
-              const PopupMenuDivider(),
-              // Rule: Settings MUST ALWAYS BE THE LAST ITEM in the menu
-              PopupMenuItem(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.settings_outlined, color: colorScheme.onSurfaceVariant, size: 20),
-                    const SizedBox(width: 12),
-                    Text(l10n.settings),
-                  ],
-                ),
-              ),
-            ],
+          const PopupMenuDivider(),
+          // Rule: Settings MUST ALWAYS BE THE LAST ITEM in the menu
+          PopupMenuItem(
+            value: 'settings',
+            child: Row(
+              children: [
+                Icon(Icons.settings_outlined, color: colorScheme.onSurfaceVariant, size: 20),
+                const SizedBox(width: 12),
+                Text(l10n.settings),
+              ],
+            ),
           ),
         ],
       ),
