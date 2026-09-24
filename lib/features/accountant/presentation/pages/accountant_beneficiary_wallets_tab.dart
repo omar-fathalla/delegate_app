@@ -59,8 +59,8 @@ class _AccountantBeneficiaryWalletsTabState
         backgroundColor: colorScheme.surface,
         appBar: AppBar(
           title: const Text(
-            'المحفظة والحسابات الداخلية',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            'المحفظة',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           actions: [
             IconButton(
@@ -360,33 +360,32 @@ class _AccountantBeneficiaryWalletsTabState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: colorScheme.primary,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'الموقف المالي للمحفظة',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.account_balance_wallet_rounded,
+                  color: colorScheme.primary,
+                  size: 18,
+                ),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'الموقف المالي للمحفظة',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
                 decoration: BoxDecoration(

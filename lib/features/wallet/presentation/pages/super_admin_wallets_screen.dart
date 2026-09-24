@@ -374,25 +374,25 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.account_balance_wallet_rounded,
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'الموقف المالي لمحافظ المستحقات',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              Icon(
+                Icons.account_balance_wallet_rounded,
+                color: colorScheme.primary,
+                size: 20,
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'الموقف المالي لمحافظ المستحقات',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
