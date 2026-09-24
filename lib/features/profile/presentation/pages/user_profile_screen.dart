@@ -271,29 +271,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
       final firestore = FirebaseFirestore.instance;
 
-      // 1. تحديث وثيقة المستخدم في users
+      // 1. تحديث وثيقة المستخدم المحددة فقط في users
       await firestore.collection('users').doc(effectiveUid).set({
         'photoURL': downloadUrl,
         'profileImageUrl': downloadUrl,
         'personalPhotoURL': downloadUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-
-      final phone = _firestoreUserData?['phoneNumber'] ?? _delegate?.phoneNumber ?? delegate?.phoneNumber;
-      if (phone != null && phone.isNotEmpty) {
-        final userQuery = await firestore
-            .collection('users')
-            .where('phoneNumber', isEqualTo: phone)
-            .get();
-        for (final doc in userQuery.docs) {
-          await doc.reference.set({
-            'photoURL': downloadUrl,
-            'profileImageUrl': downloadUrl,
-            'personalPhotoURL': downloadUrl,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        }
-      }
 
       // 2. تحديث وثيقة المندوب/المشرف في الشركات والمنظمات
       if (delegate != null && delegate.companyUID.isNotEmpty) {
@@ -356,11 +340,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         }
       } catch (_) {}
 
-      // 4. تحديث حساب Firebase Auth
+      // 4. تحديث حساب Firebase Auth (فقط إذا كان نفس المستخدم صاحب الجلسة)
       try {
-        await _currentUser?.updatePhotoURL(downloadUrl);
-        await _currentUser?.reload();
-        _currentUser = _auth.currentUser;
+        if (_currentUser != null && _currentUser!.uid == effectiveUid) {
+          await _currentUser?.updatePhotoURL(downloadUrl);
+          await _currentUser?.reload();
+          _currentUser = _auth.currentUser;
+        }
       } catch (_) {}
 
       // 5. تحديث الحالة المعروضة في الشاشة والكاش المحلي
@@ -404,28 +390,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           : 'Cq7Xa6OEwEOlRPlS41vohtfBXke2';
 
       final firestore = FirebaseFirestore.instance;
+      // 1. حذف الصورة من وثيقة المستخدم المحددة فقط في users
       await firestore.collection('users').doc(effectiveUid).set({
         'photoURL': FieldValue.delete(),
         'profileImageUrl': FieldValue.delete(),
         'personalPhotoURL': FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-
-      final phone = _firestoreUserData?['phoneNumber'] ?? _delegate?.phoneNumber ?? delegate?.phoneNumber;
-      if (phone != null && phone.isNotEmpty) {
-        final userQuery = await firestore
-            .collection('users')
-            .where('phoneNumber', isEqualTo: phone)
-            .get();
-        for (final doc in userQuery.docs) {
-          await doc.reference.set({
-            'photoURL': FieldValue.delete(),
-            'profileImageUrl': FieldValue.delete(),
-            'personalPhotoURL': FieldValue.delete(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        }
-      }
 
       if (delegate != null && delegate.companyUID.isNotEmpty) {
         final orgsSnap = await firestore.collection('organizations').get();
@@ -453,9 +424,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       }
 
       try {
-        await _currentUser?.updatePhotoURL(null);
-        await _currentUser?.reload();
-        _currentUser = _auth.currentUser;
+        if (_currentUser != null && _currentUser!.uid == effectiveUid) {
+          await _currentUser?.updatePhotoURL(null);
+          await _currentUser?.reload();
+          _currentUser = _auth.currentUser;
+        }
       } catch (_) {}
 
       if (mounted) {

@@ -154,10 +154,13 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
       }
     }
 
-    // 2. تحقق من FirebaseAuth currentUser
-    final authPhoto = FirebaseAuth.instance.currentUser?.photoURL;
-    if (authPhoto != null && authPhoto.trim().isNotEmpty) {
-      return authPhoto.trim();
+    // 2. تحقق من FirebaseAuth currentUser (فقط إذا كان نفس المستخدم صاحب الحساب)
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser != null && authUser.uid == del.uid) {
+      final authPhoto = authUser.photoURL;
+      if (authPhoto != null && authPhoto.trim().isNotEmpty) {
+        return authPhoto.trim();
+      }
     }
 
     // 3. تحقق من الصورة في كائن المندوب
