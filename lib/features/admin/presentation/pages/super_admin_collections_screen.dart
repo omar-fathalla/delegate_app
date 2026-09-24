@@ -47,6 +47,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
   String _settlementTitle = 'Settlement & Additional Adjustments';
   double _tashilPercentage = 70.0;
   double _marketPercentage = 30.0;
+  double _accountantPercentage = 20.0;
 
   // Aggregated Billing Data from Delegates
   int _totalDueReceiptsCount = 0;
@@ -94,6 +95,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
             'Settlement & Additional Adjustments';
         _tashilPercentage = prefs.getDouble('billing_tashil_percentage') ?? 70.0;
         _marketPercentage = prefs.getDouble('billing_market_percentage') ?? 30.0;
+        _accountantPercentage = prefs.getDouble('billing_accountant_percentage') ?? 20.0;
       });
     } catch (_) {}
   }
@@ -116,6 +118,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
       await prefs.setString('billing_settlement_title', _settlementTitle);
       await prefs.setDouble('billing_tashil_percentage', _tashilPercentage);
       await prefs.setDouble('billing_market_percentage', _marketPercentage);
+      await prefs.setDouble('billing_accountant_percentage', _accountantPercentage);
 
       // Persist to Firestore monthly_collections doc for sync across devices
       await FirebaseFirestore.instance
@@ -132,6 +135,8 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         'settlementTitle': _settlementTitle,
         'tashilPercentage': _tashilPercentage,
         'marketPercentage': _marketPercentage,
+        'accountantPercentage': _accountantPercentage,
+        'accountantRemainingAmount': _accountantRemainingAmount,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (_) {}
@@ -234,6 +239,9 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
           if (mData['marketPercentage'] != null) {
             _marketPercentage = (mData['marketPercentage'] as num).toDouble();
           }
+          if (mData['accountantPercentage'] != null) {
+            _accountantPercentage = (mData['accountantPercentage'] as num).toDouble();
+          }
         }
       } catch (e) {
         debugPrint('Month doc fetch notice: $e');
@@ -267,6 +275,19 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
           _isLoading = false;
           _errorMessage = null;
         });
+
+        // Sync computed totals to Firestore for real-time visibility across accountant and devices
+        try {
+          firestore.collection('monthly_collections').doc(_periodKey).set({
+            'totalDueReceiptsCount': _totalDueReceiptsCount,
+            'grandTotalDue': _grandTotalDue,
+            'totalCollectedAmount': _totalCollectedAmount,
+            'remainingBalanceAmount': _remainingBalanceAmount,
+            'accountantPercentage': _accountantPercentage,
+            'accountantRemainingAmount': _accountantRemainingAmount,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } catch (_) {}
       }
     } catch (e) {
       if (mounted) {
@@ -377,6 +398,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
   // Shares of Remaining Balance
   double get _tashilRemainingAmount => (_remainingBalanceAmount * _tashilPercentage) / 100.0;
   double get _marketRemainingAmount => (_remainingBalanceAmount * _marketPercentage) / 100.0;
+  double get _accountantRemainingAmount => (_remainingBalanceAmount * _accountantPercentage) / 100.0;
 
   double get _collectionProgressPercentage =>
       _grandTotalDue > 0 ? ((_totalCollectedAmount / _grandTotalDue) * 100.0).clamp(0.0, 100.0) : 0.0;
@@ -1183,6 +1205,8 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         TextEditingController(text: _tashilPercentage.toStringAsFixed(0));
     final marketPercController =
         TextEditingController(text: _marketPercentage.toStringAsFixed(0));
+    final accountantPercController =
+        TextEditingController(text: _accountantPercentage.toStringAsFixed(0));
 
     final settingsTheme = Theme.of(context);
     final settingsColorScheme = settingsTheme.colorScheme;
@@ -1352,6 +1376,24 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Accountant Share from Remaining (%):',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: accountantPercController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Accountant Share (% / نسبة إدارة الحسابات من المتبقي)',
+                      prefixIcon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1376,6 +1418,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                       : 'Settlement & Additional Adjustments';
                   final tPerc = double.tryParse(tashilPercController.text) ?? 70.0;
                   final mPerc = double.tryParse(marketPercController.text) ?? 30.0;
+                  final accPerc = double.tryParse(accountantPercController.text) ?? 20.0;
 
                   setState(() {
                     _receiptUnitPrice = rPrice;
@@ -1388,6 +1431,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                     _settlementTitle = sTitle;
                     _tashilPercentage = tPerc;
                     _marketPercentage = mPerc;
+                    _accountantPercentage = accPerc;
                   });
 
                   _savePreferences();
@@ -2072,6 +2116,34 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: colorScheme.onErrorContainer.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.account_balance_wallet_rounded, size: 11, color: colorScheme.onErrorContainer),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Accountant (${_accountantPercentage.toStringAsFixed(0)}%): ${_formatCurrency(_accountantRemainingAmount)}',
+                              style: TextStyle(
+                                color: colorScheme.onErrorContainer,
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

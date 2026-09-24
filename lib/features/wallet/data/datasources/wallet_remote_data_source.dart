@@ -55,6 +55,25 @@ abstract class WalletRemoteDataSource {
   });
   Stream<double> streamMonthlyAllocationsTotal(String periodKey);
   Future<List<Map<String, String>>> searchUsers(String query);
+  Stream<CollectionsRemainingMetrics> streamCollectionsRemainingMetrics({String? periodKey});
+}
+
+class CollectionsRemainingMetrics {
+  final double grandTotalDue;
+  final double totalCollectedAmount;
+  final double remainingBalanceAmount;
+  final double accountantPercentage;
+  final double accountantRemainingShare;
+  final String periodKey;
+
+  const CollectionsRemainingMetrics({
+    this.grandTotalDue = 0.0,
+    this.totalCollectedAmount = 0.0,
+    this.remainingBalanceAmount = 0.0,
+    this.accountantPercentage = 20.0,
+    this.accountantRemainingShare = 0.0,
+    this.periodKey = '',
+  });
 }
 
 class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
@@ -705,5 +724,53 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
     final list = resultsMap.values.toList();
     list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
     return list;
+  }
+
+  @override
+  Stream<CollectionsRemainingMetrics> streamCollectionsRemainingMetrics({String? periodKey}) {
+    final now = DateTime.now();
+    final pKey = periodKey ?? '${now.year}_${now.month.toString().padLeft(2, '0')}';
+
+    return _firestore.collection('monthly_collections').doc(pKey).snapshots().map((doc) {
+      if (!doc.exists) {
+        return CollectionsRemainingMetrics(periodKey: pKey);
+      }
+      final data = doc.data() ?? {};
+      var remaining = (data['remainingBalanceAmount'] as num?)?.toDouble() ??
+          (data['remainingAmount'] as num?)?.toDouble() ??
+          0.0;
+      final grandTotal = (data['grandTotalDue'] as num?)?.toDouble() ?? 0.0;
+      final collected = (data['totalCollectedAmount'] as num?)?.toDouble() ?? 0.0;
+      final accountantPct = (data['accountantPercentage'] as num?)?.toDouble() ?? 20.0;
+
+      // Fallback: calculate remaining dynamically if not pre-saved in doc
+      if (remaining == 0.0 && grandTotal > 0.0) {
+        remaining = (grandTotal - collected).clamp(0.0, grandTotal);
+      } else if (remaining == 0.0) {
+        final rPrice = (data['receiptUnitPrice'] as num?)?.toDouble() ?? 100.0;
+        final rCount = (data['totalDueReceiptsCount'] as num?)?.toInt() ?? 2049;
+        final aPrice = (data['adCompanyUnitPrice'] as num?)?.toDouble() ?? 20000.0;
+        final aCount = (data['adCompanyCount'] as num?)?.toInt() ?? 7;
+        final evPrice = (data['eventsAnalyticsUnitPrice'] as num?)?.toDouble() ?? 0.0;
+        final evCount = (data['eventsAnalyticsCount'] as num?)?.toInt() ?? 1;
+        final setAmt = (data['settlementAmount'] as num?)?.toDouble() ?? 0.0;
+        final calcDue = (rCount * rPrice) + (aCount * aPrice) + (evCount * evPrice) + setAmt;
+        if (calcDue > 0) {
+          remaining = (calcDue - collected).clamp(0.0, calcDue);
+        }
+      }
+
+      final accountantShare = (data['accountantRemainingAmount'] as num?)?.toDouble() ??
+          ((remaining * accountantPct) / 100.0);
+
+      return CollectionsRemainingMetrics(
+        grandTotalDue: grandTotal,
+        totalCollectedAmount: collected,
+        remainingBalanceAmount: remaining,
+        accountantPercentage: accountantPct,
+        accountantRemainingShare: accountantShare,
+        periodKey: pKey,
+      );
+    });
   }
 }

@@ -144,24 +144,31 @@ class _AccountantBeneficiaryWalletsTabState
 
             _currentFilteredWallets = filteredWallets;
 
-            return CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                // 1. Overview Financial Metrics Header
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: _buildFinancialSummaryCard(
-                      totalWallets: allWallets.length,
-                      totalBalanceDue: totalBalanceDue,
-                      totalMonthlyQuota: totalMonthlyQuota,
-                      totalPaid: totalPaid,
-                      totalAllocated: totalAllocated,
-                      theme: theme,
-                      colorScheme: colorScheme,
+            return StreamBuilder<CollectionsRemainingMetrics>(
+              stream: _dataSource.streamCollectionsRemainingMetrics(),
+              builder: (context, collectionsSnapshot) {
+                final collectionsMetrics = collectionsSnapshot.data ??
+                    const CollectionsRemainingMetrics();
+
+                return CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    // 1. Overview Financial Metrics Header
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: _buildFinancialSummaryCard(
+                          totalWallets: allWallets.length,
+                          totalBalanceDue: totalBalanceDue,
+                          totalMonthlyQuota: totalMonthlyQuota,
+                          totalPaid: totalPaid,
+                          totalAllocated: totalAllocated,
+                          collectionsMetrics: collectionsMetrics,
+                          theme: theme,
+                          colorScheme: colorScheme,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
 
                 // 2. Search & Filter Bar
                 SliverToBoxAdapter(
@@ -312,6 +319,7 @@ class _AccountantBeneficiaryWalletsTabState
                           final wallet = filteredWallets[index];
                           return _buildBeneficiaryCard(
                             wallet: wallet,
+                            collectionsMetrics: collectionsMetrics,
                             theme: theme,
                             colorScheme: colorScheme,
                           );
@@ -320,7 +328,9 @@ class _AccountantBeneficiaryWalletsTabState
                       ),
                     ),
                   ),
-              ],
+                  ],
+                );
+              },
             );
           },
         ),
@@ -337,9 +347,13 @@ class _AccountantBeneficiaryWalletsTabState
     required double totalMonthlyQuota,
     required double totalPaid,
     required double totalAllocated,
+    required CollectionsRemainingMetrics collectionsMetrics,
     required ThemeData theme,
     required ColorScheme colorScheme,
   }) {
+    final accountantCollectionsShare = collectionsMetrics.accountantRemainingShare;
+    final grandTotalDueCombined = totalBalanceDue + accountantCollectionsShare;
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -426,6 +440,134 @@ class _AccountantBeneficiaryWalletsTabState
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          // تفصيل مصادر التغذية المالية للمحاسب
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.account_tree_outlined, size: 14, color: colorScheme.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'مصادر التغذية والمستحقات المالية',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${collectionsMetrics.accountantPercentage.toStringAsFixed(0)}% من متبقي التحصيلات',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    // 1. المحفظة المخصصة
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'المحافظ المخصصة',
+                            style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 2),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _formatCurrency(totalBalanceDue),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text('+', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.outline)),
+                    const SizedBox(width: 8),
+                    // 2. حصة التحصيلات
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'نسبة التحصيلات (${collectionsMetrics.accountantPercentage.toStringAsFixed(0)}%)',
+                            style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 2),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _formatCurrency(accountantCollectionsShare),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text('=', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.outline)),
+                    const SizedBox(width: 8),
+                    // 3. الإجمالي الشامل
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'الإجمالي الشامل (Total)',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.primary),
+                          ),
+                          const SizedBox(height: 2),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _formatCurrency(grandTotalDueCombined),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -433,9 +575,9 @@ class _AccountantBeneficiaryWalletsTabState
               Expanded(
                 child: _buildMetricTile(
                   title: 'المستحق للصرف',
-                  value: _formatCurrency(totalBalanceDue),
+                  value: _formatCurrency(grandTotalDueCombined),
                   icon: Icons.payments_rounded,
-                  color: totalBalanceDue > 0 ? colorScheme.primary : colorScheme.tertiary,
+                  color: grandTotalDueCombined > 0 ? colorScheme.primary : colorScheme.tertiary,
                   colorScheme: colorScheme,
                 ),
               ),
@@ -526,10 +668,18 @@ class _AccountantBeneficiaryWalletsTabState
   /// كرت محفظة المستفيد الخاص بالمحاسب (Card-Based Layout)
   Widget _buildBeneficiaryCard({
     required UserWalletModel wallet,
+    required CollectionsRemainingMetrics collectionsMetrics,
     required ThemeData theme,
     required ColorScheme colorScheme,
   }) {
-    final hasBalance = wallet.currentBalance > 0;
+    final isFayezAtter = wallet.userPhone == '01001989360' ||
+        wallet.userId == 'oO6aifjJKXcAtNYj8EZV7BX7Sav1' ||
+        wallet.userRole.toLowerCase().contains('accountant') ||
+        wallet.userName.toLowerCase().contains('fayez');
+
+    final collectionsShare = isFayezAtter ? collectionsMetrics.accountantRemainingShare : 0.0;
+    final totalDueCombined = wallet.currentBalance + collectionsShare;
+    final hasBalance = totalDueCombined > 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -649,6 +799,133 @@ class _AccountantBeneficiaryWalletsTabState
             const Divider(height: 1),
             const SizedBox(height: 10),
 
+            if (isFayezAtter) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      colorScheme.primaryContainer.withValues(alpha: 0.35),
+                      colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                    ],
+                    begin: AlignmentDirectional.topStart,
+                    end: AlignmentDirectional.bottomEnd,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: colorScheme.primary.withValues(alpha: 0.35),
+                    width: 1.0,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.alt_route_rounded, size: 15, color: colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'تغذية مالية مزدوجة (المحفظة + التحصيلات)',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${collectionsMetrics.accountantPercentage.toStringAsFixed(0)}% من المتبقي',
+                            style: TextStyle(
+                              color: colorScheme.onPrimary,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        // رصيد المحفظة
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'رصيد المحفظة',
+                                style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
+                              ),
+                              const SizedBox(height: 2),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _formatCurrency(wallet.currentBalance),
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text('+', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.outline)),
+                        const SizedBox(width: 6),
+                        // حصة التحصيلات
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'نسبة التحصيلات (${collectionsMetrics.accountantPercentage.toStringAsFixed(0)}%)',
+                                style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
+                              ),
+                              const SizedBox(height: 2),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _formatCurrency(collectionsMetrics.accountantRemainingShare),
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.primary),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text('=', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.outline)),
+                        const SizedBox(width: 6),
+                        // الإجمالي المستحق
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'الإجمالي المستحق',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.primary),
+                              ),
+                              const SizedBox(height: 2),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _formatCurrency(totalDueCombined),
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colorScheme.primary),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Financial Metrics in Card
             Row(
               children: [
@@ -667,7 +944,7 @@ class _AccountantBeneficiaryWalletsTabState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'الرصيد المتبقي للصرف',
+                          isFayezAtter ? 'الرصيد المتبقي (الإجمالي)' : 'الرصيد المتبقي للصرف',
                           style: TextStyle(
                             fontSize: 10.5,
                             color: colorScheme.onSurfaceVariant,
@@ -677,7 +954,7 @@ class _AccountantBeneficiaryWalletsTabState
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            _formatCurrency(wallet.currentBalance),
+                            _formatCurrency(isFayezAtter ? totalDueCombined : wallet.currentBalance),
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -800,7 +1077,7 @@ class _AccountantBeneficiaryWalletsTabState
                 // زر سجل الحركات والتدقيق
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _showTransactionsHistorySheet(context, wallet),
+                    onPressed: () => _showTransactionsHistorySheet(context, wallet, collectionsMetrics),
                     icon: const Icon(Icons.receipt_long_rounded, size: 17),
                     label: const Text(
                       'سجل الحركات والتدقيق',
@@ -841,7 +1118,16 @@ class _AccountantBeneficiaryWalletsTabState
 
 
   // --- Modal: Transactions History for Single Wallet ---
-  void _showTransactionsHistorySheet(BuildContext context, UserWalletModel wallet) {
+  void _showTransactionsHistorySheet(
+    BuildContext context,
+    UserWalletModel wallet,
+    CollectionsRemainingMetrics collectionsMetrics,
+  ) {
+    final isFayezAtter = wallet.userPhone == '01001989360' ||
+        wallet.userId == 'oO6aifjJKXcAtNYj8EZV7BX7Sav1' ||
+        wallet.userRole.toLowerCase().contains('accountant') ||
+        wallet.userName.toLowerCase().contains('fayez');
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -881,6 +1167,39 @@ class _AccountantBeneficiaryWalletsTabState
                     ),
                   ],
                 ),
+                if (isFayezAtter && collectionsMetrics.accountantRemainingShare > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded, size: 14, color: colorScheme.primary),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'تفصيل المستحقات الحالية (المحفظة + التحصيلات):',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '• رصيد المحفظة المخصص: ${_formatCurrency(wallet.currentBalance)}\n'
+                          '• حصة متبقي التحصيلات (${collectionsMetrics.accountantPercentage.toStringAsFixed(0)}%): ${_formatCurrency(collectionsMetrics.accountantRemainingShare)}\n'
+                          '• الإجمالي المستحق للصرف: ${_formatCurrency(wallet.currentBalance + collectionsMetrics.accountantRemainingShare)}',
+                          style: const TextStyle(fontSize: 11, height: 1.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const Divider(height: 12),
                 Expanded(
                   child: StreamBuilder<List<WalletTransactionModel>>(
