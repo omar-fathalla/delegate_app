@@ -525,7 +525,7 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
     }
 
     try {
-      // ── الاستراتيجية 1: البحث المباشر والفوري برقم الهاتف ──
+      // ── الاستراتيجية 1: البحث المباشر والفوري برقم الهاتف في كولكشن users ──
       final digits = cleanQuery.replaceAll(RegExp(r'[^\d]'), '');
       if (digits.length >= 3) {
         final normalizedPhone = _normalizePhone(cleanQuery);
@@ -592,47 +592,24 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
               addUserDoc(doc.id, doc.data());
             }
           }).catchError((_) => null));
+        }
 
-          // 3. delegates (collectionGroup): phoneNumber
-          phoneFutures.add(_firestore
-              .collectionGroup('delegates')
-              .where('phoneNumber', isEqualTo: p)
-              .limit(5)
-              .get()
-              .then((snap) {
-            for (var doc in snap.docs) {
-              addUserDoc(doc.id, doc.data(), defaultRole: 'delegate');
-            }
-          }).catchError((_) => null));
+        await Future.wait(phoneFutures);
 
-          // 4. delegates (collectionGroup): phone
-          phoneFutures.add(_firestore
-              .collectionGroup('delegates')
-              .where('phone', isEqualTo: p)
-              .limit(5)
-              .get()
-              .then((snap) {
-            for (var doc in snap.docs) {
-              addUserDoc(doc.id, doc.data(), defaultRole: 'delegate');
-            }
-          }).catchError((_) => null));
+        // إذا وجدنا المستخدم برقم الهاتف، نكتفي فوراً لسرعة الاستجابة
+        if (resultsMap.isNotEmpty) {
+          final list = resultsMap.values.toList();
+          list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+          return list;
+        }
 
-          // 5. top-level delegates: phoneNumber
-          phoneFutures.add(_firestore
+        // بحث احتياطي برقم الهاتف في كولكشن delegates الرئيسي
+        final delFutures = <Future>[];
+        for (final p in phoneCandidates) {
+          if (p.isEmpty) continue;
+          delFutures.add(_firestore
               .collection('delegates')
               .where('phoneNumber', isEqualTo: p)
-              .limit(5)
-              .get()
-              .then((snap) {
-            for (var doc in snap.docs) {
-              addUserDoc(doc.id, doc.data(), defaultRole: 'delegate');
-            }
-          }).catchError((_) => null));
-
-          // 6. top-level delegates: phone
-          phoneFutures.add(_firestore
-              .collection('delegates')
-              .where('phone', isEqualTo: p)
               .limit(5)
               .get()
               .then((snap) {
@@ -641,13 +618,20 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
             }
           }).catchError((_) => null));
         }
+        await Future.wait(delFutures);
 
-        await Future.wait(phoneFutures);
+        if (resultsMap.isNotEmpty) {
+          final list = resultsMap.values.toList();
+          list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+          return list;
+        }
       }
 
       // ── الاستراتيجية 2: البحث ببادئة الاسم إذا كان الإدخال نصياً ──
       if (resultsMap.length < 20 && cleanQuery.length >= 2) {
         final queryEnd = '$cleanQuery\uf8ff';
+        final lowerQuery = cleanQuery.toLowerCase();
+        final lowerEnd = '$lowerQuery\uf8ff';
 
         final nameQueries = [
           _firestore
@@ -656,6 +640,13 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
               .where('displayName', isLessThanOrEqualTo: queryEnd)
               .limit(10)
               .get(),
+          if (lowerQuery != cleanQuery)
+            _firestore
+                .collection('users')
+                .where('displayName', isGreaterThanOrEqualTo: lowerQuery)
+                .where('displayName', isLessThanOrEqualTo: lowerEnd)
+                .limit(10)
+                .get(),
           _firestore
               .collection('users')
               .where('fullName', isGreaterThanOrEqualTo: cleanQuery)
@@ -669,15 +660,9 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
               .limit(10)
               .get(),
           _firestore
-              .collectionGroup('delegates')
+              .collection('delegates')
               .where('fullName', isGreaterThanOrEqualTo: cleanQuery)
               .where('fullName', isLessThanOrEqualTo: queryEnd)
-              .limit(10)
-              .get(),
-          _firestore
-              .collectionGroup('delegates')
-              .where('firstName', isGreaterThanOrEqualTo: cleanQuery)
-              .where('firstName', isLessThanOrEqualTo: queryEnd)
               .limit(10)
               .get(),
         ];
@@ -703,29 +688,13 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
           final name = (d['displayName'] ?? d['fullName'] ?? d['name'] ?? '').toString().toLowerCase();
           final phone = (d['phoneNumber'] ?? d['phone'] ?? '').toString();
           final role = (d['role'] ?? '').toString().toLowerCase();
-          final company = (d['companyName'] ?? '').toString().toLowerCase();
+          final company = (d['companyName'] ?? d['organizationName'] ?? '').toString().toLowerCase();
 
           if (name.contains(lowerQuery) ||
               phone.contains(cleanQuery) ||
               role.contains(lowerQuery) ||
               company.contains(lowerQuery)) {
             addUserDoc(doc.id, d);
-          }
-        }
-
-        if (resultsMap.length < 20) {
-          final delSnap = await _firestore.collectionGroup('delegates').limit(150).get();
-          for (var doc in delSnap.docs) {
-            final d = doc.data();
-            final name = (d['displayName'] ?? d['fullName'] ?? d['name'] ?? '').toString().toLowerCase();
-            final phone = (d['phoneNumber'] ?? d['phone'] ?? '').toString();
-            final company = (d['companyName'] ?? '').toString().toLowerCase();
-
-            if (name.contains(lowerQuery) ||
-                phone.contains(cleanQuery) ||
-                company.contains(lowerQuery)) {
-              addUserDoc(doc.id, d, defaultRole: 'delegate');
-            }
           }
         }
       }

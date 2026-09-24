@@ -500,6 +500,33 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ? l10n.tasks
               : l10n.photoPermissions);
 
+    PopupMenuItem<String> buildPopupItem({
+      required String value,
+      required IconData icon,
+      required String title,
+      Color? color,
+    }) {
+      return PopupMenuItem<String>(
+        value: value,
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       appBar: UniversalAppHeader(
@@ -547,248 +574,151 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           const SizedBox(width: 4),
         ],
         menuItems: [
-          const PopupMenuItem(
+          buildPopupItem(
             value: 'profile',
-            child: ListTile(
-              leading: Icon(Icons.person_rounded),
-              title: Text('الملف الشخصي'),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+            icon: Icons.person_rounded,
+            title: 'الملف الشخصي',
           ),
           if (isSuperAdmin ||
               isTechnicalSupport ||
               widget.delegate.role == UserRole.admin ||
               isOrganizationAdmin) ...[
-            const PopupMenuItem(
+            buildPopupItem(
               value: 'delegate_subscriptions',
-              child: ListTile(
-                leading: Icon(Icons.how_to_reg_rounded),
-                title: Text('طلبات اشتراك واعتماد المناديب'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.how_to_reg_rounded,
+              title: 'طلبات اشتراك واعتماد المناديب',
             ),
           ],
           if (isSuperAdmin || isTechnicalSupport) ...[
-            const PopupMenuItem(
+            buildPopupItem(
               value: 'anti_fraud',
-              child: ListTile(
-                leading: Icon(Icons.security_rounded),
-                title: Text('كشف التزييف وربط الأجهزة'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.security_rounded,
+              title: 'كشف التزييف وربط الأجهزة',
             ),
-            const PopupMenuItem(
+            buildPopupItem(
               value: 'branches',
-              child: ListTile(
-                leading: Icon(Icons.storefront_rounded),
-                title: Text('الفروع'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.storefront_rounded,
+              title: 'الفروع',
             ),
-            const PopupMenuItem(
+            buildPopupItem(
               value: 'branch_attendance',
-              child: ListTile(
-                leading: Icon(Icons.co_present_rounded),
-                title: Text('متابعة حضور الفروع'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.co_present_rounded,
+              title: 'متابعة حضور الفروع',
             ),
             if (isSuperAdmin) ...[
-              const PopupMenuItem(
+              buildPopupItem(
                 value: 'session_control',
-                child: ListTile(
-                  leading: Icon(Icons.sync_lock_rounded),
-                  title: Text('إدارة جلسات المناديب والخروج الإجباري'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
+                icon: Icons.sync_lock_rounded,
+                title: 'إدارة جلسات المناديب والخروج الإجباري',
               ),
-              PopupMenuItem(
+              buildPopupItem(
                 value: 'create_admin',
-                child: ListTile(
-                  leading: const Icon(Icons.person_add_alt_1_rounded),
-                  title: Text(l10n.createAdmin),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
+                icon: Icons.person_add_alt_1_rounded,
+                title: l10n.createAdmin,
               ),
             ],
             if (isTechnicalSupport) ...[
-              const PopupMenuItem(
+              buildPopupItem(
                 value: 'photo_permissions',
-                child: ListTile(
-                  leading: Icon(Icons.photo_library_rounded),
-                  title: Text('أذونات التصوير'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
+                icon: Icons.photo_library_rounded,
+                title: 'أذونات التصوير',
               ),
             ],
-            PopupMenuItem(
+            buildPopupItem(
               value: 'manage_admins',
-              child: ListTile(
-                leading: const Icon(Icons.group_rounded),
-                title: Text(l10n.manageAdmins),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.group_rounded,
+              title: l10n.manageAdmins,
             ),
-            PopupMenuItem(
+            buildPopupItem(
               value: 'manage_marketing',
-              child: ListTile(
-                leading: const Icon(Icons.campaign_rounded),
-                title: Text(l10n.manageMarketing),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.campaign_rounded,
+              title: l10n.manageMarketing,
             ),
-            PopupMenuItem(
+            buildPopupItem(
               value: 'manage_feedbacks',
-              child: ListTile(
-                leading: const Icon(Icons.feedback_rounded),
-                title: const Text('إدارة المقترحات'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.feedback_rounded,
+              title: 'إدارة المقترحات',
             ),
             if (isTechnicalSupport) ...[
-              PopupMenuItem(
+              buildPopupItem(
                 value: 'send_notification',
-                child: ListTile(
-                  leading: const Icon(Icons.send_rounded),
-                  title: const Text('إرسال إشعار جديد'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
+                icon: Icons.send_rounded,
+                title: 'إرسال إشعار جديد',
               ),
             ],
             if (delegate.role != UserRole.technicalSupport) ...[
-              PopupMenuItem(
+              buildPopupItem(
                 value: 'permissions_report',
-                child: ListTile(
-                  leading: const Icon(Icons.analytics_rounded),
-                  title: const Text('تقرير أذونات التصوير'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
+                icon: Icons.analytics_rounded,
+                title: 'تقرير أذونات التصوير',
               ),
-              PopupMenuItem(
+              buildPopupItem(
                 value: 'receipts_report',
-                child: ListTile(
-                  leading: const Icon(Icons.receipt_long_rounded),
-                  title: Text(l10n.receiptsReport),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
+                icon: Icons.receipt_long_rounded,
+                title: l10n.receiptsReport,
               ),
-              const PopupMenuItem(
+              buildPopupItem(
                 value: 'collections',
-                child: ListTile(
-                  leading: Icon(Icons.request_quote_rounded),
-                  title: Text('التحصيلات والفواتير'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
+                icon: Icons.request_quote_rounded,
+                title: 'التحصيلات والفواتير',
               ),
-              const PopupMenuItem(
+              buildPopupItem(
                 value: 'wallets_management',
-                child: ListTile(
-                  leading: Icon(Icons.account_balance_wallet_rounded),
-                  title: Text('إدارة المحافظ والمستحقات'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
+                icon: Icons.account_balance_wallet_rounded,
+                title: 'إدارة المحافظ والمستحقات',
               ),
             ],
           ],
 
           if (isBranchesMarketingManager) ...[
-            PopupMenuItem(
+            buildPopupItem(
               value: 'tasks',
-              child: ListTile(
-                leading: const Icon(Icons.task_alt_rounded),
-                title: Text(isArabic ? 'إدارة المهام' : 'Tasks Management'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.task_alt_rounded,
+              title: isArabic ? 'إدارة المهام' : 'Tasks Management',
             ),
-            PopupMenuItem(
+            buildPopupItem(
               value: 'search',
-              child: ListTile(
-                leading: const Icon(Icons.person_search_rounded),
-                title: Text(isArabic ? 'الاستعلامات والبحث' : 'Search'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.person_search_rounded,
+              title: isArabic ? 'الاستعلامات والبحث' : 'Search',
             ),
           ],
 
           // نظام الغرامات في القائمة للأدوار التي لا تملكه كتبويب سفلي مباشر
           if (!isOrganizationAdmin && !isSuperAdmin && !isBranchesMarketingManager) ...[
-            const PopupMenuItem(
+            buildPopupItem(
               value: 'penalties_management',
-              child: ListTile(
-                leading: Icon(Icons.gavel_rounded),
-                title: Text('نظام الغرامات والمخالفات'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.gavel_rounded,
+              title: 'نظام الغرامات والمخالفات',
             ),
           ],
 
           // لائحة الغرامات والجزاءات الرسمية
-          PopupMenuItem(
+          buildPopupItem(
             value: 'penalty_rules_catalog',
-            child: ListTile(
-              leading: const Icon(Icons.menu_book_rounded),
-              title: Text(isArabic ? 'لائحة الغرامات والجزاءات' : 'Penalty Rules Catalog'),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+            icon: Icons.menu_book_rounded,
+            title: isArabic ? 'لائحة الغرامات والجزاءات' : 'Penalty Rules Catalog',
           ),
 
           if (_isWalletEnabled) ...[
-            const PopupMenuItem(
+            buildPopupItem(
               value: 'user_wallet',
-              child: ListTile(
-                leading: Icon(Icons.account_balance_wallet_rounded),
-                title: Text('المحفظة والمستحقات'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.account_balance_wallet_rounded,
+              title: 'المحفظة والمستحقات',
             ),
           ],
 
-          PopupMenuItem(
+          buildPopupItem(
             value: 'logout',
-            child: ListTile(
-              leading: Icon(
-                Icons.logout_rounded,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              title: Text(
-                l10n.logout,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+            icon: Icons.logout_rounded,
+            title: l10n.logout,
+            color: Theme.of(context).colorScheme.error,
           ),
           const PopupMenuDivider(),
           // الإعدادات دائماً في أسفل القائمة
-          PopupMenuItem(
+          buildPopupItem(
             value: 'settings',
-            child: ListTile(
-              leading: const Icon(Icons.settings_rounded),
-              title: Text(l10n.settings),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+            icon: Icons.settings_rounded,
+            title: l10n.settings,
           ),
         ],
         onMenuSelected: _onMenuSelected,

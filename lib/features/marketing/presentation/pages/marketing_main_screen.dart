@@ -234,6 +234,33 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
             ),
           ];
 
+    PopupMenuItem<String> buildPopupItem({
+      required String value,
+      required IconData icon,
+      required String title,
+      Color? color,
+    }) {
+      return PopupMenuItem<String>(
+        value: value,
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: UniversalAppHeader(
@@ -274,83 +301,54 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
         ],
         onMenuSelected: _onMenuSelected,
         menuItems: [
-          const PopupMenuItem(
+          buildPopupItem(
             value: 'profile',
-            child: ListTile(
-              leading: Icon(Icons.person_rounded),
-              title: Text('الملف الشخصي'),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+            icon: Icons.person_rounded,
+            title: 'الملف الشخصي',
           ),
-          PopupMenuItem(
+          buildPopupItem(
             value: 'search',
-            child: ListTile(
-              leading: const Icon(Icons.search_rounded),
-              title: Text(l10n.search),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+            icon: Icons.search_rounded,
+            title: l10n.search,
           ),
           if (isPromotionOnly)
-            const PopupMenuItem(
+            buildPopupItem(
               value: 'photo_report',
-              child: ListTile(
-                leading: Icon(Icons.collections_rounded),
-                title: Text('تقارير الصور الميدانية'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.collections_rounded,
+              title: 'تقارير الصور الميدانية',
             ),
           if (!isPromotionOnly)
-            PopupMenuItem(
+            buildPopupItem(
               value: 'tasks',
-              child: ListTile(
-                leading: const Icon(Icons.task_alt_rounded),
-                title: Text(l10n.tasks),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.task_alt_rounded,
+              title: l10n.tasks,
             ),
           if (!isPromotionOnly)
-            PopupMenuItem(
+            buildPopupItem(
               value: 'penalties',
-              child: ListTile(
-                leading: Icon(Icons.gavel_rounded, color: colorScheme.error),
-                title: const Text('المخالفات والغرامات'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.gavel_rounded,
+              title: 'المخالفات والغرامات',
+              color: colorScheme.error,
             ),
           if (_isWalletEnabled)
-            PopupMenuItem(
+            buildPopupItem(
               value: 'wallet',
-              child: ListTile(
-                leading: Icon(Icons.account_balance_wallet_rounded, color: colorScheme.primary),
-                title: const Text('المحفظة والمستحقات'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
+              icon: Icons.account_balance_wallet_rounded,
+              title: 'المحفظة والمستحقات',
+              color: colorScheme.primary,
             ),
-          PopupMenuItem(
+          buildPopupItem(
             value: 'logout',
-            child: ListTile(
-              leading: Icon(Icons.logout_rounded, color: colorScheme.error),
-              title: Text(l10n.logout, style: TextStyle(color: colorScheme.error)),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+            icon: Icons.logout_rounded,
+            title: l10n.logout,
+            color: colorScheme.error,
           ),
           const PopupMenuDivider(),
           // الإعدادات دائماً في أسفل القائمة
-          PopupMenuItem(
+          buildPopupItem(
             value: 'settings',
-            child: ListTile(
-              leading: const Icon(Icons.settings_rounded),
-              title: Text(l10n.settings),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+            icon: Icons.settings_rounded,
+            title: l10n.settings,
           ),
         ],
       ),

@@ -324,20 +324,23 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                     final isCurrent = now.year == year && now.month == month;
                     final count = monthCounts[key] ?? 0;
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      decoration: BoxDecoration(
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Material(
                         color: isSelected
                             ? colorScheme.primaryContainer.withValues(alpha: 0.5)
                             : colorScheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? colorScheme.primary
-                              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: isSelected
+                                ? colorScheme.primary
+                                : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          ),
                         ),
-                      ),
-                      child: ListTile(
+                        child: ListTile(
                         onTap: () {
                           Navigator.pop(sheetContext);
                           _selectMonth(date);
@@ -381,7 +384,8 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                           ),
                         ),
                       ),
-                    );
+                    ),
+                  );
                   },
                 ),
               ),

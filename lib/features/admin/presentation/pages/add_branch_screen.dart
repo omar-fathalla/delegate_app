@@ -929,69 +929,68 @@ class _AddBranchViewState extends State<_AddBranchView> {
                     // ── Live Autocomplete Suggestions Dropdown ──
                     if (_showSuggestionsDropdown && _placeSuggestions.isNotEmpty) ...[
                       const SizedBox(height: 6),
-                      Container(
-                        constraints: const BoxConstraints(maxHeight: 220),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHigh,
+                      Material(
+                        color: colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(16),
+                        elevation: 3,
+                        shadowColor: Colors.black.withValues(alpha: 0.15),
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                          border: Border.all(
+                          side: BorderSide(
                             color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                           ),
                         ),
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          itemCount: _placeSuggestions.length,
-                          separatorBuilder: (_, _) => Divider(
-                            height: 1,
-                            indent: 48,
-                            color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 220),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            itemCount: _placeSuggestions.length,
+                            separatorBuilder: (_, _) => Divider(
+                              height: 1,
+                              indent: 48,
+                              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                            ),
+                            itemBuilder: (ctx, i) {
+                              final suggestion = _placeSuggestions[i];
+                              return ListTile(
+                                dense: true,
+                                leading: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.location_on_rounded,
+                                    color: colorScheme.primary,
+                                    size: 18,
+                                  ),
+                                ),
+                                title: Text(
+                                  suggestion.mainText,
+                                  style: GoogleFonts.cairo(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                                subtitle: suggestion.secondaryText.isNotEmpty
+                                    ? Text(
+                                        suggestion.secondaryText,
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 12,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      )
+                                    : null,
+                                onTap: () => _selectSuggestion(suggestion),
+                              );
+                            },
                           ),
-                          itemBuilder: (ctx, i) {
-                            final suggestion = _placeSuggestions[i];
-                            return ListTile(
-                              dense: true,
-                              leading: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.location_on_rounded,
-                                  color: colorScheme.primary,
-                                  size: 18,
-                                ),
-                              ),
-                              title: Text(
-                                suggestion.mainText,
-                                style: GoogleFonts.cairo(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                              subtitle: suggestion.secondaryText.isNotEmpty
-                                  ? Text(
-                                      suggestion.secondaryText,
-                                      style: GoogleFonts.cairo(
-                                        fontSize: 12,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    )
-                                  : null,
-                              onTap: () => _selectSuggestion(suggestion),
-                            );
-                          },
                         ),
                       ),
                     ],

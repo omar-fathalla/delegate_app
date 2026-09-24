@@ -1089,60 +1089,67 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                             ),
                           ),
                         if (searchResults.isNotEmpty && selectedUser == null)
-                          Container(
-                            constraints: const BoxConstraints(maxHeight: 180),
-                            margin: const EdgeInsets.only(top: 4),
-                            decoration: BoxDecoration(
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Material(
                               color: colorScheme.surfaceContainerHighest
                                   .withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: colorScheme.outlineVariant
-                                    .withValues(alpha: 0.4),
+                              clipBehavior: Clip.antiAlias,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: colorScheme.outlineVariant
+                                      .withValues(alpha: 0.4),
+                                ),
                               ),
-                            ),
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: searchResults.length,
-                              itemBuilder: (c, i) {
-                                final u = searchResults[i];
-                                return ListTile(
-                                  dense: true,
-                                  leading: CircleAvatar(
-                                    radius: 14,
-                                    backgroundColor: colorScheme.primaryContainer,
-                                    child: Text(
-                                      u['name']!.isNotEmpty
-                                          ? u['name']![0].toUpperCase()
-                                          : 'U',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: colorScheme.onPrimaryContainer,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 180),
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  padding: EdgeInsets.zero,
+                                  itemCount: searchResults.length,
+                                  itemBuilder: (c, i) {
+                                    final u = searchResults[i];
+                                    return ListTile(
+                                      dense: true,
+                                      leading: CircleAvatar(
+                                        radius: 14,
+                                        backgroundColor: colorScheme.primaryContainer,
+                                        child: Text(
+                                          u['name']!.isNotEmpty
+                                              ? u['name']![0].toUpperCase()
+                                              : 'U',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: colorScheme.onPrimaryContainer,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  title: Text(
-                                    u['name']!,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold, fontSize: 13),
-                                  ),
-                                  subtitle: Text(
-                                    '${u['role']} • ${u['companyName']}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    setModalState(() {
-                                      selectedUser = u;
-                                      userSearchController.text = u['name'] ?? '';
-                                      searchResults = [];
-                                    });
+                                      title: Text(
+                                        u['name']!,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      subtitle: Text(
+                                        '${u['role']} • ${u['companyName']}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      onTap: () {
+                                        setModalState(() {
+                                          selectedUser = u;
+                                          userSearchController.text = u['name'] ?? '';
+                                          searchResults = [];
+                                        });
+                                      },
+                                    );
                                   },
-                                );
-                              },
+                                ),
+                              ),
                             ),
                           ),
 
@@ -1360,11 +1367,13 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                         const SizedBox(height: 12),
 
                         // Step 5: Internal Secrecy Toggle
-                        Container(
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                        Material(
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(12),
+                          clipBehavior: Clip.antiAlias,
+                          shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
+                            side: BorderSide(
                               color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                             ),
                           ),
