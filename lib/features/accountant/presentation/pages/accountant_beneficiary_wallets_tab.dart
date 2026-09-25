@@ -100,26 +100,41 @@ class _AccountantBeneficiaryWalletsTabState
 
             final allWallets = snapshot.data ?? [];
 
-            // Metrics
-            final totalBalanceDue = allWallets.fold<double>(
-              0.0,
-              (sum, w) => sum + w.currentBalance,
-            );
-            final totalAllocated = allWallets.fold<double>(
-              0.0,
-              (sum, w) => sum + w.totalAllocated,
-            );
-            final totalPaid = allWallets.fold<double>(
-              0.0,
-              (sum, w) => sum + w.totalPaid,
-            );
-            final totalMonthlyQuota = allWallets.fold<double>(
-              0.0,
-              (sum, w) => sum + w.monthlyAllocation,
+            // Identify the accountant's personal wallet (Fayez Atter)
+            final accountantWallet = allWallets.cast<UserWalletModel?>().firstWhere(
+              (w) => w != null && (
+                     w.userPhone == '01001989360' ||
+                     w.userId == 'oO6aifjJKXcAtNYj8EZV7BX7Sav1' ||
+                     w.userId == widget.accountantDelegate.uid ||
+                     w.userRole.toLowerCase().contains('accountant') ||
+                     w.userName.toLowerCase().contains('fayez')),
+              orElse: () => null,
             );
 
-            // Filtering
-            final filteredWallets = allWallets.where((w) {
+            // Beneficiary wallets: Exclude the accountant (Fayez Atter) from the list below
+            // to eliminate duplication with the top financial position card
+            final beneficiaryWallets = allWallets.where((w) {
+              final isFayezAtter = w.userPhone == '01001989360' ||
+                  w.userId == 'oO6aifjJKXcAtNYj8EZV7BX7Sav1' ||
+                  w.userId == widget.accountantDelegate.uid ||
+                  w.userRole.toLowerCase().contains('accountant') ||
+                  w.userName.toLowerCase().contains('fayez');
+              return !isFayezAtter;
+            }).toList();
+
+            // The 4 Core Metrics for Accountant Financial Position:
+            // 1. المحفظة المخصصة:
+            final dedicatedWalletBalance = accountantWallet != null
+                ? accountantWallet.currentBalance
+                : allWallets.fold<double>(0.0, (sum, w) => sum + w.currentBalance);
+
+            // 4. إجمالي المصروف:
+            final dedicatedWalletPaid = accountantWallet != null
+                ? accountantWallet.totalPaid
+                : allWallets.fold<double>(0.0, (sum, w) => sum + w.totalPaid);
+
+            // Filtering for remaining beneficiary wallets
+            final filteredWallets = beneficiaryWallets.where((w) {
               if (_searchQuery.isNotEmpty) {
                 final q = _searchQuery.toLowerCase();
                 final matchName = w.userName.toLowerCase().contains(q);
@@ -158,12 +173,10 @@ class _AccountantBeneficiaryWalletsTabState
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                         child: _buildFinancialSummaryCard(
-                          totalWallets: allWallets.length,
-                          totalBalanceDue: totalBalanceDue,
-                          totalMonthlyQuota: totalMonthlyQuota,
-                          totalPaid: totalPaid,
-                          totalAllocated: totalAllocated,
+                          dedicatedWalletBalance: dedicatedWalletBalance,
+                          dedicatedWalletPaid: dedicatedWalletPaid,
                           collectionsMetrics: collectionsMetrics,
+                          accountantWallet: accountantWallet,
                           theme: theme,
                           colorScheme: colorScheme,
                         ),
@@ -240,7 +253,7 @@ class _AccountantBeneficiaryWalletsTabState
                                     children: [
                                       Icon(Icons.format_list_bulleted_rounded, size: 18, color: colorScheme.primary),
                                       const SizedBox(width: 10),
-                                      Text('جميع المحافظ (${allWallets.length})'),
+                                      Text('جميع المحافظ (${beneficiaryWallets.length})'),
                                     ],
                                   ),
                                 ),
@@ -250,7 +263,7 @@ class _AccountantBeneficiaryWalletsTabState
                                     children: [
                                       Icon(Icons.account_balance_wallet_outlined, size: 18, color: colorScheme.tertiary),
                                       const SizedBox(width: 10),
-                                      Text('مستحق للصرف (${allWallets.where((w) => w.currentBalance > 0).length})'),
+                                      Text('مستحق للصرف (${beneficiaryWallets.where((w) => w.currentBalance > 0).length})'),
                                     ],
                                   ),
                                 ),
@@ -260,7 +273,7 @@ class _AccountantBeneficiaryWalletsTabState
                                     children: [
                                       Icon(Icons.check_circle_outline_rounded, size: 18, color: colorScheme.outline),
                                       const SizedBox(width: 10),
-                                      Text('مسدد بالكامل (${allWallets.where((w) => w.currentBalance <= 0).length})'),
+                                      Text('مسدد بالكامل (${beneficiaryWallets.where((w) => w.currentBalance <= 0).length})'),
                                     ],
                                   ),
                                 ),
@@ -340,278 +353,179 @@ class _AccountantBeneficiaryWalletsTabState
 
 
 
-  /// كرت الإحصائيات والملخص المالي العام للمحاسب
+  /// كرت الموقف المالي للمحفظة الخاص بالمحاسب (4 مؤشرات واضحة وبسيطة)
   Widget _buildFinancialSummaryCard({
-    required int totalWallets,
-    required double totalBalanceDue,
-    required double totalMonthlyQuota,
-    required double totalPaid,
-    required double totalAllocated,
+    required double dedicatedWalletBalance,
+    required double dedicatedWalletPaid,
     required CollectionsRemainingMetrics collectionsMetrics,
+    required UserWalletModel? accountantWallet,
     required ThemeData theme,
     required ColorScheme colorScheme,
   }) {
-    final accountantCollectionsShare = collectionsMetrics.accountantRemainingShare;
-    final grandTotalDueCombined = totalBalanceDue + accountantCollectionsShare;
+    final collectionsShare = collectionsMetrics.accountantRemainingShare;
+    final grandTotalCombined = dedicatedWalletBalance + collectionsShare;
+    final percentageText = '${collectionsMetrics.accountantPercentage.toStringAsFixed(0)}%';
 
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primaryContainer.withValues(alpha: 0.5),
-            colorScheme.surfaceContainerHigh,
-          ],
-          begin: AlignmentDirectional.topStart,
-          end: AlignmentDirectional.bottomEnd,
-        ),
-        borderRadius: BorderRadius.circular(18),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+          width: 1.0,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── 1. الرأس والعنوان مع الأزرار السريعة ──
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   Icons.account_balance_wallet_rounded,
                   color: colorScheme.primary,
-                  size: 18,
+                  size: 20,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'الموقف المالي للمحفظة',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colorScheme.onSurface,
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              // أزرار سريعة ومبسطة (أيقونات) لسجل الحركات وكشف الحساب
+              if (accountantWallet != null && accountantWallet.userId.isNotEmpty) ...[
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                  tooltip: 'سجل الحركات والتدقيق',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _showTransactionsHistorySheet(
+                    context,
+                    accountantWallet,
+                    collectionsMetrics,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  tooltip: 'تصدير كشف الحساب',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _exportSingleWalletTransactionsCsv(accountantWallet),
+                ),
+              ],
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          // السطر الثاني للعنوان: الاسم والصفة ونسبة التحصيلات (في سطر مستقل لمنع أي Overflow نهائياً)
+          Row(
+            children: [
+              Text(
+                'فايز عاطر • إدارة الحسابات',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary,
-                  borderRadius: BorderRadius.circular(8),
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  '$totalWallets مستفيد',
+                  '$percentageText من متبقي التحصيلات',
                   style: TextStyle(
-                    color: colorScheme.onPrimary,
-                    fontSize: 10.5,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.visibility_outlined, size: 12, color: colorScheme.onSurfaceVariant),
-                const SizedBox(width: 4),
-                Text(
-                  'للاطلاع والتدقيق المحاسبي فقط',
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          // تفصيل مصادر التغذية المالية للمحاسب
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.account_tree_outlined, size: 14, color: colorScheme.primary),
-                    const SizedBox(width: 6),
-                    Text(
-                      'مصادر التغذية والمستحقات المالية',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '${collectionsMetrics.accountantPercentage.toStringAsFixed(0)}% من متبقي التحصيلات',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    // 1. المحفظة المخصصة
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'المحافظ المخصصة',
-                            style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
-                          ),
-                          const SizedBox(height: 2),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              _formatCurrency(totalBalanceDue),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text('+', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.outline)),
-                    const SizedBox(width: 8),
-                    // 2. حصة التحصيلات
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'نسبة التحصيلات (${collectionsMetrics.accountantPercentage.toStringAsFixed(0)}%)',
-                            style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
-                          ),
-                          const SizedBox(height: 2),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              _formatCurrency(accountantCollectionsShare),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text('=', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.outline)),
-                    const SizedBox(width: 8),
-                    // 3. الإجمالي الشامل
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'الإجمالي الشامل (Total)',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.primary),
-                          ),
-                          const SizedBox(height: 2),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              _formatCurrency(grandTotalDueCombined),
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+
           const SizedBox(height: 16),
+
+          // ── 2. المؤشرات المالية الأربعة في شبكة 2x2 رحبة وواضحة ──
           Row(
             children: [
-              // الرصيد القائم للصرف
-              Expanded(
-                child: _buildMetricTile(
-                  title: 'المستحق للصرف',
-                  value: _formatCurrency(grandTotalDueCombined),
-                  icon: Icons.payments_rounded,
-                  color: grandTotalDueCombined > 0 ? colorScheme.primary : colorScheme.tertiary,
-                  colorScheme: colorScheme,
-                ),
+              // 1. المحفظة المخصصة
+              _buildSummaryMetricBox(
+                title: 'المحفظة المخصصة',
+                subtitle: 'الرصيد المخصص',
+                value: _formatCurrency(dedicatedWalletBalance),
+                icon: Icons.wallet_rounded,
+                iconColor: colorScheme.primary,
+                backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                borderColor: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                colorScheme: colorScheme,
               ),
-              Container(
-                height: 40,
-                width: 1,
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                margin: const EdgeInsets.symmetric(horizontal: 8),
+              const SizedBox(width: 10),
+              // 2. نسبة التحصيلات
+              _buildSummaryMetricBox(
+                title: 'نسبة التحصيلات',
+                subtitle: '$percentageText من المتبقي',
+                value: _formatCurrency(collectionsShare),
+                icon: Icons.pie_chart_rounded,
+                iconColor: colorScheme.secondary,
+                backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                borderColor: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                colorScheme: colorScheme,
               ),
-              // الاستحقاق الشهري الدوري
-              Expanded(
-                child: _buildMetricTile(
-                  title: 'الاستحقاق الشهري',
-                  value: _formatCurrency(totalMonthlyQuota),
-                  icon: Icons.calendar_month_rounded,
-                  color: colorScheme.secondary,
-                  colorScheme: colorScheme,
-                ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          Row(
+            children: [
+              // 3. الإجمالي المستحق (Total)
+              _buildSummaryMetricBox(
+                title: 'الإجمالي المستحق',
+                subtitle: 'المحفظة + التحصيلات',
+                value: _formatCurrency(grandTotalCombined),
+                icon: Icons.account_balance_wallet_rounded,
+                iconColor: colorScheme.primary,
+                valueColor: colorScheme.primary,
+                backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.38),
+                borderColor: colorScheme.primary.withValues(alpha: 0.45),
+                colorScheme: colorScheme,
               ),
-              Container(
-                height: 40,
-                width: 1,
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-              ),
-              // إجمالي المنصرف
-              Expanded(
-                child: _buildMetricTile(
-                  title: 'إجمالي المنصرف',
-                  value: _formatCurrency(totalPaid),
-                  icon: Icons.check_circle_outline_rounded,
-                  color: colorScheme.tertiary,
-                  colorScheme: colorScheme,
-                ),
+              const SizedBox(width: 10),
+              // 4. إجمالي المصروف
+              _buildSummaryMetricBox(
+                title: 'إجمالي المصروف',
+                subtitle: 'المنصرف حتى الآن',
+                value: _formatCurrency(dedicatedWalletPaid),
+                icon: Icons.check_circle_outline_rounded,
+                iconColor: colorScheme.tertiary,
+                backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                borderColor: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                colorScheme: colorScheme,
               ),
             ],
           ),
@@ -620,48 +534,83 @@ class _AccountantBeneficiaryWalletsTabState
     );
   }
 
-  Widget _buildMetricTile({
+  Widget _buildSummaryMetricBox({
     required String title,
     required String value,
     required IconData icon,
-    required Color color,
+    required Color iconColor,
+    required Color backgroundColor,
+    required Color borderColor,
     required ColorScheme colorScheme,
+    Color? valueColor,
+    String? subtitle,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 12, color: colorScheme.onSurfaceVariant),
-            const SizedBox(width: 4),
-            Expanded(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.all(4.5),
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Icon(icon, size: 15, color: iconColor),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerStart,
               child: Text(
-                title,
+                value,
                 style: TextStyle(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.bold,
+                  color: valueColor ?? colorScheme.onSurface,
+                ),
+              ),
+            ),
+            if (subtitle != null && subtitle.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-            ),
+            ],
           ],
         ),
-        const SizedBox(height: 4),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerRight,
-          child: Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -970,7 +919,7 @@ class _AccountantBeneficiaryWalletsTabState
                 ),
                 const SizedBox(width: 8),
 
-                // 2. الاستحقاق الشهري
+                // 2. إجمالي المستحق
                 Expanded(
                   flex: 4,
                   child: Container(
@@ -983,7 +932,7 @@ class _AccountantBeneficiaryWalletsTabState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'الاستحقاق الشهري',
+                          'إجمالي المستحق',
                           style: TextStyle(
                             fontSize: 10.5,
                             color: colorScheme.onSurfaceVariant,
@@ -993,9 +942,7 @@ class _AccountantBeneficiaryWalletsTabState
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            wallet.monthlyAllocation > 0
-                                ? _formatCurrency(wallet.monthlyAllocation)
-                                : 'غير محدد',
+                            _formatCurrency(wallet.totalAllocated),
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.bold,
@@ -1323,7 +1270,7 @@ class _AccountantBeneficiaryWalletsTabState
 
     try {
       final csvHeader =
-          '\uFEFFاسم المستفيد,المسمى الوظيفي,الشركة,رقم الهاتف,الرصيد المتبقي للصرف,إجمالي المستحق,إجمالي المنصرف,الاستحقاق الشهري,حالة المحفظة,ملاحظات\n';
+          '\uFEFFاسم المستفيد,المسمى الوظيفي,الشركة,رقم الهاتف,الرصيد المتبقي للصرف,إجمالي المستحق,إجمالي المنصرف,حالة المحفظة,ملاحظات\n';
       final csvRows = wallets.map((w) {
         final name = w.userName.replaceAll(',', ' ');
         final role = w.userRole.replaceAll(',', ' ');
@@ -1332,10 +1279,9 @@ class _AccountantBeneficiaryWalletsTabState
         final currentBal = w.currentBalance.toStringAsFixed(2);
         final totalAlloc = w.totalAllocated.toStringAsFixed(2);
         final totalPaid = w.totalPaid.toStringAsFixed(2);
-        final monthly = w.monthlyAllocation.toStringAsFixed(2);
         final status = w.isWalletEnabled ? 'مفعلة' : 'معطلة';
         final notes = w.notes.replaceAll(',', ' ').replaceAll('\n', ' ');
-        return '$name,$role,$company,$phone,$currentBal,$totalAlloc,$totalPaid,$monthly,$status,$notes';
+        return '$name,$role,$company,$phone,$currentBal,$totalAlloc,$totalPaid,$status,$notes';
       }).join('\n');
 
       final csvContent = '$csvHeader$csvRows';

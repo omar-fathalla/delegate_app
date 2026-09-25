@@ -73,27 +73,56 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // (will be replaced by admin auth if admin is found)
       await signInAnonymously();
 
-      final querySnapshot = await firestore
-          .collectionGroup('delegates')
-          .where('phoneNumber', isEqualTo: normalizedPhone)
-          .get()
-          .timeout(const Duration(seconds: 5));
+      // Safe query helper to eliminate Future.catchError type mismatch errors and handle timeouts
+      Future<QuerySnapshot<Map<String, dynamic>>?> safeQuery(
+        Future<QuerySnapshot<Map<String, dynamic>>> queryFuture,
+        String debugLabel,
+      ) async {
+        try {
+          return await queryFuture.timeout(const Duration(seconds: 10));
+        } catch (e) {
+          debugPrint('$debugLabel query error: $e');
+          return null;
+        }
+      }
+
+      final delegatesFuture = safeQuery(
+        firestore
+            .collectionGroup('delegates')
+            .where('phoneNumber', isEqualTo: normalizedPhone)
+            .get(),
+        'delegates collectionGroup',
+      );
+
+      final usersFuture = safeQuery(
+        firestore
+            .collection('users')
+            .where('phoneNumber', isEqualTo: normalizedPhone)
+            .get(),
+        'users collection',
+      );
+
+      final results = await Future.wait([delegatesFuture, usersFuture]);
+      final querySnapshot = results[0];
+      var userQuery = results[1];
 
       final delegatesMap = <String, DelegateModel>{};
-      for (final doc in querySnapshot.docs) {
-        final data = doc.data();
-        final model = DelegateModel.fromJson(data, doc.id);
-        // Key based on uid, organizationUID, and companyUID to prevent identical duplicate records
-        final key = '${model.uid}_${model.organizationUID}_${model.companyUID}';
-        if (delegatesMap.containsKey(key)) {
-          final existing = delegatesMap[key]!;
-          if (existing.status != DelegateStatus.approved &&
-              existing.status != DelegateStatus.active &&
-              (model.status == DelegateStatus.approved || model.status == DelegateStatus.active)) {
+      if (querySnapshot != null) {
+        for (final doc in querySnapshot.docs) {
+          final data = doc.data();
+          final model = DelegateModel.fromJson(data, doc.id);
+          // Key based on uid, organizationUID, and companyUID to prevent identical duplicate records
+          final key = '${model.uid}_${model.organizationUID}_${model.companyUID}';
+          if (delegatesMap.containsKey(key)) {
+            final existing = delegatesMap[key]!;
+            if (existing.status != DelegateStatus.approved &&
+                existing.status != DelegateStatus.active &&
+                (model.status == DelegateStatus.approved || model.status == DelegateStatus.active)) {
+              delegatesMap[key] = model;
+            }
+          } else {
             delegatesMap[key] = model;
           }
-        } else {
-          delegatesMap[key] = model;
         }
       }
 
@@ -102,19 +131,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // Also check if the user is an admin in the 'users' collection
       // (a phone number can exist in both delegates and users collections)
       try {
-        var userQuery = await firestore
-            .collection('users')
-            .where('phoneNumber', isEqualTo: normalizedPhone)
-            .get()
-            .timeout(const Duration(seconds: 5));
-        var docs = userQuery.docs.toList();
+        var docs = userQuery?.docs.toList() ?? [];
         if (docs.isEmpty) {
-          userQuery = await firestore
-              .collection('users')
-              .where('phoneNumber', isEqualTo: phoneNumber.trim())
-              .get()
-              .timeout(const Duration(seconds: 5));
-          docs = userQuery.docs.toList();
+          try {
+            final fallbackQuery = await firestore
+                .collection('users')
+                .where('phoneNumber', isEqualTo: phoneNumber.trim())
+                .get()
+                .timeout(const Duration(seconds: 8));
+            docs = fallbackQuery.docs.toList();
+          } catch (_) {}
         }
         
         // Prioritize higher roles in case a phone number has multiple accounts
@@ -324,7 +350,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         ];
       }
       throw ServerFailure(
-        'فشل في الاتصال بقاعدة البيانات. حاول مرة أخرى. (${e.code})',
+        'فشل في الاتصال بقاعدة البيانات. يرجى التحقق من الاتصال والمحاولة مرة أخرى. (${e.code})',
       );
     } catch (e) {
       if (_normalizePhone(phoneNumber) == '01508899965') {
@@ -364,7 +390,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           ),
         ];
       }
-      throw ServerFailure('حدث خطأ غير متوقع أثناء تسجيل الدخول: $e');
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('timeout')) {
+        throw const ServerFailure('انتهت مهلة الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.');
+      } else if (errStr.contains('socket') || errStr.contains('network') || errStr.contains('unavailable')) {
+        throw const ServerFailure('تعذر الاتصال بالإنترنت. يرجى التأكد من تشغيل البيانات أو الواي فاي والمحاولة ثانية.');
+      }
+      throw const ServerFailure('تعذر تسجيل الدخول حالياً. يرجى التأكد من صحة رقم الهاتف والمحاولة ثانية.');
     }
   }
 
@@ -456,15 +488,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           .collection('users')
           .where('phoneNumber', isEqualTo: normalizedPhone)
           .get()
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 8));
 
       var docs = query.docs;
-      if (docs.isEmpty) {
+      if (docs.isEmpty && phoneNumber.trim() != normalizedPhone) {
         query = await firestore
             .collection('users')
             .where('phoneNumber', isEqualTo: phoneNumber.trim())
             .get()
-            .timeout(const Duration(seconds: 4));
+            .timeout(const Duration(seconds: 8));
         docs = query.docs;
       }
 

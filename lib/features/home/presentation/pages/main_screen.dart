@@ -67,11 +67,34 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
+  List<Delegate> _filterDelegatesForContext(List<Delegate> delegates) {
+    if (widget.delegate.role == UserRole.delegate) {
+      // In mobile delegate workspace, only show field delegate/promoter chains
+      final fieldProfiles = delegates.where((d) => d.role == UserRole.delegate).toList();
+      return fieldProfiles.isNotEmpty ? fieldProfiles : delegates;
+    }
+    return delegates;
+  }
+
   Future<void> _loadAllDelegates() async {
     final result = await di.sl<AuthRepository>().getCachedAllDelegates();
     result.fold((_) {}, (delegates) {
-      if (mounted) setState(() => _allDelegates = delegates);
+      if (mounted) setState(() => _allDelegates = _filterDelegatesForContext(delegates));
     });
+
+    // Stale-While-Revalidate: fetch latest delegates from remote to sync new chains/organizations
+    if (widget.delegate.phoneNumber.isNotEmpty) {
+      final remoteResult =
+          await di.sl<AuthRepository>().getDelegatesByPhone(widget.delegate.phoneNumber);
+      remoteResult.fold((_) {}, (latestDelegates) {
+        if (latestDelegates.isNotEmpty) {
+          di.sl<AuthRepository>().cacheAllDelegates(latestDelegates);
+          if (mounted) {
+            setState(() => _allDelegates = _filterDelegatesForContext(latestDelegates));
+          }
+        }
+      });
+    }
   }
 
   void _showLogoutDialog(BuildContext context) {
@@ -423,16 +446,31 @@ class _MainScreenState extends State<MainScreen> {
     final cacheDelegate = di.sl<CacheDelegate>();
     await cacheDelegate(delegate);
     if (mounted) {
+      final orgLabel = delegate.companyName.isNotEmpty
+          ? '${delegate.organizationName} - ${delegate.companyName}'
+          : delegate.organizationName;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'تم التبديل بنجاح إلى: ${delegate.organizationName} - ${delegate.companyName}',
-          ),
+          content: Text('تم التبديل بنجاح إلى: $orgLabel'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
         ),
       );
-      context.go('/home', extra: delegate);
+
+      if (delegate.role == UserRole.admin ||
+          delegate.role == UserRole.superAdmin ||
+          delegate.role == UserRole.organizationAdmin ||
+          delegate.role == UserRole.technicalSupport) {
+        context.go('/admin/home', extra: delegate);
+      } else if (delegate.role == UserRole.accountant) {
+        context.go('/accountant/home', extra: delegate);
+      } else if (delegate.role == UserRole.marketing ||
+          delegate.role == UserRole.marketingPromotion ||
+          delegate.role == UserRole.branchesMarketingManager) {
+        context.go('/marketing/home', extra: delegate);
+      } else {
+        context.go('/home', extra: delegate);
+      }
     }
   }
 
@@ -464,7 +502,23 @@ class _MainScreenState extends State<MainScreen> {
             ],
           ),
           children: _allDelegates.map((delegate) {
-            final isCurrentOrg = delegate.uid == currentDelegate.uid;
+            final isCurrentOrg = delegate.uid == currentDelegate.uid &&
+                delegate.organizationUID == currentDelegate.organizationUID &&
+                delegate.companyUID == currentDelegate.companyUID;
+
+            final subtitleText = delegate.companyName.trim().isNotEmpty
+                ? delegate.companyName.trim()
+                : (delegate.role == UserRole.marketing ||
+                        delegate.role == UserRole.marketingPromotion
+                    ? (isArabic ? 'إدارة التسويق' : 'Marketing Department')
+                    : (delegate.role == UserRole.admin ||
+                            delegate.role == UserRole.superAdmin ||
+                            delegate.role == UserRole.organizationAdmin
+                        ? (isArabic ? 'لوحة الإدارة' : 'Admin Panel')
+                        : (delegate.role == UserRole.accountant
+                            ? (isArabic ? 'الحسابات والمالية' : 'Accounting')
+                            : '')));
+
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Card(
@@ -486,20 +540,24 @@ class _MainScreenState extends State<MainScreen> {
                         : colorScheme.onSurfaceVariant,
                   ),
                   title: Text(
-                    delegate.organizationName,
+                    delegate.organizationName.isNotEmpty
+                        ? delegate.organizationName
+                        : 'منظمة غير محددة',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: colorScheme.onSurface,
                     ),
                   ),
-                  subtitle: Text(
-                    delegate.companyName,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                  subtitle: subtitleText.isNotEmpty
+                      ? Text(
+                          subtitleText,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        )
+                      : null,
                   trailing: isCurrentOrg
                       ? Icon(Icons.check_circle_rounded, color: colorScheme.primary)
                       : null,

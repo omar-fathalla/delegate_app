@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// نافذة أمان مخصصة عند محاولة الدخول من جهاز غير مطابق لجهاز المندوب المعتمد
-class DeviceLockDialog extends StatelessWidget {
+class DeviceLockDialog extends StatefulWidget {
   final String? boundDeviceModel;
   final String? currentDeviceModel;
   final String? delegateName;
+  final Delegate? delegate;
 
   const DeviceLockDialog({
     super.key,
     this.boundDeviceModel,
     this.currentDeviceModel,
     this.delegateName,
+    this.delegate,
   });
 
   static Future<void> show(
@@ -20,6 +22,7 @@ class DeviceLockDialog extends StatelessWidget {
     String? boundDeviceModel,
     String? currentDeviceModel,
     String? delegateName,
+    Delegate? delegate,
   }) {
     return showDialog<void>(
       context: context,
@@ -28,40 +31,91 @@ class DeviceLockDialog extends StatelessWidget {
         boundDeviceModel: boundDeviceModel,
         currentDeviceModel: currentDeviceModel,
         delegateName: delegateName,
+        delegate: delegate,
       ),
     );
   }
 
-  Future<void> _makeCall(BuildContext context) async {
-    const phone = DeviceBindingService.technicalSupportPhone;
-    final uri = Uri.parse('tel:$phone');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      }
-    } catch (_) {}
+  @override
+  State<DeviceLockDialog> createState() => _DeviceLockDialogState();
+}
+
+class _DeviceLockDialogState extends State<DeviceLockDialog> {
+  bool _isChecking = true;
+  bool _isPending = false;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingRequest();
   }
 
-  Future<void> _openWhatsApp(BuildContext context) async {
-    const phone = DeviceBindingService.technicalSupportPhone;
-    final cleanPhone = '2$phone';
-    final message = Uri.encodeComponent(
-      'السلام عليكم، أرجو فك ربط جهازي بحساب المندوب ${delegateName != null ? "($delegateName)" : ""}. قمت بتغيير الهاتف.',
-    );
-    final uri = Uri.parse('https://wa.me/$cleanPhone?text=$message');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+  Future<void> _checkExistingRequest() async {
+    if (widget.delegate != null && widget.delegate!.uid.isNotEmpty) {
+      final pending = await DeviceBindingService.hasPendingUnbindRequest(widget.delegate!.uid);
+      if (mounted) {
+        setState(() {
+          _isPending = pending;
+          _isChecking = false;
+        });
       }
-    } catch (_) {}
+    } else {
+      if (mounted) {
+        setState(() => _isChecking = false);
+      }
+    }
+  }
+
+  Future<void> _handleSendUnbindRequest() async {
+    if (widget.delegate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر تحديد بيانات المندوب لإرسال الطلب')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final success = await DeviceBindingService.submitUnbindRequest(
+        delegate: widget.delegate!,
+        currentDeviceModel: widget.currentDeviceModel,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _isPending = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success
+              ? 'تم إرسال طلب فك الارتباط للإدارة بنجاح'
+              : 'طلبك قيد المراجعة لدى الإدارة بالفعل'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ أثناء إرسال الطلب: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final boundModel = (boundDeviceModel != null && boundDeviceModel!.trim().isNotEmpty)
-        ? boundDeviceModel!
+    final boundModel = (widget.boundDeviceModel != null && widget.boundDeviceModel!.trim().isNotEmpty)
+        ? widget.boundDeviceModel!
         : 'جهاز معتمد سابق';
 
     return PopScope(
@@ -153,7 +207,7 @@ class DeviceLockDialog extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (currentDeviceModel != null && currentDeviceModel!.isNotEmpty) ...[
+                    if (widget.currentDeviceModel != null && widget.currentDeviceModel!.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
                       const SizedBox(height: 8),
@@ -173,7 +227,7 @@ class DeviceLockDialog extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsetsDirectional.only(start: 26),
                           child: Text(
-                            currentDeviceModel!,
+                            widget.currentDeviceModel!,
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -190,56 +244,88 @@ class DeviceLockDialog extends StatelessWidget {
               const SizedBox(height: 14),
 
               Text(
-                'إذا قمت بتغيير هاتفك أو استبداله، يرجى التواصل مع الدعم الفني لفك ربط الجهاز القديم وتفعيل هاتفك الجديد.',
+                'إذا قمت بتغيير هاتفك أو استبداله، يمكنك إرسال طلب لفك ارتباط جهازك القديم ليتم اعتماده من قِبل الإدارة.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
                   color: colorScheme.onSurfaceVariant,
+                  height: 1.4,
                 ),
               ),
 
               const SizedBox(height: 18),
 
-              // 5. Direct Action Call Support Button
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => _makeCall(context),
-                  icon: const Icon(Icons.phone_forwarded_rounded, size: 20),
-                  label: const Text(
-                    'اتصال بالدعم الفني (${DeviceBindingService.technicalSupportPhone})',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+              // 5. Action: Send Unbind Request OR Pending Status
+              if (_isChecking)
+                const SizedBox(
+                  height: 48,
+                  child: Center(child: CircularProgressIndicator.adaptive()),
+                )
+              else if (_isPending)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
                   ),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.hourglass_top_rounded, color: colorScheme.primary, size: 24),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'طلب فك الارتباط قيد المراجعة',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'تم استلام طلبك وهو بانتظار موافقة الإدارة. ستصلك رسالة فور فك الارتباط لتتمكن من تسجيل الدخول.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: colorScheme.onPrimaryContainer.withValues(alpha: 0.85),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _isSubmitting ? null : _handleSendUnbindRequest,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.phonelink_erase_rounded, size: 20),
+                    label: Text(
+                      _isSubmitting ? 'جاري إرسال الطلب...' : 'إرسال طلب لفك الارتباط',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
                   ),
                 ),
-              ),
 
               const SizedBox(height: 8),
 
-              // 6. WhatsApp Support Button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _openWhatsApp(context),
-                  icon: Icon(Icons.chat_rounded, size: 18, color: colorScheme.secondary),
-                  label: Text(
-                    'مراسلة الدعم الفني عبر واتساب',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.secondary),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: colorScheme.secondary.withValues(alpha: 0.5), width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // 7. Cancel / Close
+              // 6. Close Button
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(

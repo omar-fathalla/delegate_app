@@ -6,6 +6,7 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionRepository {
   final FirebaseFirestore _firestore;
@@ -371,6 +372,138 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
   }
 
   @override
+  Future<Either<Failure, String>> submitAddOrganizationRequest({
+    required String supervisorUid,
+    required String supervisorName,
+    required String supervisorPhone,
+    required String companyUID,
+    required String companyName,
+    required String targetOrganizationUID,
+    required String targetOrganizationName,
+    required Delegate existingDelegate,
+    required SubscriptionPaymentMethod paymentMethod,
+    String? receiptCode,
+    File? receiptImage,
+    double? fee,
+    int? remainingMonths,
+  }) async {
+    try {
+      final docRef = _firestore.collection('delegate_requests').doc();
+      final requestId = docRef.id;
+
+      // 1. Upload Receipt Image (if provided)
+      String? receiptUrl;
+      if (receiptImage != null) {
+        final receiptSnap = await _storage
+            .ref('delegate_subscription_receipts/$requestId/receipt.jpg')
+            .putFile(receiptImage);
+        receiptUrl = await receiptSnap.ref.getDownloadURL();
+      }
+
+      // 2. Subscription cycle dates and prorated fee
+      final cycleCode = SubscriptionCycleHelper.getCycleCode();
+      final cycleStartDate = SubscriptionCycleHelper.getCycleStartDate();
+      final cycleEndDate = SubscriptionCycleHelper.getCycleEndDate();
+      final calculatedRemainingMonths =
+          remainingMonths ?? SubscriptionCycleHelper.getRemainingMonthsInCycle();
+      final calculatedFee =
+          fee ?? SubscriptionCycleHelper.getProratedSubscriptionFee();
+
+      // 3. Extract existing document URLs
+      final profileUrl = existingDelegate.personalPhotoUrl ?? '';
+      String frontUrl = '';
+      String backUrl = '';
+      for (final doc in existingDelegate.documents) {
+        if (doc.documentKey == DocumentKey.nationalityId) {
+          frontUrl = doc.documentURL;
+          backUrl = doc.secondaryURL ?? '';
+          break;
+        }
+      }
+
+      final request = DelegateSubscriptionRequest(
+        id: requestId,
+        supervisorUid: supervisorUid,
+        supervisorName: supervisorName,
+        supervisorPhone: supervisorPhone,
+        companyUID: companyUID,
+        companyName: companyName,
+        organizationUID: targetOrganizationUID,
+        organizationName: targetOrganizationName,
+        firstName: existingDelegate.firstName,
+        secondName: existingDelegate.middleName,
+        thirdName: existingDelegate.lastName,
+        fullName: existingDelegate.fullName,
+        phoneNumber: existingDelegate.phoneNumber,
+        nationalId: existingDelegate.nationalityID,
+        profileImageUrl: profileUrl,
+        nationalIdFrontUrl: frontUrl,
+        nationalIdBackUrl: backUrl,
+        paymentMethod: paymentMethod,
+        receiptCode: receiptCode,
+        receiptImageUrl: receiptUrl,
+        subscriptionCycle: cycleCode,
+        cycleStartDate: cycleStartDate,
+        cycleEndDate: cycleEndDate,
+        fee: calculatedFee,
+        remainingMonths: calculatedRemainingMonths,
+        status: SubscriptionRequestStatus.pending,
+        requestType: 'add_organization',
+        existingDelegateUid: existingDelegate.uid,
+        currentOrganizationName: existingDelegate.organizationName,
+        createdAt: DateTime.now(),
+      );
+
+      // 4. Write request to Firestore
+      await docRef.set(request.toMap());
+
+      // 5. If branch electronic receipt, record code in used_receipt_codes
+      if (paymentMethod == SubscriptionPaymentMethod.branchReceipt &&
+          receiptCode != null &&
+          receiptCode.trim().isNotEmpty) {
+        try {
+          await _firestore.collection('used_receipt_codes').doc(receiptCode.trim()).set({
+            'receiptCode': receiptCode.trim(),
+            'requestId': requestId,
+            'supervisorUid': supervisorUid,
+            'supervisorName': supervisorName,
+            'companyUID': companyUID,
+            'companyName': companyName,
+            'organizationUID': targetOrganizationUID,
+            'organizationName': targetOrganizationName,
+            'status': 'reserved',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        } catch (_) {}
+      }
+
+      // 6. Send notifications to admins
+      final notifTitle = 'طلب إضافة سلسلة جديدة لمندوب';
+      final notifBody =
+          'طلب المشرف $supervisorName ربط المندوب ${existingDelegate.fullName} بسلسلة $targetOrganizationName (${paymentMethod.displayName})';
+
+      for (final roleKey in ['super-admin', 'technicalSupport', 'role_super_admin', 'role_technical_support']) {
+        await _firestore.collection('notifications').add({
+          'delegateUid': roleKey,
+          'title': notifTitle,
+          'body': notifBody,
+          'type': 'delegate_subscription_request',
+          'requestId': requestId,
+          'senderName': supervisorName,
+          'senderRole': 'supervisor',
+          'createdAt': FieldValue.serverTimestamp(),
+          'isRead': false,
+          'targetRoles': ['superAdmin', 'technicalSupport'],
+        });
+      }
+
+      return Right(requestId);
+    } catch (e) {
+      return Left(ServerFailure('فشل إرسال طلب ربط المندوب بالمنظمة: $e'));
+    }
+  }
+
+  @override
   Future<Either<Failure, bool>> isReceiptCodeUsed(String receiptCode) async {
     try {
       final cleanCode = receiptCode.trim();
@@ -470,9 +603,14 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'reviewedAt': now.toIso8601String(),
       });
 
+      final targetDelegateUid = (request.existingDelegateUid != null &&
+              request.existingDelegateUid!.trim().isNotEmpty)
+          ? request.existingDelegateUid!.trim()
+          : request.id;
+
       // 2. Update delegate record to active in company branch
       final delegateData = {
-        'uid': request.id,
+        'uid': targetDelegateUid,
         'firstName': request.firstName,
         'secondName': request.secondName,
         'thirdName': request.thirdName,
@@ -582,7 +720,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           .collection('companies')
           .doc(request.companyUID)
           .collection('delegates')
-          .doc(request.id)
+          .doc(targetDelegateUid)
           .set(delegateData, SetOptions(merge: true));
 
       // 2d. If supervisor belongs to a different primary organization, also provision in supervisor's branch
@@ -596,14 +734,14 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
               .collection('companies')
               .doc(request.companyUID)
               .collection('delegates')
-              .doc(request.id)
+              .doc(targetDelegateUid)
               .set(delegateData, SetOptions(merge: true));
         }
       } catch (_) {}
 
       // 3. Also ensure user record exists for mobile login
-      await _firestore.collection('users').doc(request.id).set({
-        'uid': request.id,
+      await _firestore.collection('users').doc(targetDelegateUid).set({
+        'uid': targetDelegateUid,
         'fullName': request.fullName,
         'phoneNumber': request.phoneNumber,
         'phone': request.phoneNumber,
@@ -625,19 +763,38 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         } catch (_) {}
       }
 
-      // 4. Send notification to supervisor
+      // 4. Send notification to supervisor and delegate
       try {
+        final isAddOrg = request.requestType == 'add_organization';
         await _firestore.collection('notifications').add({
           'delegateUid': request.supervisorUid,
-          'title': 'تم اعتماد المندوب بنجاح',
-          'body':
-              'تمت الموافقة على اشتراك المندوب ${request.fullName} في ${request.organizationName}، وأصبح حسابه نشطاً الآن.',
+          'title': isAddOrg
+              ? 'تم اعتماد إضافة المندوب للسلسلة بنجاح'
+              : 'تم اعتماد المندوب بنجاح',
+          'body': isAddOrg
+              ? 'تمت الموافقة على إضافة المندوب ${request.fullName} إلى ${request.organizationName}، وأصبح بإمكانه التبديل إليها وتسجيل حضوره.'
+              : 'تمت الموافقة على اشتراك المندوب ${request.fullName} في ${request.organizationName}، وأصبح حسابه نشطاً الآن.',
           'type': 'subscription_approved',
           'senderName': 'الإدارة العامة',
           'senderRole': 'superAdmin',
           'createdAt': FieldValue.serverTimestamp(),
           'isRead': false,
         });
+
+        if (isAddOrg) {
+          // Notify the delegate directly
+          await _firestore.collection('notifications').add({
+            'delegateUid': targetDelegateUid,
+            'title': 'تمت إضافتك لسلسلة ${request.organizationName}',
+            'body':
+                'تمت إضافة سلسلة ${request.organizationName} إلى حسابك بنجاح! يمكنك الآن التبديل إليها وتسجيل حضورك وانصرافك.',
+            'type': 'organization_added',
+            'senderName': 'الإدارة العامة',
+            'senderRole': 'superAdmin',
+            'createdAt': FieldValue.serverTimestamp(),
+            'isRead': false,
+          });
+        }
       } catch (e) {
         // Log non-blocking auxiliary error
       }

@@ -330,4 +330,145 @@ class DeviceBindingService {
       }
     }
   }
+
+  /// التحقق مما إذا كان لدى المندوب طلب فك ارتباط معلق حالياً
+  static Future<bool> hasPendingUnbindRequest(String delegateUid) async {
+    try {
+      final snap = await _firestore
+          .collection('device_unbind_requests')
+          .where('delegateUid', isEqualTo: delegateUid)
+          .where('status', isEqualTo: 'pending')
+          .limit(1)
+          .get();
+      return snap.docs.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking pending unbind request: $e');
+      return false;
+    }
+  }
+
+  /// إرسال طلب فك ارتباط الجهاز القديم من قبل المندوب
+  static Future<bool> submitUnbindRequest({
+    required Delegate delegate,
+    String? currentDeviceModel,
+    String? currentDeviceId,
+    String? reason,
+  }) async {
+    try {
+      final isPending = await hasPendingUnbindRequest(delegate.uid);
+      if (isPending) return false;
+
+      String devModel = currentDeviceModel ?? '';
+      String devId = currentDeviceId ?? '';
+      if (devModel.isEmpty || devId.isEmpty) {
+        final details = await getCurrentDeviceDetails();
+        if (devModel.isEmpty) devModel = details['deviceModel'] ?? 'Unknown Device';
+        if (devId.isEmpty) devId = details['deviceId'] ?? '';
+      }
+
+      final docRef = _firestore.collection('device_unbind_requests').doc();
+      await docRef.set({
+        'id': docRef.id,
+        'delegateUid': delegate.uid,
+        'delegateName': delegate.fullName.isNotEmpty
+            ? delegate.fullName
+            : '${delegate.firstName} ${delegate.lastName}'.trim(),
+        'delegatePhone': delegate.phoneNumber,
+        'organizationUID': delegate.organizationUID,
+        'companyUID': delegate.companyUID,
+        'companyName': delegate.companyName,
+        'boundDeviceId': delegate.boundDeviceId ?? '',
+        'boundDeviceModel': delegate.boundDeviceModel ?? '',
+        'requestedDeviceModel': devModel,
+        'requestedDeviceId': devId,
+        'status': 'pending',
+        'reason': reason ?? 'طلب فك ارتباط الجهاز القديم لاستبدال الهاتف',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error submitting unbind request: $e');
+      rethrow;
+    }
+  }
+
+  /// الموافقة على طلب فك الارتباط من قِبل الإدارة
+  static Future<void> approveUnbindRequest({
+    required String requestId,
+    required String delegateUid,
+    String? organizationUID,
+    String? companyUID,
+    required String adminUid,
+    required String adminName,
+  }) async {
+    // 1. فك ربط جهاز المندوب
+    await resetDelegateDeviceBinding(
+      delegateUid: delegateUid,
+      organizationUID: organizationUID,
+      companyUID: companyUID,
+      adminUid: adminUid,
+    );
+
+    // 2. تحديث حالة الطلب إلى معتمد
+    await _firestore.collection('device_unbind_requests').doc(requestId).update({
+      'status': 'approved',
+      'resolvedAt': FieldValue.serverTimestamp(),
+      'resolvedBy': adminUid,
+      'resolvedByName': adminName,
+    });
+
+    // 3. إرسال إشعار للمندوب
+    try {
+      await _firestore.collection('notifications').add({
+        'delegateUid': delegateUid,
+        'title': 'تمت الموافقة على فك ربط جهازك',
+        'body': 'تم فك ربط هاتفك القديم بنجاح. يمكنك الآن تسجيل الدخول من جهازك الجديد وسيتم اعتماده تلقائياً.',
+        'type': 'device_unbound',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': adminUid,
+        'senderName': adminName,
+      });
+    } catch (e) {
+      debugPrint('Error sending unbind approval notification: $e');
+    }
+  }
+
+  /// رفض طلب فك الارتباط من قِبل الإدارة
+  static Future<void> rejectUnbindRequest({
+    required String requestId,
+    required String delegateUid,
+    required String adminUid,
+    required String adminName,
+    String? reason,
+  }) async {
+    final rejectMsg = reason?.trim().isNotEmpty == true
+        ? reason!.trim()
+        : 'تم رفض طلب فك ارتباط الجهاز من قبل الإدارة';
+
+    // 1. تحديث حالة الطلب إلى مرفوض
+    await _firestore.collection('device_unbind_requests').doc(requestId).update({
+      'status': 'rejected',
+      'rejectReason': rejectMsg,
+      'resolvedAt': FieldValue.serverTimestamp(),
+      'resolvedBy': adminUid,
+      'resolvedByName': adminName,
+    });
+
+    // 2. إرسال إشعار للمندوب
+    try {
+      await _firestore.collection('notifications').add({
+        'delegateUid': delegateUid,
+        'title': 'تم رفض طلب فك ربط الجهاز',
+        'body': rejectMsg,
+        'type': 'device_unbind_rejected',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': adminUid,
+        'senderName': adminName,
+      });
+    } catch (e) {
+      debugPrint('Error sending unbind rejection notification: $e');
+    }
+  }
 }

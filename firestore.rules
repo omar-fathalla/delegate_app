@@ -551,6 +551,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // ==================== DEVICE UNBIND REQUESTS ====================
+    match /device_unbind_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    // ==================== DELEGATE LIVE TRACKING ====================
+    match /delegate_tracking/{delegateId} {
+      allow read, write: if true;
+    }
+
     // ==================== DEFAULT DENY ====================
     // Any collection not explicitly matched above will be denied
     match /{document=**} {

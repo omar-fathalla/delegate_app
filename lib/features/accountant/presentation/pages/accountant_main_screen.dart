@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_subscription_financial_report_screen.dart';
 import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
+import 'package:delegate_app/features/wallet/data/models/user_wallet_model.dart';
 import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
@@ -230,7 +231,7 @@ class _AccountantMainScreenState extends State<AccountantMainScreen> {
 }
 
 /// تاب النظرة العامة والكروت السريعة للعمليات المالية
-class _AccountantOverviewTab extends StatelessWidget {
+class _AccountantOverviewTab extends StatefulWidget {
   final Delegate delegate;
   final ValueChanged<int> onNavigateToTab;
 
@@ -238,6 +239,27 @@ class _AccountantOverviewTab extends StatelessWidget {
     required this.delegate,
     required this.onNavigateToTab,
   });
+
+  @override
+  State<_AccountantOverviewTab> createState() => _AccountantOverviewTabState();
+}
+
+class _AccountantOverviewTabState extends State<_AccountantOverviewTab> {
+  final WalletRemoteDataSource _dataSource = WalletRemoteDataSourceImpl();
+  late final Stream<List<UserWalletModel>> _walletsStream;
+  late final Stream<CollectionsRemainingMetrics> _collectionsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _walletsStream = _dataSource.streamAllWallets();
+    _collectionsStream = _dataSource.streamCollectionsRemainingMetrics();
+  }
+
+  String _formatCurrency(num amount) {
+    final formatter = NumberFormat('#,##0.00', 'en_US');
+    return '${formatter.format(amount)} ج.م';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -256,96 +278,301 @@ class _AccountantOverviewTab extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // بطاقة الترحيب والملف المالي
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primary,
-                    colorScheme.primary.withValues(alpha: 0.85),
-                  ],
-                  begin: AlignmentDirectional.topStart,
-                  end: AlignmentDirectional.bottomEnd,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.primary.withValues(alpha: 0.25),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // ترويسة الترحيب المالي السريعة
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        l10n.accountantDashboard,
-                        style: TextStyle(
-                          color: colorScheme.onPrimary,
-                          fontSize: 18,
+                        'مرحباً بك، ${widget.delegate.fullName.isNotEmpty ? widget.delegate.fullName : "فايز عاطر"}',
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colorScheme.onPrimary.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          formattedDate,
-                          style: TextStyle(
-                            color: colorScheme.onPrimary,
-                            fontSize: 12,
-                          ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'إدارة الرقابة المالية والحسابات',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'مرحباً بك في منظومة الرقابة المالية والحسابات. يمكنك مراجعة وتدقيق كافة اشتراكات المناديب، إيصالات الدفع الإلكتروني، وحركات المحافظ المالية بكل دقة.',
-                    style: TextStyle(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.9),
-                      fontSize: 13,
-                      height: 1.5,
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  InkWell(
-                    onTap: () => context.push('/user-profile', extra: delegate),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(
+                    formattedDate,
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // كارت المحفظة والمستحقات المالي المباشر (بنفس تصميم محفظة المستحقات المعتمد)
+            StreamBuilder<List<UserWalletModel>>(
+              stream: _walletsStream,
+              builder: (context, walletSnapshot) {
+                return StreamBuilder<CollectionsRemainingMetrics>(
+                  stream: _collectionsStream,
+                  builder: (context, collectionsSnapshot) {
+                    final allWallets = walletSnapshot.data ?? [];
+                    final collectionsMetrics = collectionsSnapshot.data ??
+                        const CollectionsRemainingMetrics();
+
+                    final accountantWallet = allWallets.cast<UserWalletModel?>().firstWhere(
+                      (w) => w != null && (
+                             w.userPhone == '01001989360' ||
+                             w.userId == 'oO6aifjJKXcAtNYj8EZV7BX7Sav1' ||
+                             w.userId == widget.delegate.uid ||
+                             w.userRole.toLowerCase().contains('accountant') ||
+                             w.userName.toLowerCase().contains('fayez')),
+                      orElse: () => null,
+                    );
+
+                    final dedicatedWalletBalance = accountantWallet != null
+                        ? accountantWallet.currentBalance
+                        : (allWallets.isNotEmpty
+                            ? allWallets.fold<double>(0.0, (sum, w) => sum + w.currentBalance)
+                            : 0.0);
+
+                    final dedicatedWalletPaid = accountantWallet != null
+                        ? accountantWallet.totalPaid
+                        : 0.0;
+
+                    final collectionsShare = collectionsMetrics.accountantRemainingShare;
+                    final grandTotalDue = dedicatedWalletBalance + collectionsShare;
+                    final remainingDue = (grandTotalDue - dedicatedWalletPaid).clamp(0.0, double.infinity);
+
+                    final companyName = accountantWallet?.companyName.isNotEmpty == true
+                        ? accountantWallet!.companyName
+                        : (widget.delegate.companyName.isNotEmpty
+                            ? widget.delegate.companyName
+                            : 'fathalla market');
+
+                    final hasBalance = grandTotalDue > 0;
+
+                    return Container(
+                      width: double.infinity,
                       decoration: BoxDecoration(
-                        color: colorScheme.onPrimary,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.manage_accounts_rounded, size: 16, color: colorScheme.primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            'تعديل بياناتي وكلمة المرور',
-                            style: TextStyle(
-                              color: colorScheme.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.primary,
+                            colorScheme.primary.withValues(alpha: 0.85),
+                            colorScheme.tertiary,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.primary.withValues(alpha: 0.3),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                ],
-              ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => widget.onNavigateToTab(2),
+                          borderRadius: BorderRadius.circular(22),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Top Row: Company & Status Badge
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.onPrimary.withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: Icon(
+                                            Icons.account_balance_wallet_rounded,
+                                            color: colorScheme.onPrimary,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Text(
+                                          companyName,
+                                          style: TextStyle(
+                                            color: colorScheme.onPrimary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: hasBalance
+                                            ? colorScheme.onPrimary.withValues(alpha: 0.22)
+                                            : colorScheme.onPrimary.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: hasBalance
+                                              ? colorScheme.onPrimary.withValues(alpha: 0.5)
+                                              : colorScheme.onPrimary.withValues(alpha: 0.25),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            hasBalance
+                                                ? Icons.check_circle_rounded
+                                                : Icons.done_all_rounded,
+                                            size: 13,
+                                            color: colorScheme.onPrimary,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            hasBalance ? 'متاح ومستحق' : 'تمت التسوية',
+                                            style: TextStyle(
+                                              color: colorScheme.onPrimary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 18),
+
+                                // Main Hero: إجمالي المستحق
+                                Text(
+                                  'إجمالي المستحق',
+                                  style: TextStyle(
+                                    color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _formatCurrency(grandTotalDue),
+                                  style: TextStyle(
+                                    color: colorScheme.onPrimary,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'المحفظة (${_formatCurrency(dedicatedWalletBalance)}) + نسبة التحصيلات 20% (${_formatCurrency(collectionsShare)})',
+                                  style: TextStyle(
+                                    color: colorScheme.onPrimary.withValues(alpha: 0.72),
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 16),
+                                Divider(
+                                  color: colorScheme.onPrimary.withValues(alpha: 0.25),
+                                  height: 1,
+                                ),
+                                const SizedBox(height: 14),
+
+                                // Bottom Row: إجمالي المتبقي & المصروف
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'المتبقي',
+                                            style: TextStyle(
+                                              color: colorScheme.onPrimary.withValues(alpha: 0.75),
+                                              fontSize: 10.5,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _formatCurrency(remainingDue),
+                                            style: TextStyle(
+                                              color: colorScheme.onPrimary,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      height: 28,
+                                      width: 1,
+                                      color: colorScheme.onPrimary.withValues(alpha: 0.25),
+                                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'المصروف',
+                                            style: TextStyle(
+                                              color: colorScheme.onPrimary.withValues(alpha: 0.75),
+                                              fontSize: 10.5,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _formatCurrency(dedicatedWalletPaid),
+                                            style: TextStyle(
+                                              color: colorScheme.onPrimary,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
             const SizedBox(height: 24),
 
@@ -374,7 +601,7 @@ class _AccountantOverviewTab extends StatelessWidget {
                   icon: Icons.pie_chart_rounded,
                   iconColor: colorScheme.primary,
                   backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.35),
-                  onTap: () => onNavigateToTab(1),
+                  onTap: () => widget.onNavigateToTab(1),
                 ),
                 _QuickActionCard(
                   title: 'المحفظة',
@@ -382,13 +609,13 @@ class _AccountantOverviewTab extends StatelessWidget {
                   icon: Icons.account_balance_wallet_rounded,
                   iconColor: colorScheme.secondary,
                   backgroundColor: colorScheme.secondaryContainer.withValues(alpha: 0.35),
-                  onTap: () => onNavigateToTab(2),
+                  onTap: () => widget.onNavigateToTab(2),
                 ),
               ],
             ),
             const SizedBox(height: 24),
 
-            // إرشادات أمان الحساب
+            // إرشادات أمان الحساب والملف الشخصي
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -421,6 +648,33 @@ class _AccountantOverviewTab extends StatelessWidget {
                             fontSize: 12,
                             color: colorScheme.onSurfaceVariant,
                             height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        InkWell(
+                          onTap: () => context.push('/user-profile', extra: widget.delegate),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.manage_accounts_rounded, size: 15, color: colorScheme.primary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'تعديل بياناتي وكلمة المرور',
+                                  style: TextStyle(
+                                    color: colorScheme.primary,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],

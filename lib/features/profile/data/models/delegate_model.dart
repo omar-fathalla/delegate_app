@@ -47,7 +47,102 @@ class DelegateModel extends Delegate {
     super.supervisorName,
     super.supervisorPhone,
     super.supervisorUid,
+    super.allOrganizationNames = const [],
   });
+
+  DelegateModel copyWith({
+    String? uid,
+    String? firstName,
+    String? middleName,
+    String? lastName,
+    String? fullName,
+    String? nationalityID,
+    String? motherName,
+    String? city,
+    String? phoneNumber,
+    DelegateGender? gender,
+    DelegatePosition? position,
+    DateTime? birthDate,
+    String? organizationUID,
+    String? organizationName,
+    String? companyUID,
+    String? companyName,
+    DelegateStatus? status,
+    String? statusReason,
+    String? delegatePublicId,
+    List<String>? allReceiptCodes,
+    DateTime? createdAt,
+    String? createdBy,
+    bool? hasPendingUpdate,
+    bool? isDeductedFromCompany,
+    bool? isPrinted,
+    bool? isProfileComplete,
+    String? latestRequestId,
+    int? numberOfDocuments,
+    double? paymentAmount,
+    String? receiptCode,
+    DateTime? updatedAt,
+    String? updatedBy,
+    int? version,
+    List<DelegateDocument>? documents,
+    UserRole? role,
+    String? email,
+    String? boundDeviceId,
+    String? boundDeviceModel,
+    DateTime? deviceBoundAt,
+    bool? isDeviceLocked,
+    String? supervisorName,
+    String? supervisorPhone,
+    String? supervisorUid,
+    List<String>? allOrganizationNames,
+  }) {
+    return DelegateModel(
+      uid: uid ?? this.uid,
+      firstName: firstName ?? this.firstName,
+      middleName: middleName ?? this.middleName,
+      lastName: lastName ?? this.lastName,
+      fullName: fullName ?? this.fullName,
+      nationalityID: nationalityID ?? this.nationalityID,
+      motherName: motherName ?? this.motherName,
+      city: city ?? this.city,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      gender: gender ?? this.gender,
+      position: position ?? this.position,
+      birthDate: birthDate ?? this.birthDate,
+      organizationUID: organizationUID ?? this.organizationUID,
+      organizationName: organizationName ?? this.organizationName,
+      companyUID: companyUID ?? this.companyUID,
+      companyName: companyName ?? this.companyName,
+      status: status ?? this.status,
+      statusReason: statusReason ?? this.statusReason,
+      delegatePublicId: delegatePublicId ?? this.delegatePublicId,
+      allReceiptCodes: allReceiptCodes ?? this.allReceiptCodes,
+      createdAt: createdAt ?? this.createdAt,
+      createdBy: createdBy ?? this.createdBy,
+      hasPendingUpdate: hasPendingUpdate ?? this.hasPendingUpdate,
+      isDeductedFromCompany: isDeductedFromCompany ?? this.isDeductedFromCompany,
+      isPrinted: isPrinted ?? this.isPrinted,
+      isProfileComplete: isProfileComplete ?? this.isProfileComplete,
+      latestRequestId: latestRequestId ?? this.latestRequestId,
+      numberOfDocuments: numberOfDocuments ?? this.numberOfDocuments,
+      paymentAmount: paymentAmount ?? this.paymentAmount,
+      receiptCode: receiptCode ?? this.receiptCode,
+      updatedAt: updatedAt ?? this.updatedAt,
+      updatedBy: updatedBy ?? this.updatedBy,
+      version: version ?? this.version,
+      documents: documents ?? this.documents,
+      role: role ?? this.role,
+      email: email ?? this.email,
+      boundDeviceId: boundDeviceId ?? this.boundDeviceId,
+      boundDeviceModel: boundDeviceModel ?? this.boundDeviceModel,
+      deviceBoundAt: deviceBoundAt ?? this.deviceBoundAt,
+      isDeviceLocked: isDeviceLocked ?? this.isDeviceLocked,
+      supervisorName: supervisorName ?? this.supervisorName,
+      supervisorPhone: supervisorPhone ?? this.supervisorPhone,
+      supervisorUid: supervisorUid ?? this.supervisorUid,
+      allOrganizationNames: allOrganizationNames ?? this.allOrganizationNames,
+    );
+  }
 
   factory DelegateModel.fromJson(Map<String, dynamic> json, String uid) {
     DelegateGender parseGender(String? gender) {
@@ -269,6 +364,11 @@ class DelegateModel extends Delegate {
       supervisorName: (json['supervisorName'] as String?)?.trim() ?? (json['supervisor_name'] as String?)?.trim(),
       supervisorPhone: (json['supervisorPhone'] as String?)?.trim() ?? (json['supervisor_phone'] as String?)?.trim(),
       supervisorUid: (json['supervisorUid'] as String?)?.trim() ?? (json['supervisor_uid'] as String?)?.trim(),
+      allOrganizationNames: (json['allOrganizationNames'] is List)
+          ? (json['allOrganizationNames'] as List)
+              .map((e) => e.toString())
+              .toList()
+          : const <String>[],
     );
   }
 
@@ -367,6 +467,8 @@ class DelegateModel extends Delegate {
       if (supervisorName != null) 'supervisorName': supervisorName,
       if (supervisorPhone != null) 'supervisorPhone': supervisorPhone,
       if (supervisorUid != null) 'supervisorUid': supervisorUid,
+      if (allOrganizationNames.isNotEmpty)
+        'allOrganizationNames': allOrganizationNames,
     };
   }
 
@@ -443,6 +545,8 @@ class DelegateModel extends Delegate {
       if (supervisorName != null) 'supervisorName': supervisorName,
       if (supervisorPhone != null) 'supervisorPhone': supervisorPhone,
       if (supervisorUid != null) 'supervisorUid': supervisorUid,
+      if (allOrganizationNames.isNotEmpty)
+        'allOrganizationNames': allOrganizationNames,
     };
   }
 }

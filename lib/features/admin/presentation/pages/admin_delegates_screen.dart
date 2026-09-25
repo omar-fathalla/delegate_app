@@ -15,6 +15,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:delegate_app/core/services/session_management_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/link_delegate_to_org_sheet.dart';
 
 class AdminDelegatesScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -79,15 +80,25 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
     super.dispose();
   }
 
-  List<Delegate> _filterDelegates(List<Delegate> delegates) {
+  List<Delegate> _filterDelegates(
+    List<Delegate> delegates,
+    Map<String, String> orgsMap,
+  ) {
     final query = _searchController.text.toLowerCase().trim();
+    final selectedOrgName =
+        _selectedOrgUID != null ? orgsMap[_selectedOrgUID] : null;
+
     return delegates.where((delegate) {
-      final matchesName = delegate.fullName.toLowerCase().contains(query) ||
+      final matchesName = query.isEmpty ||
+          delegate.fullName.toLowerCase().contains(query) ||
           delegate.phoneNumber.contains(query);
       final matchesStatus =
           _selectedStatus == null || delegate.status == _selectedStatus;
       final matchesOrg = _selectedOrgUID == null ||
-          delegate.organizationUID == _selectedOrgUID;
+          delegate.organizationUID == _selectedOrgUID ||
+          (selectedOrgName != null &&
+              (delegate.organizationName == selectedOrgName ||
+                  delegate.allOrganizationNames.contains(selectedOrgName)));
       return matchesName && matchesStatus && matchesOrg;
     }).toList();
   }
@@ -134,7 +145,6 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
           );
         } else if (state is AdminDelegatesLoaded) {
           final allDelegates = state.delegates;
-          final filteredDelegates = _filterDelegates(allDelegates);
 
           // Build dynamic map of organizations from fetched orgs + loaded delegates
           final orgsMap = <String, String>{};
@@ -151,6 +161,7 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
               );
             }
           }
+          final filteredDelegates = _filterDelegates(allDelegates, orgsMap);
 
           return Scaffold(
             body: Column(
@@ -200,93 +211,241 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
                         onChanged: (_) => setState(() {}),
                       ),
 
-                      // ── Organization Filter Chips ──
-                      if (orgsMap.length > 1) ...[
-                        const SizedBox(height: 8),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              FilterChip(
-                                avatar: _selectedOrgUID == null
-                                    ? const Icon(Icons.check_rounded, size: 14)
-                                    : const Icon(Icons.business_rounded,
-                                        size: 14),
-                                label: Text(l10n.all),
-                                selected: _selectedOrgUID == null,
-                                onSelected: (_) =>
-                                    setState(() => _selectedOrgUID = null),
-                              ),
-                              ...orgsMap.entries.map((entry) {
-                                final isSelected = _selectedOrgUID == entry.key;
-                                final (chipBg, chipFg, chipBorder) =
-                                    _getOrgBadgeColors(context, entry.value);
-                                return Padding(
-                                  padding:
-                                      const EdgeInsetsDirectional.only(start: 6),
-                                  child: FilterChip(
-                                    avatar: isSelected
-                                        ? Icon(Icons.check_rounded, size: 14, color: chipFg)
-                                        : null,
-                                    label: Text(entry.value),
-                                    labelStyle: TextStyle(
-                                      color: isSelected ? chipFg : null,
-                                      fontWeight: isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                    selected: isSelected,
-                                    selectedColor: chipBg,
-                                    side: isSelected
-                                        ? BorderSide(color: chipBorder)
-                                        : null,
-                                    onSelected: (_) => setState(() {
-                                      _selectedOrgUID =
-                                          isSelected ? null : entry.key;
-                                    }),
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      // ── Status Filter Chips ──
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            FilterChip(
-                              label: Text(l10n.all),
-                              selected: _selectedStatus == null,
-                              onSelected: (_) =>
-                                  setState(() => _selectedStatus = null),
-                            ),
-                            const SizedBox(width: 6),
-                            ...DelegateStatus.values.map((status) {
-                              return Padding(
-                                padding:
-                                    const EdgeInsetsDirectional.only(end: 6),
-                                child: FilterChip(
-                                  label: Text(_getStatusLabel(context, status)),
-                                  selected: _selectedStatus == status,
-                                  onSelected: (_) =>
-                                      setState(() => _selectedStatus = status),
-                                  selectedColor: _getStatusColor(
-                                    context,
-                                    status,
-                                  ).withValues(alpha: 0.2),
-                                  checkmarkColor: _getStatusColor(
-                                    context,
-                                    status,
-                                  ),
+                      // ── Dropdown Menus: Organization & Request Status ──
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          // 1. Organization Drop Menu
+                          Expanded(
+                            child: Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _selectedOrgUID != null
+                                      ? theme.colorScheme.primary.withValues(alpha: 0.7)
+                                      : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                  width: _selectedOrgUID != null ? 1.4 : 1.0,
                                 ),
-                              );
-                            }),
-                          ],
-                        ),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String?>(
+                                  value: _selectedOrgUID,
+                                  isExpanded: true,
+                                  icon: Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    size: 20,
+                                    color: _selectedOrgUID != null
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  hint: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.storefront_rounded,
+                                        size: 16,
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Expanded(
+                                        child: Text(
+                                          'كل السلاسل',
+                                          style: TextStyle(fontSize: 12.5),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  items: [
+                                    DropdownMenuItem<String?>(
+                                      value: null,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.storefront_rounded,
+                                            size: 16,
+                                            color: _selectedOrgUID == null
+                                                ? theme.colorScheme.primary
+                                                : theme.colorScheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'جميع السلاسل (${allDelegates.length})',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: _selectedOrgUID == null
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    ...orgsMap.entries.map((entry) {
+                                      final isSelected = _selectedOrgUID == entry.key;
+                                      final (_, badgeFg, _) =
+                                          getOrgBadgeColors(context, entry.value);
+                                      final count = allDelegates.where((d) =>
+                                          d.organizationUID == entry.key ||
+                                          d.organizationName == entry.value ||
+                                          d.allOrganizationNames.contains(entry.value)).length;
+                                      return DropdownMenuItem<String?>(
+                                        value: entry.key,
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 9,
+                                              height: 9,
+                                              decoration: BoxDecoration(
+                                                color: badgeFg,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                '${entry.value} ($count)',
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  fontWeight: isSelected
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                                  color: isSelected
+                                                      ? theme.colorScheme.primary
+                                                      : null,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                  onChanged: (val) {
+                                    setState(() => _selectedOrgUID = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // 2. Request / Status Drop Menu
+                          Expanded(
+                            child: Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _selectedStatus != null
+                                      ? theme.colorScheme.primary.withValues(alpha: 0.7)
+                                      : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                  width: _selectedStatus != null ? 1.4 : 1.0,
+                                ),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<DelegateStatus?>(
+                                  value: _selectedStatus,
+                                  isExpanded: true,
+                                  icon: Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    size: 20,
+                                    color: _selectedStatus != null
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  hint: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.filter_list_rounded,
+                                        size: 16,
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Expanded(
+                                        child: Text(
+                                          'كل الحالات',
+                                          style: TextStyle(fontSize: 12.5),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  items: [
+                                    DropdownMenuItem<DelegateStatus?>(
+                                      value: null,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.rule_rounded,
+                                            size: 16,
+                                            color: _selectedStatus == null
+                                                ? theme.colorScheme.primary
+                                                : theme.colorScheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'جميع الحالات (${allDelegates.length})',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: _selectedStatus == null
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    ...DelegateStatus.values.map((status) {
+                                      final isSelected = _selectedStatus == status;
+                                      final statusColor = _getStatusColor(context, status);
+                                      final count = allDelegates.where((d) => d.status == status).length;
+                                      return DropdownMenuItem<DelegateStatus?>(
+                                        value: status,
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 9,
+                                              height: 9,
+                                              decoration: BoxDecoration(
+                                                color: statusColor,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                '${_getStatusLabel(context, status)} ($count)',
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  fontWeight: isSelected
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                                  color: isSelected
+                                                      ? theme.colorScheme.primary
+                                                      : null,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                  onChanged: (val) {
+                                    setState(() => _selectedStatus = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
 
                       // ── Approvals & Requests Quick Banner ──
@@ -518,7 +677,7 @@ class _NoResultsView extends StatelessWidget {
 
 /// Returns a tuple of (backgroundColor, foregroundColor, borderColor) for an organization
 /// with distinct, recognizable colors for quick visual differentiation.
-(Color bg, Color fg, Color border) _getOrgBadgeColors(
+(Color bg, Color fg, Color border) getOrgBadgeColors(
   BuildContext context,
   String orgName,
 ) {
@@ -790,11 +949,15 @@ class _CompactDelegateTile extends StatelessWidget {
     }
   }
 
-  Widget _buildOrgBadge(BuildContext context, String orgName) {
+  Widget _buildOrgBadge(
+    BuildContext context,
+    String orgName, {
+    double? maxWidth,
+  }) {
     if (orgName.isEmpty) return const SizedBox.shrink();
-    final (bg, fg, border) = _getOrgBadgeColors(context, orgName);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    final (bg, fg, border) = getOrgBadgeColors(context, orgName);
+    Widget badge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(6),
@@ -807,7 +970,458 @@ class _CompactDelegateTile extends StatelessWidget {
           fontSize: 10.5,
           fontWeight: FontWeight.w600,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
+    );
+
+    if (maxWidth != null) {
+      badge = ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: badge,
+      );
+    }
+    return badge;
+  }
+
+  Widget _buildMoreBadge(
+    BuildContext context,
+    int count,
+    VoidCallback onTap,
+  ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        decoration: BoxDecoration(
+          color: isDark
+              ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.5)
+              : theme.colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: theme.colorScheme.secondary.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '+$count',
+              style: TextStyle(
+                color: theme.colorScheme.onSecondaryContainer,
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.arrow_drop_down_rounded,
+              size: 13,
+              color: theme.colorScheme.onSecondaryContainer,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAllOrgsSheet(BuildContext context, List<String> allOrgs) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Title row
+                Row(
+                  children: [
+                    AppAvatar(
+                      imageUrl: delegate.personalPhotoUrl,
+                      fallbackText: delegate.firstName,
+                      radius: 20,
+                      backgroundColor: colorScheme.primaryContainer,
+                      foregroundColor: colorScheme.onPrimaryContainer,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            delegate.fullName,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'السلاسل والمنظمات التابع لها (${allOrgs.length})',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+
+                // List of organizations
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: allOrgs.asMap().entries.map((entry) {
+                        final idx = entry.key;
+                        final name = entry.value;
+                        final isPrimary = (idx == 0 && delegate.organizationName == name);
+                        final (bg, fg, border) = getOrgBadgeColors(context, name);
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: bg.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: border, width: 1),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 26,
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  color: bg,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: border),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '${idx + 1}',
+                                  style: TextStyle(
+                                    color: fg,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                              if (isPrimary) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'الأساسية',
+                                    style: TextStyle(
+                                      color: colorScheme.onPrimaryContainer,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Action to link another organization (if supervisor)
+                if (adminDelegate != null) ...[
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () async {
+                      Navigator.of(ctx).pop();
+                      final result = await LinkDelegateToOrgSheet.show(
+                        context,
+                        delegate: delegate,
+                        supervisor: adminDelegate!,
+                      );
+                      if (result == true) {
+                        onRefresh?.call();
+                      }
+                    },
+                    icon: const Icon(Icons.add_business_rounded, size: 18),
+                    label: const Text('ربط بسلسلة / منظمة إضافية'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMarketsRow(BuildContext context) {
+    final rawList = delegate.allOrganizationNames.isNotEmpty
+        ? delegate.allOrganizationNames
+        : (delegate.organizationName.isNotEmpty
+            ? [delegate.organizationName]
+            : <String>[]);
+    final allOrgs = rawList.where((name) => name.trim().isNotEmpty).toSet().toList();
+
+    if (allOrgs.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    if (allOrgs.length == 1) {
+      return Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: _buildOrgBadge(context, allOrgs.first, maxWidth: 170),
+      );
+    }
+
+    final int visibleCount = allOrgs.length > 2 ? 1 : 2;
+    final int remainingCount = allOrgs.length - visibleCount;
+
+    return InkWell(
+      onTap: () => _showAllOrgsSheet(context, allOrgs),
+      borderRadius: BorderRadius.circular(6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < visibleCount; i++) ...[
+            if (i > 0) const SizedBox(width: 4),
+            Flexible(
+              child: _buildOrgBadge(
+                context,
+                allOrgs[i],
+                maxWidth: visibleCount == 1 ? 120 : 90,
+              ),
+            ),
+          ],
+          if (remainingCount > 0) ...[
+            const SizedBox(width: 4),
+            _buildMoreBadge(
+              context,
+              remainingCount,
+              () => _showAllOrgsSheet(context, allOrgs),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required BuildContext context,
+    required Widget icon,
+    required VoidCallback? onPressed,
+    required String tooltip,
+    required Color backgroundColor,
+    required Color foregroundColor,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: Center(
+              child: IconTheme(
+                data: IconThemeData(
+                  color: foregroundColor,
+                  size: 16,
+                ),
+                child: icon,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(
+    BuildContext context,
+    ThemeData theme,
+    AppLocalizations l10n,
+  ) {
+    final isSuperAdmin = adminDelegate?.role == UserRole.superAdmin;
+    final hasSupervisorActions = adminDelegate != null;
+
+    // 1. Link Org Button
+    final linkOrgBtn = hasSupervisorActions
+        ? _buildActionButton(
+            context: context,
+            icon: const Icon(Icons.add_business_rounded),
+            backgroundColor: const Color(0xFFB8860B).withValues(
+              alpha: theme.brightness == Brightness.dark ? 0.3 : 0.15,
+            ),
+            foregroundColor: theme.brightness == Brightness.dark
+                ? const Color(0xFFFFE082)
+                : const Color(0xFF8D6200),
+            tooltip: 'ربط بسلسلة إضافية وسداد الاشتراك',
+            onPressed: () async {
+              final result = await LinkDelegateToOrgSheet.show(
+                context,
+                delegate: delegate,
+                supervisor: adminDelegate!,
+              );
+              if (result == true) {
+                onRefresh?.call();
+              }
+            },
+          )
+        : null;
+
+    // 2. Call Button
+    final callBtn = _buildActionButton(
+      context: context,
+      icon: const Icon(Icons.phone_in_talk_rounded),
+      backgroundColor: theme.colorScheme.primary.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.25 : 0.15,
+      ),
+      foregroundColor: theme.colorScheme.primary,
+      tooltip: delegate.phoneNumber.trim().isNotEmpty
+          ? 'اتصال بالمندوب (${delegate.phoneNumber})'
+          : 'رقم الهاتف غير متوفر',
+      onPressed: delegate.phoneNumber.trim().isNotEmpty
+          ? () => _makePhoneCall(context, delegate.phoneNumber)
+          : null,
+    );
+
+    // 3. Attendance Button
+    final attendanceBtn = _buildActionButton(
+      context: context,
+      icon: const Icon(Icons.history_rounded),
+      backgroundColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
+      foregroundColor: theme.colorScheme.onPrimaryContainer,
+      tooltip: l10n.viewAttendance,
+      onPressed: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AttendanceScreen(
+              delegate: delegate,
+              viewOnly: true,
+            ),
+          ),
+        );
+      },
+    );
+
+    // 4. Profile Button
+    final profileBtn = _buildActionButton(
+      context: context,
+      icon: const Icon(Icons.person_search_rounded),
+      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+      foregroundColor: theme.colorScheme.onSurfaceVariant,
+      tooltip: l10n.viewProfileData,
+      onPressed: () async {
+        final result = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => BlocProvider(
+              create: (_) => sl<ProfileBloc>(),
+              child: ProfileScreen(
+                delegate: delegate,
+                showBackButton: true,
+              ),
+            ),
+          ),
+        );
+        if (result == true) {
+          onRefresh?.call();
+        }
+      },
+    );
+
+    // 5. Force Logout Button (SuperAdmin only)
+    final logoutBtn = isSuperAdmin
+        ? _buildActionButton(
+            context: context,
+            icon: const Icon(Icons.logout_rounded),
+            backgroundColor: theme.colorScheme.error.withValues(
+              alpha: theme.brightness == Brightness.dark ? 0.25 : 0.15,
+            ),
+            foregroundColor: theme.colorScheme.error,
+            tooltip: 'تسجيل خروج إجباري للتحقق من الشركة',
+            onPressed: () => _confirmForceLogout(context),
+          )
+        : null;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (linkOrgBtn != null) ...[
+              linkOrgBtn,
+              const SizedBox(width: 5),
+            ],
+            callBtn,
+            if (logoutBtn != null) ...[
+              const SizedBox(width: 5),
+              logoutBtn,
+            ],
+          ],
+        ),
+        const SizedBox(height: 5),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            attendanceBtn,
+            const SizedBox(width: 5),
+            profileBtn,
+          ],
+        ),
+      ],
     );
   }
 
@@ -889,6 +1503,7 @@ class _CompactDelegateTile extends StatelessWidget {
           ),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // ── Avatar with Status Dot ──
             AppAvatar(
@@ -925,6 +1540,7 @@ class _CompactDelegateTile extends StatelessWidget {
                           delegate.fullName,
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -941,111 +1557,20 @@ class _CompactDelegateTile extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (delegate.organizationName.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    _buildOrgBadge(context, delegate.organizationName),
-                  ],
+                  const SizedBox(height: 5),
+                  _buildMarketsRow(context),
                 ],
               ),
             ),
 
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
 
-            // ── Action Icons (Call, Attendance & Profile) ──
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton.filledTonal(
-                  visualDensity: VisualDensity.compact,
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary.withValues(
-                      alpha: theme.brightness == Brightness.dark ? 0.25 : 0.15,
-                    ),
-                    foregroundColor: theme.colorScheme.primary,
-                    padding: const EdgeInsets.all(8),
-                    minimumSize: const Size(36, 36),
-                  ),
-                  onPressed: delegate.phoneNumber.trim().isNotEmpty
-                      ? () => _makePhoneCall(context, delegate.phoneNumber)
-                      : null,
-                  tooltip: delegate.phoneNumber.trim().isNotEmpty
-                      ? 'اتصال بالمندوب (${delegate.phoneNumber})'
-                      : 'رقم الهاتف غير متوفر',
-                  icon: const Icon(Icons.phone_in_talk_rounded, size: 18),
-                ),
-                const SizedBox(width: 6),
-                IconButton.filledTonal(
-                  visualDensity: VisualDensity.compact,
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primaryContainer
-                        .withValues(alpha: 0.7),
-                    foregroundColor: theme.colorScheme.onPrimaryContainer,
-                    padding: const EdgeInsets.all(8),
-                    minimumSize: const Size(36, 36),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => AttendanceScreen(
-                          delegate: delegate,
-                          viewOnly: true,
-                        ),
-                      ),
-                    );
-                  },
-                  tooltip: l10n.viewAttendance,
-                  icon: const Icon(Icons.history_rounded, size: 18),
-                ),
-                const SizedBox(width: 6),
-                IconButton.filledTonal(
-                  visualDensity: VisualDensity.compact,
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    foregroundColor: theme.colorScheme.onSurfaceVariant,
-                    padding: const EdgeInsets.all(8),
-                    minimumSize: const Size(36, 36),
-                  ),
-                  onPressed: () async {
-                    final result = await Navigator.of(context).push<bool>(
-                      MaterialPageRoute(
-                        builder: (_) => BlocProvider(
-                          create: (_) => sl<ProfileBloc>(),
-                          child: ProfileScreen(
-                            delegate: delegate,
-                            showBackButton: true,
-                          ),
-                        ),
-                      ),
-                    );
-                    if (result == true) {
-                      onRefresh?.call();
-                    }
-                  },
-                  tooltip: l10n.viewProfileData,
-                  icon: const Icon(Icons.person_search_rounded, size: 18),
-                ),
-                if (adminDelegate?.role == UserRole.superAdmin) ...[
-                  const SizedBox(width: 6),
-                  IconButton.filledTonal(
-                    visualDensity: VisualDensity.compact,
-                    style: IconButton.styleFrom(
-                      backgroundColor: theme.colorScheme.error.withValues(
-                        alpha: theme.brightness == Brightness.dark ? 0.25 : 0.15,
-                      ),
-                      foregroundColor: theme.colorScheme.error,
-                      padding: const EdgeInsets.all(8),
-                      minimumSize: const Size(36, 36),
-                    ),
-                    onPressed: () => _confirmForceLogout(context),
-                    tooltip: 'تسجيل خروج إجباري للتحقق من الشركة',
-                    icon: const Icon(Icons.logout_rounded, size: 18),
-                  ),
-                ],
-              ],
-            ),
+            // ── Action Icons (2x2 Grid) ──
+            _buildActionButtons(context, theme, l10n),
           ],
         ),
       ),
     );
   }
 }
+

@@ -78,6 +78,7 @@ import 'package:delegate_app/features/changelog/domain/repositories/changelog_re
 import 'package:delegate_app/features/changelog/domain/usecases/get_new_updates.dart';
 import 'package:delegate_app/features/changelog/domain/usecases/get_all_updates.dart';
 import 'package:delegate_app/features/changelog/presentation/bloc/changelog_bloc.dart';
+import 'package:delegate_app/features/tracking/data/services/delegate_tracking_service.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/features/penalties/data/datasources/penalty_remote_data_source.dart';
@@ -582,6 +583,11 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // Trusted Time Service
   sl.registerLazySingleton<TrustedTimeService>(
     () => TrustedTimeService(firestore: sl()),
+  );
+
+  // Delegate Tracking Service
+  sl.registerLazySingleton<DelegateTrackingService>(
+    () => DelegateTrackingService(firestore: sl()),
   );
 
   // ! Core

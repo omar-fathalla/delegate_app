@@ -644,27 +644,13 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                   ),
                   tooltip: 'خيارات المحفظة',
                   onSelected: (val) {
-                    if (val == 'edit_monthly') {
-                      _showEditMonthlyAllocationDialog(context, wallet);
-                    } else if (val == 'adjust') {
+                    if (val == 'adjust') {
                       _showAdjustBalanceDialog(context, wallet);
-                    } else if (val == 'renewal') {
-                      _showApplyMonthlyRenewalDialog(context, wallet);
                     } else if (val == 'delete') {
                       _showDeleteWalletDialog(context, wallet);
                     }
                   },
                   itemBuilder: (ctx) => [
-                    const PopupMenuItem(
-                      value: 'edit_monthly',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit_calendar_rounded, size: 18),
-                          SizedBox(width: 8),
-                          Text('تعديل الاستحقاق الشهري'),
-                        ],
-                      ),
-                    ),
                     const PopupMenuItem(
                       value: 'adjust',
                       child: Row(
@@ -672,17 +658,6 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                           Icon(Icons.tune_rounded, size: 18),
                           SizedBox(width: 8),
                           Text('تعديل الرصيد (+ / -)'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'renewal',
-                      enabled: wallet.monthlyAllocation > 0,
-                      child: const Row(
-                        children: [
-                          Icon(Icons.autorenew_rounded, size: 18),
-                          SizedBox(width: 8),
-                          Text('تغذية الاستحقاق الشهري'),
                         ],
                       ),
                     ),
@@ -750,7 +725,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                 ),
                 const SizedBox(width: 8),
 
-                // الاستحقاق الشهري
+                // إجمالي المستحق
                 Expanded(
                   flex: 4,
                   child: Container(
@@ -763,7 +738,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'الاستحقاق الشهري',
+                          'إجمالي المستحق',
                           style: TextStyle(
                             fontSize: 10.5,
                             color: colorScheme.onSurfaceVariant,
@@ -773,9 +748,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            wallet.monthlyAllocation > 0
-                                ? _formatCurrency(wallet.monthlyAllocation)
-                                : 'غير محدد',
+                            _formatCurrency(wallet.totalAllocated),
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.bold,
@@ -885,21 +858,6 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                   ),
                 ),
 
-                // 3. زر تغذية الاستحقاق الدوري
-                OutlinedButton.icon(
-                  onPressed: () => _showApplyMonthlyRenewalDialog(context, wallet),
-                  icon: const Icon(Icons.autorenew_rounded, size: 15),
-                  label: const Text(
-                    'تغذية الشهر',
-                    style: TextStyle(fontSize: 11.5),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
 
                 // 4. زر السجل
                 OutlinedButton.icon(
@@ -938,7 +896,6 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
   // --- Dialog 1: Allocate Balance to User ---
   void _showAllocateBalanceDialog(BuildContext context) {
     final amountController = TextEditingController();
-    final monthlyAllocationController = TextEditingController();
     final noteController = TextEditingController(
       text: 'تخصيص مستحقات شهر ${_currentPeriodKey.replaceAll('_', '/')}',
     );
@@ -1094,7 +1051,6 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                             child: Material(
                               color: colorScheme.surfaceContainerHighest
                                   .withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(12),
                               clipBehavior: Clip.antiAlias,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -1237,7 +1193,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                                     const SizedBox(height: 6),
                                     Text(
                                       '• الرصيد القائم حالياً: ${_formatCurrency(existingWallet.currentBalance)}\n'
-                                      '• الاستحقاق الشهري: ${_formatCurrency(existingWallet.monthlyAllocation)}\n'
+                                      '• إجمالي المستحق: ${_formatCurrency(existingWallet.totalAllocated)}\n'
                                       '• إجمالي المسدد: ${_formatCurrency(existingWallet.totalPaid)}',
                                       style: TextStyle(
                                         fontSize: 11.5,
@@ -1246,42 +1202,25 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: OutlinedButton.icon(
-                                            onPressed: () {
-                                              Navigator.pop(ctx);
-                                              _showEditMonthlyAllocationDialog(
-                                                  context, existingWallet);
-                                            },
-                                            icon: const Icon(Icons.edit_calendar_rounded,
-                                                size: 15),
-                                            label: const Text('تعديل الاستحقاق',
-                                                style: TextStyle(fontSize: 11)),
-                                          ),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        onPressed: () {
+                                          Navigator.pop(ctx);
+                                          _showDeleteWalletDialog(
+                                              context, existingWallet);
+                                        },
+                                        icon: Icon(
+                                            Icons.delete_forever_rounded,
+                                            size: 15,
+                                            color: colorScheme.error),
+                                        label: Text('حذف المحفظة',
+                                            style: TextStyle(
+                                                fontSize: 11, color: colorScheme.error)),
+                                        style: OutlinedButton.styleFrom(
+                                          side: BorderSide(color: colorScheme.error),
                                         ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: OutlinedButton.icon(
-                                            onPressed: () {
-                                              Navigator.pop(ctx);
-                                              _showDeleteWalletDialog(
-                                                  context, existingWallet);
-                                            },
-                                            icon: Icon(
-                                                Icons.delete_forever_rounded,
-                                                size: 15,
-                                                color: colorScheme.error),
-                                            label: Text('حذف المحفظة',
-                                                style: TextStyle(
-                                                    fontSize: 11, color: colorScheme.error)),
-                                            style: OutlinedButton.styleFrom(
-                                              side: BorderSide(color: colorScheme.error),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1325,31 +1264,9 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                         ),
                         const SizedBox(height: 14),
 
-                        // Step 3: Monthly Recurring Quota
+                        // Step 3: Notes / Purpose
                         const Text(
-                          '3. الاستحقاق الشهري الدوري (ج.م) [اختياري]:',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: monthlyAllocationController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          decoration: InputDecoration(
-                            hintText: 'مثال: 5000 (للتغذية الشهرية الدورية)',
-                            suffixText: 'ج.م / شهر',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Step 4: Notes / Purpose
-                        const Text(
-                          '4. بيان وملاحظات التخصيص:',
+                          '3. بيان وملاحظات التخصيص:',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         const SizedBox(height: 6),
@@ -1369,7 +1286,6 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                         // Step 5: Internal Secrecy Toggle
                         Material(
                           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(12),
                           clipBehavior: Clip.antiAlias,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -1410,7 +1326,6 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                                     }
 
                                     final amt = double.tryParse(amountController.text.trim()) ?? 0.0;
-                                    final monthlyAmt = double.tryParse(monthlyAllocationController.text.trim()) ?? 0.0;
 
                                     if (amt <= 0) {
                                       ScaffoldMessenger.of(ctx).showSnackBar(
@@ -1445,7 +1360,6 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                                         adminName: widget.adminDelegate.fullName.isNotEmpty
                                             ? widget.adminDelegate.fullName
                                             : widget.adminDelegate.firstName,
-                                        monthlyAllocation: monthlyAmt > 0 ? monthlyAmt : null,
                                         isInternalOnly: isInternalOnly,
                                       );
 
@@ -2004,256 +1918,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
     );
   }
 
-  // --- Dialog 4: Apply Monthly Renewal ---
-  void _showApplyMonthlyRenewalDialog(BuildContext context, UserWalletModel wallet) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final amountController = TextEditingController(
-      text: wallet.monthlyAllocation > 0 ? wallet.monthlyAllocation.toStringAsFixed(2) : '',
-    );
-    final noteController = TextEditingController(
-      text: 'تغذية الاستحقاق الشهري الدوري (${_currentPeriodKey.replaceAll('_', '/')})',
-    );
-
-    showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Icon(Icons.autorenew_rounded, color: colorScheme.primary, size: 24),
-              const SizedBox(width: 8),
-              const Text('تغذية الاستحقاق الشهري'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'المستفيد: ${wallet.userName}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'المبلغ المقرر إضافته للمحفظة',
-                  hintText: 'مثال: 5000',
-                  suffixText: 'ج.م',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: noteController,
-                decoration: InputDecoration(
-                  labelText: 'البيان وملاحظات الإضافة',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton.icon(
-              onPressed: () async {
-                final amt = double.tryParse(amountController.text.trim()) ?? 0.0;
-                if (amt <= 0) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('يرجى إدخال مبلغ صحيح أكبر من صفر')),
-                  );
-                  return;
-                }
-
-                Navigator.pop(ctx);
-                try {
-                  await _dataSource.applyMonthlyRenewal(
-                    userId: wallet.userId,
-                    periodKey: _currentPeriodKey,
-                    customAmount: amt,
-                    notes: noteController.text.trim(),
-                    adminUid: widget.adminDelegate.uid,
-                    adminName: widget.adminDelegate.fullName.isNotEmpty
-                        ? widget.adminDelegate.fullName
-                        : widget.adminDelegate.firstName,
-                  );
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('تمت تغذية محفظة ${wallet.userName} بمبلغ ${_formatCurrency(amt)} بنجاح!'),
-                      backgroundColor: colorScheme.primaryContainer,
-                    ),
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('حدث خطأ: $e')),
-                  );
-                }
-              },
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('تأكيد الإضافة'),
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.primary,
-                foregroundColor: colorScheme.onPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- Dialog 5: Edit Monthly Allocation ---
-  void _showEditMonthlyAllocationDialog(BuildContext context, UserWalletModel wallet) {
-    final allocationController = TextEditingController(
-      text: wallet.monthlyAllocation > 0 ? wallet.monthlyAllocation.toStringAsFixed(2) : '',
-    );
-    final notesController = TextEditingController(text: wallet.notes);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        final colorScheme = Theme.of(ctx).colorScheme;
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 16,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.edit_calendar_rounded, color: colorScheme.primary, size: 22),
-                            const SizedBox(width: 8),
-                            Text(
-                              'تعديل الاستحقاق الشهري - ${wallet.userName}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                            ),
-                          ],
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 16),
-                    const Text(
-                      'قيمة الاستحقاق الشهري الدوري (ج.م):',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: allocationController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        hintText: 'مثال: 5000',
-                        suffixText: 'ج.م / شهر',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'ملاحظات / طبيعة الاستحقاق:',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: notesController,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        hintText: 'مثال: بدل انتقال ومصاريف تشغيل شهرية...',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.all(12),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          final val = double.tryParse(allocationController.text.trim()) ?? 0.0;
-                          if (val < 0) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(content: Text('يرجى إدخال قيمة صحيحة')),
-                            );
-                            return;
-                          }
-
-                          Navigator.pop(ctx);
-                          try {
-                            await _dataSource.updateMonthlyAllocation(
-                              userId: wallet.userId,
-                              monthlyAllocation: val,
-                              notes: notesController.text.trim(),
-                              adminUid: widget.adminDelegate.uid,
-                            );
-
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('تم تحديث الاستحقاق الشهري لـ ${wallet.userName} بنجاح!'),
-                                backgroundColor: colorScheme.primaryContainer,
-                              ),
-                            );
-                          } catch (e) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('حدث خطأ: $e')),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.check_rounded),
-                        label: const Text('حفظ التعديل', style: TextStyle(fontWeight: FontWeight.bold)),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                          foregroundColor: colorScheme.onPrimary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          elevation: 2,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // --- Dialog 6: Delete Wallet Permanently ---
+  // --- Dialog 4: Delete Wallet Permanently ---
   void _showDeleteWalletDialog(BuildContext context, UserWalletModel wallet) {
     final colorScheme = Theme.of(context).colorScheme;
     showDialog(
@@ -2333,7 +1998,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
     }
 
     try {
-      final csvHeader = '\uFEFFاسم المستفيد,المسمى الوظيفي,الشركة,رقم الهاتف,الرصيد الحالي,إجمالي المستحق,إجمالي المنصرف,الاستحقاق الشهري,حالة المحفظة,ملاحظات\n';
+      final csvHeader = '\uFEFFاسم المستفيد,المسمى الوظيفي,الشركة,رقم الهاتف,الرصيد الحالي,إجمالي المستحق,إجمالي المنصرف,حالة المحفظة,ملاحظات\n';
       final csvRows = wallets.map((w) {
         final name = w.userName.replaceAll(',', ' ');
         final role = w.userRole.replaceAll(',', ' ');
@@ -2342,10 +2007,9 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
         final currentBal = w.currentBalance.toStringAsFixed(2);
         final totalAlloc = w.totalAllocated.toStringAsFixed(2);
         final totalPaid = w.totalPaid.toStringAsFixed(2);
-        final monthly = w.monthlyAllocation.toStringAsFixed(2);
         final status = w.isWalletEnabled ? 'مفعلة' : 'معطلة';
         final notes = w.notes.replaceAll(',', ' ').replaceAll('\n', ' ');
-        return '$name,$role,$company,$phone,$currentBal,$totalAlloc,$totalPaid,$monthly,$status,$notes';
+        return '$name,$role,$company,$phone,$currentBal,$totalAlloc,$totalPaid,$status,$notes';
       }).join('\n');
 
       final csvContent = '$csvHeader$csvRows';

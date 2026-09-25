@@ -74,6 +74,7 @@ class Delegate extends Equatable {
   final String? supervisorName;
   final String? supervisorPhone;
   final String? supervisorUid;
+  final List<String> allOrganizationNames;
 
   const Delegate({
     required this.uid,
@@ -119,6 +120,7 @@ class Delegate extends Equatable {
     this.supervisorName,
     this.supervisorPhone,
     this.supervisorUid,
+    this.allOrganizationNames = const [],
   });
 
   @override
@@ -166,6 +168,7 @@ class Delegate extends Equatable {
     supervisorName,
     supervisorPhone,
     supervisorUid,
+    allOrganizationNames,
   ];
 
   String? get personalPhotoUrl {

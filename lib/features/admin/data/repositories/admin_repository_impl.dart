@@ -237,7 +237,7 @@ class AdminRepositoryImpl implements AdminRepository {
         remoteDataSource.getTotalCompaniesCount(organizationUID),
       ]);
 
-      final delegates = results[0] as List<Delegate>;
+      final delegates = (results[0] as List).cast<Delegate>();
       final checkedInCount = results[1] as int;
       final totalCompanies = results[2] as int;
 

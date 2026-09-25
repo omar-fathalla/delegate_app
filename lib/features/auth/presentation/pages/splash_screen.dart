@@ -95,6 +95,7 @@ class _SplashScreenState extends State<SplashScreen>
                 boundDeviceModel: state.boundDeviceModel,
                 currentDeviceModel: state.currentDeviceModel,
                 delegateName: state.delegate.fullName,
+                delegate: state.delegate,
               );
             }
           });

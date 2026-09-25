@@ -41,6 +41,7 @@ import 'package:delegate_app/features/marketing/presentation/pages/branches_mark
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_session_control_screen.dart';
+import 'package:delegate_app/features/tracking/presentation/pages/delegate_tracking_screen.dart';
 
 class AdminMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -249,6 +250,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           MaterialPageRoute(
             builder: (_) => DelegateSubscriptionRequestsPage(
               currentAdmin: widget.delegate,
+            ),
+          ),
+        );
+        break;
+      case 'delegate_tracking':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => DelegateTrackingScreen(
+              adminDelegate: widget.delegate,
             ),
           ),
         );
@@ -588,13 +598,13 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               icon: Icons.how_to_reg_rounded,
               title: 'طلبات اشتراك واعتماد المناديب',
             ),
+            buildPopupItem(
+              value: 'delegate_tracking',
+              icon: Icons.radar_rounded,
+              title: 'تتبع نطاق المناديب (Live Tracking)',
+            ),
           ],
           if (isSuperAdmin || isTechnicalSupport) ...[
-            buildPopupItem(
-              value: 'anti_fraud',
-              icon: Icons.security_rounded,
-              title: 'كشف التزييف وربط الأجهزة',
-            ),
             buildPopupItem(
               value: 'branches',
               icon: Icons.storefront_rounded,
@@ -624,11 +634,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 title: 'أذونات التصوير',
               ),
             ],
-            buildPopupItem(
-              value: 'manage_admins',
-              icon: Icons.group_rounded,
-              title: l10n.manageAdmins,
-            ),
             buildPopupItem(
               value: 'manage_marketing',
               icon: Icons.campaign_rounded,

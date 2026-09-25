@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 abstract class DelegateSubscriptionRepository {
   /// Submits a new delegate subscription request with file uploads
@@ -21,6 +22,23 @@ abstract class DelegateSubscriptionRepository {
     required File profileImage,
     required File nationalIdFront,
     required File nationalIdBack,
+    required SubscriptionPaymentMethod paymentMethod,
+    String? receiptCode,
+    File? receiptImage,
+    double? fee,
+    int? remainingMonths,
+  });
+
+  /// Submits a request to link an existing registered delegate to an additional organization
+  Future<Either<Failure, String>> submitAddOrganizationRequest({
+    required String supervisorUid,
+    required String supervisorName,
+    required String supervisorPhone,
+    required String companyUID,
+    required String companyName,
+    required String targetOrganizationUID,
+    required String targetOrganizationName,
+    required Delegate existingDelegate,
     required SubscriptionPaymentMethod paymentMethod,
     String? receiptCode,
     File? receiptImage,

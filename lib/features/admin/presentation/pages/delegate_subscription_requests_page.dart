@@ -94,27 +94,134 @@ class _DelegateSubscriptionRequestsPageState
             ),
           ),
 
-          // 2. Status Filter Chips (M3 Icon-Enhanced)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Row(
-              children: [
-                _buildFilterChip('قيد الانتظار', SubscriptionRequestStatus.pending, Icons.hourglass_top_rounded, colorScheme),
-                const SizedBox(width: 8),
-                _buildFilterChip('المعتمدة', SubscriptionRequestStatus.approved, Icons.verified_rounded, colorScheme),
-                const SizedBox(width: 8),
-                _buildFilterChip('المرفوضة', SubscriptionRequestStatus.rejected, Icons.cancel_rounded, colorScheme),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  avatar: const Icon(Icons.clear_all_rounded, size: 16),
-                  label: const Text('الكل', style: TextStyle(fontSize: 12)),
-                  selected: _statusFilter == null,
-                  onSelected: (selected) {
-                    if (selected) setState(() => _statusFilter = null);
+          // 2. Status Dropdown Menu (Default: Pending)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Container(
+              height: 46,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _statusFilter != null
+                      ? colorScheme.primary
+                      : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  width: _statusFilter != null ? 1.4 : 1,
+                ),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<SubscriptionRequestStatus?>(
+                  value: _statusFilter,
+                  isExpanded: true,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 22),
+                  items: [
+                    DropdownMenuItem<SubscriptionRequestStatus?>(
+                      value: SubscriptionRequestStatus.pending,
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.hourglass_top_rounded,
+                            size: 18,
+                            color: Color(0xFFD97706),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'طلبات قيد الانتظار',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: _statusFilter == SubscriptionRequestStatus.pending
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: _statusFilter == SubscriptionRequestStatus.pending
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem<SubscriptionRequestStatus?>(
+                      value: SubscriptionRequestStatus.approved,
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.verified_rounded,
+                            size: 18,
+                            color: Color(0xFF16A34A),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'الطلبات المعتمدة',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: _statusFilter == SubscriptionRequestStatus.approved
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: _statusFilter == SubscriptionRequestStatus.approved
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem<SubscriptionRequestStatus?>(
+                      value: SubscriptionRequestStatus.rejected,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.cancel_rounded,
+                            size: 18,
+                            color: colorScheme.error,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'الطلبات المرفوضة',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: _statusFilter == SubscriptionRequestStatus.rejected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: _statusFilter == SubscriptionRequestStatus.rejected
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem<SubscriptionRequestStatus?>(
+                      value: null,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.clear_all_rounded,
+                            size: 18,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'جميع الحالات (الكل)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: _statusFilter == null
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: _statusFilter == null
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onChanged: (val) {
+                    setState(() => _statusFilter = val);
                   },
                 ),
-              ],
+              ),
             ),
           ),
 
@@ -203,23 +310,6 @@ class _DelegateSubscriptionRequestsPageState
     );
   }
 
-  Widget _buildFilterChip(
-    String label,
-    SubscriptionRequestStatus status,
-    IconData icon,
-    ColorScheme colorScheme,
-  ) {
-    final isSelected = _statusFilter == status;
-    return ChoiceChip(
-      avatar: Icon(icon, size: 16),
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      selected: isSelected,
-      onSelected: (selected) {
-        if (selected) setState(() => _statusFilter = status);
-      },
-    );
-  }
-
   Future<void> _handleApprove(DelegateSubscriptionRequest request) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -233,8 +323,11 @@ class _DelegateSubscriptionRequestsPageState
           ],
         ),
         content: Text(
-          'هل أنت متأكد من اعتماد المندوب "${request.fullName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر) حتى نهاية دورة ${request.subscriptionCycle}؟\n\n'
-          'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}',
+          request.requestType == 'add_organization'
+              ? 'هل أنت متأكد من الموافقة على ربط المندوب "${request.fullName}" بسلسلة "${request.organizationName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر)؟\n\n'
+                  'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}'
+              : 'هل أنت متأكد من اعتماد المندوب "${request.fullName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر) حتى نهاية دورة ${request.subscriptionCycle}؟\n\n'
+                  'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}',
         ),
         actions: [
           TextButton(
@@ -418,6 +511,43 @@ class _SubscriptionRequestCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (request.requestType == 'add_organization') ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB8860B).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFFB8860B).withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.add_business_rounded,
+                      size: 15,
+                      color: Color(0xFFB8860B),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'طلب ربط بسلسلة إضافية: ${request.currentOrganizationName?.isNotEmpty == true ? request.currentOrganizationName! : "المنظمة الحالية"} ➔ ${request.organizationName}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: theme.brightness == Brightness.dark
+                              ? const Color(0xFFFFE082)
+                              : const Color(0xFF8D6200),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Row 1: Badges (Org + Company + Status)
             Row(
               children: [

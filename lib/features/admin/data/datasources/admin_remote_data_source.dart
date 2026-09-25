@@ -373,12 +373,40 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
           });
           final results = await Future.wait(futures);
           final Map<String, DelegateModel> unique = {};
+          final Map<String, Set<String>> orgNamesByDelegate = {};
           for (final list in results) {
             for (final model in list) {
-              unique[model.uid] = model;
+              final key = model.uid.isNotEmpty ? model.uid : model.phoneNumber;
+              if (model.organizationName.isNotEmpty) {
+                orgNamesByDelegate.putIfAbsent(key, () => {}).add(model.organizationName);
+              }
+              if (!unique.containsKey(key)) {
+                unique[key] = model;
+              } else {
+                if (unique[key]!.status != DelegateStatus.active &&
+                    unique[key]!.status != DelegateStatus.approved &&
+                    (model.status == DelegateStatus.active ||
+                        model.status == DelegateStatus.approved)) {
+                  unique[key] = model;
+                }
+              }
             }
           }
-          delegatesList.addAll(unique.values);
+
+          for (final entry in unique.entries) {
+            final allOrgs =
+                orgNamesByDelegate[entry.key]?.where((s) => s.isNotEmpty).toList() ??
+                    [];
+            if (allOrgs.length > 1) {
+              delegatesList.add(
+                entry.value.copyWith(
+                  allOrganizationNames: allOrgs,
+                ),
+              );
+            } else {
+              delegatesList.add(entry.value);
+            }
+          }
         }
       } else if (organizationUID.isNotEmpty && organizationUID != 'all') {
         final compSnap = await firestore

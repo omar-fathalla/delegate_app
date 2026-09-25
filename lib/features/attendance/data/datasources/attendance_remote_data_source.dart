@@ -117,6 +117,18 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         ),
       );
 
+      unawaited(
+        _syncDelegateTrackingCheckIn(
+          userId: userId,
+          companyId: companyId,
+          organizationId: organizationId,
+          branchName: branchName,
+          lat: lat,
+          long: long,
+          time: currentTime,
+        ),
+      );
+
       return AttendanceModel(
         id: docRef.id,
         userId: userId,
@@ -183,6 +195,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           branchName: lastData['branchName'] as String?,
           type: 'check_out',
           time: currentOutTime,
+        ),
+      );
+
+      unawaited(
+        _syncDelegateTrackingCheckOut(
+          userId: userId,
         ),
       );
 
@@ -681,6 +699,95 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           'deletedBy': <String>[],
         });
       }
+    } catch (_) {}
+  }
+
+  Future<void> _syncDelegateTrackingCheckIn({
+    required String userId,
+    required String companyId,
+    required String organizationId,
+    required String? branchName,
+    required double lat,
+    required double long,
+    required DateTime time,
+  }) async {
+    try {
+      String delegateName = 'مندوب';
+      String delegatePhone = '';
+      try {
+        final userDoc = await firestore.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+          final data = userDoc.data();
+          delegateName = (data?['fullName'] ??
+                  data?['name'] ??
+                  '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim())
+              .toString();
+          delegatePhone = (data?['phoneNumber'] ??
+                  data?['phone'] ??
+                  data?['mobileNumber'] ??
+                  '')
+              .toString();
+        }
+      } catch (_) {}
+
+      double branchLat = lat;
+      double branchLng = long;
+      double geofenceRadius = 100.0;
+      String branchId = '';
+
+      if (branchName != null && branchName.trim().isNotEmpty) {
+        try {
+          final branchQuery = await firestore
+              .collection('branches')
+              .where('branchName', isEqualTo: branchName.trim())
+              .limit(1)
+              .get();
+          if (branchQuery.docs.isNotEmpty) {
+            final bDoc = branchQuery.docs.first;
+            final bData = bDoc.data();
+            branchId = bDoc.id;
+            branchLat = (bData['latitude'] as num?)?.toDouble() ?? lat;
+            branchLng = (bData['longitude'] as num?)?.toDouble() ?? long;
+            geofenceRadius =
+                (bData['geofenceRadius'] as num?)?.toDouble() ?? 100.0;
+          }
+        } catch (_) {}
+      }
+
+      await firestore.collection('delegate_tracking').doc(userId).set({
+        'delegateId': userId,
+        'delegateName': delegateName,
+        'delegatePhone': delegatePhone,
+        'companyId': companyId,
+        'organizationId': organizationId,
+        'branchId': branchId,
+        'branchName': branchName ?? 'الفرع الميداني',
+        'branchLat': branchLat,
+        'branchLng': branchLng,
+        'geofenceRadius': geofenceRadius,
+        'currentStatus': 'inside',
+        'currentDistanceMeters': 0.0,
+        'lastLatitude': lat,
+        'lastLongitude': long,
+        'lastUpdated': FieldValue.serverTimestamp(),
+        'checkInTime': Timestamp.fromDate(time),
+        'isOnline': true,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error syncing delegate tracking on checkIn: $e');
+    }
+  }
+
+  Future<void> _syncDelegateTrackingCheckOut({
+    required String userId,
+  }) async {
+    try {
+      await firestore.collection('delegate_tracking').doc(userId).update({
+        'currentStatus': 'checked_out',
+        'isTrackingEnabled': false,
+        'checkOutTime': FieldValue.serverTimestamp(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
     } catch (_) {}
   }
 }

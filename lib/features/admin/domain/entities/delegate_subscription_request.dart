@@ -59,6 +59,9 @@ class DelegateSubscriptionRequest extends Equatable {
   final double fee;
   final int remainingMonths;
   final SubscriptionRequestStatus status;
+  final String requestType;
+  final String? existingDelegateUid;
+  final String? currentOrganizationName;
   final String? rejectionReason;
   final String? reviewedBy;
   final DateTime? reviewedAt;
@@ -91,6 +94,9 @@ class DelegateSubscriptionRequest extends Equatable {
     this.fee = 500.0,
     this.remainingMonths = 6,
     this.status = SubscriptionRequestStatus.pending,
+    this.requestType = 'new_delegate',
+    this.existingDelegateUid,
+    this.currentOrganizationName,
     this.rejectionReason,
     this.reviewedBy,
     this.reviewedAt,
@@ -129,6 +135,9 @@ class DelegateSubscriptionRequest extends Equatable {
       'fee': fee,
       'remainingMonths': remainingMonths,
       'status': status.name,
+      'requestType': requestType,
+      'existingDelegateUid': existingDelegateUid,
+      'currentOrganizationName': currentOrganizationName,
       'rejectionReason': rejectionReason,
       'reviewedBy': reviewedBy,
       'reviewedAt': reviewedAt?.toIso8601String(),
@@ -189,6 +198,9 @@ class DelegateSubscriptionRequest extends Equatable {
       fee: (map['fee'] as num?)?.toDouble() ?? 500.0,
       remainingMonths: (map['remainingMonths'] as num?)?.toInt() ?? 6,
       status: parseStatus(map['status']),
+      requestType: map['requestType'] as String? ?? 'new_delegate',
+      existingDelegateUid: map['existingDelegateUid'] as String?,
+      currentOrganizationName: map['currentOrganizationName'] as String?,
       rejectionReason: map['rejectionReason'],
       reviewedBy: map['reviewedBy'],
       reviewedAt: map['reviewedAt'] != null ? parseDate(map['reviewedAt']) : null,
@@ -223,6 +235,9 @@ class DelegateSubscriptionRequest extends Equatable {
     double? fee,
     int? remainingMonths,
     SubscriptionRequestStatus? status,
+    String? requestType,
+    String? existingDelegateUid,
+    String? currentOrganizationName,
     String? rejectionReason,
     String? reviewedBy,
     DateTime? reviewedAt,
@@ -255,6 +270,9 @@ class DelegateSubscriptionRequest extends Equatable {
       fee: fee ?? this.fee,
       remainingMonths: remainingMonths ?? this.remainingMonths,
       status: status ?? this.status,
+      requestType: requestType ?? this.requestType,
+      existingDelegateUid: existingDelegateUid ?? this.existingDelegateUid,
+      currentOrganizationName: currentOrganizationName ?? this.currentOrganizationName,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       reviewedBy: reviewedBy ?? this.reviewedBy,
       reviewedAt: reviewedAt ?? this.reviewedAt,
@@ -276,6 +294,9 @@ class DelegateSubscriptionRequest extends Equatable {
         fee,
         remainingMonths,
         status,
+        requestType,
+        existingDelegateUid,
+        currentOrganizationName,
         createdAt,
       ];
 }

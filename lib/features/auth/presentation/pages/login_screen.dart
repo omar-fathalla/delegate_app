@@ -81,6 +81,7 @@ class _LoginScreenState extends State<LoginScreen>
               boundDeviceModel: state.boundDeviceModel,
               currentDeviceModel: state.currentDeviceModel,
               delegateName: state.delegate.fullName,
+              delegate: state.delegate,
             );
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(

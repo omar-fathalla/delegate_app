@@ -300,7 +300,7 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
 
       final newBalance = currentBalance + amount;
       final newTotalAllocated = totalAllocated + amount;
-      final finalMonthly = monthlyAllocation ?? (existingMonthly > 0 ? existingMonthly : amount);
+      final finalMonthly = monthlyAllocation ?? (existingMonthly > 0 ? existingMonthly : 0.0);
 
       // 1. Update user wallet document
       transaction.set(

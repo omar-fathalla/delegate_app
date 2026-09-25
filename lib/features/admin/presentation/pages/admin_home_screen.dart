@@ -22,6 +22,7 @@ import 'package:delegate_app/features/admin/presentation/pages/delegate_subscrip
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_delegate_form_screen.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
+import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
@@ -1803,13 +1804,18 @@ class _AttendanceDetailsBottomSheetState
     extends State<_AttendanceDetailsBottomSheet> {
   bool _isLoading = true;
   late String _filter;
+  String _selectedOrgId = 'all';
   String _searchQuery = '';
   List<_DelegateAttendanceData> _allData = [];
+  Map<String, String> _availableOrgs = {'all': 'جميع السلاسل'};
 
   @override
   void initState() {
     super.initState();
-    _filter = widget.initialFilter;
+    // Default to 'checked_in' (الحاضرون اليوم) as requested
+    _filter = (widget.initialFilter.isNotEmpty && widget.initialFilter != 'all')
+        ? widget.initialFilter
+        : 'checked_in';
     _fetchAttendanceData();
   }
 
@@ -1821,10 +1827,19 @@ class _AttendanceDetailsBottomSheetState
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     try {
-      // 1. Fetch delegates for the company across organizations
       final List<DelegateModel> delegates = [];
+      final Map<String, String> orgNamesById = {};
+      final Map<String, String> discoveredOrgs = {'all': 'جميع السلاسل'};
+
+      // 1. Fetch delegates for the company across organizations
       if (widget.adminDelegate.companyUID.isNotEmpty) {
         final orgsSnap = await firestore.collection('organizations').get();
+        for (final doc in orgsSnap.docs) {
+          final data = doc.data();
+          final name = (data['name'] ?? data['title'] ?? doc.id).toString();
+          orgNamesById[doc.id] = name;
+        }
+
         final futures = orgsSnap.docs.map((orgDoc) => firestore
             .collection('organizations')
             .doc(orgDoc.id)
@@ -1833,13 +1848,28 @@ class _AttendanceDetailsBottomSheetState
             .collection('delegates')
             .get());
         final results = await Future.wait(futures);
+
         final Map<String, DelegateModel> unique = {};
-        for (final res in results) {
+        final Map<String, Set<String>> delegateOrgs = {};
+        for (var i = 0; i < results.length; i++) {
+          final orgId = orgsSnap.docs[i].id;
+          final orgName = orgNamesById[orgId] ?? orgId;
+          final res = results[i];
+          if (res.docs.isNotEmpty) {
+            discoveredOrgs[orgId] = orgName;
+          }
           for (final doc in res.docs) {
+            delegateOrgs.putIfAbsent(doc.id, () => {}).add(orgName);
             unique[doc.id] = DelegateModel.fromJson(doc.data(), doc.id);
           }
         }
-        delegates.addAll(unique.values);
+        for (final entry in unique.entries) {
+          final orgsList = delegateOrgs[entry.key]?.toList() ?? [];
+          delegates.add(entry.value.copyWith(
+            allOrganizationNames:
+                orgsList.isNotEmpty ? orgsList : entry.value.allOrganizationNames,
+          ));
+        }
       } else {
         final delegatesSnapshot = await firestore
             .collection('organizations')
@@ -1852,6 +1882,13 @@ class _AttendanceDetailsBottomSheetState
           delegatesSnapshot.docs
               .map((doc) => DelegateModel.fromJson(doc.data(), doc.id)),
         );
+        if (widget.adminDelegate.organizationUID.isNotEmpty) {
+          final name = widget.adminDelegate.organizationName.isNotEmpty
+              ? widget.adminDelegate.organizationName
+              : widget.adminDelegate.organizationUID;
+          discoveredOrgs[widget.adminDelegate.organizationUID] = name;
+          orgNamesById[widget.adminDelegate.organizationUID] = name;
+        }
       }
 
       // 2. Fetch today's attendance logs
@@ -1879,7 +1916,8 @@ class _AttendanceDetailsBottomSheetState
           if (date.isBefore(startOfDay) || date.isAfter(endOfDay)) continue;
         }
 
-        final delegateId = (data['delegateId'] ?? data['userId'] ?? '').toString();
+        final delegateId =
+            (data['delegateId'] ?? data['userId'] ?? '').toString();
         if (delegateId.isNotEmpty) {
           logsByDelegate.putIfAbsent(delegateId, () => []).add(data);
         }
@@ -1891,6 +1929,8 @@ class _AttendanceDetailsBottomSheetState
         DateTime? checkIn;
         DateTime? checkOut;
         String? branch;
+        String? orgId;
+        String? orgName;
 
         for (var log in logs) {
           final type = (log['type'] ?? '').toString();
@@ -1899,30 +1939,47 @@ class _AttendanceDetailsBottomSheetState
           if (ts is Timestamp) logTime = ts.toDate();
 
           if (type == 'check_in') {
-            if (checkIn == null || (logTime != null && logTime.isBefore(checkIn))) {
+            if (checkIn == null ||
+                (logTime != null && logTime.isBefore(checkIn))) {
               checkIn = logTime;
             }
             if (branch == null && log['branchName'] != null) {
               branch = log['branchName'].toString();
             }
+            if (orgId == null && log['organizationId'] != null) {
+              orgId = log['organizationId'].toString();
+              orgName = log['organizationName']?.toString() ??
+                  orgNamesById[orgId] ??
+                  orgId;
+            }
           } else if (type == 'check_out') {
-            if (checkOut == null || (logTime != null && logTime.isAfter(checkOut))) {
+            if (checkOut == null ||
+                (logTime != null && logTime.isAfter(checkOut))) {
               checkOut = logTime;
             }
           }
         }
+
+        // Fallbacks for organization metadata if not checked-in today
+        orgId ??= d.organizationUID;
+        orgName ??= (d.organizationName.isNotEmpty
+            ? d.organizationName
+            : (orgNamesById[d.organizationUID] ?? ''));
 
         list.add(_DelegateAttendanceData(
           delegate: d,
           checkInTime: checkIn,
           checkOutTime: checkOut,
           branchName: branch,
+          organizationId: orgId,
+          organizationName: orgName,
         ));
       }
 
       if (mounted) {
         setState(() {
           _allData = list;
+          _availableOrgs = discoveredOrgs;
           _isLoading = false;
         });
       }
@@ -1936,17 +1993,35 @@ class _AttendanceDetailsBottomSheetState
   List<_DelegateAttendanceData> get _filteredData {
     return _allData.where((item) {
       final matchesSearch = _searchQuery.isEmpty ||
-          item.delegate.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          item.delegate.fullName
+              .toLowerCase()
+              .contains(_searchQuery.toLowerCase()) ||
           item.delegate.phoneNumber.contains(_searchQuery);
 
       if (!matchesSearch) return false;
 
+      // Status filter
       if (_filter == 'checked_in') {
-        return item.checkInTime != null;
+        if (item.checkInTime == null) return false;
       } else if (_filter == 'absent') {
-        return item.checkInTime == null;
+        if (item.checkInTime != null) return false;
       }
-      return true; // 'all'
+
+      // Organization chain filter
+      if (_selectedOrgId != 'all') {
+        final targetOrgName = _availableOrgs[_selectedOrgId] ?? '';
+        final matchesCheckedInOrg = item.organizationId == _selectedOrgId ||
+            (targetOrgName.isNotEmpty && item.organizationName == targetOrgName);
+        final matchesAssignedOrg = item.delegate.organizationUID == _selectedOrgId ||
+            (targetOrgName.isNotEmpty &&
+                item.delegate.allOrganizationNames.contains(targetOrgName)) ||
+            (targetOrgName.isNotEmpty &&
+                item.delegate.organizationName == targetOrgName);
+
+        if (!matchesCheckedInOrg && !matchesAssignedOrg) return false;
+      }
+
+      return true;
     }).toList();
   }
 
@@ -2007,48 +2082,204 @@ class _AttendanceDetailsBottomSheetState
             ),
             const SizedBox(height: 12),
 
-            // Choice Chips Filter
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  ChoiceChip(
-                    label: Text('الحاضرون اليوم ($checkedInCount)'),
-                    selected: _filter == 'checked_in',
-                    selectedColor: colorScheme.primaryContainer,
-                    labelStyle: TextStyle(
-                      color: _filter == 'checked_in' ? colorScheme.onPrimaryContainer : null,
-                      fontWeight: FontWeight.bold,
+            // Dual Dropdown Menu Bar (Attendance Status + Chain Filter)
+            Row(
+              children: [
+                // 1. Attendance Status Dropdown (الحاضرون اليوم، الغائبون اليوم، إجمالي المناديب)
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _filter != 'all'
+                            ? colorScheme.primary
+                            : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                        width: _filter != 'all' ? 1.4 : 1,
+                      ),
                     ),
-                    onSelected: (selected) {
-                      if (selected) setState(() => _filter = 'checked_in');
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: Text('الغائبون اليوم ($absentCount)'),
-                    selected: _filter == 'absent',
-                    selectedColor: colorScheme.errorContainer,
-                    labelStyle: TextStyle(
-                      color: _filter == 'absent' ? colorScheme.onErrorContainer : null,
-                      fontWeight: FontWeight.bold,
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _filter,
+                        isExpanded: true,
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                        items: [
+                          DropdownMenuItem<String>(
+                            value: 'checked_in',
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 16,
+                                  color: Color(0xFF16A34A),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'الحاضرون اليوم ($checkedInCount)',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: _filter == 'checked_in'
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: _filter == 'checked_in'
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurface,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem<String>(
+                            value: 'absent',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.cancel_rounded,
+                                  size: 16,
+                                  color: colorScheme.error,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'الغائبون اليوم ($absentCount)',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: _filter == 'absent'
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: _filter == 'absent'
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurface,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem<String>(
+                            value: 'all',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.people_alt_rounded,
+                                  size: 16,
+                                  color: colorScheme.primary,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'إجمالي المناديب (${_allData.length})',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: _filter == 'all'
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: _filter == 'all'
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurface,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setState(() => _filter = val);
+                        },
+                      ),
                     ),
-                    onSelected: (selected) {
-                      if (selected) setState(() => _filter = 'absent');
-                    },
                   ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: Text('إجمالي المناديب (${_allData.length})'),
-                    selected: _filter == 'all',
-                    onSelected: (selected) {
-                      if (selected) setState(() => _filter = 'all');
-                    },
+                ),
+
+                const SizedBox(width: 8),
+
+                // 2. Organization Chain Dropdown
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _selectedOrgId != 'all'
+                            ? colorScheme.primary
+                            : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                        width: _selectedOrgId != 'all' ? 1.4 : 1,
+                      ),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _availableOrgs.containsKey(_selectedOrgId) ? _selectedOrgId : 'all',
+                        isExpanded: true,
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                        items: _availableOrgs.entries.map((entry) {
+                          final isAll = entry.key == 'all';
+                          final count = isAll
+                              ? _allData.length
+                              : _allData.where((item) {
+                                  final targetName = entry.value;
+                                  return item.organizationId == entry.key ||
+                                      (targetName.isNotEmpty && item.organizationName == targetName) ||
+                                      item.delegate.organizationUID == entry.key ||
+                                      (targetName.isNotEmpty &&
+                                          item.delegate.allOrganizationNames.contains(targetName)) ||
+                                      (targetName.isNotEmpty && item.delegate.organizationName == targetName);
+                                }).length;
+
+                          return DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isAll ? Icons.storefront_rounded : Icons.business_rounded,
+                                  size: 16,
+                                  color: isAll
+                                      ? colorScheme.primary
+                                      : (_selectedOrgId == entry.key
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    '${entry.value} ($count)',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: entry.key == _selectedOrgId
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: entry.key == _selectedOrgId
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurface,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _selectedOrgId = val);
+                          }
+                        },
+                      ),
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             // Search Bar
             TextField(
@@ -2153,11 +2384,38 @@ class _AttendanceDetailsBottomSheetState
                                                   ),
                                                 ),
                                                 const SizedBox(height: 2),
-                                                Text(
-                                                  'الهاتف: ${item.delegate.phoneNumber}',
-                                                  style: theme.textTheme.bodySmall?.copyWith(
-                                                    color: colorScheme.onSurfaceVariant,
-                                                  ),
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      'الهاتف: ${item.delegate.phoneNumber}',
+                                                      style: theme.textTheme.bodySmall?.copyWith(
+                                                        color: colorScheme.onSurfaceVariant,
+                                                      ),
+                                                    ),
+                                                    if (item.organizationName != null &&
+                                                        item.organizationName!.isNotEmpty &&
+                                                        !isCheckedIn) ...[
+                                                      const SizedBox(width: 8),
+                                                      Flexible(
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                          decoration: BoxDecoration(
+                                                            color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: Text(
+                                                            item.organizationName!,
+                                                            style: TextStyle(
+                                                              fontSize: 10,
+                                                              fontWeight: FontWeight.w600,
+                                                              color: colorScheme.onSecondaryContainer,
+                                                            ),
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
                                                 ),
                                               ],
                                             ),
@@ -2219,21 +2477,80 @@ class _AttendanceDetailsBottomSheetState
                                             ),
                                           ],
                                         ),
-                                        if (item.branchName != null && item.branchName!.isNotEmpty) ...[
-                                          const SizedBox(height: 6),
-                                          Row(
-                                            children: [
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            if (item.organizationName != null && item.organizationName!.isNotEmpty) ...[
+                                              Builder(
+                                                builder: (ctx) {
+                                                  final (bg, fg, border) = getOrgBadgeColors(ctx, item.organizationName!);
+                                                  return Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                    decoration: BoxDecoration(
+                                                      color: bg,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: Border.all(color: border, width: 0.5),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(Icons.storefront_rounded, size: 13, color: fg),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          item.organizationName!,
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: fg,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                              const SizedBox(width: 8),
+                                            ],
+                                            if (item.branchName != null && item.branchName!.isNotEmpty) ...[
                                               Icon(Icons.location_on_rounded, size: 16, color: colorScheme.primary),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                'الفرع: ${item.branchName}',
-                                                style: theme.textTheme.bodySmall?.copyWith(
-                                                  fontWeight: FontWeight.w600,
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  'الفرع: ${item.branchName}',
+                                                  style: theme.textTheme.bodySmall?.copyWith(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             ],
-                                          ),
-                                        ],
+                                          ],
+                                        ),
+                                      ] else if (item.delegate.allOrganizationNames.isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: item.delegate.allOrganizationNames.map((orgName) {
+                                            final (bg, fg, border) = getOrgBadgeColors(context, orgName);
+                                            return Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: bg,
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: border, width: 0.5),
+                                              ),
+                                              child: Text(
+                                                orgName,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: fg,
+                                                ),
+                                              ),
+                                            );
+                                          }).toList(),
+                                        ),
                                       ],
                                     ],
                                   ),
@@ -2255,11 +2572,15 @@ class _DelegateAttendanceData {
   final DateTime? checkInTime;
   final DateTime? checkOutTime;
   final String? branchName;
+  final String? organizationId;
+  final String? organizationName;
 
   _DelegateAttendanceData({
     required this.delegate,
     this.checkInTime,
     this.checkOutTime,
     this.branchName,
+    this.organizationId,
+    this.organizationName,
   });
 }
