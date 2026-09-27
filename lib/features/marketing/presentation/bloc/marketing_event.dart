@@ -128,14 +128,16 @@ class LoadAllFavoriteBranchesAttendance extends MarketingEvent {
   final List<String> favoriteBranches;
   final String organizationId;
   final DateTime? date;
+  final bool forceRefresh;
 
   const LoadAllFavoriteBranchesAttendance({
     required this.favoriteBranches,
     required this.organizationId,
     this.date,
+    this.forceRefresh = false,
   });
 
   @override
-  List<Object?> get props => [favoriteBranches, organizationId, date];
+  List<Object?> get props => [favoriteBranches, organizationId, date, forceRefresh];
 }
 

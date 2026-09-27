@@ -64,7 +64,16 @@ class MockAdminRemoteDataSource implements AdminRemoteDataSource {
     required String phoneNumber,
     required String temporaryPassword,
     required String displayName,
+    String? role,
+    String? companyName,
   }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getCompaniesForOrg(
+    String organizationUID,
+  ) {
     throw UnimplementedError();
   }
 

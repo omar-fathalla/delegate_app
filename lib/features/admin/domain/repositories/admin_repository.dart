@@ -7,6 +7,9 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 abstract class AdminRepository {
   Future<Either<Failure, List<Map<String, dynamic>>>> getOrganizations();
+  Future<Either<Failure, List<Map<String, dynamic>>>> getCompaniesForOrg(
+    String organizationUID,
+  );
   Future<Either<Failure, List<Branch>>> getBranches();
   Future<Either<Failure, Branch>> addBranch(Branch branch);
   Future<Either<Failure, Branch>> updateBranch(Branch branch);
@@ -17,6 +20,9 @@ abstract class AdminRepository {
     required String displayName,
     String role = 'company-admin',
     String organizationUID = '',
+    String? companyUID,
+    String? companyName,
+    String? jobTitle,
   });
   Future<Either<Failure, List<AdminUser>>> getAdmins();
   Future<Either<Failure, Unit>> updateAdminUser(AdminUser admin);

@@ -114,6 +114,9 @@ class _LoginScreenState extends State<LoginScreen>
               } else if (delegate.role == UserRole.accountant) {
                 debugPrint('🚀 LoginScreen: Navigating to /accountant/home');
                 context.go('/accountant/home', extra: delegate);
+              } else if (delegate.role == UserRole.hr) {
+                debugPrint('🚀 LoginScreen: Navigating to /hr/home');
+                context.go('/hr/home', extra: delegate);
               } else if (delegate.role == UserRole.marketing ||
                   delegate.role == UserRole.marketingPromotion) {
                 debugPrint('🚀 LoginScreen: Navigating to /marketing/home');

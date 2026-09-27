@@ -241,7 +241,6 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
     );
     final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
     final active = branchPreferenceService.getActiveBranch(event.userId);
-    _branchesAttendanceCache.clear();
     emit(BranchPreferencesLoaded(
       favoriteBranches: favorites,
       activeBranch: active,
@@ -258,7 +257,6 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
     );
     final favorites = branchPreferenceService.getFavoriteBranches(event.userId);
     final active = branchPreferenceService.getActiveBranch(event.userId);
-    _branchesAttendanceCache.clear();
     emit(BranchPreferencesLoaded(
       favoriteBranches: favorites,
       activeBranch: active,
@@ -280,49 +278,109 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
     ));
   }
 
-  // ─── Load ALL favorite branches attendance at once ──────────────────────────
-  static final Map<String, AllBranchesAttendanceLoaded> _branchesAttendanceCache = {};
-  static void clearCache() => _branchesAttendanceCache.clear();
+  // ─── Per-Branch Attendance Cache (Cache-First / Incremental) ────────────────
+  // Key: "${organizationId}_${branchName}_${date.year}_${date.month}_${date.day}"
+  static final Map<String, List<Map<String, dynamic>>> _perBranchAttendanceCache = {};
+  static void clearCache() => _perBranchAttendanceCache.clear();
 
   Future<void> _onLoadAllFavoriteBranchesAttendance(
     LoadAllFavoriteBranchesAttendance event,
     Emitter<MarketingState> emit,
   ) async {
     if (event.favoriteBranches.isEmpty) {
-      emit(AllBranchesAttendanceLoaded(
+      emit(const AllBranchesAttendanceLoaded(
         data: {},
         favoriteBranches: [],
+        loadingBranches: {},
       ));
       return;
     }
 
     final date = event.date ?? DateTime.now();
-    final cacheKey = '${event.organizationId}_${event.favoriteBranches.join(',')}_${date.year}_${date.month}_${date.day}';
-    final cached = _branchesAttendanceCache[cacheKey];
+    final dateSuffix = '${date.year}_${date.month}_${date.day}';
 
-    if (cached != null) {
-      emit(cached);
+    // 1. Gather all currently cached branch data
+    final Map<String, List<Map<String, dynamic>>> branchData = {};
+    final List<String> branchesToFetch = [];
+
+    // If current state already has loaded data, reuse it as immediate baseline
+    if (state is AllBranchesAttendanceLoaded) {
+      final currentState = state as AllBranchesAttendanceLoaded;
+      for (final b in event.favoriteBranches) {
+        if (currentState.data.containsKey(b)) {
+          branchData[b] = currentState.data[b]!;
+        }
+      }
+    }
+
+    // Check persistent in-memory per-branch cache
+    for (final branch in event.favoriteBranches) {
+      final key = '${event.organizationId}_${branch}_$dateSuffix';
+      if (_perBranchAttendanceCache.containsKey(key)) {
+        branchData[branch] = _perBranchAttendanceCache[key]!;
+      } else if (!branchData.containsKey(branch)) {
+        branchesToFetch.add(branch);
+      }
+    }
+
+    // If this is a forced refresh, re-fetch all requested branches
+    if (event.forceRefresh) {
+      branchesToFetch.clear();
+      branchesToFetch.addAll(event.favoriteBranches);
+    }
+
+    // If we have some data ready right now (e.g. Agmy Star is already loaded):
+    if (branchData.isNotEmpty) {
+      // 0ms instant render of cached branches!
+      emit(AllBranchesAttendanceLoaded(
+        data: Map.from(branchData),
+        favoriteBranches: event.favoriteBranches,
+        loadingBranches: Set.from(branchesToFetch),
+      ));
     } else {
+      // No data cached at all for any branch -> show initial loading skeletons
       emit(AllBranchesAttendanceLoading());
     }
 
+    // If nothing needs to be fetched (all branches cached and no force refresh)
+    if (branchesToFetch.isEmpty) {
+      return;
+    }
+
     try {
-      // جلب بيانات كل الفروع دفعة واحدة باستعلام موحد ومحسن
-      final data = await remoteDataSource.getTodayAttendanceForBranches(
-        branchNames: event.favoriteBranches,
+      // Only fetch the branches that actually need fetching (e.g. newly added branch only!)
+      final fetchedData = await remoteDataSource.getTodayAttendanceForBranches(
+        branchNames: branchesToFetch,
         organizationId: event.organizationId,
         date: date,
       );
 
-      final loadedState = AllBranchesAttendanceLoaded(
-        data: data,
-        favoriteBranches: event.favoriteBranches,
-      );
+      // Save to per-branch cache & merge
+      for (final entry in fetchedData.entries) {
+        final key = '${event.organizationId}_${entry.key}_$dateSuffix';
+        _perBranchAttendanceCache[key] = entry.value;
+        branchData[entry.key] = entry.value;
+      }
 
-      _branchesAttendanceCache[cacheKey] = loadedState;
-      emit(loadedState);
+      // Ensure every favorite branch has an entry in branchData
+      for (final b in event.favoriteBranches) {
+        branchData.putIfAbsent(b, () => []);
+      }
+
+      emit(AllBranchesAttendanceLoaded(
+        data: Map.from(branchData),
+        favoriteBranches: event.favoriteBranches,
+        loadingBranches: const {},
+      ));
     } catch (e) {
-      if (cached == null) {
+      // If we already showed cached data, keep it! Do not break the UI with error screen.
+      if (branchData.isNotEmpty) {
+        emit(AllBranchesAttendanceLoaded(
+          data: Map.from(branchData),
+          favoriteBranches: event.favoriteBranches,
+          loadingBranches: const {},
+        ));
+      } else {
         emit(AllBranchesAttendanceError(
           message: 'فشل في جلب بيانات الفروع: ${e.toString()}',
         ));

@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/photo_cache_manager.dart';
+import '../utils/image_url_helper.dart';
 import 'app_loading_indicator.dart';
 
 class AppPhotoImage extends StatefulWidget {
@@ -47,7 +49,7 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
   }
 
   Future<void> _checkLocalFile() async {
-    if (widget.photoUrl.startsWith('http://') || widget.photoUrl.startsWith('https://')) {
+    if (kIsWeb || widget.photoUrl.startsWith('http://') || widget.photoUrl.startsWith('https://')) {
       return;
     }
 
@@ -72,7 +74,37 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
     final isNetwork = widget.photoUrl.startsWith('http://') || widget.photoUrl.startsWith('https://');
 
     if (isNetwork) {
-      content = CachedNetworkImage(
+      if (kIsWeb) {
+        final webUrl = ImageUrlHelper.getWebSafeUrl(
+          widget.photoUrl,
+          width: widget.isThumbnail ? 400 : 1800,
+        );
+        content = Image.network(
+          webUrl,
+          width: widget.width,
+          height: widget.height,
+          fit: widget.fit,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Center(
+              child: AppLoadingIndicator(
+                size: widget.isThumbnail ? 16 : 28,
+                color: colorScheme.primary,
+                style: AppLoadingStyle.threeArchedCircle,
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) => Image.network(
+            widget.photoUrl,
+            width: widget.width,
+            height: widget.height,
+            fit: widget.fit,
+            errorBuilder: (c, e, s) =>
+                widget.errorWidget ?? _defaultErrorWidget(colorScheme),
+          ),
+        );
+      } else {
+        content = CachedNetworkImage(
         imageUrl: widget.photoUrl,
         cacheManager: PhotoCacheManager.instance,
         width: widget.width,
@@ -111,6 +143,7 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
           );
         },
       );
+      }
     } else {
       if (_isCheckingLocal) {
         content = Center(

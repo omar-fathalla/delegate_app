@@ -72,6 +72,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     _loadBranches();
     _loadCompanies();
     _loadCachedDeviceCounts();
+    _fetchDelegatesIfNeeded();
   }
 
   Future<void> _loadCachedDeviceCounts() async {
@@ -106,7 +107,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
 
       final snapshot = await query.get();
       final docs = snapshot.docs;
-      final delegatesList = docs.map((d) {
+      final rawList = docs.map((d) {
         final data = d.data() as Map<String, dynamic>;
         return {
           'docId': d.id,
@@ -115,8 +116,32 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         };
       }).where((d) {
         final role = d['role']?.toString().toLowerCase() ?? '';
-        return role.isEmpty || role == 'delegate';
+        return role != 'admin' &&
+            role != 'superadmin' &&
+            role != 'super_admin' &&
+            role != 'technicalsupport' &&
+            role != 'technical_support';
       }).toList();
+
+      // Deduplicate delegates across subcollections if same delegate appears in multiple records
+      final Map<String, Map<String, dynamic>> uniqueMap = {};
+      for (final d in rawList) {
+        final key = (d['uid'] != null && d['uid'].toString().isNotEmpty)
+            ? d['uid'].toString()
+            : (d['phoneNumber'] != null && d['phoneNumber'].toString().isNotEmpty)
+                ? d['phoneNumber'].toString()
+                : d['docId'].toString();
+        if (!uniqueMap.containsKey(key)) {
+          uniqueMap[key] = d;
+        } else {
+          final existingBound = uniqueMap[key]!['boundDeviceId']?.toString().trim() ?? '';
+          final newBound = d['boundDeviceId']?.toString().trim() ?? '';
+          if (existingBound.isEmpty && newBound.isNotEmpty) {
+            uniqueMap[key] = d;
+          }
+        }
+      }
+      final delegatesList = uniqueMap.values.toList();
 
       int locked = 0;
       int unbound = 0;
@@ -2623,7 +2648,10 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           Expanded(
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () => setState(() => _currentTab = 'devices'),
+              onTap: () {
+                setState(() => _currentTab = 'devices');
+                _fetchDelegatesIfNeeded();
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -2876,7 +2904,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                           title: 'طلبات فك',
                           value: '${pendingRequests.length}',
                           icon: Icons.phonelink_erase_rounded,
-                          isHighlight: isRequestsView || pendingRequests.isNotEmpty,
+                          isHighlight: isRequestsView,
                           highlightColor: pendingRequests.isNotEmpty ? colorScheme.errorContainer : colorScheme.primaryContainer,
                           onHighlightColor: pendingRequests.isNotEmpty ? colorScheme.onErrorContainer : colorScheme.onPrimaryContainer,
                           onTap: () => setState(() {
@@ -3215,8 +3243,31 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                             pendingRequests.isEmpty
                                 ? 'لا توجد طلبات فك ارتباط معلقة حالياً'
                                 : 'لا توجد طلبات فك مطابقة للبحث',
-                            style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
                           ),
+                          if (pendingRequests.isEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              'كافة حسابات وأجهزة المناديب منتظمة، ويمكنك استعراض وإدارة قائمة الأجهزة بالكامل.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                            ),
+                            const SizedBox(height: 16),
+                            FilledButton.tonalIcon(
+                              onPressed: () {
+                                setState(() {
+                                  _deviceStatusFilter = 'all';
+                                });
+                                _fetchDelegatesIfNeeded();
+                              },
+                              icon: const Icon(Icons.people_outline_rounded, size: 18),
+                              label: const Text('استعراض كافة المناديب والأجهزة'),
+                            ),
+                          ],
                         ],
                       ),
                     ),

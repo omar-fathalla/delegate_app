@@ -1,5 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../utils/image_url_helper.dart';
 
 /// ويدجت موحد وآمن لعرض الصور الشخصية والأفاتار في التطبيق
 /// يتعامل تلقائياً وبأمان تام مع أخطاء الروابط المنتهية أو غير المصرح بها (مثل 403 Forbidden و 404)
@@ -64,6 +67,48 @@ class AppAvatar extends StatelessWidget {
     Widget avatarContent;
     if (!hasUrl) {
       avatarContent = fallbackWidget();
+    } else if (kIsWeb) {
+      // On Flutter Web CanvasKit, cross-origin images without CORS headers get blocked.
+      // ImageUrlHelper routes Firebase Storage URLs through a high-speed CORS proxy.
+      final webUrl = ImageUrlHelper.getWebSafeUrl(
+        cleanUrl,
+        width: (size * 2).toInt(),
+        height: (size * 2).toInt(),
+      );
+
+      avatarContent = Image.network(
+        webUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: size,
+            height: size,
+            color: bg,
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: radius * 0.65,
+              height: radius * 0.65,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: fg.withValues(alpha: 0.5),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          // If proxy failed, attempt direct URL or fallback to initial
+          return Image.network(
+            cleanUrl,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => fallbackWidget(),
+          );
+        },
+      );
     } else {
       avatarContent = CachedNetworkImage(
         imageUrl: cleanUrl,

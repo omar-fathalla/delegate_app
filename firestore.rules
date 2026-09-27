@@ -41,6 +41,12 @@ service cloud.firestore {
              getUserData().role == 'company-admin';
     }
 
+    // Helper function to check if user is HR
+    function isHR() {
+      return isAuthenticated() &&
+             (getUserData().role == 'hr' || getUserData().role == 'company-hr' || getUserData().role == 'company_hr');
+    }
+
     // Helper function to check if user is marketing
     function isMarketing() {
       return isAuthenticated() &&
@@ -77,7 +83,8 @@ service cloud.firestore {
     function canAccessCompany(orgId, compId) {
       return isSuperAdmin() ||
              (isOrgAdmin() && belongsToOrganization(orgId)) ||
-             (isCompanyAdmin() && belongsToCompany(orgId, compId));
+             (isCompanyAdmin() && belongsToCompany(orgId, compId)) ||
+             (isHR() && belongsToCompany(orgId, compId));
     }
 
     // Helper function to check if the update is only incrementing the admin count
@@ -559,6 +566,11 @@ service cloud.firestore {
     // ==================== DELEGATE LIVE TRACKING ====================
     match /delegate_tracking/{delegateId} {
       allow read, write: if true;
+    }
+
+    // ==================== FLOOR CHECKS / VERIFICATION ====================
+    match /floor_checks/{checkId} {
+      allow read, write: if isAuthenticated();
     }
 
     // ==================== DEFAULT DENY ====================

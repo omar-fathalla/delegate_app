@@ -548,6 +548,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     if (delegate?.role == UserRole.admin || roleStr.contains('company-admin')) {
       return 'مشرف الشركة (Company Admin)';
     }
+    if (delegate?.role == UserRole.hr || roleStr == 'hr' || roleStr.contains('hr')) {
+      return 'مسؤول موارد بشرية (HR)';
+    }
+    if (delegate?.role == UserRole.accountant || roleStr.contains('account')) {
+      return 'إدارة الحسابات (Accountant)';
+    }
     if (delegate?.role == UserRole.marketing || delegate?.role == UserRole.marketingPromotion || roleStr.contains('marketing')) {
       return 'التسويق والعلاقات (Marketing)';
     }

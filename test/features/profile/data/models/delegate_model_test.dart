@@ -113,5 +113,36 @@ void main() {
       final delegate2 = DelegateModel.fromJson(jsonAccounting, "acc_123");
       expect(delegate2.role, UserRole.accountant);
     });
+
+    test('should correctly parse and serialize hr role', () {
+      final jsonHR = {
+        "firstName": "سارة",
+        "middleName": "",
+        "lastName": "الموارد البشرية",
+        "fullName": "سارة الموارد البشرية",
+        "phoneNumber": "01001234567",
+        "role": "hr",
+        "birthDate": "2026-01-01T00:00:00.000",
+        "createdAt": "2026-01-01T00:00:00.000",
+      };
+
+      final delegate = DelegateModel.fromJson(jsonHR, "hr_123");
+      expect(delegate.role, UserRole.hr);
+      expect(DelegateModel.roleToString(delegate.role), 'hr');
+
+      final jsonCompanyHR = {
+        ...jsonHR,
+        "role": "company-hr",
+      };
+      final delegate2 = DelegateModel.fromJson(jsonCompanyHR, "hr_123");
+      expect(delegate2.role, UserRole.hr);
+
+      final jsonCompanyHRUnderscore = {
+        ...jsonHR,
+        "role": "company_hr",
+      };
+      final delegate3 = DelegateModel.fromJson(jsonCompanyHRUnderscore, "hr_123");
+      expect(delegate3.role, UserRole.hr);
+    });
   });
 }

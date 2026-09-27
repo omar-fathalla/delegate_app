@@ -95,6 +95,14 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
         (cs) => cs.onSurfaceVariant,
       );
     }
+    if (norm == 'hr' || norm == 'company_hr') {
+      return (
+        isArabic ? 'موارد بشرية (HR)' : 'HR Admin',
+        Icons.badge_rounded,
+        (cs) => cs.tertiaryContainer,
+        (cs) => cs.onTertiaryContainer,
+      );
+    }
     return (
       rawRole,
       Icons.person_rounded,
@@ -147,6 +155,9 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
         }
         if (_selectedRoleFilter == 'supervisor') {
           return normRole == 'supervisor';
+        }
+        if (_selectedRoleFilter == 'hr') {
+          return normRole == 'hr' || normRole == 'company_hr';
         }
         return true;
       }();
@@ -346,6 +357,13 @@ class _ManageAdminsViewState extends State<_ManageAdminsView> {
                               label: Text(isArabic ? 'مشرف' : 'Supervisor'),
                               selected: _selectedRoleFilter == 'supervisor',
                               onSelected: (_) => setState(() => _selectedRoleFilter = 'supervisor'),
+                            ),
+                            const SizedBox(width: 8),
+                            FilterChip(
+                              avatar: const Icon(Icons.badge_rounded, size: 16),
+                              label: Text(isArabic ? 'موارد بشرية (HR)' : 'HR'),
+                              selected: _selectedRoleFilter == 'hr',
+                              onSelected: (_) => setState(() => _selectedRoleFilter = 'hr'),
                             ),
                           ],
                         ),

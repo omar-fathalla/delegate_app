@@ -12,6 +12,7 @@ import 'package:delegate_app/features/admin/domain/usecases/create_admin.dart';
 import 'package:delegate_app/features/admin/domain/usecases/delete_admin_user.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_admins.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_organizations.dart';
+import 'package:delegate_app/features/admin/domain/usecases/get_companies_for_org.dart';
 import 'package:delegate_app/features/admin/domain/usecases/suspend_admin_user.dart';
 import 'package:delegate_app/features/admin/domain/usecases/update_admin_user.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
@@ -36,6 +37,7 @@ import 'package:delegate_app/features/attendance/data/datasources/attendance_rem
 import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
 import 'package:delegate_app/features/marketing/data/repositories/marketing_repository_impl.dart';
 import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
+import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
 import 'package:delegate_app/features/marketing/domain/repositories/marketing_repository.dart';
 import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_companies.dart';
 import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_delegates.dart';
@@ -265,7 +267,11 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   // Create Admin BLoC
   sl.registerFactory(
-    () => CreateAdminBloc(createAdmin: sl(), getOrganizations: sl()),
+    () => CreateAdminBloc(
+      createAdmin: sl(),
+      getOrganizations: sl(),
+      getCompaniesForOrg: sl(),
+    ),
   );
 
   // Manage Admins BLoC
@@ -303,6 +309,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => CreateAdmin(sl()));
   sl.registerLazySingleton(() => GetAdmins(sl()));
   sl.registerLazySingleton(() => GetOrganizations(sl()));
+  sl.registerLazySingleton(() => GetCompaniesForOrg(sl()));
   sl.registerLazySingleton(() => DeleteAdminUser(sl()));
   sl.registerLazySingleton(() => SuspendAdminUser(sl()));
   sl.registerLazySingleton(() => UpdateAdminUser(sl()));
@@ -450,6 +457,9 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // ! Features - Marketing
   sl.registerLazySingleton(
     () => BranchPreferenceService(prefs: sl()),
+  );
+  sl.registerLazySingleton(
+    () => FloorVerificationService(prefs: sl(), firestore: sl()),
   );
   sl.registerFactory(
     () => MarketingBloc(

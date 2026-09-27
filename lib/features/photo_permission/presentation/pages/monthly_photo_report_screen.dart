@@ -93,7 +93,8 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
         widget.delegate.role == UserRole.superAdmin ||
         widget.delegate.role == UserRole.marketing ||
         widget.delegate.role == UserRole.marketingPromotion ||
-        widget.delegate.role == UserRole.branchesMarketingManager;
+        widget.delegate.role == UserRole.branchesMarketingManager ||
+        widget.delegate.role == UserRole.hr;
 
     if (isGeneralManagerOrAdmin) {
       _currentGroupMode = GroupMode.byBranch;
@@ -116,7 +117,8 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
         widget.delegate.role == UserRole.superAdmin ||
         widget.delegate.role == UserRole.marketing ||
         widget.delegate.role == UserRole.marketingPromotion ||
-        widget.delegate.role == UserRole.branchesMarketingManager;
+        widget.delegate.role == UserRole.branchesMarketingManager ||
+        widget.delegate.role == UserRole.hr;
 
     if (isGeneralManagerOrAdmin) {
       context.read<PhotoPermissionBloc>().add(

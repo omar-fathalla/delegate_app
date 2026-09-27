@@ -154,6 +154,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             if (norm == 'technical_support' || norm == 'technicalsupport' || norm == 'tech_support' || norm == 'techsupport') return 90;
             if (norm == 'accountant' || norm == 'accounting') return 85;
             if (norm == 'organization_admin' || norm == 'organizationadmin') return 80;
+            if (norm == 'hr' || norm == 'company_hr' || norm == 'company-hr' || norm == 'human_resources') return 75;
             if (norm == 'company_admin' || norm == 'companyadmin' || norm == 'admin') return 70;
             if (norm == 'branches_marketing' || norm == 'branches_marketing_manager' || norm == 'branchesmarketingmanager') return 65;
             if (norm == 'supervisor') return 60;
@@ -182,6 +183,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           final isBranchesMarketing = normRole == 'branches_marketing' ||
               normRole == 'branches_marketing_manager' ||
               normRole == 'branchesmarketingmanager';
+          final isHR = normRole == 'hr' ||
+              normRole == 'company_hr' ||
+              normRole == 'company-hr' ||
+              normRole == 'human_resources';
 
           if (isSuperAdmin ||
               isTechSupport ||
@@ -191,28 +196,31 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               isSupervisor ||
               isMarketing ||
               isMarketingPromotion ||
-              isBranchesMarketing) {
+              isBranchesMarketing ||
+              isHR) {
             // Get admin email from Firestore
             final adminEmail = userData['email'] as String? ?? '';
 
             // Determine the correct UserRole
-            final mappedRole = isAccountant
-                ? UserRole.accountant
-                : isMarketing
-                    ? UserRole.marketing
-                    : isMarketingPromotion
-                        ? UserRole.marketingPromotion
-                        : isOrgAdmin
-                            ? UserRole.organizationAdmin
-                            : isTechSupport
-                                ? UserRole.technicalSupport
-                                : isSuperAdmin
-                                    ? UserRole.superAdmin
-                                    : isBranchesMarketing
-                                        ? UserRole.branchesMarketingManager
-                                        : UserRole.admin;
+            final mappedRole = isHR
+                ? UserRole.hr
+                : isAccountant
+                    ? UserRole.accountant
+                    : isMarketing
+                        ? UserRole.marketing
+                        : isMarketingPromotion
+                            ? UserRole.marketingPromotion
+                            : isOrgAdmin
+                                ? UserRole.organizationAdmin
+                                : isTechSupport
+                                    ? UserRole.technicalSupport
+                                    : isSuperAdmin
+                                        ? UserRole.superAdmin
+                                        : isBranchesMarketing
+                                            ? UserRole.branchesMarketingManager
+                                            : UserRole.admin;
 
-            // Use phone-based password check if user has a stored password or is marketing/technical_support/branches_marketing/accountant
+            // Use phone-based password check if user has a stored password or is marketing/technical_support/branches_marketing/accountant/hr
             final hasStoredPassword = userData['password'] != null ||
                 userData['temporaryPassword'] != null ||
                 userData['tempPassword'] != null;
@@ -222,7 +230,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                     isMarketingPromotion ||
                     isTechSupport ||
                     isBranchesMarketing ||
-                    isAccountant)
+                    isAccountant ||
+                    isHR)
                 ? '__phone_auth__:$normalizedPhone'
                 : (adminEmail.isNotEmpty)
                     ? '__firebase_auth__:$adminEmail'

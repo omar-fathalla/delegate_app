@@ -71,3 +71,6 @@ Certificates_modern.p12
 # Binaries & packages
 *.apk
 *.aab
+
+# Firebase cache
+.firebase/

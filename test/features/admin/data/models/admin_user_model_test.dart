@@ -105,5 +105,28 @@ void main() {
       };
       expect(result, expectedMap);
     });
+
+    test('should include companyName and jobTitle when present', () {
+      final hrAdmin = AdminUserModel(
+        uid: 'hr1',
+        phoneNumber: '01012345678',
+        email: 'hr@company.com',
+        displayName: 'HR Manager',
+        role: 'hr',
+        organizationUID: 'org1',
+        companyUID: 'comp1',
+        companyName: 'Al-Amal Co',
+        jobTitle: 'HR Specialist',
+        createdAt: tDateTime,
+        createdBy: 'admin1',
+        temporaryPassword: 'temp',
+        isActive: true,
+      );
+
+      final result = hrAdmin.toMap();
+      expect(result['companyName'], 'Al-Amal Co');
+      expect(result['jobTitle'], 'HR Specialist');
+      expect(result['role'], 'hr');
+    });
   });
 }

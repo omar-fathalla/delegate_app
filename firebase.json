@@ -27,6 +27,21 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "hosting": {
+    "site": "tashil-hr-test",
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
   "functions": [
     {
       "codebase": "tashil-mobile-notifications",

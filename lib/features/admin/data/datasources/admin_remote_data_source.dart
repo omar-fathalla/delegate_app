@@ -25,7 +25,12 @@ abstract class AdminRemoteDataSource {
     required String phoneNumber,
     required String temporaryPassword,
     required String displayName,
+    String? role,
+    String? companyName,
   });
+  Future<List<Map<String, dynamic>>> getCompaniesForOrg(
+    String organizationUID,
+  );
   Future<List<DelegateModel>> getCompanyDelegates(
     String organizationUID,
     String companyUID,
@@ -225,6 +230,8 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
               'tech_support',
               'accountant',
               'accounting',
+              'hr',
+              'company-hr',
             ],
           )
           .get();
@@ -275,12 +282,28 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     required String phoneNumber,
     required String temporaryPassword,
     required String displayName,
+    String? role,
+    String? companyName,
   }) async {
     try {
+      final isHR = role == 'hr' || role == 'company-hr';
+      final emailSubject = isHR
+          ? 'Tashil - تفعيل حساب مسؤول الموارد البشرية (HR)'
+          : 'Tashil - تفعيل حساب Admin';
+      final companyText = (companyName != null && companyName.isNotEmpty)
+          ? ' لشركة <strong>$companyName</strong>'
+          : '';
+      final roleDescription = isHR
+          ? 'تم إنشاء حساب مسؤول موارد بشرية (HR)$companyText على منصة تسهيل.'
+          : 'تم إنشاء حساب Admin لك على منصة تسهيل.';
+      final accessInstruction = isHR
+          ? 'يمكنك تسجيل الدخول عبر تطبيق الهاتف أو بوابة الويب (Desktop / Web) باستخدام البيانات أعلاه.'
+          : 'قم بتحميل تطبيق تسهيل وسجل الدخول بالبيانات أعلاه.';
+
       await firestore.collection('mail').add({
         'to': [email],
         'message': {
-          'subject': 'Tashil - تفعيل حساب Admin',
+          'subject': emailSubject,
           'html':
               '''
 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -290,14 +313,14 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   <div style="background: #ffffff; padding: 32px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px;">
     <h2 style="color: #333;">مرحباً $displayName</h2>
     <p style="color: #555; font-size: 16px;">
-      تم إنشاء حساب Admin لك على منصة تسهيل.
+      $roleDescription
     </p>
     <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
       <p style="margin: 8px 0;"><strong>رقم الهاتف:</strong> $phoneNumber</p>
       <p style="margin: 8px 0;"><strong>كلمة السر المؤقتة:</strong> $temporaryPassword</p>
     </div>
     <p style="color: #555;">
-      قم بتحميل تطبيق تسهيل وسجل الدخول بالبيانات أعلاه.
+      $accessInstruction
     </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
     <p style="color: #999; font-size: 12px; text-align: center;">
@@ -310,6 +333,28 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
       });
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في إرسال بريد التفعيل.');
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getCompaniesForOrg(
+    String organizationUID,
+  ) async {
+    try {
+      final snapshot = await firestore
+          .collection('organizations')
+          .doc(organizationUID)
+          .collection('companies')
+          .get();
+      final list = snapshot.docs
+          .map((doc) => {'uid': doc.id, ...doc.data()})
+          .toList();
+      list.sort((a, b) => (a['name']?.toString() ?? '')
+          .toLowerCase()
+          .compareTo((b['name']?.toString() ?? '').toLowerCase()));
+      return list;
+    } on FirebaseException catch (e) {
+      throwFirestoreFailure(e, 'فشل في جلب بيانات الشركات.');
     }
   }
 

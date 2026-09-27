@@ -1851,11 +1851,11 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '$_totalDueReceiptsCount Receipts',
+                          '$_totalDueReceiptsCount Receipts (${_formatAmountOnly(_dueReceiptsTotalAmount)} EGP)',
                           style: TextStyle(
                             color: colorScheme.onPrimary,
                             fontWeight: FontWeight.bold,
-                            fontSize: 11,
+                            fontSize: 10.5,
                           ),
                         ),
                       ),
@@ -1867,7 +1867,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            '$_adCompanyCount Ad Cos',
+                            '$_adCompanyCount Ad Cos (${_formatAmountOnly(_adCompanyTotalAmount)} EGP)',
                             style: TextStyle(
                               color: colorScheme.onPrimary,
                               fontWeight: FontWeight.w600,

@@ -138,14 +138,30 @@ class AllBranchesAttendanceLoading extends MarketingState {}
 class AllBranchesAttendanceLoaded extends MarketingState {
   final Map<String, List<Map<String, dynamic>>> data;
   final List<String> favoriteBranches;
+  final Set<String> loadingBranches;
 
   const AllBranchesAttendanceLoaded({
     required this.data,
     required this.favoriteBranches,
+    this.loadingBranches = const {},
   });
 
+  bool isBranchLoading(String branch) => loadingBranches.contains(branch);
+
+  AllBranchesAttendanceLoaded copyWith({
+    Map<String, List<Map<String, dynamic>>>? data,
+    List<String>? favoriteBranches,
+    Set<String>? loadingBranches,
+  }) {
+    return AllBranchesAttendanceLoaded(
+      data: data ?? this.data,
+      favoriteBranches: favoriteBranches ?? this.favoriteBranches,
+      loadingBranches: loadingBranches ?? this.loadingBranches,
+    );
+  }
+
   @override
-  List<Object?> get props => [data, favoriteBranches];
+  List<Object?> get props => [data, favoriteBranches, loadingBranches];
 }
 
 class AllBranchesAttendanceError extends MarketingState {

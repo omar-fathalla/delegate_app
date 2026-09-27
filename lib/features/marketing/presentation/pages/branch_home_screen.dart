@@ -12,6 +12,9 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/features/marketing/data/models/floor_verification_model.dart';
+import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 /// الشاشة الرئيسية للفروع - تعرض جميع الفروع المفضلة في نفس الصفحة
@@ -74,14 +77,32 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  /// Set of collapsed branch names. By default, branches are expanded.
+  final Set<String> _collapsedBranches = {};
+
+  /// Cache of last loaded state to prevent full-screen blinking during incremental loads
+  AllBranchesAttendanceLoaded? _lastLoadedState;
+
+  /// Floor verification service for 0ms local cache and background cloud sync
+  late final FloorVerificationService _floorService;
+
+  /// Map of delegateId -> FloorVerificationItem for the selected date
+  Map<String, FloorVerificationItem> _floorVerifications = {};
+
+  /// Filter state per branch: 'all' | 'remaining' | 'verified' | 'missing'
+  final Map<String, String> _branchFilter = {};
+
   @override
   void initState() {
     super.initState();
     try {
+      _floorService = di.sl<FloorVerificationService>();
       final prefService = di.sl<BranchPreferenceService>();
       final favorites = prefService.getFavoriteBranches(widget.marketingUser.uid);
       _favoriteBranches = favorites;
       _prefsLoaded = true;
+      _floorVerifications = _floorService.getLocalVerifications(_selectedDate);
+      _syncFloorVerificationsFromCloud();
     } catch (_) {}
   }
 
@@ -91,7 +112,303 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     super.dispose();
   }
 
-  void _loadAllBranches(BuildContext context, List<String> favorites) {
+  Future<void> _syncFloorVerificationsFromCloud() async {
+    if (_favoriteBranches.isEmpty) return;
+    try {
+      final cloudData = await _floorService.fetchCloudVerifications(
+        date: _selectedDate,
+        branchNames: _favoriteBranches,
+      );
+      if (mounted) {
+        setState(() {
+          _floorVerifications = cloudData;
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _toggleFloorVerification(Map<String, dynamic> record, [String? fallbackBranch]) {
+    final delegateId = record['delegateId'] as String? ?? '';
+    final branchName = (record['branchName'] as String? ?? fallbackBranch ?? '').trim();
+    if (delegateId.isEmpty || branchName.isEmpty) return;
+
+    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final currentItem = _floorVerifications[delegateId];
+
+    if (currentItem != null && currentItem.isVerified) {
+      // Toggle OFF -> unverified
+      HapticFeedback.lightImpact();
+      _floorService.removeVerification(
+        dateStr: dateStr,
+        branchName: branchName,
+        delegateId: delegateId,
+      );
+      setState(() {
+        _floorVerifications.remove(delegateId);
+      });
+    } else {
+      // Toggle ON -> verified (متواجد بالصالة)
+      HapticFeedback.mediumImpact();
+      final item = FloorVerificationItem(
+        delegateId: delegateId,
+        branchName: branchName,
+        date: dateStr,
+        status: 'verified',
+        timestamp: DateTime.now(),
+        verifiedBy: widget.marketingUser.uid,
+        verifierName: widget.marketingUser.fullName.isNotEmpty
+            ? widget.marketingUser.fullName
+            : 'مشرف الصالة',
+      );
+      _floorService.saveVerification(item: item);
+      setState(() {
+        _floorVerifications[delegateId] = item;
+      });
+    }
+  }
+
+  void _showFloorVerificationDialog(BuildContext context, Map<String, dynamic> record, [String? fallbackBranch]) {
+    final delegateId = record['delegateId'] as String? ?? '';
+    final branchName = (record['branchName'] as String? ?? fallbackBranch ?? '').trim();
+    final fullName = record['fullName'] as String? ?? 'المندوب';
+    if (delegateId.isEmpty || branchName.isEmpty) return;
+
+    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final currentItem = _floorVerifications[delegateId];
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (bCtx) {
+        final theme = Theme.of(bCtx);
+        final cs = theme.colorScheme;
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: cs.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Text(
+                  'تحديد حالة التواجد بالصالة',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  fullName,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Option 1: متواجد بالصالة (تم التأكد)
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: currentItem?.isVerified == true
+                          ? const Color(0xFF2E7D32)
+                          : cs.outlineVariant.withValues(alpha: 0.3),
+                      width: currentItem?.isVerified == true ? 1.5 : 1,
+                    ),
+                  ),
+                  tileColor: currentItem?.isVerified == true
+                      ? const Color(0xFFE8F5E9)
+                      : cs.surfaceContainerLow,
+                  leading: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Color(0xFF2E7D32),
+                    size: 26,
+                  ),
+                  title: const Text(
+                    'متواجد بالصالة (تم التحقق)',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Color(0xFF1B5E20),
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'المندوب حاضر ومتواجد في مكانه/الستاند',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: currentItem?.isVerified == true
+                      ? const Icon(Icons.done_rounded, color: Color(0xFF2E7D32))
+                      : null,
+                  onTap: () {
+                    Navigator.pop(bCtx);
+                    HapticFeedback.mediumImpact();
+                    final item = FloorVerificationItem(
+                      delegateId: delegateId,
+                      branchName: branchName,
+                      date: dateStr,
+                      status: 'verified',
+                      timestamp: DateTime.now(),
+                      verifiedBy: widget.marketingUser.uid,
+                      verifierName: widget.marketingUser.fullName.isNotEmpty
+                          ? widget.marketingUser.fullName
+                          : 'مشرف الصالة',
+                    );
+                    _floorService.saveVerification(item: item);
+                    setState(() {
+                      _floorVerifications[delegateId] = item;
+                    });
+                  },
+                ),
+                const SizedBox(height: 10),
+
+                // Option 2: غير متواجد بالصالة (غائب عن الستاند)
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: currentItem?.isMissing == true
+                          ? const Color(0xFFC62828)
+                          : cs.outlineVariant.withValues(alpha: 0.3),
+                      width: currentItem?.isMissing == true ? 1.5 : 1,
+                    ),
+                  ),
+                  tileColor: currentItem?.isMissing == true
+                       ? const Color(0xFFFFEBEE)
+                      : cs.surfaceContainerLow,
+                  leading: const Icon(
+                    Icons.cancel_rounded,
+                    color: Color(0xFFC62828),
+                    size: 26,
+                  ),
+                  title: const Text(
+                    'غير متواجد بالصالة',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Color(0xFFB71C1C),
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'مسجل حضور في التطبيق لكنه غير متواجد فعلياً',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: currentItem?.isMissing == true
+                      ? const Icon(Icons.done_rounded, color: Color(0xFFC62828))
+                      : null,
+                  onTap: () {
+                    Navigator.pop(bCtx);
+                    HapticFeedback.heavyImpact();
+                    final item = FloorVerificationItem(
+                      delegateId: delegateId,
+                      branchName: branchName,
+                      date: dateStr,
+                      status: 'missing',
+                      timestamp: DateTime.now(),
+                      verifiedBy: widget.marketingUser.uid,
+                      verifierName: widget.marketingUser.fullName.isNotEmpty
+                          ? widget.marketingUser.fullName
+                          : 'مشرف الصالة',
+                    );
+                    _floorService.saveVerification(item: item);
+                    setState(() {
+                      _floorVerifications[delegateId] = item;
+                    });
+                  },
+                ),
+
+                if (currentItem != null) ...[
+                  const SizedBox(height: 10),
+                  // Option 3: إلغاء التحديد
+                  ListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    leading: Icon(
+                      Icons.restart_alt_rounded,
+                      color: cs.onSurfaceVariant,
+                      size: 24,
+                    ),
+                    title: const Text(
+                      'إعادة تعيين (لم يتم المرور بعد)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(bCtx);
+                      HapticFeedback.lightImpact();
+                      _floorService.removeVerification(
+                        dateStr: dateStr,
+                        branchName: branchName,
+                        delegateId: delegateId,
+                      );
+                      setState(() {
+                        _floorVerifications.remove(delegateId);
+                      });
+                    },
+                  ),
+                ],
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _toggleBranchExpansion(String branchName) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_collapsedBranches.contains(branchName)) {
+        _collapsedBranches.remove(branchName);
+      } else {
+        _collapsedBranches.add(branchName);
+      }
+    });
+  }
+
+  void _collapseAll(List<String> branches) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _collapsedBranches.addAll(branches);
+    });
+  }
+
+  void _expandAll() {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _collapsedBranches.clear();
+    });
+  }
+
+  void _loadAllBranches(
+    BuildContext context,
+    List<String> favorites, {
+    bool forceRefresh = false,
+  }) {
     if (favorites.isEmpty) return;
     context.read<MarketingBloc>().add(
       LoadAllFavoriteBranchesAttendance(
@@ -100,6 +417,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             ? widget.marketingUser.organizationUID
             : 'PiioBFgxaHAeuRdjlDgj',
         date: _selectedDate,
+        forceRefresh: forceRefresh,
       ),
     );
   }
@@ -116,8 +434,10 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       if (!mounted) return;
       setState(() {
         _selectedDate = picked;
+        _floorVerifications = _floorService.getLocalVerifications(picked);
       });
       _loadAllBranches(context, _favoriteBranches);
+      _syncFloorVerificationsFromCloud();
     }
   }
 
@@ -163,14 +483,29 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
 
         if (_favoriteBranches.isEmpty) {
           body = _buildEmptyState(context, colorScheme);
-        } else if (state is AllBranchesAttendanceLoading) {
-          body = _buildLoadingSkeletons(colorScheme);
-        } else if (state is AllBranchesAttendanceError) {
-          body = _buildError(context, state.message, colorScheme);
         } else if (state is AllBranchesAttendanceLoaded) {
+          _lastLoadedState = state;
           body = _buildAllBranches(context, state, colorScheme);
+        } else if (state is AllBranchesAttendanceLoading) {
+          if (_lastLoadedState != null && _lastLoadedState!.data.isNotEmpty) {
+            body = _buildAllBranches(context, _lastLoadedState!, colorScheme);
+          } else {
+            body = _buildLoadingSkeletons(colorScheme);
+          }
+        } else if (state is AllBranchesAttendanceError) {
+          if (_lastLoadedState != null && _lastLoadedState!.data.isNotEmpty) {
+            body = _buildAllBranches(context, _lastLoadedState!, colorScheme);
+          } else {
+            body = _buildError(context, state.message, colorScheme);
+          }
+        } else if (_lastLoadedState != null && _lastLoadedState!.data.isNotEmpty) {
+          body = _buildAllBranches(
+            context,
+            _lastLoadedState!.copyWith(favoriteBranches: _favoriteBranches),
+            colorScheme,
+          );
         } else {
-          body = const Center(child: CircularProgressIndicator());
+          body = _buildLoadingSkeletons(colorScheme);
         }
 
         final content = Stack(
@@ -209,6 +544,24 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               ),
               centerTitle: false,
               actions: [
+                if (_favoriteBranches.length > 1)
+                  IconButton(
+                    icon: Icon(
+                      _collapsedBranches.length >= _favoriteBranches.length
+                          ? Icons.unfold_more_rounded
+                          : Icons.unfold_less_rounded,
+                    ),
+                    tooltip: _collapsedBranches.length >= _favoriteBranches.length
+                        ? 'فتح الكل'
+                        : 'طي الكل',
+                    onPressed: () {
+                      if (_collapsedBranches.length >= _favoriteBranches.length) {
+                        _expandAll();
+                      } else {
+                        _collapseAll(_favoriteBranches);
+                      }
+                    },
+                  ),
                 IconButton(
                   icon: const Icon(Icons.calendar_month_rounded),
                   tooltip: 'تغيير التاريخ',
@@ -217,7 +570,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
                   tooltip: 'تحديث',
-                  onPressed: () => _loadAllBranches(context, _favoriteBranches),
+                  onPressed: () => _loadAllBranches(context, _favoriteBranches, forceRefresh: true),
                 ),
               ],
             ),
@@ -456,6 +809,69 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             ),
           ),
 
+          // ─── شريط التحكم بالفروع (إذا كان هناك أكثر من فرع) ──────────────
+          if (state.favoriteBranches.length > 1)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.store_mall_directory_rounded,
+                      size: 16,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'الفروع المتابعة (${state.favoriteBranches.length})',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        if (_collapsedBranches.length >= state.favoriteBranches.length) {
+                          _expandAll();
+                        } else {
+                          _collapseAll(state.favoriteBranches);
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _collapsedBranches.length >= state.favoriteBranches.length
+                                  ? Icons.unfold_more_rounded
+                                  : Icons.unfold_less_rounded,
+                              size: 16,
+                              color: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _collapsedBranches.length >= state.favoriteBranches.length
+                                  ? 'فتح الكل'
+                                  : 'طي الكل',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // ─── قسم لكل فرع ──────────────────────────────────────────────
           for (final branchName in state.favoriteBranches)
             _buildBranchSection(
@@ -463,6 +879,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               branchName,
               state.data[branchName] ?? [],
               colorScheme,
+              isBranchLoading: state.isBranchLoading(branchName),
             ),
 
           // مسافة أسفل الصفحة
@@ -477,10 +894,23 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     BuildContext context,
     String branchName,
     List<Map<String, dynamic>> records,
-    ColorScheme colorScheme,
-  ) {
+    ColorScheme colorScheme, {
+    bool isBranchLoading = false,
+  }) {
     final query = _searchQuery.toLowerCase();
-    final filteredRecords = query.isEmpty
+    final totalCount = records.length;
+    final presentCount = records.where((r) => r['checkOutTime'] == null).length;
+    final checkedOutCount = totalCount - presentCount;
+    final isExpanded = !_collapsedBranches.contains(branchName);
+
+    // Floor Verification Stats
+    final verifiedCount = records.where((r) => _floorVerifications[r['delegateId']]?.isVerified == true).length;
+    final missingCount = records.where((r) => _floorVerifications[r['delegateId']]?.isMissing == true).length;
+    final remainingCount = totalCount - verifiedCount - missingCount;
+
+    // Filter by branch floor status
+    final currentFilter = _branchFilter[branchName] ?? 'all';
+    final searchFilteredRecords = query.isEmpty
         ? records
         : records.where((r) {
             final name = (r['fullName'] as String? ?? '').toLowerCase();
@@ -489,14 +919,28 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             return name.contains(query) || company.contains(query) || phone.contains(query);
           }).toList();
 
+    final displayRecords = searchFilteredRecords.where((r) {
+      final dId = r['delegateId'] as String? ?? '';
+      final vItem = _floorVerifications[dId];
+      if (currentFilter == 'remaining') {
+        return vItem == null || (!vItem.isVerified && !vItem.isMissing);
+      } else if (currentFilter == 'verified') {
+        return vItem?.isVerified == true;
+      } else if (currentFilter == 'missing') {
+        return vItem?.isMissing == true;
+      }
+      return true;
+    }).toList();
+
     return SliverToBoxAdapter(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Branch Header ──
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          // ── Branch Header (Tappable for Collapse / Expand) ──
+          AnimatedContainer(
+            duration: AppMotionDurations.short4,
+            curve: AppMotionCurves.emphasized,
+            margin: EdgeInsets.fromLTRB(16, 12, 16, isExpanded ? 0 : 8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -506,142 +950,618 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
               ),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-                bottom: Radius.circular(4),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.location_on_rounded,
-                    color: colorScheme.primary,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    branchName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                ),
-                // Badge عدد المندوبين
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    query.isEmpty
-                        ? '${records.length} مندوب'
-                        : '${filteredRecords.length} من ${records.length}',
-                    style: TextStyle(
-                      color: colorScheme.onPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                // زر حذف الفرع المباشر
-                IconButton(
-                  icon: Icon(
-                    Icons.delete_outline_rounded,
-                    color: colorScheme.error,
-                    size: 20,
-                  ),
-                  tooltip: 'إزالة الفرع من القائمة',
-                  style: IconButton.styleFrom(
-                    backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
-                    padding: const EdgeInsets.all(6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: () => _confirmRemoveBranch(context, branchName),
+              borderRadius: isExpanded
+                  ? const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                      bottom: Radius.circular(4),
+                    )
+                  : BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: isExpanded
+                    ? const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                        bottom: Radius.circular(4),
+                      )
+                    : BorderRadius.circular(16),
+                onTap: () => _toggleBranchExpansion(branchName),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.location_on_rounded,
+                          color: colorScheme.primary,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              branchName,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                            if (totalCount > 0) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                '$presentCount حاضر • $checkedOutCount منصرف • تم فحص $verifiedCount من $totalCount',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (isBranchLoading) ...[
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      // Badge عدد المندوبين
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          query.isEmpty
+                              ? (currentFilter == 'all'
+                                  ? '$totalCount مندوب'
+                                  : '${displayRecords.length} من $totalCount')
+                              : '${displayRecords.length} من $totalCount',
+                          style: TextStyle(
+                            color: colorScheme.onPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      // زر حذف الفرع المباشر
+                      IconButton(
+                        icon: Icon(
+                          Icons.delete_outline_rounded,
+                          color: colorScheme.error,
+                          size: 20,
+                        ),
+                        tooltip: 'إزالة الفرع من القائمة',
+                        style: IconButton.styleFrom(
+                          backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
+                          padding: const EdgeInsets.all(6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => _confirmRemoveBranch(context, branchName),
+                      ),
+                      const SizedBox(width: 4),
+                      // سهم الطي والانكماش Animated Chevron
+                      AnimatedRotation(
+                        turns: isExpanded ? 0.5 : 0.0,
+                        duration: AppMotionDurations.short4,
+                        curve: AppMotionCurves.emphasized,
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: colorScheme.onPrimaryContainer,
+                          size: 22,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
 
-          // ── Delegates List ──
-          if (filteredRecords.isEmpty)
+          // ── Animated Expand / Collapse Content ──
+          ClipRect(
+            child: AnimatedSize(
+              duration: AppMotionDurations.medium2,
+              reverseDuration: AppMotionDurations.short4,
+              curve: AppMotionCurves.emphasized,
+              alignment: Alignment.topCenter,
+              child: isExpanded
+                  ? (isBranchLoading && records.isEmpty
+                      ? _buildBranchLoadingCard(colorScheme)
+                      : (records.isEmpty
+                          ? _buildEmptyBranchPlaceholder(query, colorScheme)
+                          : _buildDelegatesContainer(
+                              context,
+                              branchName,
+                              records,
+                              displayRecords,
+                              colorScheme,
+                              verifiedCount: verifiedCount,
+                              missingCount: missingCount,
+                              remainingCount: remainingCount,
+                              currentFilter: currentFilter,
+                            )))
+                  : const SizedBox.shrink(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBranchLoadingCard(ColorScheme colorScheme) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(4),
+          bottom: Radius.circular(16),
+        ),
+      ),
+      child: Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'جاري تحميل بيانات الفرع...',
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyBranchPlaceholder(String query, ColorScheme colorScheme) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(4),
+          bottom: Radius.circular(16),
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            query.isNotEmpty
+                ? Icons.search_off_rounded
+                : Icons.people_outline_rounded,
+            color: colorScheme.outlineVariant,
+            size: 36,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            query.isNotEmpty
+                ? 'لا يوجد مندوب مطابق للبحث في هذا الفرع'
+                : 'لا يوجد حضور اليوم',
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDelegatesContainer(
+    BuildContext context,
+    String branchName,
+    List<Map<String, dynamic>> allRecords,
+    List<Map<String, dynamic>> displayRecords,
+    ColorScheme colorScheme, {
+    required int verifiedCount,
+    required int missingCount,
+    required int remainingCount,
+    required String currentFilter,
+  }) {
+    final totalCount = allRecords.length;
+    final verifiedPercent = totalCount > 0 ? (verifiedCount / totalCount) : 0.0;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(4),
+          bottom: Radius.circular(16),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ─── شريط تقدم التحقق الميداني بالصالة والفلاتر السريعة ───
+          if (totalCount > 0)
             Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              padding: const EdgeInsets.symmetric(vertical: 20),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerLow,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(4),
-                  bottom: Radius.circular(16),
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                border: Border(
+                  bottom: BorderSide(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                  ),
                 ),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    query.isNotEmpty
-                        ? Icons.search_off_rounded
-                        : Icons.people_outline_rounded,
-                    color: colorScheme.outlineVariant,
-                    size: 36,
+                  // Row: عنوان الفحص ونسبة الإنجاز
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.verified_rounded,
+                          size: 15,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'التحقق الميداني بالصالة',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'تم التحقق من $verifiedCount / $totalCount (${(verifiedPercent * 100).toInt()}%)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: verifiedCount == totalCount && totalCount > 0
+                              ? const Color(0xFF2E7D32)
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    query.isNotEmpty
-                        ? 'لا يوجد مندوب مطابق للبحث في هذا الفرع'
-                        : 'لا يوجد حضور اليوم',
-                    style: TextStyle(
-                      color: colorScheme.onSurfaceVariant,
-                      fontSize: 13,
+                  // شريط التقدم المرئي
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: verifiedPercent,
+                      minHeight: 6,
+                      backgroundColor: colorScheme.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        verifiedCount == totalCount && totalCount > 0
+                            ? const Color(0xFF2E7D32)
+                            : colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // فلاتر سريعة بنقرة واحدة (Quick Filters)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFloorFilterChip(
+                          label: 'الكل',
+                          count: totalCount,
+                          icon: Icons.group_rounded,
+                          isSelected: currentFilter == 'all',
+                          colorScheme: colorScheme,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _branchFilter[branchName] = 'all';
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _buildFloorFilterChip(
+                          label: 'المتبقي للمرور',
+                          count: remainingCount,
+                          icon: Icons.directions_walk_rounded,
+                          isSelected: currentFilter == 'remaining',
+                          colorScheme: colorScheme,
+                          badgeColor: remainingCount > 0 ? colorScheme.primary : null,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _branchFilter[branchName] = 'remaining';
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _buildFloorFilterChip(
+                          label: 'تم التحقق',
+                          count: verifiedCount,
+                          icon: Icons.check_circle_rounded,
+                          isSelected: currentFilter == 'verified',
+                          colorScheme: colorScheme,
+                          badgeColor: verifiedCount > 0 ? const Color(0xFF2E7D32) : null,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _branchFilter[branchName] = 'verified';
+                            });
+                          },
+                        ),
+                        if (missingCount > 0 || currentFilter == 'missing') ...[
+                          const SizedBox(width: 6),
+                          _buildFloorFilterChip(
+                            label: 'غير متواجد',
+                            count: missingCount,
+                            icon: Icons.cancel_rounded,
+                            isSelected: currentFilter == 'missing',
+                            colorScheme: colorScheme,
+                            badgeColor: const Color(0xFFC62828),
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _branchFilter[branchName] = 'missing';
+                              });
+                            },
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],
               ),
+            ),
+
+          // ─── قائمة المناديب أو شاشة الاكتمال ───
+          if (displayRecords.isEmpty)
+            _buildEmptyFilterPlaceholder(
+              context,
+              branchName,
+              currentFilter,
+              verifiedCount,
+              missingCount,
+              totalCount,
+              colorScheme,
             )
           else
+            ...displayRecords.asMap().entries.map((entry) {
+              final isLast = entry.key == displayRecords.length - 1;
+              return Column(
+                children: [
+                  _buildDelegateRow(context, entry.value, colorScheme, branchName),
+                  if (!isLast)
+                    Divider(
+                      height: 1,
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      indent: 68,
+                    ),
+                ],
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyFilterPlaceholder(
+    BuildContext context,
+    String branchName,
+    String filter,
+    int verifiedCount,
+    int missingCount,
+    int totalCount,
+    ColorScheme colorScheme,
+  ) {
+    if (filter == 'remaining' && totalCount > 0) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: Column(
+          children: [
             Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                border: Border.all(color: colorScheme.outlineVariant),
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(4),
-                  bottom: Radius.circular(16),
-                ),
+              padding: const EdgeInsets.all(12),
+              decoration: const BoxDecoration(
+                color: Color(0xFFE8F5E9),
+                shape: BoxShape.circle,
               ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: filteredRecords.asMap().entries.map((entry) {
-                  final isLast = entry.key == filteredRecords.length - 1;
-                  return Column(
-                    children: [
-                      _buildDelegateRow(context, entry.value, colorScheme),
-                      if (!isLast)
-                        Divider(
-                          height: 1,
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                          indent: 68,
-                        ),
-                    ],
-                  );
-                }).toList(),
+              child: const Icon(
+                Icons.task_alt_rounded,
+                size: 38,
+                color: Color(0xFF2E7D32),
               ),
             ),
+            const SizedBox(height: 12),
+            const Text(
+              'اكتمل المرور على جميع مناديب الفرع!',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Color(0xFF1B5E20),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'تم التحقق من $verifiedCount مندوب${missingCount > 0 ? " ورصد $missingCount غير متواجد" : ""}',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.tonalIcon(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                setState(() {
+                  _branchFilter[branchName] = 'all';
+                });
+              },
+              icon: const Icon(Icons.people_outline_rounded, size: 18),
+              label: const Text('عرض جميع المناديب'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    String msg = 'لا توجد عناصر مطابقة';
+    IconData icon = Icons.info_outline_rounded;
+    if (filter == 'verified') {
+      msg = 'لم يتم التحقق من أي مندوب بعد';
+      icon = Icons.check_circle_outline_rounded;
+    } else if (filter == 'missing') {
+      msg = 'لا يوجد أي مندوب رُصد كغير متواجد';
+      icon = Icons.check_circle_outline_rounded;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: Column(
+        children: [
+          Icon(icon, size: 36, color: colorScheme.outlineVariant),
+          const SizedBox(height: 8),
+          Text(
+            msg,
+            style: TextStyle(
+              fontSize: 13,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              setState(() {
+                _branchFilter[branchName] = 'all';
+              });
+            },
+            child: const Text('عرض الكل'),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFloorFilterChip({
+    required String label,
+    required int count,
+    required IconData icon,
+    required bool isSelected,
+    required ColorScheme colorScheme,
+    required VoidCallback onTap,
+    Color? badgeColor,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: AppMotionDurations.short3,
+          curve: AppMotionCurves.standard,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant.withValues(alpha: 0.6),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected
+                    ? colorScheme.onPrimary
+                    : (badgeColor ?? colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? colorScheme.onPrimary.withValues(alpha: 0.25)
+                      : (badgeColor?.withValues(alpha: 0.12) ??
+                          colorScheme.surfaceContainerHighest),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected
+                        ? colorScheme.onPrimary
+                        : (badgeColor ?? colorScheme.onSurfaceVariant),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -650,8 +1570,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   Widget _buildDelegateRow(
     BuildContext context,
     Map<String, dynamic> record,
-    ColorScheme colorScheme,
-  ) {
+    ColorScheme colorScheme, [
+    String? branchName,
+  ]) {
     final String fullName = record['fullName'] as String? ?? 'مندوب';
     final String companyName = record['companyName'] as String? ?? '';
     final String? imageUrl = record['personalPhotoURL'] as String? ??
@@ -669,143 +1590,303 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
 
     final hasPhoto = imageUrl != null && imageUrl.isNotEmpty;
 
-    return InkWell(
-      onTap: () => _openAttendanceHistory(context, record),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          children: [
-            // Avatar (صورة المندوب أو الحرف الأول مع إمكانية التكبير عند الضغط)
-            GestureDetector(
-              onTap: hasPhoto
-                  ? () => _showImagePreview(
-                        context,
-                        imageUrl,
-                        fullName,
-                        companyName,
-                      )
-                  : null,
-              child: AppAvatar(
-                imageUrl: hasPhoto ? imageUrl : null,
-                fallbackText: fullName,
-                radius: 22,
-                backgroundColor: hasCheckOut
-                    ? colorScheme.surfaceContainerHighest
-                    : colorScheme.primaryContainer,
-                foregroundColor: hasCheckOut
-                    ? colorScheme.onSurfaceVariant
-                    : colorScheme.onPrimaryContainer,
-                badge: hasPhoto
-                    ? Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surface,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 3,
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.zoom_in_rounded,
-                          size: 10,
-                          color: colorScheme.primary,
-                        ),
-                      )
+    // Floor verification item for this delegate
+    final delegateId = record['delegateId'] as String? ?? '';
+    final vItem = _floorVerifications[delegateId];
+    final isVerified = vItem?.isVerified == true;
+    final isMissing = vItem?.isMissing == true;
+
+    Color? rowBgColor;
+    if (isVerified) {
+      rowBgColor = const Color(0xFF2E7D32).withValues(alpha: 0.04);
+    } else if (isMissing) {
+      rowBgColor = const Color(0xFFC62828).withValues(alpha: 0.04);
+    }
+
+    return Material(
+      color: rowBgColor ?? Colors.transparent,
+      child: InkWell(
+        onTap: () => _openAttendanceHistory(context, record),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              // Avatar (صورة المندوب أو الحرف الأول مع إمكانية التكبير عند الضغط)
+              GestureDetector(
+                onTap: hasPhoto
+                    ? () => _showImagePreview(
+                          context,
+                          imageUrl,
+                          fullName,
+                          companyName,
+                        )
                     : null,
+                child: AppAvatar(
+                  imageUrl: hasPhoto ? imageUrl : null,
+                  fallbackText: fullName,
+                  radius: 22,
+                  backgroundColor: hasCheckOut
+                      ? colorScheme.surfaceContainerHighest
+                      : colorScheme.primaryContainer,
+                  foregroundColor: hasCheckOut
+                      ? colorScheme.onSurfaceVariant
+                      : colorScheme.onPrimaryContainer,
+                  badge: hasPhoto
+                      ? Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surface,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 3,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.zoom_in_rounded,
+                            size: 10,
+                            color: colorScheme.primary,
+                          ),
+                        )
+                      : null,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            // Name
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    fullName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  if (companyName.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+              const SizedBox(width: 12),
+              // Name & Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      companyName,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                        fontWeight: FontWeight.w500,
+                      fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
                       ),
+                    ),
+                    if (companyName.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        companyName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _miniChip(
+                          Icons.login_rounded,
+                          checkInStr,
+                          colorScheme.tertiaryContainer,
+                          colorScheme.onTertiaryContainer,
+                        ),
+                        _miniChip(
+                          Icons.logout_rounded,
+                          checkOutStr,
+                          hasCheckOut
+                              ? colorScheme.errorContainer.withValues(alpha: 0.6)
+                              : colorScheme.surfaceContainerHighest,
+                          hasCheckOut
+                              ? colorScheme.onErrorContainer
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                      ],
                     ),
                   ],
-                  const SizedBox(height: 4),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Trailing actions: Call Supervisor + Status Pill + Quick Floor Verification Button
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _miniChip(
-                        Icons.login_rounded,
-                        checkInStr,
-                        colorScheme.tertiaryContainer,
-                        colorScheme.onTertiaryContainer,
+                      // زر اتصال بمشرف المندوب
+                      IconButton(
+                        icon: Icon(
+                          Icons.phone_in_talk_rounded,
+                          color: colorScheme.primary,
+                          size: 18,
+                        ),
+                        tooltip: 'اتصال بمشرف المندوب',
+                        style: IconButton.styleFrom(
+                          backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                          padding: const EdgeInsets.all(5),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => _contactSupervisor(context, record),
                       ),
                       const SizedBox(width: 6),
-                      _miniChip(
-                        Icons.logout_rounded,
-                        checkOutStr,
-                        hasCheckOut
-                            ? colorScheme.errorContainer.withValues(alpha: 0.6)
-                            : colorScheme.surfaceContainerHighest,
-                        hasCheckOut
-                            ? colorScheme.onErrorContainer
-                            : colorScheme.onSurfaceVariant,
+                      // حالة الحضور (حاضر / منصرف)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: hasCheckOut
+                              ? colorScheme.surfaceContainerHighest
+                              : colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          hasCheckOut ? 'منصرف' : 'حاضر',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: hasCheckOut
+                                ? colorScheme.onSurfaceVariant
+                                : colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // ── زر الفحص التفاعلي السريع (Floor Verification Button) ──
+                      _buildFloorVerificationButton(
+                        context,
+                        record,
+                        vItem,
+                        colorScheme,
+                        branchName,
                       ),
                     ],
                   ),
+                  // وقت الفحص الميداني
+                  if (vItem != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isVerified
+                                ? Icons.verified_rounded
+                                : Icons.error_outline_rounded,
+                            size: 11,
+                            color: isVerified
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFC62828),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${isVerified ? "تم المرور" : "غير متواجد"} • ${DateFormat('hh:mm a', 'ar').format(vItem.timestamp)}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isVerified
+                                  ? const Color(0xFF2E7D32)
+                                  : const Color(0xFFC62828),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloorVerificationButton(
+    BuildContext context,
+    Map<String, dynamic> record,
+    FloorVerificationItem? vItem,
+    ColorScheme colorScheme, [
+    String? branchName,
+  ]) {
+    final isVerified = vItem?.isVerified == true;
+    final isMissing = vItem?.isMissing == true;
+
+    Color bg;
+    Color border;
+    Color fg;
+    IconData icon;
+    String label;
+
+    if (isVerified) {
+      bg = const Color(0xFFE8F5E9);
+      border = const Color(0xFF2E7D32);
+      fg = const Color(0xFF1B5E20);
+      icon = Icons.check_circle_rounded;
+      label = 'تم المرور';
+    } else if (isMissing) {
+      bg = const Color(0xFFFFEBEE);
+      border = const Color(0xFFC62828);
+      fg = const Color(0xFFB71C1C);
+      icon = Icons.cancel_rounded;
+      label = 'غير متواجد';
+    } else {
+      bg = colorScheme.surfaceContainerHighest.withValues(alpha: 0.6);
+      border = colorScheme.outlineVariant.withValues(alpha: 0.6);
+      fg = colorScheme.onSurfaceVariant;
+      icon = Icons.radio_button_unchecked_rounded;
+      label = 'فحص';
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: Tooltip(
+        message: isVerified
+            ? 'تم التحقق • اضغط للإلغاء أو ضغطة مطولة لتغيير الحالة'
+            : (isMissing
+                ? 'غير متواجد بالصالة • اضغط للتحقق أو ضغطة مطولة للخيارات'
+                : 'اضغط لتأكيد التواجد بالصالة • ضغطة مطولة لتحديد غير متواجد'),
+        child: InkWell(
+          onTap: () => _toggleFloorVerification(record, branchName),
+          onLongPress: () => _showFloorVerificationDialog(context, record, branchName),
+          borderRadius: BorderRadius.circular(8),
+          child: AnimatedContainer(
+            duration: AppMotionDurations.short3,
+            curve: AppMotionCurves.standard,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: border, width: isVerified || isMissing ? 1.2 : 1),
+              boxShadow: isVerified
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF2E7D32).withValues(alpha: 0.18),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                  : null,
             ),
-            // Call Supervisor Button
-            IconButton(
-              icon: Icon(
-                Icons.phone_in_talk_rounded,
-                color: colorScheme.primary,
-                size: 19,
-              ),
-              tooltip: 'اتصال بمشرف المندوب',
-              style: IconButton.styleFrom(
-                backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
-                padding: const EdgeInsets.all(6),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              onPressed: () => _contactSupervisor(context, record),
-            ),
-            const SizedBox(width: 8),
-            // Status
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: hasCheckOut
-                    ? colorScheme.surfaceContainerHighest
-                    : colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                hasCheckOut ? 'منصرف' : 'حاضر',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: hasCheckOut
-                      ? colorScheme.onSurfaceVariant
-                      : colorScheme.onPrimaryContainer,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 15, color: fg),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isVerified || isMissing ? FontWeight.bold : FontWeight.w600,
+                    color: fg,
+                  ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: 4),
-            Icon(Icons.chevron_left_rounded, color: colorScheme.outline, size: 18),
-          ],
+          ),
         ),
       ),
     );
@@ -1416,6 +2497,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         userRole: widget.marketingUser.role,
         currentFavorites: _favoriteBranches,
         onBranchSelected: (branchName) {
+          setState(() {
+            _collapsedBranches.remove(branchName);
+          });
           bloc.add(AddFavoriteBranch(
             userId: widget.marketingUser.uid,
             branchName: branchName,
@@ -1453,6 +2537,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               ),
               onPressed: () {
                 Navigator.pop(dialogCtx);
+                setState(() {
+                  _collapsedBranches.remove(branchName);
+                });
                 final bloc = context.read<MarketingBloc>();
                 bloc.add(RemoveFavoriteBranch(
                   userId: widget.marketingUser.uid,

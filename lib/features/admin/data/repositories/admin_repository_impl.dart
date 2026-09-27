@@ -35,6 +35,20 @@ class AdminRepositoryImpl implements AdminRepository {
   }
 
   @override
+  Future<Either<Failure, List<Map<String, dynamic>>>> getCompaniesForOrg(
+    String organizationUID,
+  ) async {
+    try {
+      final companies = await remoteDataSource.getCompaniesForOrg(organizationUID);
+      return Right(companies);
+    } on Failure catch (f) {
+      return Left(f);
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ غير متوقع.'));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<Branch>>> getBranches() async {
     try {
       final branches = await remoteDataSource.getBranches();
@@ -113,6 +127,9 @@ class AdminRepositoryImpl implements AdminRepository {
     required String displayName,
     String role = 'company-admin',
     String organizationUID = '',
+    String? companyUID,
+    String? companyName,
+    String? jobTitle,
   }) async {
     try {
       final tempPassword = _generateTemporaryPassword();
@@ -123,6 +140,9 @@ class AdminRepositoryImpl implements AdminRepository {
         displayName: displayName,
         role: role,
         organizationUID: organizationUID,
+        companyUID: companyUID,
+        companyName: companyName,
+        jobTitle: jobTitle,
         createdAt: DateTime.now(),
         createdBy: 'super-admin',
         temporaryPassword: tempPassword,
@@ -135,6 +155,8 @@ class AdminRepositoryImpl implements AdminRepository {
         phoneNumber: phoneNumber,
         temporaryPassword: tempPassword,
         displayName: displayName,
+        role: role,
+        companyName: companyName,
       );
 
       return Right(result);

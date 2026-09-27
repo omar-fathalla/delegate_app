@@ -62,6 +62,8 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
         return 'تسويق';
       case UserRole.branchesMarketingManager:
         return 'مدير فروع التسويق';
+      case UserRole.hr:
+        return 'موارد بشرية (HR)';
       case UserRole.delegate:
         if (del.position == DelegatePosition.supervisor) {
           return 'مشرف';

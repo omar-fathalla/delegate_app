@@ -10,6 +10,7 @@ class AdminUser extends Equatable {
   final String? organizationName;
   final String? companyUID;
   final String? companyName;
+  final String? jobTitle;
   final DateTime createdAt;
   final String createdBy;
   final String temporaryPassword;
@@ -25,6 +26,7 @@ class AdminUser extends Equatable {
     this.organizationName,
     this.companyUID,
     this.companyName,
+    this.jobTitle,
     required this.createdAt,
     required this.createdBy,
     required this.temporaryPassword,
@@ -41,6 +43,7 @@ class AdminUser extends Equatable {
     String? organizationName,
     String? companyUID,
     String? companyName,
+    String? jobTitle,
     DateTime? createdAt,
     String? createdBy,
     String? temporaryPassword,
@@ -56,6 +59,7 @@ class AdminUser extends Equatable {
       organizationName: organizationName ?? this.organizationName,
       companyUID: companyUID ?? this.companyUID,
       companyName: companyName ?? this.companyName,
+      jobTitle: jobTitle ?? this.jobTitle,
       createdAt: createdAt ?? this.createdAt,
       createdBy: createdBy ?? this.createdBy,
       temporaryPassword: temporaryPassword ?? this.temporaryPassword,
@@ -74,6 +78,7 @@ class AdminUser extends Equatable {
     organizationName,
     companyUID,
     companyName,
+    jobTitle,
     createdAt,
     createdBy,
     temporaryPassword,

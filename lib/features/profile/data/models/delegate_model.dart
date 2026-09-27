@@ -207,6 +207,11 @@ class DelegateModel extends Delegate {
         case 'accounting':
         case 'account_admin':
           return UserRole.accountant;
+        case 'hr':
+        case 'company_hr':
+        case 'company-hr':
+        case 'human_resources':
+          return UserRole.hr;
         default:
           return UserRole.delegate;
       }
@@ -390,6 +395,8 @@ class DelegateModel extends Delegate {
         return 'branches_marketing';
       case UserRole.accountant:
         return 'accountant';
+      case UserRole.hr:
+        return 'hr';
       case UserRole.delegate:
         return 'delegate';
     }
