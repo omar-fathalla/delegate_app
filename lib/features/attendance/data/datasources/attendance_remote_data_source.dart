@@ -85,6 +85,43 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     String? branchName,
   }) async {
     try {
+      // Guard against duplicate active check-in in Firestore
+      try {
+        final existingActive = await findActiveAttendance(
+          userId,
+          organizationId,
+        ).timeout(const Duration(seconds: 4));
+
+        if (existingActive != null) {
+          DateTime now;
+          try {
+            now = sl<TrustedTimeService>().now;
+          } catch (_) {
+            now = DateTime.now();
+          }
+
+          final isSameDay = existingActive.checkInTime.year == now.year &&
+              existingActive.checkInTime.month == now.month &&
+              existingActive.checkInTime.day == now.day;
+
+          if (isSameDay) {
+            if (existingActive.branchName == branchName) {
+              throw const ServerFailure(
+                'أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.',
+              );
+            } else {
+              throw ServerFailure(
+                'لديك تسجيل حضور نشط في فرع ${existingActive.branchName ?? "آخر"}. يرجى تسجيل الانصراف أولاً.',
+              );
+            }
+          }
+        }
+      } on Failure {
+        rethrow;
+      } catch (e) {
+        debugPrint('Active check-in verification warning: $e');
+      }
+
       final docRef = await _attendanceCollection(organizationId)
           .add({
             'delegateId': userId,
@@ -142,6 +179,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       throwFirestoreFailure(e, 'فشل في تسجيل الحضور. حاول مرة أخرى.');
     } on TimeoutException {
       throwTimeoutFailure();
+    } on Failure {
+      rethrow;
     } catch (_) {
       throwUnexpectedFailure('حدث خطأ غير متوقع أثناء تسجيل الحضور.');
     }
@@ -179,6 +218,44 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
           })
           .timeout(const Duration(seconds: 15));
+
+      // Auto-resolve any orphaned unclosed check-in for the same user and branch today
+      try {
+        final orphanedSnaps = await _attendanceCollection(organizationId)
+            .where('delegateId', isEqualTo: userId)
+            .where('type', isEqualTo: 'check_in')
+            .where('branchName', isEqualTo: lastData['branchName'])
+            .limit(5)
+            .get()
+            .timeout(const Duration(seconds: 4));
+
+        for (final doc in orphanedSnaps.docs) {
+          if (doc.id != attendanceId) {
+            final outSnap = await _attendanceCollection(organizationId)
+                .where('relatedCheckInId', isEqualTo: doc.id)
+                .limit(1)
+                .get()
+                .timeout(const Duration(seconds: 3));
+
+            if (outSnap.docs.isEmpty) {
+              await _attendanceCollection(organizationId).add({
+                'delegateId': userId,
+                'userId': userId,
+                'companyId': companyId,
+                'organizationId': organizationId,
+                'timestamp': FieldValue.serverTimestamp(),
+                'type': 'check_out',
+                'location': {'latitude': lat, 'longitude': long},
+                'relatedCheckInId': doc.id,
+                if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
+                'autoClosedDuplicate': true,
+              });
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Auto-close orphaned check-in warning: $e');
+      }
 
       DateTime currentOutTime;
       try {

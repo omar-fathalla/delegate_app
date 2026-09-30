@@ -44,6 +44,42 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     CheckInRequested event,
     Emitter<AttendanceState> emit,
   ) async {
+    final previousLoadedState = state is AttendanceHistoryLoaded
+        ? (state as AttendanceHistoryLoaded)
+        : _cachedHistoryState[event.userId];
+    final currentHistory = previousLoadedState?.history;
+
+    // Fast memory check: guard against duplicate check-in if there's already an active session
+    final activeAttendance = previousLoadedState?.activeAttendance ??
+        currentHistory?.cast<Attendance?>().firstWhere(
+          (a) => a?.checkOutTime == null,
+          orElse: () => null,
+        );
+
+    if (activeAttendance != null) {
+      final now = DateTime.now();
+      final isToday = activeAttendance.checkInTime.year == now.year &&
+          activeAttendance.checkInTime.month == now.month &&
+          activeAttendance.checkInTime.day == now.day;
+
+      if (isToday) {
+        if (activeAttendance.branchName == event.branchName) {
+          emit(const AttendanceError(
+            message: 'أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.',
+          ));
+          if (previousLoadedState != null) emit(previousLoadedState);
+          return;
+        } else {
+          emit(AttendanceError(
+            message:
+                'لديك تسجيل حضور نشط في فرع ${activeAttendance.branchName ?? "آخر"}. يرجى تسجيل الانصراف أولاً.',
+          ));
+          if (previousLoadedState != null) emit(previousLoadedState);
+          return;
+        }
+      }
+    }
+
     _cachedHistoryState.remove(event.userId);
     emit(AttendanceLoading());
     final result = await checkIn(
@@ -55,13 +91,14 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         lat: event.lat,
         long: event.long,
         branchName: event.branchName,
-        currentHistory: state is AttendanceHistoryLoaded
-            ? (state as AttendanceHistoryLoaded).history
-            : null,
+        currentHistory: currentHistory,
       ),
     );
     result.fold(
-      (failure) => emit(AttendanceError(message: failure.message)),
+      (failure) {
+        emit(AttendanceError(message: failure.message));
+        if (previousLoadedState != null) emit(previousLoadedState);
+      },
       (attendance) {
         emit(AttendanceCheckedIn(attendance: attendance));
         _reviewService?.triggerSmartReview();
@@ -221,6 +258,11 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     CheckOutAndCheckInRequested event,
     Emitter<AttendanceState> emit,
   ) async {
+    final previousLoadedState = state is AttendanceHistoryLoaded
+        ? (state as AttendanceHistoryLoaded)
+        : _cachedHistoryState[event.userId];
+    final currentHistory = previousLoadedState?.history;
+
     emit(AttendanceLoading());
     // 1. Check out of the old attendance
     final checkOutResult = await checkOut(
@@ -234,7 +276,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     );
 
     await checkOutResult.fold(
-      (failure) async => emit(AttendanceError(message: failure.message)),
+      (failure) async {
+        emit(AttendanceError(message: failure.message));
+        if (previousLoadedState != null) emit(previousLoadedState);
+      },
       (attendance) async {
         // 2. If check-out is successful, proceed to check-in to the new branch
         final checkInResult = await checkIn(
@@ -246,14 +291,15 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
             lat: event.lat,
             long: event.long,
             branchName: event.branchName,
-            currentHistory: state is AttendanceHistoryLoaded
-                ? (state as AttendanceHistoryLoaded).history
-                : null,
+            currentHistory: currentHistory,
           ),
         );
 
         checkInResult.fold(
-          (failure) => emit(AttendanceError(message: failure.message)),
+          (failure) {
+            emit(AttendanceError(message: failure.message));
+            if (previousLoadedState != null) emit(previousLoadedState);
+          },
           (newAttendance) =>
               emit(AttendanceCheckedIn(attendance: newAttendance)),
         );

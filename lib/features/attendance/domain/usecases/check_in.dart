@@ -12,17 +12,49 @@ class CheckIn implements UseCase<Attendance, CheckInParams> {
 
   @override
   Future<Either<Failure, Attendance>> call(CheckInParams params) async {
-    if (params.currentHistory != null && params.branchName != null) {
-      final now = DateTime.now();
-      final hasVisitedToday = params.currentHistory!.any((attendance) {
-        final isSameDay = attendance.checkInTime.year == now.year &&
-            attendance.checkInTime.month == now.month &&
-            attendance.checkInTime.day == now.day;
-        return isSameDay && attendance.branchName == params.branchName;
-      });
+    if (params.currentHistory != null) {
+      // 1. Guard against checking in while another session is still active (unclosed)
+      final activeAttendance = params.currentHistory!.cast<Attendance?>().firstWhere(
+        (attendance) => attendance?.checkOutTime == null,
+        orElse: () => null,
+      );
 
-      if (hasVisitedToday) {
-        return const Left(ServerFailure('لا يمكن تكرار زيارة نفس الفرع في نفس اليوم'));
+      if (activeAttendance != null) {
+        final now = DateTime.now();
+        final isToday = activeAttendance.checkInTime.year == now.year &&
+            activeAttendance.checkInTime.month == now.month &&
+            activeAttendance.checkInTime.day == now.day;
+
+        if (isToday) {
+          if (activeAttendance.branchName == params.branchName) {
+            return const Left(
+              ServerFailure('أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.'),
+            );
+          } else {
+            return Left(
+              ServerFailure(
+                'لديك تسجيل حضور نشط في فرع ${activeAttendance.branchName ?? "آخر"}. يرجى تسجيل الانصراف أولاً.',
+              ),
+            );
+          }
+        }
+      }
+
+      // 2. Guard against duplicate visits to the same branch on the same day
+      if (params.branchName != null) {
+        final now = DateTime.now();
+        final hasVisitedToday = params.currentHistory!.any((attendance) {
+          final isSameDay = attendance.checkInTime.year == now.year &&
+              attendance.checkInTime.month == now.month &&
+              attendance.checkInTime.day == now.day;
+          return isSameDay && attendance.branchName == params.branchName;
+        });
+
+        if (hasVisitedToday) {
+          return const Left(
+            ServerFailure('لا يمكن تكرار زيارة نفس الفرع في نفس اليوم'),
+          );
+        }
       }
     }
 

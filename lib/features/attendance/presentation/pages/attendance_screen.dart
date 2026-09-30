@@ -322,6 +322,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             isCheckedIn = state.activeAttendance != null;
             activeAttendance = state.activeAttendance;
             isSyncing = state.syncStatus == SyncStatus.inProgress;
+          } else if (_rawHistory.isNotEmpty) {
+            activeAttendance = _rawHistory.cast<Attendance?>().firstWhere(
+              (element) => element?.checkOutTime == null,
+              orElse: () => null,
+            );
+            isCheckedIn = activeAttendance != null;
           }
 
           return Scaffold(
@@ -1632,27 +1638,40 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final branchName = branchToUse.branchName;
     final position = _currentPosition!;
 
-    if (isCheckedIn && activeAttendance != null) {
+    // Dynamically resolve latest active attendance to prevent stale closure state
+    Attendance? currentActive = activeAttendance;
+    final currentState = attendanceBloc.state;
+    if (currentState is AttendanceHistoryLoaded && currentState.activeAttendance != null) {
+      currentActive = currentState.activeAttendance;
+    } else if (_rawHistory.isNotEmpty) {
+      currentActive = _rawHistory.cast<Attendance?>().firstWhere(
+        (a) => a?.checkOutTime == null,
+        orElse: () => null,
+      );
+    }
+    final bool currentlyCheckedIn = isCheckedIn || currentActive != null;
+
+    if (currentlyCheckedIn && currentActive != null) {
       final now = _getTrustedNow();
       final isPreviousDay =
-          activeAttendance.checkInTime.year != now.year ||
-          activeAttendance.checkInTime.month != now.month ||
-          activeAttendance.checkInTime.day != now.day;
+          currentActive.checkInTime.year != now.year ||
+          currentActive.checkInTime.month != now.month ||
+          currentActive.checkInTime.day != now.day;
 
       if (isPreviousDay) {
         _showPreviousDayCheckoutDialog(
           parentContext,
-          activeAttendance,
+          currentActive,
           branchName,
           position,
           attendanceBloc,
           l10n,
         );
-      } else if (activeAttendance.branchName == branchName ||
-          activeAttendance.branchName == null) {
+      } else if (currentActive.branchName == branchName ||
+          currentActive.branchName == null) {
         attendanceBloc.add(
           CheckOutRequested(
-            attendanceId: activeAttendance.id,
+            attendanceId: currentActive.id,
             userId: widget.delegate.uid,
             organizationId: widget.delegate.organizationUID,
             lat: position.latitude,
@@ -1662,7 +1681,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       } else {
         _showForgotCheckoutDialog(
           parentContext,
-          activeAttendance,
+          currentActive,
           branchName,
           position,
           attendanceBloc,
@@ -1707,27 +1726,40 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           actionType: isCheckedIn ? 'تسجيل انصراف' : 'تسجيل حضور',
         );
         if (position != null && parentContext.mounted) {
-          if (isCheckedIn && activeAttendance != null) {
+          // Dynamically resolve latest active attendance to prevent stale closure state
+          Attendance? currentActive = activeAttendance;
+          final currentState = attendanceBloc.state;
+          if (currentState is AttendanceHistoryLoaded && currentState.activeAttendance != null) {
+            currentActive = currentState.activeAttendance;
+          } else if (_rawHistory.isNotEmpty) {
+            currentActive = _rawHistory.cast<Attendance?>().firstWhere(
+              (a) => a?.checkOutTime == null,
+              orElse: () => null,
+            );
+          }
+          final bool currentlyCheckedIn = isCheckedIn || currentActive != null;
+
+          if (currentlyCheckedIn && currentActive != null) {
             final now = _getTrustedNow();
             final isPreviousDay =
-                activeAttendance.checkInTime.year != now.year ||
-                activeAttendance.checkInTime.month != now.month ||
-                activeAttendance.checkInTime.day != now.day;
+                currentActive.checkInTime.year != now.year ||
+                currentActive.checkInTime.month != now.month ||
+                currentActive.checkInTime.day != now.day;
 
             if (isPreviousDay) {
               _showPreviousDayCheckoutDialog(
                 parentContext,
-                activeAttendance,
+                currentActive,
                 scannedBranch,
                 position,
                 attendanceBloc,
                 l10n,
               );
-            } else if (activeAttendance.branchName == scannedBranch ||
-                activeAttendance.branchName == null) {
+            } else if (currentActive.branchName == scannedBranch ||
+                currentActive.branchName == null) {
               attendanceBloc.add(
                 CheckOutRequested(
-                  attendanceId: activeAttendance.id,
+                  attendanceId: currentActive.id,
                   userId: widget.delegate.uid,
                   organizationId: widget.delegate.organizationUID,
                   lat: position.latitude,
@@ -1737,7 +1769,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             } else {
               _showForgotCheckoutDialog(
                 parentContext,
-                activeAttendance,
+                currentActive,
                 scannedBranch,
                 position,
                 attendanceBloc,
