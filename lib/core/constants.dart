@@ -13,3 +13,9 @@ const bool isProduction = true;
 const String kAttendanceCollection = isProduction
     ? 'attendance_logs'
     : 'attendance_logs_testing';
+
+/// The name of the collection to store attendance adjustments audit logs.
+/// Switches based on [isProduction].
+const String kAttendanceAdjustmentLogsCollection = isProduction
+    ? 'attendance_adjustment_logs'
+    : 'attendance_adjustment_logs_testing';

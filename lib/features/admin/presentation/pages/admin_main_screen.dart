@@ -254,6 +254,9 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
         );
         break;
+      case 'hr_system':
+        context.push('/hr/home', extra: widget.delegate);
+        break;
       case 'delegate_tracking':
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -597,6 +600,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               value: 'delegate_subscriptions',
               icon: Icons.how_to_reg_rounded,
               title: 'طلبات اشتراك واعتماد المناديب',
+            ),
+            buildPopupItem(
+              value: 'hr_system',
+              icon: Icons.badge_outlined,
+              title: isArabic ? 'نظام الموارد البشرية (HR)' : 'HR System',
             ),
             buildPopupItem(
               value: 'delegate_tracking',

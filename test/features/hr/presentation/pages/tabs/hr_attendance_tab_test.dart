@@ -79,6 +79,89 @@ void main() {
       expect(record.isPresent, isFalse);
       expect(record.isDeparted, isFalse);
       expect(record.isAbsent, isTrue);
+      expect(record.safetyLevel, equals('unknown'));
+      expect(record.integrityStatus, equals('none'));
+    });
+  });
+
+  group('Anti-Fraud & Integrity Score (مؤشر النزاهة الرقمية ومكافحة الاحتيال)', () {
+    test('🟢 100% Trusted: distance <= 50m, no fraud alerts, no VPN', () {
+      final record = HRAttendanceRecord(
+        delegate: tDelegate,
+        checkInTime: DateTime(2026, 9, 27, 9, 0),
+        branchName: 'فرع المعادي',
+        distanceMeters: 23.5,
+        isInsideGeofence: true,
+        isMockLocation: false,
+        isVpnUsed: false,
+        hasSecurityViolation: false,
+        trustScore: 100,
+        integrityStatus: 'trusted',
+      );
+
+      expect(record.trustScore, equals(100));
+      expect(record.integrityStatus, equals('trusted'));
+      expect(record.safetyLevel, equals('safe'));
+      expect(record.isMockLocation, isFalse);
+      expect(record.isVpnUsed, isFalse);
+      expect(record.hasSecurityViolation, isFalse);
+    });
+
+    test('🟡 Warning (Suspicious): distance > 50m or VPN used', () {
+      final recordWarningDistance = HRAttendanceRecord(
+        delegate: tDelegate,
+        checkInTime: DateTime(2026, 9, 27, 9, 0),
+        branchName: 'فرع مدينة نصر',
+        distanceMeters: 145.0,
+        isInsideGeofence: false,
+        isMockLocation: false,
+        isVpnUsed: false,
+        trustScore: 75,
+        integrityStatus: 'warning',
+        violationReason: 'تسجيل خارج نطاق الفرع (145م)',
+      );
+
+      expect(recordWarningDistance.trustScore, equals(75));
+      expect(recordWarningDistance.integrityStatus, equals('warning'));
+      expect(recordWarningDistance.safetyLevel, equals('warning'));
+
+      final recordVpn = HRAttendanceRecord(
+        delegate: tDelegate,
+        checkInTime: DateTime(2026, 9, 27, 9, 0),
+        branchName: 'فرع المعادي',
+        distanceMeters: 20.0,
+        isInsideGeofence: true,
+        isMockLocation: false,
+        isVpnUsed: true,
+        trustScore: 55,
+        integrityStatus: 'warning',
+        violationReason: 'رصد اتصال مشبوه عبر VPN/Proxy',
+      );
+
+      expect(recordVpn.trustScore, equals(55));
+      expect(recordVpn.integrityStatus, equals('warning'));
+      expect(recordVpn.isVpnUsed, isTrue);
+    });
+
+    test('🔴 Critical Violation: Fake GPS / Mock Location detected', () {
+      final recordMock = HRAttendanceRecord(
+        delegate: tDelegate,
+        checkInTime: DateTime(2026, 9, 27, 9, 0),
+        branchName: 'فرع الدقي',
+        distanceMeters: 10.0,
+        isInsideGeofence: true,
+        isMockLocation: true,
+        hasSecurityViolation: true,
+        trustScore: 15,
+        integrityStatus: 'violation',
+        violationReason: 'رصد تزييف موقع (Mock Location / Fake GPS)',
+      );
+
+      expect(recordMock.trustScore, equals(15));
+      expect(recordMock.integrityStatus, equals('violation'));
+      expect(recordMock.safetyLevel, equals('violation'));
+      expect(recordMock.hasSecurityViolation, isTrue);
+      expect(recordMock.isMockLocation, isTrue);
     });
   });
 }

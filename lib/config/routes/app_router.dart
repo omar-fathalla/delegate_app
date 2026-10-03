@@ -13,6 +13,7 @@ import 'package:delegate_app/features/admin/domain/entities/company.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/marketing_main_screen.dart';
 import 'package:delegate_app/features/accountant/presentation/pages/accountant_main_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_main_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/changelog/presentation/pages/changelog_screen.dart';
@@ -132,6 +133,22 @@ final appRouter = GoRouter(
         return AppMotionPage.fadeThrough(
           state: state,
           child: HRMainScreen(delegate: delegate),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/hr/delegate-attendance',
+      pageBuilder: (context, state) {
+        final delegate = state.extra is Delegate ? state.extra as Delegate : null;
+        if (delegate == null) {
+          return AppMotionPage.fadeThrough(
+            state: state,
+            child: const SplashScreen(),
+          );
+        }
+        return AppMotionPage.fadeThrough(
+          state: state,
+          child: HRDelegateAttendanceDetailScreen(delegate: delegate),
         );
       },
     ),

@@ -116,6 +116,30 @@ class AppTheme {
         backgroundColor: colorScheme.surfaceContainer,
       ),
 
+      // Tooltips (Material Design 3 Rounded Style)
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        textStyle: baseTextTheme.bodySmall?.copyWith(
+          color: colorScheme.onSurface,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      ),
+
       // Material Design 3 Motion Page Transitions
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {

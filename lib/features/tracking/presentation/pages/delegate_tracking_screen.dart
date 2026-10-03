@@ -1,4 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../profile/domain/entities/delegate.dart';
 import '../../data/services/delegate_tracking_service.dart';
@@ -6,13 +9,18 @@ import '../../domain/entities/delegate_tracking_session.dart';
 import '../widgets/delegate_tracking_card.dart';
 import '../widgets/tracking_live_map_view.dart';
 import '../widgets/tracking_stats_overview.dart';
+import '../../../../core/widgets/tashil_button_group.dart';
 
 class DelegateTrackingScreen extends StatefulWidget {
   final Delegate adminDelegate;
+  final bool initialMapView;
+  final bool showAppBar;
 
   const DelegateTrackingScreen({
     super.key,
     required this.adminDelegate,
+    this.initialMapView = false,
+    this.showAppBar = true,
   });
 
   @override
@@ -28,12 +36,13 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
   String _selectedBranch = 'all';
 
   bool _isSyncing = false;
-  bool _isMapView = false;
+  late bool _isMapView;
   bool _isBulkUpdating = false;
 
   @override
   void initState() {
     super.initState();
+    _isMapView = widget.initialMapView;
     _trackingService = DelegateTrackingService();
     _populateInitialData();
   }
@@ -44,9 +53,79 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
     super.dispose();
   }
 
+  final Map<String, String> _delegateNamesMap = {};
+  final Map<String, String> _delegatePhonesMap = {};
+  final Map<String, String> _delegatePhotosMap = {};
+
   Future<void> _populateInitialData() async {
     setState(() => _isSyncing = true);
     try {
+      // 1. مزامنة بيانات المناديب (الاسم ورقم الهاتف والصورة) من GetCompanyDelegates
+      try {
+        final delegatesResult = await di.sl<GetCompanyDelegates>()(
+          GetCompanyDelegatesParams(
+            organizationUID: widget.adminDelegate.organizationUID,
+            companyUID: widget.adminDelegate.companyUID,
+          ),
+        );
+        delegatesResult.fold(
+          (_) {},
+          (delegates) {
+            for (final d in delegates) {
+              final rawFull = d.fullName.trim();
+              final combined = '${d.firstName} ${d.lastName}'.trim();
+              final effective = rawFull.isNotEmpty ? rawFull : combined;
+              if (effective.isNotEmpty) {
+                _delegateNamesMap[d.uid] = effective;
+              }
+              if (d.phoneNumber.trim().isNotEmpty) {
+                _delegatePhonesMap[d.uid] = d.phoneNumber.trim();
+              }
+              if (d.personalPhotoUrl != null && d.personalPhotoUrl!.isNotEmpty) {
+                _delegatePhotosMap[d.uid] = d.personalPhotoUrl!;
+              }
+            }
+          },
+        );
+      } catch (_) {}
+
+      // 2. البحث المباشر في Firestore للتأكيد
+      try {
+        final cUid = widget.adminDelegate.companyUID;
+        final oUid = widget.adminDelegate.organizationUID;
+        if (cUid.isNotEmpty && oUid.isNotEmpty) {
+          final snap = await FirebaseFirestore.instance
+              .collection('organizations')
+              .doc(oUid)
+              .collection('companies')
+              .doc(cUid)
+              .collection('delegates')
+              .get();
+          for (final doc in snap.docs) {
+            final d = doc.data();
+            final rawFull = (d['fullName'] ?? d['name'])?.toString().trim();
+            final combined =
+                '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'.trim();
+            final effective =
+                (rawFull != null && rawFull.isNotEmpty) ? rawFull : combined;
+            if (effective.isNotEmpty) {
+              _delegateNamesMap[doc.id] = effective;
+            }
+            final ph = (d['phoneNumber'] ?? d['phone'] ?? '').toString().trim();
+            if (ph.isNotEmpty) {
+              _delegatePhonesMap[doc.id] = ph;
+            }
+            final photo = DelegateTrackingService.extractPhotoUrl(d);
+            if (photo.isNotEmpty) {
+              _delegatePhotosMap[doc.id] = photo;
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (mounted) setState(() {});
+
+      // 3. تحديث الحاضرين في خدمة التتبع
       await _trackingService.populateTodayAttendanceToTracking(
         companyId: widget.adminDelegate.companyUID,
         organizationId: widget.adminDelegate.organizationUID,
@@ -216,8 +295,9 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
     final orgId = widget.adminDelegate.organizationUID;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
+      backgroundColor: colorScheme.surfaceContainerLowest,
+      appBar: widget.showAppBar
+          ? AppBar(
         title: Text(
           'تتبع نطاق المناديب (Live Tracking)',
           style: textTheme.titleMedium?.copyWith(
@@ -257,7 +337,8 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
               onPressed: _populateInitialData,
             ),
         ],
-      ),
+      )
+          : null,
       body: StreamBuilder<List<DelegateTrackingSession>>(
         stream: _trackingService.streamTrackingSessions(
           companyId: companyId.isNotEmpty ? companyId : null,
@@ -269,7 +350,36 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final allSessions = snapshot.data ?? [];
+          final rawSessions = snapshot.data ?? [];
+          final allSessions = rawSessions.map((s) {
+            final realName = _delegateNamesMap[s.delegateId];
+            final realPhone = _delegatePhonesMap[s.delegateId];
+            final realPhoto = _delegatePhotosMap[s.delegateId];
+            final isGeneric = s.delegateName == 'مندوب' ||
+                s.delegateName == 'مندوب غير محدد' ||
+                s.delegateName.trim().isEmpty ||
+                s.delegateName.trim() == 'مندوب';
+
+            final effectiveName = (realName != null &&
+                    realName.isNotEmpty &&
+                    (isGeneric || s.delegateName != realName))
+                ? realName
+                : s.delegateName;
+            final effectivePhone = (s.delegatePhone.isEmpty && realPhone != null)
+                ? realPhone
+                : (realPhone != null && realPhone.isNotEmpty
+                    ? realPhone
+                    : s.delegatePhone);
+            final effectivePhoto = (realPhoto != null && realPhoto.isNotEmpty)
+                ? realPhoto
+                : s.avatarUrl;
+
+            return s.copyWith(
+              delegateName: effectiveName,
+              delegatePhone: effectivePhone,
+              avatarUrl: effectivePhoto,
+            );
+          }).toList();
           final filteredSessions = _filterSessions(allSessions);
 
           // حساب الإحصائيات الحية
@@ -289,340 +399,147 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
             if (s.branchName.isNotEmpty) branches.add(s.branchName);
           }
 
+          final Widget content;
           if (_isMapView) {
-            return TrackingLiveMapView(
+            content = TrackingLiveMapView(
               sessions: filteredSessions,
               onToggleTracking: (session) {
                 _handleToggleTracking(session, !session.isTrackingEnabled);
               },
               onRefresh: _populateInitialData,
             );
-          }
-
-          return RefreshIndicator(
-            onRefresh: _populateInitialData,
-            child: CustomScrollView(
-              slivers: [
-                // 1. Overview Header
-                SliverToBoxAdapter(
-                  child: TrackingStatsOverview(
-                    totalCount: totalCount,
-                    activeTrackingCount: activeTrackingCount,
-                    insideCount: insideCount,
-                    outsideCount: outsideCount,
-                    offlineCount: offlineCount,
-                  ),
-                ),
-
-                // 2. Bulk Actions Bar
-                if (allSessions.isNotEmpty)
+          } else {
+            content = RefreshIndicator(
+              onRefresh: _populateInitialData,
+              child: CustomScrollView(
+                slivers: [
+                  // 1. Stats Overview Cards
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 4.0,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.tonalIcon(
-                              onPressed: _isBulkUpdating
-                                  ? null
-                                  : () => _handleBulkToggle(
-                                        allSessions,
-                                        !allAreActive,
-                                      ),
-                              icon: Icon(
-                                allAreActive
-                                    ? Icons.power_settings_new_rounded
-                                    : Icons.radar_rounded,
-                                size: 18,
-                              ),
-                              label: Text(
-                                allAreActive
-                                    ? 'إيقاف التتبع لجميع الحاضرين'
-                                    : 'تفعيل التتبع لجميع الحاضرين ($totalCount)',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: allAreActive
-                                    ? colorScheme.errorContainer
-                                    : colorScheme.primaryContainer,
-                                foregroundColor: allAreActive
-                                    ? colorScheme.onErrorContainer
-                                    : colorScheme.onPrimaryContainer,
-                                shape: const StadiumBorder(),
-                                padding: const EdgeInsetsDirectional.symmetric(vertical: 10),
-                              ),
-                            ),
-                          ),
-                        ],
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                          16.0, 12.0, 16.0, 8.0),
+                      child: TrackingStatsOverview(
+                        totalCount: totalCount,
+                        activeTrackingCount: activeTrackingCount,
+                        insideCount: insideCount,
+                        outsideCount: outsideCount,
+                        offlineCount: offlineCount,
+                        selectedFilter: _selectedStatusFilter,
+                        onFilterChanged: (filter) {
+                          setState(() => _selectedStatusFilter = filter);
+                        },
                       ),
                     ),
                   ),
 
-                // 3. Search & Filter Controls (M3 Dropdowns)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(16.0, 6.0, 16.0, 8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Search bar
-                        TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: 'بحث باسم المندوب أو الفرع أو الهاتف...',
-                            prefixIcon: const Icon(Icons.search_rounded),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear_rounded),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() => _searchQuery = '');
-                                    },
-                                  )
-                                : null,
-                            filled: true,
-                            fillColor: colorScheme.surfaceContainerLow,
-                            contentPadding: const EdgeInsetsDirectional.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: colorScheme.outlineVariant
-                                    .withValues(alpha: 0.5),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: colorScheme.outlineVariant
-                                    .withValues(alpha: 0.5),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: colorScheme.primary,
-                                width: 1.5,
-                              ),
-                            ),
-                          ),
-                          onChanged: (val) =>
-                              setState(() => _searchQuery = val.trim()),
-                        ),
-                        const SizedBox(height: 8),
+                  // 2. Search, M3 Filter Dropdowns & Bulk Actions (Single Web Row)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                          16.0, 6.0, 16.0, 8.0),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isDesktop = constraints.maxWidth >= 768;
 
-                        // Dropdown Filters Row
-                        Row(
-                          children: [
-                            // Status Filter Dropdown
-                            Expanded(
-                              flex: branches.length > 1 ? 3 : 1,
-                              child: Container(
-                                height: 48,
-                                padding: const EdgeInsetsDirectional.symmetric(horizontal: 10),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerLow,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _selectedStatusFilter != 'all'
-                                        ? colorScheme.primary
-                                        : colorScheme.outlineVariant.withValues(alpha: 0.5),
-                                    width: _selectedStatusFilter != 'all' ? 1.4 : 1.0,
-                                  ),
+                          if (isDesktop) {
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                // 1. Search Bar
+                                Expanded(
+                                  flex: 4,
+                                  child: _buildSearchField(colorScheme),
                                 ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _selectedStatusFilter,
-                                    isExpanded: true,
-                                    icon: Icon(
-                                      Icons.keyboard_arrow_down_rounded,
-                                      size: 20,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    items: [
-                                      DropdownMenuItem(
-                                        value: 'all',
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.filter_list_rounded,
-                                              size: 18,
-                                              color: colorScheme.primary,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                'جميع الحالات ($totalCount)',
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 12.5),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'tracking_active',
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.radar_rounded,
-                                              size: 18,
-                                              color: colorScheme.secondary,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                'التتبع مفعّل ($activeTrackingCount)',
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 12.5),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'inside',
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.check_circle_rounded,
-                                              size: 18,
-                                              color: colorScheme.tertiary,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                'داخل الفرع ($insideCount)',
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 12.5),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'outside',
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.warning_amber_rounded,
-                                              size: 18,
-                                              color: colorScheme.error,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                'خارج النطاق ($outsideCount)',
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 12.5),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'offline',
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.cloud_off_rounded,
-                                              size: 18,
-                                              color: colorScheme.onSurfaceVariant,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                'غير متصل ($offlineCount)',
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 12.5),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                    onChanged: (val) {
-                                      if (val != null) {
-                                        setState(() => _selectedStatusFilter = val);
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
+                                const SizedBox(width: 10),
 
-                            // Branch Filter Dropdown (Shown when branches exist)
-                            if (branches.length > 1) ...[
-                              const SizedBox(width: 8),
-                              Expanded(
-                                flex: 2,
-                                child: Container(
-                                  height: 48,
-                                  padding: const EdgeInsetsDirectional.symmetric(horizontal: 10),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.surfaceContainerLow,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _selectedBranch != 'all'
-                                          ? colorScheme.primary
-                                          : colorScheme.outlineVariant.withValues(alpha: 0.5),
-                                      width: _selectedBranch != 'all' ? 1.4 : 1.0,
-                                    ),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _selectedBranch,
-                                      isExpanded: true,
-                                      icon: Icon(
-                                        Icons.keyboard_arrow_down_rounded,
-                                        size: 20,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      items: branches.map((b) {
-                                        return DropdownMenuItem<String>(
-                                          value: b,
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.storefront_rounded,
-                                                size: 16,
-                                                color: colorScheme.onSurfaceVariant,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Expanded(
-                                                child: Text(
-                                                  b == 'all' ? 'جميع الفروع' : b,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(fontSize: 12.5),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }).toList(),
-                                      onChanged: (newBranch) {
-                                        if (newBranch != null) {
-                                          setState(() => _selectedBranch = newBranch);
-                                        }
-                                      },
-                                    ),
+                                // 2. Status Filter Dropdown (M3 Dropdown)
+                                Expanded(
+                                  flex: 3,
+                                  child: _buildM3StatusMenu(
+                                    colorScheme: colorScheme,
+                                    totalCount: totalCount,
+                                    activeTrackingCount: activeTrackingCount,
+                                    insideCount: insideCount,
+                                    outsideCount: outsideCount,
+                                    offlineCount: offlineCount,
                                   ),
                                 ),
+
+                                // 3. Branch Filter Dropdown (M3 Dropdown)
+                                if (branches.length > 1) ...[
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    flex: 3,
+                                    child: _buildM3BranchMenu(
+                                      colorScheme: colorScheme,
+                                      branches: branches,
+                                    ),
+                                  ),
+                                ],
+
+                                // 4. Bulk Toggle Button (Responsive natural-sized button)
+                                if (allSessions.isNotEmpty) ...[
+                                  const SizedBox(width: 10),
+                                  _buildBulkActionButton(
+                                    colorScheme: colorScheme,
+                                    allAreActive: allAreActive,
+                                    totalCount: totalCount,
+                                    allSessions: allSessions,
+                                  ),
+                                ],
+                              ],
+                            );
+                          }
+
+                          // Compact view for narrow screens / mobile
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildSearchField(colorScheme),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildM3StatusMenu(
+                                      colorScheme: colorScheme,
+                                      totalCount: totalCount,
+                                      activeTrackingCount: activeTrackingCount,
+                                      insideCount: insideCount,
+                                      outsideCount: outsideCount,
+                                      offlineCount: offlineCount,
+                                    ),
+                                  ),
+                                  if (branches.length > 1) ...[
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _buildM3BranchMenu(
+                                        colorScheme: colorScheme,
+                                        branches: branches,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
+                              if (allSessions.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Align(
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: _buildBulkActionButton(
+                                    colorScheme: colorScheme,
+                                    allAreActive: allAreActive,
+                                    totalCount: totalCount,
+                                    allSessions: allSessions,
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                      ],
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
 
-                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
                 // 4. Delegate Tracking List / Empty State
                 if (filteredSessions.isEmpty)
@@ -714,8 +631,569 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
               ],
             ),
           );
-        },
+        }
+
+        if (!widget.showAppBar) {
+          return Column(
+            children: [
+              _buildEmbeddedTopBar(
+                context: context,
+                totalCount: totalCount,
+                insideCount: insideCount,
+                outsideCount: outsideCount,
+                allAreActive: allAreActive,
+                allSessions: allSessions,
+              ),
+              Expanded(child: content),
+            ],
+          );
+        }
+
+        return content;
+      },
+    ),
+  );
+}
+
+  Widget _buildSearchField(ColorScheme colorScheme) {
+    return SizedBox(
+      height: 44,
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) => setState(() => _searchQuery = val.trim()),
+        textAlignVertical: TextAlignVertical.center,
+        style: TextStyle(
+          fontSize: 13,
+          color: colorScheme.onSurface,
+        ),
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          hintText: 'بحث باسم المندوب أو الفرع أو الهاتف...',
+          hintStyle: TextStyle(
+            fontSize: 12.5,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            size: 20,
+            color: colorScheme.primary,
+          ),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: colorScheme.surfaceContainerHigh,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide(
+              color: colorScheme.primary,
+              width: 1.5,
+            ),
+          ),
+        ),
       ),
     );
   }
+
+  Widget _buildM3StatusMenu({
+    required ColorScheme colorScheme,
+    required int totalCount,
+    required int activeTrackingCount,
+    required int insideCount,
+    required int outsideCount,
+    required int offlineCount,
+  }) {
+    String currentLabel;
+    IconData currentIcon;
+    Color currentIconColor = colorScheme.primary;
+
+    switch (_selectedStatusFilter) {
+      case 'tracking_active':
+        currentLabel = 'التتبع مفعّل ($activeTrackingCount)';
+        currentIcon = Icons.radar_rounded;
+        break;
+      case 'inside':
+        currentLabel = 'داخل النطاق ($insideCount)';
+        currentIcon = Icons.check_circle_outline_rounded;
+        currentIconColor = const Color(0xFF2E7D32);
+        break;
+      case 'outside':
+        currentLabel = 'خارج النطاق ($outsideCount)';
+        currentIcon = Icons.warning_amber_rounded;
+        currentIconColor = const Color(0xFFEF6C00);
+        break;
+      case 'offline':
+        currentLabel = 'غير متصل ($offlineCount)';
+        currentIcon = Icons.cloud_off_rounded;
+        currentIconColor = colorScheme.outline;
+        break;
+      case 'all':
+      default:
+        currentLabel = 'جميع الحالات ($totalCount)';
+        currentIcon = Icons.filter_alt_outlined;
+        break;
+    }
+
+    return LayoutBuilder(
+      builder: (context, menuConstraints) {
+        final menuWidth = menuConstraints.maxWidth;
+        return SizedBox(
+          height: 44,
+          child: PopupMenuButton<String>(
+            tooltip: 'فلترة حسب الحالة',
+            offset: const Offset(0, 48),
+            constraints: BoxConstraints(
+              minWidth: menuWidth,
+              maxWidth: menuWidth,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                width: 1,
+              ),
+            ),
+            color: colorScheme.surfaceContainerHigh,
+            elevation: 3,
+            onSelected: (filter) {
+              setState(() => _selectedStatusFilter = filter);
+            },
+            itemBuilder: (context) => [
+              _buildM3MenuItem(
+                value: 'all',
+                label: 'جميع الحالات',
+                count: totalCount,
+                icon: Icons.filter_alt_outlined,
+                isSelected: _selectedStatusFilter == 'all',
+                colorScheme: colorScheme,
+              ),
+              _buildM3MenuItem(
+                value: 'tracking_active',
+                label: 'التتبع مفعّل',
+                count: activeTrackingCount,
+                icon: Icons.radar_rounded,
+                isSelected: _selectedStatusFilter == 'tracking_active',
+                colorScheme: colorScheme,
+                accentColor: colorScheme.primary,
+              ),
+              _buildM3MenuItem(
+                value: 'inside',
+                label: 'داخل النطاق',
+                count: insideCount,
+                icon: Icons.check_circle_outline_rounded,
+                isSelected: _selectedStatusFilter == 'inside',
+                colorScheme: colorScheme,
+                accentColor: const Color(0xFF2E7D32),
+              ),
+              _buildM3MenuItem(
+                value: 'outside',
+                label: 'خارج النطاق',
+                count: outsideCount,
+                icon: Icons.warning_amber_rounded,
+                isSelected: _selectedStatusFilter == 'outside',
+                colorScheme: colorScheme,
+                accentColor: const Color(0xFFC65102),
+              ),
+              _buildM3MenuItem(
+                value: 'offline',
+                label: 'غير متصل / لم يسجل',
+                count: offlineCount,
+                icon: Icons.cloud_off_rounded,
+                isSelected: _selectedStatusFilter == 'offline',
+                colorScheme: colorScheme,
+                accentColor: colorScheme.outline,
+              ),
+            ],
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(currentIcon, size: 18, color: currentIconColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      currentLabel,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    Icons.expand_more_rounded,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildM3BranchMenu({
+    required ColorScheme colorScheme,
+    required Set<String> branches,
+  }) {
+    final currentLabel =
+        _selectedBranch == 'all' ? 'جميع الفروع' : _selectedBranch;
+
+    return LayoutBuilder(
+      builder: (context, menuConstraints) {
+        final menuWidth = menuConstraints.maxWidth;
+        return SizedBox(
+          height: 44,
+          child: PopupMenuButton<String>(
+            tooltip: 'فلترة حسب الفرع',
+            offset: const Offset(0, 48),
+            constraints: BoxConstraints(
+              minWidth: menuWidth,
+              maxWidth: menuWidth,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                width: 1,
+              ),
+            ),
+            color: colorScheme.surfaceContainerHigh,
+            elevation: 3,
+            onSelected: (branch) {
+              setState(() => _selectedBranch = branch);
+            },
+            itemBuilder: (context) => branches.map((b) {
+              final isSelected = _selectedBranch == b;
+              return _buildM3MenuItem(
+                value: b,
+                label: b == 'all' ? 'جميع الفروع' : b,
+                count: null,
+                icon: Icons.storefront_rounded,
+                isSelected: isSelected,
+                colorScheme: colorScheme,
+                accentColor: isSelected ? colorScheme.primary : null,
+              );
+            }).toList(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.storefront_rounded,
+                    size: 18,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      currentLabel,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    Icons.expand_more_rounded,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBulkActionButton({
+    required ColorScheme colorScheme,
+    required bool allAreActive,
+    required int totalCount,
+    required List<DelegateTrackingSession> allSessions,
+  }) {
+    if (allAreActive) {
+      return SizedBox(
+        height: 44,
+        child: OutlinedButton.icon(
+          onPressed: _isBulkUpdating
+              ? null
+              : () => _handleBulkToggle(allSessions, false),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: colorScheme.error,
+            backgroundColor: colorScheme.errorContainer.withValues(alpha: 0.35),
+            side: BorderSide(
+              color: colorScheme.error.withValues(alpha: 0.45),
+              width: 1,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+          ),
+          icon: _isBulkUpdating
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.error,
+                  ),
+                )
+              : const Icon(Icons.power_settings_new_rounded, size: 18),
+          label: Text(
+            'إيقاف التتبع للجميع ($totalCount)',
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 44,
+      child: FilledButton.tonalIcon(
+        onPressed: _isBulkUpdating
+            ? null
+            : () => _handleBulkToggle(allSessions, true),
+        style: FilledButton.styleFrom(
+          foregroundColor: colorScheme.primary,
+          backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+        icon: _isBulkUpdating
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.primary,
+                ),
+              )
+            : const Icon(Icons.radar_rounded, size: 18),
+        label: Text(
+          'تفعيل التتبع للجميع ($totalCount)',
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildM3MenuItem({
+    required String value,
+    required String label,
+    required int? count,
+    required IconData icon,
+    required bool isSelected,
+    required ColorScheme colorScheme,
+    Color? accentColor,
+  }) {
+    final effectiveColor = accentColor ??
+        (isSelected ? colorScheme.primary : colorScheme.onSurface);
+
+    return PopupMenuItem<String>(
+      value: value,
+      height: 40,
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: effectiveColor,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+              ),
+            ),
+          ),
+          if (count != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? colorScheme.primary.withValues(alpha: 0.15)
+                    : colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (isSelected)
+            Icon(
+              Icons.check_rounded,
+              size: 18,
+              color: colorScheme.primary,
+            )
+          else
+            const SizedBox(width: 18),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmbeddedTopBar({
+  required BuildContext context,
+  required int totalCount,
+  required int insideCount,
+  required int outsideCount,
+  required bool allAreActive,
+  required List<DelegateTrackingSession> allSessions,
+}) {
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
+
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    decoration: BoxDecoration(
+      color: colorScheme.surface,
+      border: Border(
+        bottom: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+    ),
+    child: Row(
+      textDirection: TextDirection.rtl,
+      children: [
+        // View Switcher (Map vs List) using standard TashilConnectedButtonGroup
+        TashilConnectedButtonGroup<bool>(
+          height: 38,
+          selectedValue: _isMapView,
+          onSelected: (val) {
+            setState(() => _isMapView = val);
+          },
+          items: [
+            const TashilConnectedButtonItem<bool>(
+              value: true,
+              label: 'الخريطة الحية',
+              icon: Icons.map_rounded,
+            ),
+            TashilConnectedButtonItem<bool>(
+              value: false,
+              label: 'قائمة تفصيلية ($totalCount)',
+              icon: Icons.view_list_rounded,
+            ),
+          ],
+        ),
+        const SizedBox(width: 16),
+        // Live status chips
+        if (totalCount > 0) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '🟢 $insideCount داخل',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2E7D32),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          if (outsideCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFC65102).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '🟠 $outsideCount خارج',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFC65102),
+                ),
+              ),
+            ),
+        ],
+        const Spacer(),
+        // Refresh Button
+        if (_isSyncing || _isBulkUpdating)
+          const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else
+          IconButton.filledTonal(
+            iconSize: 18,
+            visualDensity: VisualDensity.compact,
+            tooltip: 'تحديث بيانات الحاضرين',
+            onPressed: _populateInitialData,
+            icon: const Icon(Icons.sync_rounded),
+          ),
+      ],
+    ),
+  );
+}
 }

@@ -4,8 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/constants.dart';
 import '../models/delegate_tracking_session_model.dart';
 import '../../domain/entities/delegate_tracking_session.dart';
+import '../../domain/entities/tracking_breadcrumb.dart';
+import '../models/tracking_breadcrumb_model.dart';
 
 class DelegateTrackingService {
   final FirebaseFirestore _firestore;
@@ -116,6 +119,7 @@ class DelegateTrackingService {
     required String delegateId,
     required String delegateName,
     required String delegatePhone,
+    String? avatarUrl,
     required String companyId,
     required String organizationId,
     required String branchId,
@@ -126,6 +130,9 @@ class DelegateTrackingService {
     required double currentLat,
     required double currentLng,
     DateTime? checkInTime,
+    double? speed,
+    int? batteryLevel,
+    bool? isMoving,
   }) async {
     try {
       final distance = Geolocator.distanceBetween(
@@ -140,11 +147,16 @@ class DelegateTrackingService {
       final sessionDoc = await _trackingCollection.doc(delegateId).get();
       final bool previousEnabled =
           sessionDoc.exists ? (sessionDoc.data()?['isTrackingEnabled'] == true) : false;
+      final existingAvatar = sessionDoc.data()?['avatarUrl']?.toString();
+      final effectiveAvatar = (avatarUrl != null && avatarUrl.isNotEmpty)
+          ? avatarUrl
+          : (existingAvatar != null && existingAvatar.isNotEmpty ? existingAvatar : null);
 
       final session = DelegateTrackingSessionModel(
         delegateId: delegateId,
         delegateName: delegateName,
         delegatePhone: delegatePhone,
+        avatarUrl: effectiveAvatar,
         companyId: companyId,
         organizationId: organizationId,
         branchId: branchId,
@@ -162,19 +174,47 @@ class DelegateTrackingService {
         isOnline: true,
         isMockLocationDetected: false,
         offlineBreadcrumbsCount: 0,
+        speed: speed ?? 0.0,
+        batteryLevel: batteryLevel,
+        isMoving: isMoving ?? false,
       );
 
-      await _trackingCollection.doc(delegateId).set(session.toJson(), SetOptions(merge: true));
+      await _trackingCollection.doc(delegateId).set({
+        ...session.toJson(),
+        'companyId': companyId,
+        'companyUID': companyId,
+        'organizationId': organizationId,
+        'organizationUID': organizationId,
+      }, SetOptions(merge: true));
+
+      // تسجيل أول نقطة مسار (First Breadcrumb)
+      try {
+        await _trackingCollection
+            .doc(delegateId)
+            .collection('breadcrumbs')
+            .add({
+          'latitude': currentLat,
+          'longitude': currentLng,
+          'timestamp': FieldValue.serverTimestamp(),
+          'speed': speed ?? 0.0,
+          'batteryLevel': ?batteryLevel,
+          'distanceMeters': distance,
+          'isInside': isInside,
+        });
+      } catch (_) {}
     } catch (e) {
       debugPrint('Error initializing tracking session: $e');
     }
   }
 
-  /// 4. فحص موقع المندوب وتحديث النطاق الجغرافي مع فترة سماح ذكية ورصد التزييف
+  /// 4. فحص موقع المندوب وتحديث النطاق الجغرافي مع التيليميتري الحية ومسار الحركة
   Future<void> updateLocationAndCheckGeofence({
     required String delegateId,
     required double currentLat,
     required double currentLng,
+    double? speed,
+    int? batteryLevel,
+    bool? isMoving,
     bool isMocked = false,
   }) async {
     try {
@@ -218,6 +258,9 @@ class DelegateTrackingService {
         await _trackingCollection.doc(delegateId).update({
           'lastLatitude': currentLat,
           'lastLongitude': currentLng,
+          'speed': ?speed,
+          'batteryLevel': ?batteryLevel,
+          'isMoving': ?isMoving,
           'lastUpdated': FieldValue.serverTimestamp(),
           'isOnline': true,
         });
@@ -257,6 +300,9 @@ class DelegateTrackingService {
           'currentDistanceMeters': distance,
           'lastLatitude': currentLat,
           'lastLongitude': currentLng,
+          'speed': ?speed,
+          'batteryLevel': ?batteryLevel,
+          'isMoving': ?isMoving,
           'lastUpdated': FieldValue.serverTimestamp(),
           if (isFirstRecordedExit) 'firstExitedAt': FieldValue.serverTimestamp(),
           if (shouldNotifyBreach) 'lastBreachAt': FieldValue.serverTimestamp(),
@@ -303,6 +349,9 @@ class DelegateTrackingService {
           'currentDistanceMeters': distance,
           'lastLatitude': currentLat,
           'lastLongitude': currentLng,
+          'speed': ?speed,
+          'batteryLevel': ?batteryLevel,
+          'isMoving': ?isMoving,
           'lastUpdated': FieldValue.serverTimestamp(),
           'firstExitedAt': FieldValue.delete(),
           'isOnline': true,
@@ -325,13 +374,137 @@ class DelegateTrackingService {
           'currentDistanceMeters': distance,
           'lastLatitude': currentLat,
           'lastLongitude': currentLng,
+          'speed': ?speed,
+          'batteryLevel': ?batteryLevel,
+          'isMoving': ?isMoving,
           'lastUpdated': FieldValue.serverTimestamp(),
           'isOnline': true,
           'currentStatus': 'inside',
         });
       }
+
+      // تسجيل نقطة مسار في سجل التحركات (Breadcrumb trail)
+      try {
+        await _trackingCollection
+            .doc(delegateId)
+            .collection('breadcrumbs')
+            .add({
+          'latitude': currentLat,
+          'longitude': currentLng,
+          'timestamp': FieldValue.serverTimestamp(),
+          'speed': speed ?? 0.0,
+          'batteryLevel': ?batteryLevel,
+          'distanceMeters': distance,
+          'isInside': isNowInside,
+        });
+      } catch (err) {
+        debugPrint('Error recording breadcrumb: $err');
+      }
     } catch (e) {
       debugPrint('Error updating location and checking geofence: $e');
+    }
+  }
+
+  /// 4.1 البث المباشر لمسار المندوب (Breadcrumb Trail) لرسم خط السير على الخريطة
+  Stream<List<TrackingBreadcrumb>> streamBreadcrumbs({
+    required String delegateId,
+    int limit = 200,
+  }) {
+    return _trackingCollection
+        .doc(delegateId)
+        .collection('breadcrumbs')
+        .orderBy('timestamp', descending: false)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => TrackingBreadcrumbModel.fromFirestore(doc))
+            .toList());
+  }
+
+  /// 4.2 جلب مسار تحرك المندوب لليوم
+  Future<List<TrackingBreadcrumb>> getTodayBreadcrumbs({
+    required String delegateId,
+    int limit = 300,
+  }) async {
+    try {
+      final snap = await _trackingCollection
+          .doc(delegateId)
+          .collection('breadcrumbs')
+          .orderBy('timestamp', descending: false)
+          .limit(limit)
+          .get();
+
+      return snap.docs
+          .map((doc) => TrackingBreadcrumbModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching breadcrumbs: $e');
+      return [];
+    }
+  }
+
+  /// 4.3 محاكاة وتوليد مسار تحرك ميداني حي للمندوب (لأغراض المعاينة والاختبار على لوحة الويب)
+  Future<void> simulateDelegateMovement({
+    required String delegateId,
+    required double baseLat,
+    required double baseLng,
+    int? batteryLevel,
+    double? speed,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final batch = _firestore.batch();
+      final crumbsRef =
+          _trackingCollection.doc(delegateId).collection('breadcrumbs');
+
+      // مسار تحرك واقعي مكون من 6 نقاط متتالية تنطلق من الفرع إلى الشارع الرئيسي
+      final offsets = [
+        {'dLat': 0.0000, 'dLng': 0.0000, 'speed': 0.0, 'battery': 88, 'dist': 0.0, 'inside': true},
+        {'dLat': 0.0008, 'dLng': 0.0006, 'speed': 12.5, 'battery': 87, 'dist': 95.0, 'inside': true},
+        {'dLat': 0.0021, 'dLng': 0.0016, 'speed': 24.0, 'battery': 86, 'dist': 260.0, 'inside': false},
+        {'dLat': 0.0039, 'dLng': 0.0031, 'speed': 32.5, 'battery': 85, 'dist': 510.0, 'inside': false},
+        {'dLat': 0.0055, 'dLng': 0.0048, 'speed': 28.0, 'battery': 84, 'dist': 780.0, 'inside': false},
+        {'dLat': 0.0072, 'dLng': 0.0065, 'speed': 19.5, 'battery': 83, 'dist': 1120.0, 'inside': false},
+      ];
+
+      for (int i = 0; i < offsets.length; i++) {
+        final off = offsets[i];
+        final pointLat = baseLat + (off['dLat'] as double);
+        final pointLng = baseLng + (off['dLng'] as double);
+        final pointTime = now.subtract(Duration(minutes: (offsets.length - 1 - i) * 3));
+
+        final crumbDoc = crumbsRef.doc();
+        batch.set(crumbDoc, {
+          'latitude': pointLat,
+          'longitude': pointLng,
+          'timestamp': Timestamp.fromDate(pointTime),
+          'speed': off['speed'],
+          'batteryLevel': off['battery'],
+          'distanceMeters': off['dist'],
+          'isInside': off['inside'],
+        });
+      }
+
+      final lastOff = offsets.last;
+      final currentLat = baseLat + (lastOff['dLat'] as double);
+      final currentLng = baseLng + (lastOff['dLng'] as double);
+
+      final sessionDocRef = _trackingCollection.doc(delegateId);
+      batch.update(sessionDocRef, {
+        'lastLatitude': currentLat,
+        'lastLongitude': currentLng,
+        'speed': speed ?? (lastOff['speed'] as double),
+        'batteryLevel': batteryLevel ?? (lastOff['battery'] as int),
+        'isMoving': true,
+        'currentStatus': 'outside',
+        'currentDistanceMeters': lastOff['dist'],
+        'lastUpdated': FieldValue.serverTimestamp(),
+        'isOnline': true,
+      });
+
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Error simulating delegate movement: $e');
     }
   }
 
@@ -509,85 +682,273 @@ class DelegateTrackingService {
     try {
       final now = DateTime.now();
       final startOfDay = DateTime(now.year, now.month, now.day);
-      final endOfDay = startOfDay.add(const Duration(days: 1));
+      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
 
       // جلب الفروع للحصول على إحداثياتها ونصف قطر الزون
       final branchesSnap = await _firestore.collection('branches').get();
       final Map<String, Map<String, dynamic>> branchesByName = {};
       for (final doc in branchesSnap.docs) {
         final data = doc.data();
-        final name = (data['branchName'] ?? data['name'] ?? '').toString().trim();
+        final name = (data['branchName'] ?? data['name'] ?? '').toString().trim().toLowerCase();
         if (name.isNotEmpty) {
-          branchesByName[name] = data;
+          branchesByName[name] = {...data, 'id': doc.id};
         }
       }
 
-      Query<Map<String, dynamic>> attendanceQuery =
-          _firestore.collection('attendance');
-
+      // جلب سجلات الحضور المعتمدة لليوم
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> attendanceDocs = [];
       if (companyId != null && companyId.isNotEmpty) {
-        attendanceQuery = attendanceQuery.where('companyId', isEqualTo: companyId);
+        final snap = await _firestore
+            .collection(kAttendanceCollection)
+            .where('companyId', isEqualTo: companyId)
+            .get();
+        attendanceDocs = snap.docs;
+        if (attendanceDocs.isEmpty) {
+          final snapUid = await _firestore
+              .collection(kAttendanceCollection)
+              .where('companyUID', isEqualTo: companyId)
+              .get();
+          attendanceDocs = snapUid.docs;
+        }
       } else if (organizationId != null && organizationId.isNotEmpty) {
-        attendanceQuery =
-            attendanceQuery.where('organizationId', isEqualTo: organizationId);
+        final snap = await _firestore
+            .collection(kAttendanceCollection)
+            .where('organizationId', isEqualTo: organizationId)
+            .get();
+        attendanceDocs = snap.docs;
+        if (attendanceDocs.isEmpty) {
+          final snapOrgUid = await _firestore
+              .collection(kAttendanceCollection)
+              .where('organizationUID', isEqualTo: organizationId)
+              .get();
+          attendanceDocs = snapOrgUid.docs;
+        }
+      } else {
+        final snap = await _firestore.collection(kAttendanceCollection).get();
+        attendanceDocs = snap.docs;
       }
 
-      final attendanceSnap = await attendanceQuery.get();
+      // تجميع أحدث تسجيل حضور اليوم لكل مندوب مع تتبع الانصرافات
+      final Map<String, Map<String, dynamic>> latestCheckIns = {};
+      final Map<String, DateTime> latestCheckOuts = {};
 
-      for (final doc in attendanceSnap.docs) {
+      for (final doc in attendanceDocs) {
         final data = doc.data();
         final type = (data['type'] ?? '').toString();
-        if (type != 'check_in') continue;
-
-        final ts = data['timestamp'];
-        if (ts is Timestamp) {
-          final date = ts.toDate();
-          if (date.isBefore(startOfDay) || date.isAfter(endOfDay)) continue;
-        }
-
-        final delegateId = (data['delegateId'] ?? data['userId'] ?? '').toString();
+        final delegateId = (data['delegateId'] ?? data['userId'] ?? '').toString().trim();
         if (delegateId.isEmpty) continue;
 
-        final branchName = (data['branchName'] ?? '').toString();
-        final branchData = branchesByName[branchName] ?? {};
+        DateTime? logTime;
+        final ts = data['timestamp'];
+        if (ts is Timestamp) {
+          logTime = ts.toDate();
+        } else if (data['realTimestamp'] != null) {
+          logTime = DateTime.tryParse(data['realTimestamp'].toString());
+        } else if (data['createdAt'] != null) {
+          logTime = DateTime.tryParse(data['createdAt'].toString());
+        }
+
+        if (logTime != null) {
+          if (logTime.isBefore(startOfDay) || logTime.isAfter(endOfDay)) {
+            continue;
+          }
+        }
+
+        if (type == 'check_out') {
+          if (logTime != null) {
+            final prevOut = latestCheckOuts[delegateId];
+            if (prevOut == null || logTime.isAfter(prevOut)) {
+              latestCheckOuts[delegateId] = logTime;
+            }
+          }
+        } else if (type.isEmpty || type == 'check_in') {
+          final existing = latestCheckIns[delegateId];
+          if (existing == null) {
+            latestCheckIns[delegateId] = data;
+          } else {
+            final existingTs = existing['timestamp'] is Timestamp
+                ? (existing['timestamp'] as Timestamp).toDate()
+                : null;
+            if (logTime != null && (existingTs == null || logTime.isAfter(existingTs))) {
+              latestCheckIns[delegateId] = data;
+            }
+          }
+        }
+      }
+
+      for (final entry in latestCheckIns.entries) {
+        final delegateId = entry.key;
+        final data = entry.value;
+
+        final branchName = (data['branchName'] ?? '').toString().trim();
+        final branchData = branchesByName[branchName.toLowerCase()] ?? {};
+
+        // استخراج إحداثيات الموقع المسجل
+        double? currentLat;
+        double? currentLng;
+        if (data['location'] is Map) {
+          final loc = data['location'] as Map;
+          currentLat = (loc['latitude'] as num?)?.toDouble() ??
+              double.tryParse(loc['latitude']?.toString() ?? '');
+          currentLng = (loc['longitude'] as num?)?.toDouble() ??
+              double.tryParse(loc['longitude']?.toString() ?? '');
+        }
+        currentLat ??= (data['latitude'] as num?)?.toDouble() ??
+            double.tryParse(data['latitude']?.toString() ?? '');
+        currentLng ??= (data['longitude'] as num?)?.toDouble() ??
+            double.tryParse(data['longitude']?.toString() ?? '');
 
         final double branchLat = (branchData['latitude'] as num?)?.toDouble() ??
-            (data['location']?['latitude'] as num?)?.toDouble() ??
-            0.0;
-        final double branchLng =
-            (branchData['longitude'] as num?)?.toDouble() ??
-                (data['location']?['longitude'] as num?)?.toDouble() ??
-                0.0;
+            double.tryParse(branchData['latitude']?.toString() ?? '') ??
+            (currentLat ?? 0.0);
+        final double branchLng = (branchData['longitude'] as num?)?.toDouble() ??
+            double.tryParse(branchData['longitude']?.toString() ?? '') ??
+            (currentLng ?? 0.0);
         final double geofenceRadius =
-            (branchData['geofenceRadius'] as num?)?.toDouble() ?? 100.0;
+            (branchData['geofenceRadius'] as num?)?.toDouble() ??
+                double.tryParse(branchData['geofenceRadius']?.toString() ?? '') ??
+                100.0;
 
-        final trackingDoc = await _trackingCollection.doc(delegateId).get();
-        if (!trackingDoc.exists) {
-          // جلب بيانات المندوب للاسم ورقم الهاتف
-          final userDoc = await _firestore.collection('users').doc(delegateId).get();
-          final userData = userDoc.data() ?? {};
-          final name = (userData['fullName'] ?? userData['name'] ?? 'مندوب').toString();
-          final phone = (userData['phoneNumber'] ?? userData['phone'] ?? '').toString();
+        currentLat ??= branchLat;
+        currentLng ??= branchLng;
 
-          await initializeTrackingSession(
-            delegateId: delegateId,
-            delegateName: name,
-            delegatePhone: phone,
-            companyId: companyId ?? (data['companyId'] ?? '').toString(),
-            organizationId: organizationId ?? (data['organizationId'] ?? '').toString(),
-            branchId: (branchData['id'] ?? '').toString(),
-            branchName: branchName.isNotEmpty ? branchName : 'الفرع الميداني',
-            branchLat: branchLat,
-            branchLng: branchLng,
-            geofenceRadius: geofenceRadius,
-            currentLat: branchLat,
-            currentLng: branchLng,
-            checkInTime: ts is Timestamp ? ts.toDate() : now,
-          );
+        // جلب بيانات المندوب للاسم ورقم الهاتف والصورة
+        String name = (data['delegateName'] ?? data['userName'] ?? '').toString().trim();
+        String phone = (data['delegatePhone'] ?? data['userPhone'] ?? '').toString().trim();
+        String avatarUrl = extractPhotoUrl(data);
+
+        if (name.isEmpty || phone.isEmpty || avatarUrl.isEmpty) {
+          try {
+            if (organizationId != null &&
+                organizationId.isNotEmpty &&
+                companyId != null &&
+                companyId.isNotEmpty) {
+              final nestedDelDoc = await _firestore
+                  .collection('organizations')
+                  .doc(organizationId)
+                  .collection('companies')
+                  .doc(companyId)
+                  .collection('delegates')
+                  .doc(delegateId)
+                  .get();
+              if (nestedDelDoc.exists) {
+                final dData = nestedDelDoc.data() ?? {};
+                if (name.isEmpty) {
+                  final rawFull = (dData['fullName'] ?? dData['name'])?.toString().trim();
+                  final combined = '${dData['firstName'] ?? ''} ${dData['lastName'] ?? ''}'.trim();
+                  name = (rawFull != null && rawFull.isNotEmpty) ? rawFull : combined;
+                }
+                if (phone.isEmpty) {
+                  phone = (dData['phoneNumber'] ?? dData['phone'] ?? '').toString().trim();
+                }
+                if (avatarUrl.isEmpty) {
+                  avatarUrl = extractPhotoUrl(dData);
+                }
+              }
+            }
+
+            if (name.isEmpty || phone.isEmpty || avatarUrl.isEmpty) {
+              final delDoc = await _firestore.collection('delegates').doc(delegateId).get();
+              if (delDoc.exists) {
+                final dData = delDoc.data() ?? {};
+                if (name.isEmpty) {
+                  final rawFull = (dData['fullName'] ?? dData['name'])?.toString().trim();
+                  final combined = '${dData['firstName'] ?? ''} ${dData['lastName'] ?? ''}'.trim();
+                  name = (rawFull != null && rawFull.isNotEmpty) ? rawFull : combined;
+                }
+                if (phone.isEmpty) {
+                  phone = (dData['phoneNumber'] ?? dData['phone'] ?? '').toString().trim();
+                }
+                if (avatarUrl.isEmpty) {
+                  avatarUrl = extractPhotoUrl(dData);
+                }
+              }
+            }
+          } catch (_) {}
+
+          if (name.isEmpty || phone.isEmpty || avatarUrl.isEmpty) {
+            try {
+              final userDoc = await _firestore.collection('users').doc(delegateId).get();
+              final userData = userDoc.data() ?? {};
+              if (name.isEmpty) {
+                name = (userData['fullName'] ?? userData['name'] ?? userData['displayName'] ?? '').toString().trim();
+              }
+              if (phone.isEmpty) {
+                phone = (userData['phoneNumber'] ?? userData['phone'] ?? '').toString().trim();
+              }
+              if (avatarUrl.isEmpty) {
+                avatarUrl = extractPhotoUrl(userData);
+              }
+            } catch (_) {}
+          }
         }
+        if (name.isEmpty) name = 'مندوب';
+
+        final checkInTs = data['timestamp'];
+        final checkInTime = checkInTs is Timestamp
+            ? checkInTs.toDate()
+            : (checkInTs is String ? DateTime.tryParse(checkInTs) : null);
+
+        // إذا كان المندوب قد انصرف أو انتهت ورديته (9 ساعات كاملة)، لا نضيفه للمتابعة الحية
+        final outTime = latestCheckOuts[delegateId];
+        if (checkInTime != null) {
+          if (outTime != null && outTime.isAfter(checkInTime)) continue;
+          if (now.difference(checkInTime) >= const Duration(hours: 9)) continue;
+        }
+
+        await initializeTrackingSession(
+          delegateId: delegateId,
+          delegateName: name,
+          delegatePhone: phone,
+          avatarUrl: avatarUrl.isNotEmpty ? avatarUrl : null,
+          companyId: companyId ?? (data['companyId'] ?? '').toString(),
+          organizationId: organizationId ?? (data['organizationId'] ?? '').toString(),
+          branchId: (branchData['id'] ?? '').toString(),
+          branchName: branchName.isNotEmpty ? branchName : 'الفرع الميداني',
+          branchLat: branchLat,
+          branchLng: branchLng,
+          geofenceRadius: geofenceRadius,
+          currentLat: currentLat,
+          currentLng: currentLng,
+          checkInTime: checkInTime ?? now,
+        );
       }
     } catch (e) {
       debugPrint('Error populating today attendance to tracking: $e');
     }
+  }
+
+  /// أداة استخراج رابط الصورة الشخصية للمندوب بمرونة من وثائق فايرستور
+  static String extractPhotoUrl(Map<String, dynamic> data) {
+    final direct = (data['avatarUrl'] ??
+            data['photoURL'] ??
+            data['photoUrl'] ??
+            data['profileImageUrl'] ??
+            data['personalPhotoURL'] ??
+            data['personalPhotoUrl'] ??
+            data['imageUrl'] ??
+            data['userPhoto'])
+        ?.toString()
+        .trim();
+    if (direct != null && direct.isNotEmpty && direct.startsWith('http')) {
+      return direct;
+    }
+    final docs = data['documents'];
+    if (docs is List) {
+      for (final doc in docs) {
+        if (doc is Map &&
+            (doc['documentKey'] == 'personalPhoto' ||
+                doc['key'] == 'personalPhoto' ||
+                doc['type'] == 'personalPhoto')) {
+          final url = (doc['documentURL'] ?? doc['url'] ?? doc['downloadUrl'])
+              ?.toString()
+              .trim();
+          if (url != null && url.isNotEmpty && url.startsWith('http')) {
+            return url;
+          }
+        }
+      }
+    }
+    return '';
   }
 }

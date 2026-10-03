@@ -2,20 +2,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "delegate_app (Mobile)",
-            "request": "launch",
-            "type": "dart",
-            "program": "lib/main.dart"
-        },
-        {
-            "name": "delegate_app (Web HTML)",
+            "name": "Tashil HR (Web Chrome - Port 8085)",
             "request": "launch",
             "type": "dart",
             "program": "lib/main.dart",
             "args": [
-                "--web-renderer",
-                "html"
+                "-d",
+                "chrome",
+                "--web-port=8085"
             ]
+        },
+        {
+            "name": "Tashil Web (Chrome)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "-d",
+                "chrome"
+            ]
+        },
+        {
+            "name": "Tashil Mobile (Device / Emulator)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart"
         }
     ]
 }

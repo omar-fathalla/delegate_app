@@ -65,6 +65,20 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   final Map<String, List<_CompanyContact>> _companyContactsCache = {};
   bool _isExporting = false;
 
+  bool get _isCompanyScoped =>
+      widget.delegate.companyUID.isNotEmpty &&
+      widget.delegate.role != UserRole.superAdmin &&
+      widget.delegate.role != UserRole.technicalSupport &&
+      widget.delegate.role != UserRole.organizationAdmin;
+
+  bool get _isOrgScoped =>
+      widget.delegate.organizationUID.isNotEmpty &&
+      widget.delegate.role != UserRole.superAdmin &&
+      widget.delegate.role != UserRole.technicalSupport;
+
+  String get _cachedDevicePrefix =>
+      _isCompanyScoped ? 'cached_device_${widget.delegate.companyUID}_' : 'cached_device_';
+
   @override
   void initState() {
     super.initState();
@@ -78,9 +92,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   Future<void> _loadCachedDeviceCounts() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final total = prefs.getInt('cached_device_total_delegates');
-      final locked = prefs.getInt('cached_device_locked_count');
-      final unbound = prefs.getInt('cached_device_unbound_count');
+      final total = prefs.getInt('${_cachedDevicePrefix}total_delegates');
+      final locked = prefs.getInt('${_cachedDevicePrefix}locked_count');
+      final unbound = prefs.getInt('${_cachedDevicePrefix}unbound_count');
       if (mounted && (total != null || locked != null || unbound != null)) {
         setState(() {
           _cachedTotalDelegatesCount = total;
@@ -98,34 +112,64 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     if (mounted) setState(() => _isLoadingDelegates = true);
 
     try {
-      Query query = FirebaseFirestore.instance.collectionGroup('delegates');
-      if (widget.delegate.organizationUID.isNotEmpty &&
-          widget.delegate.role != UserRole.technicalSupport &&
-          widget.delegate.role != UserRole.superAdmin) {
-        query = query.where('organizationUID', isEqualTo: widget.delegate.organizationUID);
+      final List<Map<String, dynamic>> rawList = [];
+
+      if (_isCompanyScoped && widget.delegate.organizationUID.isNotEmpty) {
+        // Query direct path for the company's delegates (instant & strictly scoped)
+        final snap = await FirebaseFirestore.instance
+            .collection('organizations')
+            .doc(widget.delegate.organizationUID)
+            .collection('companies')
+            .doc(widget.delegate.companyUID)
+            .collection('delegates')
+            .get();
+
+        for (final d in snap.docs) {
+          rawList.add({
+            'docId': d.id,
+            'docPath': d.reference.path,
+            ...d.data(),
+          });
+        }
+      } else {
+        Query query = FirebaseFirestore.instance.collectionGroup('delegates');
+        if (_isCompanyScoped) {
+          query = query.where('companyUID', isEqualTo: widget.delegate.companyUID);
+        } else if (_isOrgScoped) {
+          query = query.where('organizationUID', isEqualTo: widget.delegate.organizationUID);
+        }
+
+        final snapshot = await query.get();
+        for (final d in snapshot.docs) {
+          rawList.add({
+            'docId': d.id,
+            'docPath': d.reference.path,
+            ...d.data() as Map<String, dynamic>,
+          });
+        }
       }
 
-      final snapshot = await query.get();
-      final docs = snapshot.docs;
-      final rawList = docs.map((d) {
-        final data = d.data() as Map<String, dynamic>;
-        return {
-          'docId': d.id,
-          'docPath': d.reference.path,
-          ...data,
-        };
-      }).where((d) {
+      final filteredRaw = rawList.where((d) {
         final role = d['role']?.toString().toLowerCase() ?? '';
-        return role != 'admin' &&
-            role != 'superadmin' &&
-            role != 'super_admin' &&
-            role != 'technicalsupport' &&
-            role != 'technical_support';
+        final isExcludedRole = role == 'admin' ||
+            role == 'superadmin' ||
+            role == 'super_admin' ||
+            role == 'technicalsupport' ||
+            role == 'technical_support';
+        if (isExcludedRole) return false;
+
+        if (_isCompanyScoped) {
+          final cId = (d['companyUID'] ?? '').toString().trim();
+          if (cId.isNotEmpty && cId != widget.delegate.companyUID) {
+            return false;
+          }
+        }
+        return true;
       }).toList();
 
       // Deduplicate delegates across subcollections if same delegate appears in multiple records
       final Map<String, Map<String, dynamic>> uniqueMap = {};
-      for (final d in rawList) {
+      for (final d in filteredRaw) {
         final key = (d['uid'] != null && d['uid'].toString().isNotEmpty)
             ? d['uid'].toString()
             : (d['phoneNumber'] != null && d['phoneNumber'].toString().isNotEmpty)
@@ -155,9 +199,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
       }
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('cached_device_total_delegates', delegatesList.length);
-      await prefs.setInt('cached_device_locked_count', locked);
-      await prefs.setInt('cached_device_unbound_count', unbound);
+      await prefs.setInt('${_cachedDevicePrefix}total_delegates', delegatesList.length);
+      await prefs.setInt('${_cachedDevicePrefix}locked_count', locked);
+      await prefs.setInt('${_cachedDevicePrefix}unbound_count', unbound);
 
       if (mounted) {
         setState(() {
@@ -362,32 +406,6 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     required bool isArabic,
     required VoidCallback onTap,
   }) {
-    final String label;
-    final Color bgColor;
-    final Color fgColor;
-    final Color borderColor;
-    final IconData iconData;
-
-    if (daysCount <= 1) {
-      label = isArabic ? 'يوم واحد' : '1 Day';
-      bgColor = colorScheme.surfaceContainerHighest.withValues(alpha: 0.6);
-      fgColor = colorScheme.onSurfaceVariant;
-      borderColor = colorScheme.outlineVariant.withValues(alpha: 0.7);
-      iconData = Icons.calendar_today_rounded;
-    } else if (daysCount == 2) {
-      label = isArabic ? 'يومان (2)' : '2 Days';
-      bgColor = colorScheme.errorContainer.withValues(alpha: 0.55);
-      fgColor = colorScheme.error;
-      borderColor = colorScheme.error.withValues(alpha: 0.5);
-      iconData = Icons.warning_amber_rounded;
-    } else {
-      label = isArabic ? '$daysCount أيام' : '$daysCount Days';
-      bgColor = colorScheme.errorContainer;
-      fgColor = colorScheme.onErrorContainer;
-      borderColor = colorScheme.error;
-      iconData = Icons.crisis_alert_rounded;
-    }
-
     return Tooltip(
       message: isArabic
           ? 'تم رصد محاولات تزييف في $daysCount ${daysCount == 1 ? "يوم واحد" : (daysCount == 2 ? "يومين مختلفين" : "أيام مختلفة")}'
@@ -395,29 +413,32 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
             decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor, width: daysCount >= 3 ? 1.2 : 0.9),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(iconData, size: 12.5, color: fgColor),
-                const SizedBox(width: 4),
-                Text(
-                  isArabic ? 'تزييف: $label' : 'Fraud: $label',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: daysCount > 1 ? FontWeight.bold : FontWeight.w600,
-                    color: fgColor,
-                  ),
+              color: colorScheme.error,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.error.withValues(alpha: 0.35),
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
                 ),
               ],
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$daysCount',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onError,
+                height: 1.0,
+              ),
+              textAlign: TextAlign.center,
             ),
           ),
         ),
@@ -1413,11 +1434,15 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     final colorScheme = theme.colorScheme;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
+    Query auditQuery = FirebaseFirestore.instance.collection('security_audit_logs');
+    if (_isCompanyScoped) {
+      auditQuery = auditQuery.where('companyUID', isEqualTo: widget.delegate.companyUID);
+    } else if (_isOrgScoped) {
+      auditQuery = auditQuery.where('organizationUID', isEqualTo: widget.delegate.organizationUID);
+    }
+
     final body = StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('security_audit_logs')
-          .orderBy('timestamp', descending: true)
-          .snapshots(),
+      stream: auditQuery.snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -1431,6 +1456,39 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             ...data,
           };
         }).toList();
+
+        // 1. Strict double-enforcement of Company / Org isolation in memory
+        if (_isCompanyScoped) {
+          allLogs.removeWhere((item) {
+            final compId = (item['companyUID'] ?? '').toString().trim();
+            final compName = _resolveCompanyName(item).trim();
+            if (compId.isNotEmpty && compId != widget.delegate.companyUID) {
+              return true;
+            }
+            if (compId.isEmpty && compName.isNotEmpty && compName != widget.delegate.companyName.trim()) {
+              return true;
+            }
+            return false;
+          });
+        } else if (_isOrgScoped) {
+          allLogs.removeWhere((item) {
+            final orgId = (item['organizationUID'] ?? '').toString().trim();
+            return orgId.isNotEmpty && orgId != widget.delegate.organizationUID;
+          });
+        }
+
+        // 2. Sort by timestamp descending in memory (0ms)
+        allLogs.sort((a, b) {
+          final aTs = (a['timestamp'] as Timestamp?)?.toDate() ??
+              DateTime.tryParse(a['realTimestamp']?.toString() ?? '') ??
+              (a['createdAt'] != null ? DateTime.tryParse(a['createdAt'].toString()) : null) ??
+              DateTime(2000);
+          final bTs = (b['timestamp'] as Timestamp?)?.toDate() ??
+              DateTime.tryParse(b['realTimestamp']?.toString() ?? '') ??
+              (b['createdAt'] != null ? DateTime.tryParse(b['createdAt'].toString()) : null) ??
+              DateTime(2000);
+          return bTs.compareTo(aTs);
+        });
 
         // Calculate distinct calendar days of fraud attempts per delegate
         final Map<String, Set<String>> delegateDistinctDaysMap = {};
@@ -1552,310 +1610,168 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                // Top Tab Switcher (Violations vs Device Binding)
-                SliverToBoxAdapter(
-                  child: _buildTabSwitcher(colorScheme, isArabic),
-                ),
-
                 if (_currentTab == 'devices') ...[
                   SliverToBoxAdapter(
                     child: _buildDeviceBindingSection(colorScheme, isArabic),
                   ),
                 ] else ...[
-                  // 1. Header Metrics Card
+                  // 1. Header Metrics (3/4) & Tab Switcher Card (1/4)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: _buildHeaderMetrics(
-                        colorScheme: colorScheme,
-                        totalAttempts: allLogs.length,
-                        todayAttempts: todayAttempts,
-                        uniqueDelegatesCount: uniqueDelegates.length,
-                        uniqueDevicesCount: uniqueDevices.length,
-                        isArabic: isArabic,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isDesktop = constraints.maxWidth >= 768;
+                          final metricsWidget = _buildHeaderMetrics(
+                            colorScheme: colorScheme,
+                            totalAttempts: allLogs.length,
+                            todayAttempts: todayAttempts,
+                            uniqueDelegatesCount: uniqueDelegates.length,
+                            uniqueDevicesCount: uniqueDevices.length,
+                            isArabic: isArabic,
+                          );
+
+                          if (isDesktop) {
+                            return IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: metricsWidget,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    flex: 1,
+                                    child: _buildTabSwitcherCard(
+                                      colorScheme,
+                                      isArabic,
+                                      violationsCount: allLogs.length,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          } else {
+                            return Column(
+                              children: [
+                                _buildTabSwitcherCard(
+                                  colorScheme,
+                                  isArabic,
+                                  violationsCount: allLogs.length,
+                                  isHorizontal: true,
+                                ),
+                                const SizedBox(height: 10),
+                                metricsWidget,
+                              ],
+                            );
+                          }
+                        },
                       ),
                     ),
                   ),
 
-              // 2. Branch Dropdown, Search & Time Filters
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Column(
-                    children: [
-                      // Branch Filter Dropdown (الفروع المرصودة فقط)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: _selectedBranchFilter != 'all'
-                                ? colorScheme.primary
-                                : colorScheme.outlineVariant.withValues(alpha: 0.5),
-                            width: _selectedBranchFilter != 'all' ? 1.5 : 1.0,
-                          ),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: (detectedBranches.contains(_selectedBranchFilter) || _selectedBranchFilter == 'all')
-                                ? _selectedBranchFilter
-                                : 'all',
-                            isExpanded: true,
-                            borderRadius: BorderRadius.circular(14),
-                            icon: Icon(
-                              Icons.arrow_drop_down_rounded,
-                              color: _selectedBranchFilter != 'all'
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                            items: [
-                              DropdownMenuItem<String>(
-                                value: 'all',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.storefront_rounded,
-                                      size: 18,
-                                      color: _selectedBranchFilter == 'all'
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        isArabic
-                                            ? 'جميع الفروع المرصودة (${allLogs.length})'
-                                            : 'All Detected Branches (${allLogs.length})',
-                                        style: TextStyle(
-                                          fontWeight: _selectedBranchFilter == 'all'
-                                              ? FontWeight.bold
-                                              : FontWeight.w500,
-                                          fontSize: 13,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              ...detectedBranches.map((branchName) {
-                                final branchLogsCount = allLogs
-                                    .where((l) => _resolveBranchName(l).trim() == branchName)
-                                    .length;
-                                return DropdownMenuItem<String>(
-                                  value: branchName,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.location_on_rounded,
-                                        size: 18,
-                                        color: colorScheme.primary,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          '$branchName ($branchLogsCount)',
-                                          style: TextStyle(
-                                            fontWeight: _selectedBranchFilter == branchName
-                                                ? FontWeight.bold
-                                                : FontWeight.w500,
-                                            fontSize: 13,
-                                            color: _selectedBranchFilter == branchName
-                                                ? colorScheme.primary
-                                                : null,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() => _selectedBranchFilter = val);
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Search bar with Dedicated Search Action Button
-                      Row(
+                  // 2. Single-Row Filter Toolbar & Results Header
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              style: TextStyle(fontSize: 13.5, color: colorScheme.onSurface),
-                              textInputAction: TextInputAction.search,
-                              onSubmitted: (val) {
-                                setState(() => _searchQuery = val.trim());
-                              },
-                              decoration: InputDecoration(
-                                hintText: isArabic
-                                    ? 'بحث بالمندوب، الشركة، الفرع، أو نوع الجهاز...'
-                                    : 'Search delegate, company, branch, or device...',
-                                hintStyle: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w300,
-                                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                                ),
-                                prefixIcon: IconButton(
-                                  icon: const Icon(Icons.search_rounded),
-                                  tooltip: isArabic ? 'تنفيذ البحث' : 'Search',
-                                  onPressed: () {
-                                    setState(() => _searchQuery = _searchController.text.trim());
-                                    FocusScope.of(context).unfocus();
-                                  },
-                                ),
-                                suffixIcon: _searchController.text.isNotEmpty || _searchQuery.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(Icons.clear_rounded),
-                                        tooltip: isArabic ? 'مسح البحث' : 'Clear search',
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          setState(() => _searchQuery = '');
-                                        },
-                                      )
-                                    : null,
-                                filled: true,
-                                fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(
-                                    color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          // Single-Row Filter Toolbar (Desktop: 1 row, Mobile: 2 rows)
+                          _buildFilterToolbar(
+                            colorScheme: colorScheme,
+                            isArabic: isArabic,
+                            allLogs: allLogs,
+                            filteredLogs: filteredLogs,
+                            detectedBranches: detectedBranches,
+                            todayAttempts: todayAttempts,
+                          ),
+
+                          if (_searchQuery.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: colorScheme.outlineVariant),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.filter_alt_rounded, size: 16, color: colorScheme.primary),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      isArabic
+                                          ? 'نتائج البحث عن: "$_searchQuery" (${filteredLogs.length} سجل)'
+                                          : 'Results for "$_searchQuery" (${filteredLogs.length} items)',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSurface,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  InkWell(
+                                    onTap: () {
+                                      _searchController.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          isArabic ? 'إلغاء' : 'Clear',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: colorScheme.error,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Icon(Icons.close_rounded, size: 14, color: colorScheme.error),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton.filled(
-                            onPressed: () {
-                              setState(() => _searchQuery = _searchController.text.trim());
-                              FocusScope.of(context).unfocus();
-                            },
-                            icon: const Icon(Icons.search_rounded, size: 20),
-                            tooltip: isArabic ? 'بحث' : 'Search',
-                          ),
-                        ],
-                      ),
-                      if (_searchQuery.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: colorScheme.outlineVariant),
-                          ),
-                          child: Row(
+                          ],
+
+                          const SizedBox(height: 10),
+
+                          // Section Title with Detected Violations Count
+                          Row(
                             children: [
-                              Icon(Icons.filter_alt_rounded, size: 16, color: colorScheme.primary),
-                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(Icons.shield_outlined, size: 15, color: colorScheme.primary),
+                              ),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   isArabic
-                                      ? 'نتائج البحث عن: "$_searchQuery" (${filteredLogs.length} سجل)'
-                                      : 'Results for "$_searchQuery" (${filteredLogs.length} items)',
+                                      ? 'سجلات محاولات التزييف المكتشفة (${filteredLogs.length})'
+                                      : 'Detected Violations (${filteredLogs.length})',
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.bold,
-                                    color: colorScheme.onSurface,
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
-                                ),
-                              ),
-                              InkWell(
-                                onTap: () {
-                                  _searchController.clear();
-                                  setState(() => _searchQuery = '');
-                                },
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      isArabic ? 'إلغاء' : 'Clear',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: colorScheme.error,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 2),
-                                    Icon(Icons.close_rounded, size: 14, color: colorScheme.error),
-                                  ],
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 10),
-
-                      // Time Filters (Only: All, Today)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildFilterChip(
-                              'all',
-                              isArabic ? 'الكل (${allLogs.length})' : 'All (${allLogs.length})',
-                              colorScheme,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildFilterChip(
-                              'today',
-                              isArabic ? 'اليوم ($todayAttempts)' : 'Today ($todayAttempts)',
-                              colorScheme,
-                            ),
-                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-
-              // 3. Results Count & Export Excel Button
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          isArabic
-                              ? 'سجلات محاولات التزييف المكتشفة (${filteredLogs.length})'
-                              : 'Detected Violations (${filteredLogs.length})',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (filteredLogs.isNotEmpty)
-                        IconButton.filledTonal(
-                          onPressed: _isExporting ? null : () => _exportToCSV(filteredLogs),
-                          icon: _isExporting
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.file_download_rounded, size: 20),
-                          tooltip: isArabic ? 'تصدير إكسيل' : 'Export Excel',
-                        ),
-                    ],
-                  ),
-                ),
-              ),
 
               // 4. List of Violation Cards
               if (filteredLogs.isEmpty)
@@ -1896,7 +1812,14 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     ),
                   ),
                 )
-              else
+              else ...[
+                if (MediaQuery.sizeOf(context).width >= 850)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: _buildTableHeader(colorScheme, isArabic),
+                    ),
+                  ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                   sliver: SliverList(
@@ -1915,6 +1838,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     ),
                   ),
                 ),
+              ],
                 ],
             ],
           ),
@@ -1947,24 +1871,6 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     return body;
   }
 
-  Widget _buildFilterChip(String key, String label, ColorScheme colorScheme) {
-    final isSelected = _timeFilter == key;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        if (selected) {
-          setState(() => _timeFilter = key);
-        }
-      },
-      selectedColor: colorScheme.primaryContainer,
-      labelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
-      ),
-    );
-  }
 
   Widget _buildHeaderMetrics({
     required ColorScheme colorScheme,
@@ -2032,37 +1938,40 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           const SizedBox(height: 12),
 
           // Stat row
-          Row(
-            children: [
-              _buildStatBox(
-                colorScheme: colorScheme,
-                title: isArabic ? 'إجمالي المحاولات' : 'Total Attempts',
-                value: '$totalAttempts',
-                icon: Icons.gavel_rounded,
-              ),
-              const SizedBox(width: 8),
-              _buildStatBox(
-                colorScheme: colorScheme,
-                title: isArabic ? 'اليوم' : 'Today',
-                value: '$todayAttempts',
-                icon: Icons.today_rounded,
-                isHighlight: todayAttempts > 0,
-              ),
-              const SizedBox(width: 8),
-              _buildStatBox(
-                colorScheme: colorScheme,
-                title: isArabic ? 'المناديب' : 'Delegates',
-                value: '$uniqueDelegatesCount',
-                icon: Icons.people_outline_rounded,
-              ),
-              const SizedBox(width: 8),
-              _buildStatBox(
-                colorScheme: colorScheme,
-                title: isArabic ? 'الأجهزة' : 'Devices',
-                value: '$uniqueDevicesCount',
-                icon: Icons.phone_android_rounded,
-              ),
-            ],
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildStatBox(
+                  colorScheme: colorScheme,
+                  title: isArabic ? 'إجمالي المحاولات' : 'Total Attempts',
+                  value: '$totalAttempts',
+                  icon: Icons.gavel_rounded,
+                ),
+                const SizedBox(width: 8),
+                _buildStatBox(
+                  colorScheme: colorScheme,
+                  title: isArabic ? 'اليوم' : 'Today',
+                  value: '$todayAttempts',
+                  icon: Icons.today_rounded,
+                  isHighlight: todayAttempts > 0,
+                ),
+                const SizedBox(width: 8),
+                _buildStatBox(
+                  colorScheme: colorScheme,
+                  title: isArabic ? 'المناديب' : 'Delegates',
+                  value: '$uniqueDelegatesCount',
+                  icon: Icons.people_outline_rounded,
+                ),
+                const SizedBox(width: 8),
+                _buildStatBox(
+                  colorScheme: colorScheme,
+                  title: isArabic ? 'الأجهزة' : 'Devices',
+                  value: '$uniqueDevicesCount',
+                  icon: Icons.phone_android_rounded,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -2134,7 +2043,531 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     return Expanded(child: box);
   }
 
+  Widget _buildTableHeader(ColorScheme colorScheme, bool isArabic) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 23,
+            child: _buildHeaderCell(
+              icon: Icons.person_off_rounded,
+              label: isArabic ? 'المندوب / الموظف' : 'Delegate / User',
+              colorScheme: colorScheme,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 18,
+            child: _buildHeaderCell(
+              icon: Icons.storefront_rounded,
+              label: isArabic ? 'الفرع والشركة' : 'Branch & Company',
+              colorScheme: colorScheme,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 19,
+            child: _buildHeaderCell(
+              icon: Icons.phone_android_rounded,
+              label: isArabic ? 'الجهاز والشبكة' : 'Device & Network',
+              colorScheme: colorScheme,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 22,
+            child: _buildHeaderCell(
+              icon: Icons.security_rounded,
+              label: isArabic ? 'توقيت المحاولة والموقع' : 'Attempt & Location',
+              colorScheme: colorScheme,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 18,
+            child: _buildHeaderCell(
+              icon: Icons.tune_rounded,
+              label: isArabic ? 'الإجراءات والقرارات' : 'Actions',
+              colorScheme: colorScheme,
+              alignment: AlignmentDirectional.centerEnd,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderCell({
+    required IconData icon,
+    required String label,
+    required ColorScheme colorScheme,
+    AlignmentDirectional alignment = AlignmentDirectional.centerStart,
+  }) {
+    return Align(
+      alignment: alignment,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: colorScheme.primary),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildViolationCard({
+    required BuildContext context,
+    required ColorScheme colorScheme,
+    required Map<String, dynamic> data,
+    required bool isArabic,
+    required int distinctDaysCount,
+  }) {
+    final width = MediaQuery.sizeOf(context).width;
+    if (width >= 850) {
+      return _buildWideViolationRow(
+        context: context,
+        colorScheme: colorScheme,
+        data: data,
+        isArabic: isArabic,
+        distinctDaysCount: distinctDaysCount,
+      );
+    }
+    return _buildMobileViolationCard(
+      context: context,
+      colorScheme: colorScheme,
+      data: data,
+      isArabic: isArabic,
+      distinctDaysCount: distinctDaysCount,
+    );
+  }
+
+  Widget _buildWideViolationRow({
+    required BuildContext context,
+    required ColorScheme colorScheme,
+    required Map<String, dynamic> data,
+    required bool isArabic,
+    required int distinctDaysCount,
+  }) {
+    final docId = (data['docId'] != null && data['docId'].toString().trim().isNotEmpty)
+        ? data['docId'].toString().trim()
+        : (data['id']?.toString().trim() ?? '');
+    final delegateName = data['delegateName']?.toString() ?? 'مندوب غير محدد';
+    final delegatePhone = data['delegatePhone']?.toString() ?? '';
+    final companyName = _resolveCompanyName(data);
+    final branchName = _resolveBranchName(data);
+    final deviceModel = data['deviceModel']?.toString() ?? 'جهاز غير معروف';
+    final actionType = data['actionType']?.toString() ?? '';
+    final networkLocation = data['networkLocation']?.toString() ?? '';
+    final ipAddress = data['ipAddress']?.toString() ?? '';
+    final ipCity = data['ipCity']?.toString() ?? '';
+    final ipIsp = data['ipIsp']?.toString() ?? '';
+
+    // Coordinates
+    final lat = (data['latitude'] as num?)?.toDouble();
+    final lng = (data['longitude'] as num?)?.toDouble();
+
+    // Actual attempt timestamp
+    final ts = (data['timestamp'] as Timestamp?)?.toDate();
+    final realTs = data['realTimestamp'] != null
+        ? DateTime.tryParse(data['realTimestamp'].toString())
+        : (data['createdAt'] != null ? DateTime.tryParse(data['createdAt'].toString()) : null);
+    final effectiveRealDate = ts ?? realTs;
+    final realDateStr = effectiveRealDate != null
+        ? DateFormat('yyyy-MM-dd  hh:mm a').format(effectiveRealDate)
+        : 'غير محدد';
+
+    final isApple = deviceModel.toLowerCase().contains('iphone') ||
+        deviceModel.toLowerCase().contains('ipad') ||
+        deviceModel.toLowerCase().contains('ios');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0.5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 1. Delegate & Days (flex: 23)
+            Expanded(
+              flex: 23,
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: colorScheme.errorContainer,
+                    foregroundColor: colorScheme.onErrorContainer,
+                    radius: 17,
+                    child: const Icon(Icons.person_off_rounded, size: 18),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                delegateName,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            _buildFraudDaysChip(
+                              colorScheme: colorScheme,
+                              daysCount: distinctDaysCount,
+                              isArabic: isArabic,
+                              onTap: () {
+                                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      isArabic
+                                          ? 'سجل المندوب: رُصدت محاولات التزييف في $distinctDaysCount ${distinctDaysCount == 1 ? "يوم واحد" : (distinctDaysCount == 2 ? "يومين مختلفين" : "أيام مختلفة")}.'
+                                          : 'Fraud record: Spoofing detected on $distinctDaysCount distinct day${distinctDaysCount > 1 ? "s" : ""}.',
+                                    ),
+                                    behavior: SnackBarBehavior.floating,
+                                    duration: const Duration(seconds: 3),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        if (delegatePhone.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            delegatePhone,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // 2. Branch & Company (flex: 18)
+            Expanded(
+              flex: 18,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.storefront_rounded, size: 14, color: colorScheme.primary),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          branchName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: colorScheme.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (companyName.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.business_rounded, size: 13, color: colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            companyName,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // 3. Device & Network (flex: 19)
+            Expanded(
+              flex: 19,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isApple ? Icons.phone_iphone_rounded : Icons.phone_android_rounded,
+                        size: 14,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          deviceModel,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.wifi_tethering_rounded, size: 13, color: colorScheme.outline),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          networkLocation.isNotEmpty
+                              ? networkLocation
+                              : (ipCity.isNotEmpty
+                                  ? '$ipCity ($ipIsp)'
+                                  : (ipAddress.isNotEmpty
+                                      ? 'IP: $ipAddress'
+                                      : (actionType.isNotEmpty ? actionType : '-'))),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // 4. Incident & Coordinates (flex: 22)
+            Expanded(
+              flex: 22,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.schedule_rounded, size: 13, color: colorScheme.error),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          realDateStr,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: colorScheme.error.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          'محظورة',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  if (lat != null && lng != null)
+                    InkWell(
+                      onTap: () => _openLocationOnMap(lat, lng),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.location_on_rounded, size: 13, color: colorScheme.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                              decorationColor: colorScheme.primary.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.open_in_new_rounded, size: 11, color: colorScheme.primary),
+                        ],
+                      ),
+                    )
+                  else if (actionType.isNotEmpty)
+                    Text(
+                      'العملية: $actionType',
+                      style: TextStyle(fontSize: 10.5, color: colorScheme.onSurfaceVariant),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // 5. Actions (flex: 18)
+            Expanded(
+              flex: 18,
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (lat != null && lng != null)
+                        IconButton.filledTonal(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: const Icon(Icons.map_rounded, size: 15),
+                          tooltip: isArabic ? 'عرض الموقع على الخريطة' : 'View on Map',
+                          onPressed: () => _openLocationOnMap(lat, lng),
+                        ),
+                      const SizedBox(width: 4),
+                      IconButton.filledTonal(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        icon: const Icon(Icons.phone_rounded, size: 15),
+                        tooltip: isArabic
+                            ? 'اتصال بمشرف الشركة (${companyName.isNotEmpty ? companyName : "الشركة"})'
+                            : 'Call Company Supervisor (${companyName.isNotEmpty ? companyName : "Company"})',
+                        onPressed: () => _handleCompanyCall(context, data),
+                      ),
+                      if (delegatePhone.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        IconButton.filledTonal(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: const Icon(Icons.chat_rounded, size: 15),
+                          tooltip: isArabic ? 'مراسلة المندوب عبر واتساب' : 'WhatsApp Delegate',
+                          onPressed: () => _openWhatsApp(delegatePhone),
+                        ),
+                      ],
+                      const SizedBox(width: 4),
+                      IconButton.filledTonal(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        style: IconButton.styleFrom(
+                          backgroundColor: colorScheme.errorContainer,
+                          foregroundColor: colorScheme.onErrorContainer,
+                        ),
+                        icon: const Icon(Icons.gavel_rounded, size: 15),
+                        tooltip: isArabic ? 'تطبيق مخالفة وغرامة للمندوب' : 'Issue Penalty',
+                        onPressed: () => _createPenaltyForDelegate(
+                          context,
+                          data,
+                          distinctDaysCount: distinctDaysCount,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton.filledTonal(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        icon: const Icon(Icons.phonelink_erase_rounded, size: 15),
+                        tooltip: isArabic ? 'فك ربط جهاز المندوب' : 'Unbind Device',
+                        onPressed: () => _resetDelegateDevice(
+                          context,
+                          data['delegateUid']?.toString() ?? '',
+                          delegateName,
+                          orgId: data['organizationUID']?.toString(),
+                          compId: data['companyUID']?.toString(),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        icon: Icon(Icons.delete_outline_rounded, color: colorScheme.outline, size: 17),
+                        tooltip: isArabic ? 'حذف السجل' : 'Delete Log',
+                        onPressed: () => _deleteAuditLog(context, docId, delegateName),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileViolationCard({
     required BuildContext context,
     required ColorScheme colorScheme,
     required Map<String, dynamic> data,
@@ -2594,109 +3027,677 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     );
   }
 
-  Widget _buildTabSwitcher(ColorScheme colorScheme, bool isArabic) {
+  Widget _buildTabSwitcherCard(
+    ColorScheme colorScheme,
+    bool isArabic, {
+    int? violationsCount,
+    int? pendingRequestsCount,
+    bool isHorizontal = false,
+  }) {
+    if (isHorizontal) {
+      return Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildTabCardItem(
+                title: isArabic ? 'سجلات كشف التزييف' : 'Fraud Violations',
+                icon: Icons.security_rounded,
+                isSelected: _currentTab == 'violations',
+                count: violationsCount,
+                colorScheme: colorScheme,
+                onTap: () {
+                  if (_currentTab != 'violations') {
+                    setState(() => _currentTab = 'violations');
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _buildTabCardItem(
+                title: isArabic ? 'ربط أجهزة المناديب' : 'Device Binding',
+                icon: Icons.phonelink_lock_rounded,
+                isSelected: _currentTab == 'devices',
+                count: pendingRequestsCount,
+                isWarningBadge: (pendingRequestsCount ?? 0) > 0,
+                colorScheme: colorScheme,
+                onTap: () {
+                  if (_currentTab != 'devices') {
+                    setState(() => _currentTab = 'devices');
+                    _fetchDelegatesIfNeeded();
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
       ),
-      padding: const EdgeInsets.all(4),
-      child: Row(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => setState(() => _currentTab = 'violations'),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: _currentTab == 'violations'
-                      ? colorScheme.primary
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Icon(
+                  Icons.layers_rounded,
+                  color: colorScheme.primary,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.security_rounded,
-                      size: 18,
-                      color: _currentTab == 'violations'
-                          ? colorScheme.onPrimary
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
                     Text(
-                      isArabic ? 'سجلات كشف التزييف' : 'Fraud Violations',
+                      isArabic ? 'أقسام الرقابة' : 'Audit Sections',
                       style: TextStyle(
-                        fontSize: 12.5,
+                        color: colorScheme.onSurface,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.bold,
-                        color: _currentTab == 'violations'
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurfaceVariant,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      isArabic ? 'سجلات الاحتيال والأجهزة' : 'Violations & Devices',
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 10.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () {
+          const SizedBox(height: 8),
+          Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.35), height: 1),
+          const Spacer(),
+          // Tab 1: Fraud Violations
+          _buildTabCardItem(
+            title: isArabic ? 'سجلات كشف التزييف' : 'Fraud Violations',
+            icon: Icons.security_rounded,
+            isSelected: _currentTab == 'violations',
+            count: violationsCount,
+            colorScheme: colorScheme,
+            onTap: () {
+              if (_currentTab != 'violations') {
+                setState(() => _currentTab = 'violations');
+              }
+            },
+          ),
+          const SizedBox(height: 6),
+          // Tab 2: Device Binding
+          _buildTabCardItem(
+            title: isArabic ? 'ربط أجهزة المناديب' : 'Device Binding',
+            icon: Icons.phonelink_lock_rounded,
+            isSelected: _currentTab == 'devices',
+            count: pendingRequestsCount,
+            isWarningBadge: (pendingRequestsCount ?? 0) > 0,
+            colorScheme: colorScheme,
+            onTap: () {
+              if (_currentTab != 'devices') {
                 setState(() => _currentTab = 'devices');
                 _fetchDelegatesIfNeeded();
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: _currentTab == 'devices'
-                      ? colorScheme.primary
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.phonelink_lock_rounded,
-                      size: 18,
-                      color: _currentTab == 'devices'
-                          ? colorScheme.onPrimary
-                          : colorScheme.onSurfaceVariant,
+              }
+            },
+          ),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabCardItem({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required ColorScheme colorScheme,
+    required VoidCallback onTap,
+    int? count,
+    bool isWarningBadge = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        hoverColor: colorScheme.primary.withValues(alpha: 0.08),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant.withValues(alpha: 0.5),
+              width: isSelected ? 1.2 : 0.8,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isArabic ? 'ربط أجهزة المناديب' : 'Device Binding',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: _currentTab == 'devices'
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? colorScheme.onPrimary : colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (count != null && count > 0) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? (isWarningBadge ? colorScheme.error : colorScheme.onPrimary.withValues(alpha: 0.25))
+                        : (isWarningBadge ? colorScheme.errorContainer : colorScheme.primaryContainer),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected
+                          ? colorScheme.onPrimary
+                          : (isWarningBadge ? colorScheme.onErrorContainer : colorScheme.onPrimaryContainer),
+                    ),
+                  ),
+                ),
+              ],
+              if (isSelected && (count == null || count == 0)) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 14,
+                  color: colorScheme.onPrimary,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterToolbar({
+    required ColorScheme colorScheme,
+    required bool isArabic,
+    required List<Map<String, dynamic>> allLogs,
+    required List<Map<String, dynamic>> filteredLogs,
+    required List<String> detectedBranches,
+    required int todayAttempts,
+  }) {
+    // 1. Search text field
+    final searchField = SizedBox(
+      height: 44,
+      child: TextField(
+        controller: _searchController,
+        style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+        textInputAction: TextInputAction.search,
+        onSubmitted: (val) {
+          setState(() => _searchQuery = val.trim());
+        },
+        decoration: InputDecoration(
+          hintText: isArabic
+              ? 'بحث بالمندوب، الشركة، الفرع، أو نوع الجهاز...'
+              : 'Search delegate, company, branch, or device...',
+          hintStyle: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w400,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            size: 19,
+            color: colorScheme.primary,
+          ),
+          suffixIcon: _searchController.text.isNotEmpty || _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 16),
+                  tooltip: isArabic ? 'مسح البحث' : 'Clear search',
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: colorScheme.surfaceContainerHigh,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
             ),
           ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide(
+              color: colorScheme.primary,
+              width: 1.5,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // 2. Search action button
+    final searchButton = SizedBox(
+      width: 44,
+      height: 44,
+      child: IconButton.filled(
+        onPressed: () {
+          setState(() => _searchQuery = _searchController.text.trim());
+          FocusScope.of(context).unfocus();
+        },
+        icon: const Icon(Icons.search_rounded, size: 19),
+        tooltip: isArabic ? 'تنفيذ البحث' : 'Search',
+        style: IconButton.styleFrom(
+          backgroundColor: colorScheme.primary,
+          foregroundColor: colorScheme.onPrimary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          padding: EdgeInsets.zero,
+        ),
+      ),
+    );
+
+    // 3. Branch Filter Dropdown (M3 via PopupMenuButton)
+    final branchDropdown = PopupMenuButton<String>(
+      tooltip: isArabic ? 'تصفية الفروع' : 'Filter branches',
+      initialValue: (detectedBranches.contains(_selectedBranchFilter) || _selectedBranchFilter == 'all')
+          ? _selectedBranchFilter
+          : 'all',
+      color: colorScheme.surfaceContainerHigh,
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      onSelected: (val) {
+        setState(() => _selectedBranchFilter = val);
+      },
+      itemBuilder: (context) {
+        return [
+          PopupMenuItem<String>(
+            value: 'all',
+            child: Row(
+              children: [
+                Icon(
+                  Icons.storefront_rounded,
+                  size: 18,
+                  color: _selectedBranchFilter == 'all'
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isArabic ? 'جميع الفروع المرصودة' : 'All Detected Branches',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: _selectedBranchFilter == 'all' ? FontWeight.bold : FontWeight.normal,
+                      color: _selectedBranchFilter == 'all' ? colorScheme.primary : colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${allLogs.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                if (_selectedBranchFilter == 'all') ...[
+                  const SizedBox(width: 6),
+                  Icon(Icons.check_rounded, size: 16, color: colorScheme.primary),
+                ],
+              ],
+            ),
+          ),
+          ...detectedBranches.map((branchName) {
+            final branchLogsCount = allLogs
+                .where((l) => _resolveBranchName(l).trim() == branchName)
+                .length;
+            final isSelected = _selectedBranchFilter == branchName;
+            return PopupMenuItem<String>(
+              value: branchName,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.location_on_rounded,
+                    size: 18,
+                    color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      branchName,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$branchLogsCount',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  if (isSelected) ...[
+                    const SizedBox(width: 6),
+                    Icon(Icons.check_rounded, size: 16, color: colorScheme.primary),
+                  ],
+                ],
+              ),
+            );
+          }),
+        ];
+      },
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: _selectedBranchFilter != 'all'
+                ? colorScheme.primary
+                : colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: _selectedBranchFilter != 'all' ? 1.4 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.storefront_rounded,
+              size: 18,
+              color: _selectedBranchFilter != 'all'
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                _selectedBranchFilter == 'all'
+                    ? (isArabic
+                        ? 'جميع الفروع (${allLogs.length})'
+                        : 'All Branches (${allLogs.length})')
+                    : '$_selectedBranchFilter (${allLogs.where((l) => _resolveBranchName(l).trim() == _selectedBranchFilter).length})',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: _selectedBranchFilter != 'all'
+                      ? colorScheme.primary
+                      : colorScheme.onSurface,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.expand_more_rounded,
+              size: 18,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // 4. Time Filters (الكل / اليوم) M3 Segmented Control
+    final timeFilterSegment = Container(
+      height: 44,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildSegmentButton(
+            label: isArabic ? 'الكل (${allLogs.length})' : 'All (${allLogs.length})',
+            isSelected: _timeFilter == 'all',
+            colorScheme: colorScheme,
+            onTap: () => setState(() => _timeFilter = 'all'),
+          ),
+          const SizedBox(width: 3),
+          _buildSegmentButton(
+            label: isArabic ? 'اليوم ($todayAttempts)' : 'Today ($todayAttempts)',
+            isSelected: _timeFilter == 'today',
+            colorScheme: colorScheme,
+            onTap: () => setState(() => _timeFilter = 'today'),
+          ),
         ],
+      ),
+    );
+
+    // 5. Excel Export Button
+    final exportButton = SizedBox(
+      height: 44,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: (_isExporting || filteredLogs.isEmpty)
+              ? null
+              : () => _exportToCSV(filteredLogs),
+          borderRadius: BorderRadius.circular(22),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: filteredLogs.isEmpty
+                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+                  : colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              ),
+            ),
+            alignment: Alignment.center,
+            child: _isExporting
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: colorScheme.primary,
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.arrow_downward_rounded,
+                        size: 18,
+                        color: filteredLogs.isEmpty
+                            ? colorScheme.onSurfaceVariant.withValues(alpha: 0.35)
+                            : colorScheme.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Excel',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: filteredLogs.isEmpty
+                              ? colorScheme.onSurfaceVariant.withValues(alpha: 0.35)
+                              : colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 768;
+        if (isDesktop) {
+          return Row(
+            children: [
+              Expanded(child: searchField),
+              const SizedBox(width: 8),
+              searchButton,
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 180, maxWidth: 260),
+                child: branchDropdown,
+              ),
+              const SizedBox(width: 8),
+              timeFilterSegment,
+              const SizedBox(width: 8),
+              exportButton,
+            ],
+          );
+        } else {
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: searchField),
+                  const SizedBox(width: 8),
+                  searchButton,
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: branchDropdown),
+                  const SizedBox(width: 8),
+                  timeFilterSegment,
+                  const SizedBox(width: 8),
+                  exportButton,
+                ],
+              ),
+            ],
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildSegmentButton({
+    required String label,
+    required bool isSelected,
+    required ColorScheme colorScheme,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(19),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: isSelected ? colorScheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(19),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.25),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildDeviceBindingSection(ColorScheme colorScheme, bool isArabic) {
     Query requestsQuery = FirebaseFirestore.instance.collection('device_unbind_requests');
-    if (widget.delegate.organizationUID.isNotEmpty &&
-        widget.delegate.role != UserRole.technicalSupport &&
-        widget.delegate.role != UserRole.superAdmin) {
+    if (_isCompanyScoped) {
+      requestsQuery = requestsQuery.where('companyUID', isEqualTo: widget.delegate.companyUID);
+    } else if (_isOrgScoped) {
       requestsQuery = requestsQuery.where('organizationUID', isEqualTo: widget.delegate.organizationUID);
     }
 
@@ -2721,6 +3722,18 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             ...data,
           };
         }).toList();
+
+        if (_isCompanyScoped) {
+          allRequests.removeWhere((r) {
+            final cId = (r['companyUID'] ?? '').toString().trim();
+            return cId.isNotEmpty && cId != widget.delegate.companyUID;
+          });
+        } else if (_isOrgScoped) {
+          allRequests.removeWhere((r) {
+            final oId = (r['organizationUID'] ?? '').toString().trim();
+            return oId.isNotEmpty && oId != widget.delegate.organizationUID;
+          });
+        }
 
         allRequests.sort((a, b) {
           final aTime = a['createdAt'];
@@ -2797,126 +3810,170 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Device Binding Header Banner
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              // 1. Device Binding Header Banner (3/4) & Tab Switcher Card (1/4)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isDesktop = constraints.maxWidth >= 768;
+                  final deviceBanner = Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.phonelink_lock_rounded, color: colorScheme.onPrimaryContainer, size: 22),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'منظومة قفل وربط أجهزة المناديب',
-                                style: TextStyle(
-                                  color: colorScheme.onSurface,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer,
+                                shape: BoxShape.circle,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'حساب كل مندوب مقترن بهاتفه المعتمد لمنع تبادل الحسابات',
-                                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
+                              child: Icon(Icons.phonelink_lock_rounded, color: colorScheme.onPrimaryContainer, size: 22),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'منظومة قفل وربط أجهزة المناديب',
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'حساب كل مندوب مقترن بهاتفه المعتمد لمنع تبادل الحسابات',
+                                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildStatBox(
+                                colorScheme: colorScheme,
+                                title: 'المناديب',
+                                value: totalDelegatesStr,
+                                icon: Icons.people_outline_rounded,
+                                isHighlight: _deviceStatusFilter == 'all',
+                                onTap: () {
+                                  setState(() {
+                                    _deviceStatusFilter = 'all';
+                                    _deviceSearchQuery = '';
+                                    _deviceSearchController.clear();
+                                  });
+                                  if (_cachedDelegatesList == null) {
+                                    _fetchDelegatesIfNeeded();
+                                  }
+                                },
+                              ),
+                              const SizedBox(width: 6),
+                              _buildStatBox(
+                                colorScheme: colorScheme,
+                                title: 'مقترنة',
+                                value: lockedStr,
+                                icon: Icons.lock_rounded,
+                                isHighlight: _deviceStatusFilter == 'locked',
+                                onTap: () {
+                                  setState(() {
+                                    _deviceStatusFilter = 'locked';
+                                    _deviceSearchQuery = '';
+                                    _deviceSearchController.clear();
+                                  });
+                                  if (_cachedDelegatesList == null) {
+                                    _fetchDelegatesIfNeeded();
+                                  }
+                                },
+                              ),
+                              const SizedBox(width: 6),
+                              _buildStatBox(
+                                colorScheme: colorScheme,
+                                title: 'متاحة',
+                                value: unboundStr,
+                                icon: Icons.lock_open_rounded,
+                                isHighlight: _deviceStatusFilter == 'unbound',
+                                onTap: () {
+                                  setState(() {
+                                    _deviceStatusFilter = 'unbound';
+                                    _deviceSearchQuery = '';
+                                    _deviceSearchController.clear();
+                                  });
+                                  if (_cachedDelegatesList == null) {
+                                    _fetchDelegatesIfNeeded();
+                                  }
+                                },
+                              ),
+                              const SizedBox(width: 6),
+                              _buildStatBox(
+                                colorScheme: colorScheme,
+                                title: 'طلبات فك',
+                                value: '${pendingRequests.length}',
+                                icon: Icons.phonelink_erase_rounded,
+                                isHighlight: isRequestsView,
+                                highlightColor: pendingRequests.isNotEmpty ? colorScheme.errorContainer : colorScheme.primaryContainer,
+                                onHighlightColor: pendingRequests.isNotEmpty ? colorScheme.onErrorContainer : colorScheme.onPrimaryContainer,
+                                onTap: () => setState(() {
+                                  _deviceStatusFilter = 'requests';
+                                  _deviceSearchQuery = '';
+                                  _deviceSearchController.clear();
+                                }),
                               ),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    Row(
+                  );
+
+                  if (isDesktop) {
+                    return IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: deviceBanner,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 1,
+                            child: _buildTabSwitcherCard(
+                              colorScheme,
+                              isArabic,
+                              pendingRequestsCount: pendingRequests.length,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    return Column(
                       children: [
-                        _buildStatBox(
-                          colorScheme: colorScheme,
-                          title: 'المناديب',
-                          value: totalDelegatesStr,
-                          icon: Icons.people_outline_rounded,
-                          isHighlight: _deviceStatusFilter == 'all',
-                          onTap: () {
-                            setState(() {
-                              _deviceStatusFilter = 'all';
-                              _deviceSearchQuery = '';
-                              _deviceSearchController.clear();
-                            });
-                            if (_cachedDelegatesList == null) {
-                              _fetchDelegatesIfNeeded();
-                            }
-                          },
+                        _buildTabSwitcherCard(
+                          colorScheme,
+                          isArabic,
+                          pendingRequestsCount: pendingRequests.length,
+                          isHorizontal: true,
                         ),
-                        const SizedBox(width: 6),
-                        _buildStatBox(
-                          colorScheme: colorScheme,
-                          title: 'مقترنة',
-                          value: lockedStr,
-                          icon: Icons.lock_rounded,
-                          isHighlight: _deviceStatusFilter == 'locked',
-                          onTap: () {
-                            setState(() {
-                              _deviceStatusFilter = 'locked';
-                              _deviceSearchQuery = '';
-                              _deviceSearchController.clear();
-                            });
-                            if (_cachedDelegatesList == null) {
-                              _fetchDelegatesIfNeeded();
-                            }
-                          },
-                        ),
-                        const SizedBox(width: 6),
-                        _buildStatBox(
-                          colorScheme: colorScheme,
-                          title: 'متاحة',
-                          value: unboundStr,
-                          icon: Icons.lock_open_rounded,
-                          isHighlight: _deviceStatusFilter == 'unbound',
-                          onTap: () {
-                            setState(() {
-                              _deviceStatusFilter = 'unbound';
-                              _deviceSearchQuery = '';
-                              _deviceSearchController.clear();
-                            });
-                            if (_cachedDelegatesList == null) {
-                              _fetchDelegatesIfNeeded();
-                            }
-                          },
-                        ),
-                        const SizedBox(width: 6),
-                        _buildStatBox(
-                          colorScheme: colorScheme,
-                          title: 'طلبات فك',
-                          value: '${pendingRequests.length}',
-                          icon: Icons.phonelink_erase_rounded,
-                          isHighlight: isRequestsView,
-                          highlightColor: pendingRequests.isNotEmpty ? colorScheme.errorContainer : colorScheme.primaryContainer,
-                          onHighlightColor: pendingRequests.isNotEmpty ? colorScheme.onErrorContainer : colorScheme.onPrimaryContainer,
-                          onTap: () => setState(() {
-                            _deviceStatusFilter = 'requests';
-                            _deviceSearchQuery = '';
-                            _deviceSearchController.clear();
-                          }),
-                        ),
+                        const SizedBox(height: 10),
+                        deviceBanner,
                       ],
-                    ),
-                  ],
-                ),
+                    );
+                  }
+                },
               ),
 
               const SizedBox(height: 12),
@@ -2925,60 +3982,79 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _deviceSearchController,
-                      style: TextStyle(fontSize: 13.5, color: colorScheme.onSurface),
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (val) {
-                        setState(() => _deviceSearchQuery = val.trim());
-                      },
-                      decoration: InputDecoration(
-                        hintText: isArabic
-                            ? (isRequestsView
-                                ? 'بحث بالاسم، الهاتف، أو الجهاز...'
-                                : 'بحث بالاسم، الهاتف، الشركة، أو الجهاز...')
-                            : 'Search delegate, phone, company, or device...',
-                        hintStyle: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w300,
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                        ),
-                        prefixIcon: IconButton(
-                          icon: const Icon(Icons.search_rounded),
-                          tooltip: isArabic ? 'تنفيذ البحث' : 'Search',
-                          onPressed: () {
-                            setState(() => _deviceSearchQuery = _deviceSearchController.text.trim());
-                            FocusScope.of(context).unfocus();
-                          },
-                        ),
-                        suffixIcon: _deviceSearchController.text.isNotEmpty || _deviceSearchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear_rounded),
-                                tooltip: isArabic ? 'مسح البحث' : 'Clear search',
-                                onPressed: () {
-                                  _deviceSearchController.clear();
-                                  setState(() => _deviceSearchQuery = '');
-                                },
-                              )
-                            : null,
-                        filled: true,
-                        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                    child: SizedBox(
+                      height: 44,
+                      child: TextField(
+                        controller: _deviceSearchController,
+                        style: TextStyle(fontSize: 13.5, color: colorScheme.onSurface),
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (val) {
+                          setState(() => _deviceSearchQuery = val.trim());
+                        },
+                        decoration: InputDecoration(
+                          hintText: isArabic
+                              ? (isRequestsView
+                                  ? 'بحث بالاسم، الهاتف، أو الجهاز...'
+                                  : 'بحث بالاسم، الهاتف، الشركة، أو الجهاز...')
+                              : 'Search delegate, phone, company, or device...',
+                          hintStyle: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w300,
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search_rounded,
+                            size: 19,
+                            color: colorScheme.primary,
+                          ),
+                          suffixIcon: _deviceSearchController.text.isNotEmpty || _deviceSearchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded, size: 16),
+                                  tooltip: isArabic ? 'مسح البحث' : 'Clear search',
+                                  onPressed: () {
+                                    _deviceSearchController.clear();
+                                    setState(() => _deviceSearchQuery = '');
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHigh,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide(
+                              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide(
+                              color: colorScheme.primary,
+                              width: 1.5,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: () {
-                      setState(() => _deviceSearchQuery = _deviceSearchController.text.trim());
-                      FocusScope.of(context).unfocus();
-                    },
-                    icon: const Icon(Icons.search_rounded, size: 20),
-                    tooltip: isArabic ? 'بحث' : 'Search',
+                  SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: IconButton.filled(
+                      onPressed: () {
+                        setState(() => _deviceSearchQuery = _deviceSearchController.text.trim());
+                        FocusScope.of(context).unfocus();
+                      },
+                      icon: const Icon(Icons.search_rounded, size: 19),
+                      tooltip: isArabic ? 'بحث' : 'Search',
+                      style: IconButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
                   ),
                 ],
               ),

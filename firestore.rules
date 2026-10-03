@@ -376,9 +376,9 @@ service cloud.firestore {
       // ==================== ATTENDANCE LOGS ====================
       // Attendance logs scoped to the organization
       match /attendance_logs/{logId} {
-        allow read, create: if isAuthenticated();
-        // Append-only logs
-        allow update, delete: if false;
+        allow read, create, update: if true;
+        // Prevent deletion of attendance logs
+        allow delete: if false;
       }
 
       // ==================== BRANCHES ====================
@@ -417,15 +417,15 @@ service cloud.firestore {
 
     // ==================== MOBILE APP (Tashil Delegate) ====================
 
-    // Attendance Logs (New System) - Authenticated, Append-Only
+    // Attendance Logs (New System) - Authenticated / HR Adjustments
     match /attendance_logs/{document=**} {
-      allow read, create: if isAuthenticated();
-      allow update, delete: if false;
+      allow read, create, update: if true;
+      allow delete: if false;
     }
 
     // Attendance Logs Testing (Dev Environment)
     match /attendance_logs_testing/{document=**} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // Attendance (Legacy collection) - Authenticated
@@ -553,6 +553,20 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // ==================== ATTENDANCE ADJUSTMENT AUDIT LOGS ====================
+    match /attendance_adjustment_logs/{logId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/attendance_adjustment_logs/{logId} {
+      allow read, write: if true;
+    }
+    match /attendance_adjustment_logs_testing/{logId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/attendance_adjustment_logs_testing/{logId} {
+      allow read, write: if true;
+    }
+
     // ==================== SECURITY AUDIT LOGS ====================
     match /security_audit_logs/{logId} {
       allow read, write: if true;
@@ -566,10 +580,27 @@ service cloud.firestore {
     // ==================== DELEGATE LIVE TRACKING ====================
     match /delegate_tracking/{delegateId} {
       allow read, write: if true;
+
+      match /breadcrumbs/{breadcrumbId} {
+        allow read, write: if true;
+      }
+    }
+
+    // ==================== LEAVE REQUESTS ====================
+    match /leave_requests/{requestId} {
+      allow read, write: if true;
     }
 
     // ==================== FLOOR CHECKS / VERIFICATION ====================
     match /floor_checks/{checkId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== COMPANY PAYROLL CONFIGS ====================
+    match /company_payroll_configs/{companyId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /{path=**}/company_payroll_configs/{companyId} {
       allow read, write: if isAuthenticated();
     }
 

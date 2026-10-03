@@ -53,7 +53,12 @@ class DeviceBindingService {
     String osVersion = '';
 
     try {
-      if (Platform.isAndroid) {
+      if (kIsWeb) {
+        deviceId = 'web_browser';
+        deviceModel = 'Web Browser';
+        brand = 'Browser';
+        osVersion = 'Web';
+      } else if (Platform.isAndroid) {
         final androidInfo = await _deviceInfoPlugin.androidInfo;
         deviceId = androidInfo.id;
         brand = androidInfo.brand;
@@ -69,8 +74,8 @@ class DeviceBindingService {
         deviceModel = name.isNotEmpty ? name : model;
         osVersion = 'iOS ${iosInfo.systemVersion}';
       } else {
-        deviceId = 'web_or_desktop_${Platform.operatingSystem}';
-        deviceModel = Platform.operatingSystem;
+        deviceId = 'desktop_platform';
+        deviceModel = 'Desktop';
       }
     } catch (e) {
       debugPrint('Error reading device info: $e');

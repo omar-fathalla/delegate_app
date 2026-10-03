@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:battery_plus/battery_plus.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/core/models/pagination_response.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
+import 'package:delegate_app/features/tracking/data/services/delegate_tracking_engine.dart';
 import 'package:delegate_app/injection_container.dart';
 
 abstract class AttendanceRemoteDataSource {
@@ -470,6 +473,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
       if (checkOuts.containsKey(checkInId)) {
         final outData = checkOuts[checkInId]!;
+        final isAuto = outData['isAutoCheckOut'] == true;
+        final autoReason = outData['autoCheckOutReason'] as String?;
         history.add(
           AttendanceModel(
             id: checkInId,
@@ -482,20 +487,41 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             latitude: lat,
             longitude: lng,
             branchName: branchName,
+            isAutoCheckOut: isAuto,
+            autoCheckOutReason: autoReason,
           ),
         );
       } else {
-        history.add(
-          AttendanceModel(
-            id: checkInId,
-            userId: userId,
-            organizationId: organizationId,
-            checkInTime: checkInTime,
-            latitude: lat,
-            longitude: lng,
-            branchName: branchName,
-          ),
-        );
+        // إذا مر أكثر من 9 ساعات على وقت تسجيل الحضور ولم يسجل انصراف، يتم إغلاقه ديناميكياً
+        final isExpired = DateTime.now().difference(checkInTime) >= const Duration(hours: 9);
+        if (isExpired) {
+          history.add(
+            AttendanceModel(
+              id: checkInId,
+              userId: userId,
+              organizationId: organizationId,
+              checkInTime: checkInTime,
+              checkOutTime: checkInTime.add(const Duration(hours: 9)),
+              latitude: lat,
+              longitude: lng,
+              branchName: branchName,
+              isAutoCheckOut: true,
+              autoCheckOutReason: 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+            ),
+          );
+        } else {
+          history.add(
+            AttendanceModel(
+              id: checkInId,
+              userId: userId,
+              organizationId: organizationId,
+              checkInTime: checkInTime,
+              latitude: lat,
+              longitude: lng,
+              branchName: branchName,
+            ),
+          );
+        }
       }
     }
 
@@ -522,13 +548,34 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final data = doc.data();
 
       if (data['type'] == 'check_in') {
+        final checkInTime = data['timestamp'] != null
+            ? (data['timestamp'] as Timestamp).toDate()
+            : DateTime.now();
+
+        DateTime nowTime;
+        try {
+          nowTime = sl<TrustedTimeService>().now;
+        } catch (_) {
+          nowTime = DateTime.now();
+        }
+
+        if (nowTime.difference(checkInTime) >= const Duration(hours: 9)) {
+          // انتهت مدة الشفت (9 ساعات) - إغلاق الجلسة تلقائياً في الخلفية وتحرير المندوب
+          unawaited(
+            _autoCheckOutExpiredSession(
+              checkInDoc: doc,
+              organizationId: organizationId,
+              autoCheckOutTime: checkInTime.add(const Duration(hours: 9)),
+            ),
+          );
+          return null;
+        }
+
         return AttendanceModel(
           id: doc.id,
           userId: data['delegateId'] ?? data['userId'] ?? '',
           organizationId: organizationId,
-          checkInTime: data['timestamp'] != null
-              ? (data['timestamp'] as Timestamp).toDate()
-              : DateTime.now(),
+          checkInTime: checkInTime,
           latitude: (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
           longitude:
               (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
@@ -543,6 +590,41 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       throwTimeoutFailure('انتهت مهلة الاتصال بالخادم.');
     } catch (_) {
       throwUnexpectedFailure();
+    }
+  }
+
+  Future<void> _autoCheckOutExpiredSession({
+    required DocumentSnapshot<Map<String, dynamic>> checkInDoc,
+    required String organizationId,
+    required DateTime autoCheckOutTime,
+  }) async {
+    try {
+      final data = checkInDoc.data()!;
+      final userId = (data['delegateId'] ?? data['userId'] ?? '').toString();
+      final companyId = data['companyId'];
+      final branchName = data['branchName'];
+      final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0;
+      final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0;
+
+      await _attendanceCollection(organizationId).add({
+        'delegateId': userId,
+        'userId': userId,
+        'companyId': companyId,
+        'organizationId': organizationId,
+        'timestamp': Timestamp.fromDate(autoCheckOutTime),
+        'type': 'check_out',
+        'location': {'latitude': lat, 'longitude': lng},
+        'relatedCheckInId': checkInDoc.id,
+        'isAutoCheckOut': true,
+        'autoCheckOutReason': 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+        'branchName': ?branchName,
+      });
+
+      unawaited(
+        _syncDelegateTrackingCheckOut(userId: userId),
+      );
+    } catch (e) {
+      debugPrint('Error auto checking out expired session: $e');
     }
   }
 
@@ -792,18 +874,47 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       String delegateName = 'مندوب';
       String delegatePhone = '';
       try {
-        final userDoc = await firestore.collection('users').doc(userId).get();
-        if (userDoc.exists) {
-          final data = userDoc.data();
-          delegateName = (data?['fullName'] ??
-                  data?['name'] ??
-                  '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim())
-              .toString();
-          delegatePhone = (data?['phoneNumber'] ??
-                  data?['phone'] ??
-                  data?['mobileNumber'] ??
-                  '')
-              .toString();
+        if (organizationId.isNotEmpty && companyId.isNotEmpty) {
+          final nestedDoc = await firestore
+              .collection('organizations')
+              .doc(organizationId)
+              .collection('companies')
+              .doc(companyId)
+              .collection('delegates')
+              .doc(userId)
+              .get();
+          if (nestedDoc.exists) {
+            final data = nestedDoc.data();
+            final rawFull = (data?['fullName'] ?? data?['name'])?.toString().trim();
+            final combined = '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim();
+            delegateName = (rawFull != null && rawFull.isNotEmpty) ? rawFull : (combined.isNotEmpty ? combined : 'مندوب');
+            delegatePhone = (data?['phoneNumber'] ?? data?['phone'] ?? data?['mobileNumber'] ?? '').toString();
+          }
+        }
+
+        if (delegateName == 'مندوب') {
+          final delDoc = await firestore.collection('delegates').doc(userId).get();
+          if (delDoc.exists) {
+            final data = delDoc.data();
+            final rawFull = (data?['fullName'] ?? data?['name'])?.toString().trim();
+            final combined = '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim();
+            delegateName = (rawFull != null && rawFull.isNotEmpty) ? rawFull : (combined.isNotEmpty ? combined : 'مندوب');
+            delegatePhone = (data?['phoneNumber'] ?? data?['phone'] ?? data?['mobileNumber'] ?? '').toString();
+          } else {
+            final userDoc = await firestore.collection('users').doc(userId).get();
+            if (userDoc.exists) {
+              final data = userDoc.data();
+              delegateName = (data?['fullName'] ??
+                      data?['name'] ??
+                      '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim())
+                  .toString();
+              delegatePhone = (data?['phoneNumber'] ??
+                      data?['phone'] ??
+                      data?['mobileNumber'] ??
+                      '')
+                  .toString();
+            }
+          }
         }
       } catch (_) {}
 
@@ -831,6 +942,16 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         } catch (_) {}
       }
 
+      // احتساب المسافة الدقيقة عن الفرع ونسبة البطارية الحقيقية
+      final exactDist =
+          Geolocator.distanceBetween(lat, long, branchLat, branchLng);
+      final isInside = exactDist <= (geofenceRadius + 50.0);
+
+      int? batteryLevel;
+      try {
+        batteryLevel = await Battery().batteryLevel;
+      } catch (_) {}
+
       await firestore.collection('delegate_tracking').doc(userId).set({
         'delegateId': userId,
         'delegateName': delegateName,
@@ -842,14 +963,41 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'branchLat': branchLat,
         'branchLng': branchLng,
         'geofenceRadius': geofenceRadius,
-        'currentStatus': 'inside',
-        'currentDistanceMeters': 0.0,
+        'currentStatus': isInside ? 'inside' : 'outside',
+        'currentDistanceMeters': exactDist,
         'lastLatitude': lat,
         'lastLongitude': long,
+        'speed': 0.0,
+        'batteryLevel': ?batteryLevel,
+        'isMoving': false,
         'lastUpdated': FieldValue.serverTimestamp(),
         'checkInTime': Timestamp.fromDate(time),
         'isOnline': true,
       }, SetOptions(merge: true));
+
+      // تسجيل أول نقطة مسار (First Breadcrumb)
+      try {
+        await firestore
+            .collection('delegate_tracking')
+            .doc(userId)
+            .collection('breadcrumbs')
+            .add({
+          'latitude': lat,
+          'longitude': long,
+          'timestamp': FieldValue.serverTimestamp(),
+          'speed': 0.0,
+          'batteryLevel': ?batteryLevel,
+          'distanceMeters': exactDist,
+          'isInside': isInside,
+        });
+      } catch (_) {}
+
+      // بدء محرك التتبع الدوري في جهاز المندوب
+      try {
+        unawaited(
+          DelegateTrackingEngine().startTrackingSession(delegateId: userId),
+        );
+      } catch (_) {}
     } catch (e) {
       debugPrint('Error syncing delegate tracking on checkIn: $e');
     }
@@ -859,6 +1007,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     required String userId,
   }) async {
     try {
+      DelegateTrackingEngine().stopTrackingSession();
       await firestore.collection('delegate_tracking').doc(userId).update({
         'currentStatus': 'checked_out',
         'isTrackingEnabled': false,

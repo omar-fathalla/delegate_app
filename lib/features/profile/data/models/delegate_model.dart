@@ -235,6 +235,18 @@ class DelegateModel extends Delegate {
         ? rawCompanyName
         : (altCompanyName ?? '');
 
+    bool parseBool(dynamic val, [bool defaultValue = false]) {
+      if (val == null) return defaultValue;
+      if (val is bool) return val;
+      if (val is String) {
+        final s = val.trim().toLowerCase();
+        if (s == 'true' || s == '1') return true;
+        if (s == 'false' || s == '0') return false;
+      }
+      if (val is num) return val != 0;
+      return defaultValue;
+    }
+
     return DelegateModel(
       uid: uid,
       firstName: first,
@@ -260,10 +272,10 @@ class DelegateModel extends Delegate {
           .toList(),
       createdAt: DateTimeUtils.parseDate(json['createdAt']),
       createdBy: json['createdBy'] ?? '',
-      hasPendingUpdate: json['hasPendingUpdate'] ?? false,
-      isDeductedFromCompany: json['isDeductedFromCompany'] ?? false,
-      isPrinted: json['isPrinted'] ?? false,
-      isProfileComplete: json['isProfileComplete'] ?? false,
+      hasPendingUpdate: parseBool(json['hasPendingUpdate']),
+      isDeductedFromCompany: parseBool(json['isDeductedFromCompany']),
+      isPrinted: parseBool(json['isPrinted']),
+      isProfileComplete: parseBool(json['isProfileComplete']),
       latestRequestId: json['latestRequestId'],
       numberOfDocuments: json['numberOfDocuments'] ?? 0,
       paymentAmount: json['paymentAmount'] ?? 0,
@@ -365,7 +377,7 @@ class DelegateModel extends Delegate {
       boundDeviceId: json['boundDeviceId'],
       boundDeviceModel: json['boundDeviceModel'],
       deviceBoundAt: DateTimeUtils.parseNullableDate(json['deviceBoundAt']),
-      isDeviceLocked: json['isDeviceLocked'] ?? false,
+      isDeviceLocked: parseBool(json['isDeviceLocked']),
       supervisorName: (json['supervisorName'] as String?)?.trim() ?? (json['supervisor_name'] as String?)?.trim(),
       supervisorPhone: (json['supervisorPhone'] as String?)?.trim() ?? (json['supervisor_phone'] as String?)?.trim(),
       supervisorUid: (json['supervisorUid'] as String?)?.trim() ?? (json['supervisor_uid'] as String?)?.trim(),

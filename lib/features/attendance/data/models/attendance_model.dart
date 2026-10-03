@@ -15,6 +15,8 @@ class AttendanceModel extends Attendance {
     super.isSynced = true,
     super.localCheckInTime,
     super.localCheckOutTime,
+    super.isAutoCheckOut = false,
+    super.autoCheckOutReason,
   });
 
   factory AttendanceModel.fromJson(Map<String, dynamic> json, String id) {
@@ -41,6 +43,8 @@ class AttendanceModel extends Attendance {
       localCheckOutTime: DateTimeUtils.parseNullableDate(
         json['localCheckOutTime'],
       ),
+      isAutoCheckOut: json['isAutoCheckOut'] == true,
+      autoCheckOutReason: json['autoCheckOutReason'] as String?,
     );
   }
 
@@ -59,6 +63,8 @@ class AttendanceModel extends Attendance {
       'isSynced': isSynced,
       'localCheckInTime': localCheckInTime?.toIso8601String(),
       'localCheckOutTime': localCheckOutTime?.toIso8601String(),
+      'isAutoCheckOut': isAutoCheckOut,
+      if (autoCheckOutReason != null) 'autoCheckOutReason': autoCheckOutReason,
     };
   }
 
@@ -75,6 +81,8 @@ class AttendanceModel extends Attendance {
     bool? isSynced,
     DateTime? localCheckInTime,
     DateTime? localCheckOutTime,
+    bool? isAutoCheckOut,
+    String? autoCheckOutReason,
   }) {
     return AttendanceModel(
       id: id ?? this.id,
@@ -89,6 +97,8 @@ class AttendanceModel extends Attendance {
       isSynced: isSynced ?? this.isSynced,
       localCheckInTime: localCheckInTime ?? this.localCheckInTime,
       localCheckOutTime: localCheckOutTime ?? this.localCheckOutTime,
+      isAutoCheckOut: isAutoCheckOut ?? this.isAutoCheckOut,
+      autoCheckOutReason: autoCheckOutReason ?? this.autoCheckOutReason,
     );
   }
 }

@@ -6,12 +6,14 @@ import 'package:flutter/foundation.dart';
 class CrashlyticsService {
   CrashlyticsService._();
 
-  static final FirebaseCrashlytics _crashlytics = FirebaseCrashlytics.instance;
+  static FirebaseCrashlytics? get _crashlytics =>
+      kIsWeb ? null : FirebaseCrashlytics.instance;
 
   /// تهيئة Crashlytics - يتم استدعاؤها في main()
   static Future<void> initialize() async {
+    if (kIsWeb) return;
     // تعطيل في وضع التطوير
-    await _crashlytics.setCrashlyticsCollectionEnabled(!kDebugMode);
+    await _crashlytics?.setCrashlyticsCollectionEnabled(!kDebugMode);
 
     // التقاط أخطاء Flutter framework
     FlutterError.onError = (errorDetails) {
@@ -39,7 +41,8 @@ class CrashlyticsService {
     String? reason,
     bool fatal = false,
   }) async {
-    await _crashlytics.recordError(
+    if (kIsWeb) return;
+    await _crashlytics?.recordError(
       exception,
       stack,
       reason: reason ?? 'Non-fatal error',
@@ -49,21 +52,25 @@ class CrashlyticsService {
 
   /// تسجيل رسالة مخصصة (breadcrumb)
   static Future<void> log(String message) async {
-    await _crashlytics.log(message);
+    if (kIsWeb) return;
+    await _crashlytics?.log(message);
   }
 
   /// تعيين معرف المستخدم للتتبع
   static Future<void> setUserIdentifier(String userId) async {
-    await _crashlytics.setUserIdentifier(userId);
+    if (kIsWeb) return;
+    await _crashlytics?.setUserIdentifier(userId);
   }
 
   /// إضافة مفتاح مخصص للتتبع
   static Future<void> setCustomKey(String key, Object value) async {
-    await _crashlytics.setCustomKey(key, value);
+    if (kIsWeb) return;
+    await _crashlytics?.setCustomKey(key, value);
   }
 
   /// مسح معرف المستخدم عند تسجيل الخروج
   static Future<void> clearUserIdentifier() async {
-    await _crashlytics.setUserIdentifier('');
+    if (kIsWeb) return;
+    await _crashlytics?.setUserIdentifier('');
   }
 }

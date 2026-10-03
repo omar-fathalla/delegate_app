@@ -31,23 +31,59 @@ class AttendanceHistoryList extends StatelessWidget {
               child: Icon(Icons.history, color: theme.colorScheme.primary),
             ),
             title: Text(DateFormat('yyyy-MM-dd').format(item.checkInTime)),
-            subtitle: Text(
-              l10n.historyInOut(
-                DateFormat('HH:mm').format(item.checkInTime),
-                item.checkOutTime != null
-                    ? DateFormat('HH:mm').format(item.checkOutTime!)
-                    : l10n.active,
-              ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.historyInOut(
+                    DateFormat('HH:mm').format(item.checkInTime),
+                    item.effectiveCheckOutTime != null
+                        ? DateFormat('HH:mm').format(item.effectiveCheckOutTime!)
+                        : l10n.active,
+                  ),
+                ),
+                if (item.isEffectiveAutoCheckOut) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_mode_rounded, size: 12, color: Colors.amber[800]),
+                        const SizedBox(width: 4),
+                        Text(
+                          'إغلاق تلقائي (9 س)',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber[900],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
-            trailing: item.checkOutTime == null
+            trailing: item.isActive
                 ? Icon(
                     Icons.circle,
                     color: theme.colorScheme.secondary,
                     size: 12,
                   )
                 : Icon(
-                    Icons.check_circle,
-                    color: theme.colorScheme.outlineVariant,
+                    item.isEffectiveAutoCheckOut
+                        ? Icons.auto_mode_rounded
+                        : Icons.check_circle,
+                    color: item.isEffectiveAutoCheckOut
+                        ? Colors.amber[800]
+                        : theme.colorScheme.outlineVariant,
                     size: 16,
                   ),
             ),

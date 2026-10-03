@@ -46,6 +46,7 @@ class TashilConnectedButtonGroup<T> extends StatelessWidget {
   final ValueChanged<T> onSelected;
   final double height;
   final bool isScrollable;
+  final double? width;
 
   const TashilConnectedButtonGroup({
     super.key,
@@ -54,6 +55,7 @@ class TashilConnectedButtonGroup<T> extends StatelessWidget {
     required this.onSelected,
     this.height = 44.0,
     this.isScrollable = false,
+    this.width,
   });
 
   @override
@@ -63,6 +65,7 @@ class TashilConnectedButtonGroup<T> extends StatelessWidget {
 
     final content = Container(
       height: height,
+      width: width,
       padding: const EdgeInsets.all(4.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
@@ -73,7 +76,7 @@ class TashilConnectedButtonGroup<T> extends StatelessWidget {
         ),
       ),
       child: Row(
-        mainAxisSize: isScrollable ? MainAxisSize.min : MainAxisSize.max,
+        mainAxisSize: isScrollable || width == null ? MainAxisSize.min : MainAxisSize.max,
         children: items.map((item) {
           final isSelected = item.value == selectedValue;
           final buttonWidget = _TashilConnectedButtonSegment<T>(
@@ -82,7 +85,7 @@ class TashilConnectedButtonGroup<T> extends StatelessWidget {
             onTap: () => onSelected(item.value),
           );
 
-          if (isScrollable) {
+          if (isScrollable || width == null) {
             return buttonWidget;
           }
           return Expanded(child: buttonWidget);

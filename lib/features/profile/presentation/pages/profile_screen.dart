@@ -15,14 +15,18 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:delegate_app/injection_container.dart' as di;
+
 class ProfileScreen extends StatefulWidget {
   final Delegate delegate;
   final bool showBackButton;
+  final int initialTabIndex;
 
   const ProfileScreen({
     super.key,
     required this.delegate,
     this.showBackButton = false,
+    this.initialTabIndex = 0,
   });
 
   @override
@@ -33,23 +37,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Load full delegate profile from Firebase
+    // Load full delegate profile from Firebase if ProfileBloc is available
     Future.microtask(() {
       if (mounted) {
-        context.read<ProfileBloc>().add(
-          LoadProfile(
-            uid: widget.delegate.uid,
-            organizationUID: widget.delegate.organizationUID,
-            companyUID: widget.delegate.companyUID,
-          ),
-        );
+        try {
+          context.read<ProfileBloc>().add(
+            LoadProfile(
+              uid: widget.delegate.uid,
+              organizationUID: widget.delegate.organizationUID,
+              companyUID: widget.delegate.companyUID,
+            ),
+          );
+        } catch (_) {}
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<ProfileBloc, ProfileState>(
+    Widget profileContent = BlocBuilder<ProfileBloc, ProfileState>(
       builder: (context, state) {
         // Use loaded delegate if available, otherwise use passed delegate
         final delegate = state is ProfileLoaded
@@ -58,6 +64,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         return DefaultTabController(
           length: 3,
+          initialIndex: widget.initialTabIndex,
           child: _ProfileBody(
             delegate: delegate,
             showBackButton: widget.showBackButton,
@@ -67,6 +74,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+
+    // Ensure ProfileBloc is present; if not, wrap with a local provider
+    try {
+      BlocProvider.of<ProfileBloc>(context);
+      return profileContent;
+    } catch (_) {
+      return BlocProvider(
+        create: (_) => di.sl<ProfileBloc>()
+          ..add(
+            LoadProfile(
+              uid: widget.delegate.uid,
+              organizationUID: widget.delegate.organizationUID,
+              companyUID: widget.delegate.companyUID,
+            ),
+          ),
+        child: profileContent,
+      );
+    }
   }
 }
 

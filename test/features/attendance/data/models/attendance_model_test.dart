@@ -118,5 +118,64 @@ void main() {
       expect(result.latitude, 12.0);
       expect(result.longitude, 56.0);
     });
+
+    test('should parse and serialize isAutoCheckOut and autoCheckOutReason', () {
+      final Map<String, dynamic> json = {
+        'userId': tUserId,
+        'organizationId': 'org1',
+        'checkInTime': tCheckInTimestamp,
+        'checkOutTime': tCheckOutTimestamp,
+        'isAutoCheckOut': true,
+        'autoCheckOutReason': 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+      };
+
+      final model = AttendanceModel.fromJson(json, tId);
+      expect(model.isAutoCheckOut, true);
+      expect(model.autoCheckOutReason, 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي');
+      expect(model.isEffectiveAutoCheckOut, true);
+      expect(model.effectiveCheckOutTime, tCheckOutDateTime);
+      expect(model.isActive, false);
+
+      final toJson = model.toJson();
+      expect(toJson['isAutoCheckOut'], true);
+      expect(toJson['autoCheckOutReason'], 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي');
+    });
+
+    test('should dynamically calculate 9h auto checkout when session exceeded 9 hours without checkout', () {
+      // Checked in 10 hours ago
+      final tenHoursAgo = DateTime.now().subtract(const Duration(hours: 10));
+      final Map<String, dynamic> json = {
+        'userId': tUserId,
+        'organizationId': 'org1',
+        'checkInTime': Timestamp.fromDate(tenHoursAgo),
+        'checkOutTime': null,
+      };
+
+      final model = AttendanceModel.fromJson(json, tId);
+      expect(model.checkOutTime, isNull);
+      expect(model.isEffectiveAutoCheckOut, true);
+      expect(model.isActive, false);
+      expect(
+        model.effectiveCheckOutTime!.difference(tenHoursAgo).inHours,
+        9,
+      );
+    });
+
+    test('should remain active when checked in within 9 hours without checkout', () {
+      // Checked in 2 hours ago
+      final twoHoursAgo = DateTime.now().subtract(const Duration(hours: 2));
+      final Map<String, dynamic> json = {
+        'userId': tUserId,
+        'organizationId': 'org1',
+        'checkInTime': Timestamp.fromDate(twoHoursAgo),
+        'checkOutTime': null,
+      };
+
+      final model = AttendanceModel.fromJson(json, tId);
+      expect(model.checkOutTime, isNull);
+      expect(model.isEffectiveAutoCheckOut, false);
+      expect(model.isActive, true);
+      expect(model.effectiveCheckOutTime, isNull);
+    });
   });
 }

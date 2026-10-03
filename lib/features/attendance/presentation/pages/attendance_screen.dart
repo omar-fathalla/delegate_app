@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -123,7 +124,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2400),
     );
-    if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (!kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST')) {
       _radarController.repeat();
     }
     _radarAnimation = CurvedAnimation(
@@ -132,7 +133,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
 
     // If Geofence mode is expected, load organization settings and branches
-    if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (!kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST')) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _fetchOrganizationSettings().then((_) {
@@ -1248,18 +1249,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   ),
                 ),
                 ...records.map((item) {
+                  final isArabic = locale.startsWith('ar');
                   final inTime = DateFormat(
                     'hh:mm a',
                     locale,
                   ).format(item.checkInTime);
-                  final outTime = item.checkOutTime != null
-                      ? DateFormat('hh:mm a', locale).format(item.checkOutTime!)
+                  final effectiveOut = item.effectiveCheckOutTime;
+                  final outTime = effectiveOut != null
+                      ? DateFormat('hh:mm a', locale).format(effectiveOut)
                       : '--:--';
                   final branchName = item.branchName ?? l10n.unspecifiedBranch;
 
                   String durationStr;
-                  if (item.checkOutTime != null) {
-                    final diff = item.checkOutTime!.difference(
+                  if (effectiveOut != null) {
+                    final diff = effectiveOut.difference(
                       item.checkInTime,
                     );
                     final hours = diff.inHours;
@@ -1317,17 +1320,53 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 Row(
                                   children: [
                                     Icon(
-                                      Icons.logout_rounded,
+                                      item.isEffectiveAutoCheckOut
+                                          ? Icons.auto_mode_rounded
+                                          : Icons.logout_rounded,
                                       size: 16,
-                                      color: colorScheme.error,
+                                      color: item.isEffectiveAutoCheckOut
+                                          ? Colors.amber[800]
+                                          : colorScheme.error,
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
                                       l10n.outLabel(outTime),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.w500,
+                                        color: item.isEffectiveAutoCheckOut
+                                            ? Colors.amber[900]
+                                            : null,
                                       ),
                                     ),
+                                    if (item.isEffectiveAutoCheckOut) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: Colors.amber.withValues(alpha: 0.5),
+                                          ),
+                                        ),
+                                        child: Tooltip(
+                                          message: isArabic
+                                              ? 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً'
+                                              : 'Auto check-out after 9h shift expiration',
+                                          child: Text(
+                                            isArabic ? 'إغلاق تلقائي (9 س)' : 'Auto Closed (9h)',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.amber[900],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                                 const SizedBox(height: 6),
@@ -1336,7 +1375,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                     Icon(
                                       Icons.timer_rounded,
                                       size: 14,
-                                      color: item.checkOutTime != null
+                                      color: effectiveOut != null
                                           ? colorScheme.primary
                                           : colorScheme.outlineVariant,
                                     ),
@@ -1346,7 +1385,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
-                                        color: item.checkOutTime != null
+                                        color: effectiveOut != null
                                             ? colorScheme.primary
                                             : colorScheme.outlineVariant,
                                       ),
@@ -1370,7 +1409,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 ),
                               ),
                             ),
-                          if (item.checkOutTime == null)
+                          if (item.isActive)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -1913,6 +1952,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Future<String> _getDeviceInfo() async {
     final deviceInfoPlugin = DeviceInfoPlugin();
     try {
+      if (kIsWeb) {
+        return 'Web Browser';
+      }
       if (Platform.isAndroid) {
         final androidInfo = await deviceInfoPlugin.androidInfo;
         return '${androidInfo.brand} ${androidInfo.model}';

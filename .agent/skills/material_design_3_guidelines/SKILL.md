@@ -243,3 +243,84 @@ All animations, route navigations, modal reveals, and state changes MUST follow 
 - **Tokens**: Always consume tokens from `AppMotionCurves` and `AppMotionDurations` in `lib/config/theme/app_motion.dart`. Never use `Curves.linear` or arbitrary millisecond values.
 - **RTL Support**: In Arabic mode, Shared Axis X animations must invert the horizontal direction vector.
 
+---
+
+## 10. Web-First Enterprise Tables, Filter Toolbars & M3 Dropdown Standard
+
+When building or updating enterprise screens (HR System, Backoffice, Management Portals):
+
+### 1. Web Application Viewport First
+- **No Stretched Buttons**: Action buttons (such as bulk toggle, export, create) must NEVER expand to fill the full screen width (`double.infinity`). They must have natural content width (`MainAxisSize.min`, standard height 44dp, padding horizontal 16dp).
+- **Single-Row Responsive Toolbar**: On desktop viewports (`constraints.maxWidth >= 768px`), place the Search bar, Status filter dropdown, Branch/Category dropdown, and Action buttons on **ONE unified horizontal line** (`Row`) at 44dp height.
+  ```dart
+  if (isDesktop) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(flex: 4, child: _buildSearchField(colorScheme)),
+        const SizedBox(width: 10),
+        Expanded(flex: 3, child: _buildM3StatusMenu(...)),
+        const SizedBox(width: 10),
+        Expanded(flex: 3, child: _buildM3BranchMenu(...)),
+        const SizedBox(width: 10),
+        _buildBulkActionButton(...), // Natural content-sized button
+      ],
+    );
+  }
+  ```
+
+### 2. Material Design 3 Dropdown Menus
+- **Google Icons Only**: Use only `Icons.*_rounded` or `Icons.*_outlined` from Flutter's official material icon font.
+- **M3 PopupMenuButton Pattern**:
+  ```dart
+  PopupMenuButton<String>(
+    tooltip: 'فلترة',
+    offset: const Offset(0, 48),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+    ),
+    color: colorScheme.surfaceContainerHigh,
+    elevation: 3,
+    onSelected: onSelect,
+    itemBuilder: (context) => items.map((item) => PopupMenuItem<String>(
+      value: item.value,
+      height: 40,
+      child: Row(
+        children: [
+          Icon(item.icon, size: 18, color: item.isSelected ? colorScheme.primary : colorScheme.onSurface),
+          const SizedBox(width: 10),
+          Expanded(child: Text(item.label, style: TextStyle(fontWeight: item.isSelected ? FontWeight.bold : FontWeight.normal))),
+          if (item.count != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: item.isSelected ? colorScheme.primary.withValues(alpha: 0.15) : colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text('${item.count}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (item.isSelected) Icon(Icons.check_rounded, size: 18, color: colorScheme.primary),
+        ],
+      ),
+    )).toList(),
+    child: Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
+      ),
+      child: Row(...),
+    ),
+  );
+  ```
+
+### 3. Single-Seed Theme Harmony
+- Cards and table rows must derive all surfaces, borders, and hover states strictly from `Theme.of(context).colorScheme` (Purple primary theme in Tashil).
+- Status semantic colors (green, amber, red) are restricted to badges, pills, and 3.5px start border accents. The card background remains `colorScheme.surface` and outer border remains `colorScheme.outlineVariant`.
+
+

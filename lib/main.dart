@@ -11,6 +11,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -69,21 +70,25 @@ void main() async {
 
   // Enable smart offline persistence and caching for Firestore
   try {
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-    );
+    if (!kIsWeb) {
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      );
+    }
   } catch (e) {
     debugPrint('Firestore settings config: $e');
   }
 
-  // Register background message handler
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  if (!kIsWeb) {
+    // Register background message handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // Initialize Crashlytics non-blockingly
-  CrashlyticsService.initialize().catchError((e) {
-    debugPrint('Crashlytics Init Error: $e');
-  });
+    // Initialize Crashlytics non-blockingly
+    CrashlyticsService.initialize().catchError((e) {
+      debugPrint('Crashlytics Init Error: $e');
+    });
+  }
 
   // مراقب BLoC لتسجيل الأخطاء والانتقالات
   Bloc.observer = AppBlocObserver();
@@ -116,6 +121,7 @@ void main() async {
 
 /// Schedules background sync safely after UI has settled, avoiding main-thread contention during boot.
 void _scheduleBackgroundSync() {
+  if (kIsWeb) return;
   Future.delayed(const Duration(seconds: 8), () {
     try {
       Workmanager().initialize(

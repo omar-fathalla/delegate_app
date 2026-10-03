@@ -11,6 +11,7 @@ class ThemeCubit extends Cubit<ThemeState> {
   static const _kThemeKey = 'app_theme_mode';
   static const _kSeedColorKey = 'app_seed_color';
   static const _kMigratedPurpleKey = 'migrated_to_purple_default_v3';
+  static const _kMigratedLightKey = 'migrated_to_light_default_v1';
   final SharedPreferences _prefs;
 
   ThemeCubit(this._prefs) : super(const ThemeState()) {
@@ -19,11 +20,24 @@ class ThemeCubit extends Cubit<ThemeState> {
 
   void _loadTheme() {
     final savedTheme = _prefs.getString(_kThemeKey);
-    ThemeMode mode = ThemeMode.system;
-    if (savedTheme != null) {
+    final isMigratedLight = _prefs.getBool(_kMigratedLightKey) ?? false;
+    ThemeMode mode = ThemeMode.light;
+
+    if (!isMigratedLight) {
+      _prefs.setBool(_kMigratedLightKey, true);
+      if (savedTheme == null || savedTheme == ThemeMode.system.name) {
+        _prefs.setString(_kThemeKey, ThemeMode.light.name);
+        mode = ThemeMode.light;
+      } else {
+        mode = ThemeMode.values.firstWhere(
+          (e) => e.name == savedTheme,
+          orElse: () => ThemeMode.light,
+        );
+      }
+    } else if (savedTheme != null) {
       mode = ThemeMode.values.firstWhere(
         (e) => e.name == savedTheme,
-        orElse: () => ThemeMode.system,
+        orElse: () => ThemeMode.light,
       );
     }
 

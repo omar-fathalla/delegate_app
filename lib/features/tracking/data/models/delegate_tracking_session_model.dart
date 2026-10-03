@@ -25,6 +25,10 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
     super.isOnline = true,
     super.isMockLocationDetected = false,
     super.offlineBreadcrumbsCount = 0,
+    super.speed,
+    super.batteryLevel,
+    super.isMoving,
+    super.avatarUrl,
   });
 
   factory DelegateTrackingSessionModel.fromFirestore(DocumentSnapshot doc) {
@@ -59,6 +63,32 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
       status = TrackingStatus.insideZone;
     }
 
+    final speedVal = json['speed'];
+    final double? speed = speedVal is num ? speedVal.toDouble() : null;
+
+    final batteryVal = json['batteryLevel'] ?? json['battery'];
+    final int? batteryLevel = batteryVal is num ? batteryVal.toInt() : null;
+
+    final isMovingVal = json['isMoving'];
+    final bool? isMoving = isMovingVal is bool
+        ? isMovingVal
+        : (isMovingVal is String
+            ? (isMovingVal.toLowerCase() == 'true' || isMovingVal == '1')
+            : null);
+
+    final avatarUrlVal = (json['avatarUrl'] ??
+            json['photoURL'] ??
+            json['photoUrl'] ??
+            json['profileImageUrl'] ??
+            json['personalPhotoURL'] ??
+            json['personalPhotoUrl'] ??
+            json['imageUrl'])
+        ?.toString()
+        .trim();
+    final avatarUrl = (avatarUrlVal != null && avatarUrlVal.isNotEmpty)
+        ? avatarUrlVal
+        : null;
+
     return DelegateTrackingSessionModel(
       delegateId: json['delegateId']?.toString() ?? docId,
       delegateName: json['delegateName']?.toString() ??
@@ -92,6 +122,10 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
       isMockLocationDetected: json['isMockLocationDetected'] == true,
       offlineBreadcrumbsCount:
           (json['offlineBreadcrumbsCount'] as num?)?.toInt() ?? 0,
+      speed: speed,
+      batteryLevel: batteryLevel,
+      isMoving: isMoving,
+      avatarUrl: avatarUrl,
     );
   }
 
@@ -135,6 +169,10 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
       'isOnline': isOnline,
       'isMockLocationDetected': isMockLocationDetected,
       'offlineBreadcrumbsCount': offlineBreadcrumbsCount,
+      if (speed != null) 'speed': speed,
+      if (batteryLevel != null) 'batteryLevel': batteryLevel,
+      if (isMoving != null) 'isMoving': isMoving,
+      if (avatarUrl != null && avatarUrl!.isNotEmpty) 'avatarUrl': avatarUrl,
     };
   }
 }

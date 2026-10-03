@@ -42,11 +42,13 @@ void main() {
   late MockSyncAttendance mockSyncAttendance;
   late MockGetHistoryPaginated mockGetHistoryPaginated;
 
+  final tCheckInTime = DateTime.now().subtract(const Duration(hours: 1));
+
   final tAttendance = Attendance(
     id: 'att-1',
     userId: 'user-1',
     organizationId: 'org-1',
-    checkInTime: DateTime(2024, 1, 1, 8, 0),
+    checkInTime: tCheckInTime,
     latitude: 30.0444,
     longitude: 31.2357,
     branchName: 'فرع القاهرة',
@@ -56,8 +58,8 @@ void main() {
     id: 'att-1',
     userId: 'user-1',
     organizationId: 'org-1',
-    checkInTime: DateTime(2024, 1, 1, 8, 0),
-    checkOutTime: DateTime(2024, 1, 1, 17, 0),
+    checkInTime: tCheckInTime,
+    checkOutTime: tCheckInTime.add(const Duration(hours: 8)),
     latitude: 30.0444,
     longitude: 31.2357,
     branchName: 'فرع القاهرة',

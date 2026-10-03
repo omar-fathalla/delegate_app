@@ -4,14 +4,17 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_button_group.dart';
 import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
+import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
-import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
+import 'package:delegate_app/features/admin/presentation/pages/anti_fraud_audit_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
@@ -24,8 +27,22 @@ class HRAttendanceRecord {
   final double? latitude;
   final double? longitude;
   final String? deviceInfo;
+  final String? deviceUuid;
   final double? distanceMeters;
   final bool? isInsideGeofence;
+  final bool isMockLocation;
+  final bool isVpnUsed;
+  final bool hasSecurityViolation;
+  final String? violationReason;
+  final int trustScore; // 0 to 100
+  final String integrityStatus; // 'trusted' (🟢), 'warning' (🟡), 'violation' (🔴), 'none'
+  final String? ipAddress;
+  final String? ipIsp;
+  final bool isOnApprovedLeave;
+  final String? leaveReason;
+  final String? leaveType;
+  final bool isAutoCheckOut;
+  final String? autoCheckOutReason;
 
   const HRAttendanceRecord({
     required this.delegate,
@@ -35,19 +52,124 @@ class HRAttendanceRecord {
     this.latitude,
     this.longitude,
     this.deviceInfo,
+    this.deviceUuid,
     this.distanceMeters,
     this.isInsideGeofence,
+    this.isMockLocation = false,
+    this.isVpnUsed = false,
+    this.hasSecurityViolation = false,
+    this.violationReason,
+    this.trustScore = 100,
+    this.integrityStatus = 'none',
+    this.ipAddress,
+    this.ipIsp,
+    this.isOnApprovedLeave = false,
+    this.leaveReason,
+    this.leaveType,
+    this.isAutoCheckOut = false,
+    this.autoCheckOutReason,
   });
 
-  bool get isPresent => checkInTime != null && checkOutTime == null;
-  bool get isDeparted => checkInTime != null && checkOutTime != null;
+  bool get isPresent => checkInTime != null && checkOutTime == null && !isAutoCheckOut;
+  bool get isDeparted => checkInTime != null && (checkOutTime != null || isAutoCheckOut);
   bool get isAbsent => checkInTime == null;
+  bool get isOnLeave => isAbsent && isOnApprovedLeave;
+
+  String get formattedLeaveType {
+    switch (leaveType) {
+      case 'annual':
+        return 'إجازة اعتيادية';
+      case 'sick':
+        return 'إجازة مرضية';
+      case 'emergency':
+        return 'إجازة عارضة';
+      case 'delay':
+        return 'عذر تأخير';
+      case 'absence':
+        return 'عذر غياب';
+      default:
+        return 'إجازة معتمدة';
+    }
+  }
+
+  /// صافي مدة العمل المحسوبة
+  Duration? get duration {
+    if (checkInTime == null) return null;
+    if (checkOutTime != null) {
+      return checkOutTime!.difference(checkInTime!);
+    }
+    if (isAutoCheckOut) {
+      return const Duration(hours: 9);
+    }
+    // إذا كان المندوب على رأس العمل اليوم ولم ينصرف بعد
+    final now = DateTime.now();
+    if (checkInTime!.year == now.year &&
+        checkInTime!.month == now.month &&
+        checkInTime!.day == now.day) {
+      return now.difference(checkInTime!);
+    }
+    return null;
+  }
+
+  /// صياغة نصية مفهومة لصافي ساعات العمل
+  String get formattedDuration {
+    if (checkInTime == null) return '-';
+    if (checkOutTime == null && !isAutoCheckOut) {
+      final now = DateTime.now();
+      final isToday = checkInTime!.year == now.year &&
+          checkInTime!.month == now.month &&
+          checkInTime!.day == now.day;
+      if (isToday) {
+        final d = now.difference(checkInTime!);
+        final hours = d.inHours;
+        final minutes = d.inMinutes.remainder(60);
+        if (hours > 0 && minutes > 0) {
+          return '$hours س و $minutes د';
+        } else if (hours > 0) {
+          return '$hours س';
+        } else {
+          return '$minutes د';
+        }
+      }
+      return 'لم يسجل انصراف';
+    }
+    final effectiveOut = checkOutTime ?? checkInTime!.add(const Duration(hours: 9));
+    final d = effectiveOut.difference(checkInTime!);
+    final hours = d.inHours;
+    final minutes = d.inMinutes.remainder(60);
+    if (hours > 0 && minutes > 0) {
+      return '$hours س و $minutes د';
+    } else if (hours > 0) {
+      return '$hours ساعة';
+    } else {
+      return '$minutes دقيقة';
+    }
+  }
+
+  /// مستوى الأمان ومطابقة النطاق الجغرافي للصيدلية/الفرع
+  /// Returns: 'safe' (داخل النطاق/آمن), 'warning' (خارج النطاق/تحذير), 'violation' (مخالفة احتيال), 'unknown' (غير محدد)
+  String get safetyLevel {
+    if (checkInTime == null) return 'unknown';
+    if (isMockLocation || hasSecurityViolation) return 'violation';
+    if (isInsideGeofence == true && (distanceMeters == null || distanceMeters! <= 50)) {
+      return 'safe';
+    }
+    if (isInsideGeofence == false || (distanceMeters != null && distanceMeters! > 50)) {
+      return 'warning';
+    }
+    return 'safe';
+  }
 }
 
 class HRAttendanceTab extends StatefulWidget {
   final Delegate hrDelegate;
+  final ValueChanged<int>? onNavigateToTab;
 
-  const HRAttendanceTab({super.key, required this.hrDelegate});
+  const HRAttendanceTab({
+    super.key,
+    required this.hrDelegate,
+    this.onNavigateToTab,
+  });
 
   @override
   State<HRAttendanceTab> createState() => _HRAttendanceTabState();
@@ -56,6 +178,14 @@ class HRAttendanceTab extends StatefulWidget {
 class _HRAttendanceTabState extends State<HRAttendanceTab> {
   DateTime _selectedDate = DateTime.now();
   final TextEditingController _searchController = TextEditingController();
+  ScrollController? _horizontalTableScrollController;
+  ScrollController? _verticalTableScrollController;
+
+  ScrollController get _hScrollCtrl =>
+      _horizontalTableScrollController ??= ScrollController();
+
+  ScrollController get _vScrollCtrl =>
+      _verticalTableScrollController ??= ScrollController();
 
   String _statusFilter = 'all'; // 'all', 'present', 'departed', 'absent'
   String _selectedBranch = 'all';
@@ -78,6 +208,8 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
   @override
   void dispose() {
     _searchController.dispose();
+    _horizontalTableScrollController?.dispose();
+    _verticalTableScrollController?.dispose();
     super.dispose();
   }
 
@@ -97,20 +229,12 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
           await FirebaseFirestore.instance.collection('branches').get();
       final Map<String, Branch> branchesMap = {};
       for (final doc in branchesSnap.docs) {
-        final data = doc.data();
-        final name = (data['branchName'] ?? data['name'] ?? '').toString();
+        final b = BranchModel.fromFirestore(doc);
+        final name = b.branchName.trim();
         if (name.isNotEmpty) {
-          final lat = (data['latitude'] as num?)?.toDouble() ?? 0.0;
-          final lng = (data['longitude'] as num?)?.toDouble() ?? 0.0;
-          final radius = (data['geofenceRadius'] as num?)?.toDouble() ?? 100.0;
-          branchesMap[name.toLowerCase().trim()] = Branch(
-            id: doc.id,
-            branchName: name,
-            latitude: lat,
-            longitude: lng,
-            geofenceRadius: radius,
-          );
+          branchesMap[name.toLowerCase()] = b;
         }
+        branchesMap[doc.id.toLowerCase().trim()] = b;
       }
       _branchesByName = branchesMap;
 
@@ -171,6 +295,75 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
 
       final snapshot = await query.get();
 
+      // Query security_audit_logs for this company to cross-reference anti-fraud violations
+      final Map<String, List<Map<String, dynamic>>> auditLogsByDelegate = {};
+      try {
+        Query<Map<String, dynamic>> auditQuery = FirebaseFirestore.instance
+            .collection('security_audit_logs')
+            .where('companyUID', isEqualTo: widget.hrDelegate.companyUID);
+
+        final auditSnapshot = await auditQuery.get();
+        for (final doc in auditSnapshot.docs) {
+          final data = doc.data();
+          final delegateUid = (data['delegateUid'] ?? '').toString();
+          if (delegateUid.isEmpty) continue;
+
+          DateTime? auditDate;
+          final ts = data['timestamp'];
+          if (ts is Timestamp) {
+            auditDate = ts.toDate();
+          } else if (data['realTimestamp'] != null) {
+            auditDate = DateTime.tryParse(data['realTimestamp'].toString());
+          } else if (data['createdAt'] != null) {
+            auditDate = DateTime.tryParse(data['createdAt'].toString());
+          }
+
+          if (auditDate != null) {
+            if (auditDate.isAfter(startOfDay.subtract(const Duration(seconds: 1))) &&
+                auditDate.isBefore(endOfDay.add(const Duration(seconds: 1)))) {
+              auditLogsByDelegate.putIfAbsent(delegateUid, () => []).add(data);
+            }
+          } else if (data['status'] == 'pending_review') {
+            auditLogsByDelegate.putIfAbsent(delegateUid, () => []).add(data);
+          }
+        }
+      } catch (e) {
+        debugPrint('HR: Error loading security audit logs: $e');
+      }
+
+      // Query approved leave requests for this company to cross-reference approved absences
+      final Map<String, Map<String, dynamic>> activeLeavesByDelegate = {};
+      try {
+        Query<Map<String, dynamic>> leaveQuery = FirebaseFirestore.instance
+            .collection('leave_requests')
+            .where('companyUID', isEqualTo: widget.hrDelegate.companyUID)
+            .where('status', isEqualTo: 'approved');
+
+        final leaveSnapshot = await leaveQuery.get();
+
+        // Map active approved leaves for the selected date by delegate UID
+        final selectedCal = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+        for (final doc in leaveSnapshot.docs) {
+          final data = doc.data();
+          final startTs = data['startDate'];
+          final endTs = data['endDate'];
+          if (startTs is Timestamp) {
+            final start = startTs.toDate();
+            final end = endTs is Timestamp ? endTs.toDate() : start;
+            final startCal = DateTime(start.year, start.month, start.day);
+            final endCal = DateTime(end.year, end.month, end.day, 23, 59, 59);
+            if (!selectedCal.isBefore(startCal) && !selectedCal.isAfter(endCal)) {
+              final delId = (data['delegateUid'] ?? data['delegateUID'] ?? '').toString();
+              if (delId.isNotEmpty) {
+                activeLeavesByDelegate[delId] = data;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('HR: Error loading leave requests: $e');
+      }
+
       // Group logs by delegate ID
       final Map<String, List<Map<String, dynamic>>> logsByDelegate = {};
       final Set<String> branchNames = {};
@@ -202,12 +395,24 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
 
       for (final d in _companyDelegates) {
         final logs = logsByDelegate[d.uid] ?? [];
+        final auditLogs = auditLogsByDelegate[d.uid] ?? [];
+        final leaveData = activeLeavesByDelegate[d.uid];
+        final isOnLeave = leaveData != null;
+        final leaveReason = leaveData?['reason']?.toString();
+        final leaveType = leaveData?['type']?.toString() ?? leaveData?['leaveType']?.toString();
         DateTime? checkIn;
         DateTime? checkOut;
         String? branch;
         double? lat;
         double? lng;
         String? device;
+        String? deviceUuid;
+        String? ipAddress;
+        String? ipIsp;
+        bool isMockLocation = false;
+        bool isVpnUsed = false;
+        bool isAutoCheckOut = false;
+        String? autoCheckOutReason;
 
         for (final log in logs) {
           final type = (log['type'] ?? '').toString();
@@ -221,16 +426,101 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
               checkIn = logTime;
               branch = log['branchName']?.toString();
               device = log['deviceInfo']?.toString();
-              final loc = log['location'];
-              if (loc is Map) {
-                lat = (loc['latitude'] as num?)?.toDouble();
-                lng = (loc['longitude'] as num?)?.toDouble();
+              deviceUuid = log['deviceUuid']?.toString() ??
+                  log['uuid']?.toString() ??
+                  log['deviceId']?.toString();
+              ipAddress = log['ipAddress']?.toString() ?? log['ip']?.toString();
+              ipIsp = log['isp']?.toString() ?? log['networkIsp']?.toString();
+
+              if (log['isMockLocation'] == true ||
+                  log['isMocked'] == true ||
+                  log['mockLocation'] == true) {
+                isMockLocation = true;
               }
+              if (log['isVpnUsed'] == true ||
+                  log['isVpn'] == true ||
+                  log['vpn'] == true) {
+                isVpnUsed = true;
+              }
+
+              final loc = log['location'];
+              if (loc is GeoPoint) {
+                lat = loc.latitude;
+                lng = loc.longitude;
+              } else if (loc is Map) {
+                lat = (loc['latitude'] as num?)?.toDouble() ??
+                    (loc['lat'] as num?)?.toDouble() ??
+                    double.tryParse(loc['latitude']?.toString() ?? '') ??
+                    double.tryParse(loc['lat']?.toString() ?? '');
+                lng = (loc['longitude'] as num?)?.toDouble() ??
+                    (loc['lng'] as num?)?.toDouble() ??
+                    double.tryParse(loc['longitude']?.toString() ?? '') ??
+                    double.tryParse(loc['lng']?.toString() ?? '');
+              }
+              lat ??= (log['latitude'] as num?)?.toDouble() ??
+                  (log['lat'] as num?)?.toDouble() ??
+                  double.tryParse(log['latitude']?.toString() ?? '');
+              lng ??= (log['longitude'] as num?)?.toDouble() ??
+                  (log['lng'] as num?)?.toDouble() ??
+                  double.tryParse(log['longitude']?.toString() ?? '');
             }
           } else if (type == 'check_out') {
             if (checkOut == null ||
                 (logTime != null && logTime.isAfter(checkOut))) {
               checkOut = logTime;
+              if (log['isAutoCheckOut'] == true) {
+                isAutoCheckOut = true;
+                autoCheckOutReason = log['autoCheckOutReason']?.toString();
+              }
+            }
+          }
+        }
+
+        // قاعدة الـ 9 ساعات: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (9 ساعات) أو كان تاريخاً سابقاً
+        if (checkIn != null && checkOut == null) {
+          final now = DateTime.now();
+          final isPastDate = _selectedDate.isBefore(DateTime(now.year, now.month, now.day));
+          final isElapsed9Hours = now.difference(checkIn) >= const Duration(hours: 9);
+
+          if (isPastDate || isElapsed9Hours) {
+            checkOut = checkIn.add(const Duration(hours: 9));
+            isAutoCheckOut = true;
+            autoCheckOutReason = 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي';
+          }
+        }
+
+        // Fallback scan across all logs of the day if coordinates weren't in the earliest check-in
+        if (lat == null || lng == null) {
+          for (final log in logs) {
+            final loc = log['location'];
+            if (loc is GeoPoint) {
+              lat ??= loc.latitude;
+              lng ??= loc.longitude;
+            } else if (loc is Map) {
+              lat ??= (loc['latitude'] as num?)?.toDouble() ??
+                  (loc['lat'] as num?)?.toDouble() ??
+                  double.tryParse(loc['latitude']?.toString() ?? '');
+              lng ??= (loc['longitude'] as num?)?.toDouble() ??
+                  (loc['lng'] as num?)?.toDouble() ??
+                  double.tryParse(loc['longitude']?.toString() ?? '');
+            }
+            lat ??= (log['latitude'] as num?)?.toDouble() ??
+                (log['lat'] as num?)?.toDouble() ??
+                double.tryParse(log['latitude']?.toString() ?? '');
+            lng ??= (log['longitude'] as num?)?.toDouble() ??
+                (log['lng'] as num?)?.toDouble() ??
+                double.tryParse(log['longitude']?.toString() ?? '');
+            if (lat != null && lng != null) break;
+          }
+        }
+
+        // Fallback branch name from any log of the day if not present in check-in
+        if (branch == null || branch.isEmpty) {
+          for (final log in logs) {
+            final b = log['branchName']?.toString().trim();
+            if (b != null && b.isNotEmpty) {
+              branch = b;
+              break;
             }
           }
         }
@@ -238,9 +528,40 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         // Calculate anti-fraud geofence status
         double? distance;
         bool? isInside;
+        Branch? matchedBranch;
 
-        if (lat != null && lng != null && branch != null) {
-          final matchedBranch = _branchesByName[branch.toLowerCase().trim()];
+        if (lat != null && lng != null) {
+          if (branch != null && branch.trim().isNotEmpty) {
+            final cleanBranch = branch.trim().toLowerCase();
+            matchedBranch = _branchesByName[cleanBranch];
+            if (matchedBranch == null) {
+              for (final entry in _branchesByName.entries) {
+                if (entry.key.contains(cleanBranch) || cleanBranch.contains(entry.key)) {
+                  matchedBranch = entry.value;
+                  break;
+                }
+              }
+            }
+          }
+
+          // If still not matched by branch name, find the closest branch within 500m
+          if (matchedBranch == null && _branchesByName.isNotEmpty) {
+            double minDistance = double.infinity;
+            Branch? closest;
+            for (final b in _branchesByName.values) {
+              if (b.latitude != 0.0 && b.longitude != 0.0) {
+                final dMeters = Geolocator.distanceBetween(lat, lng, b.latitude, b.longitude);
+                if (dMeters < minDistance) {
+                  minDistance = dMeters;
+                  closest = b;
+                }
+              }
+            }
+            if (closest != null && minDistance <= 500.0) {
+              matchedBranch = closest;
+            }
+          }
+
           if (matchedBranch != null &&
               matchedBranch.latitude != 0.0 &&
               matchedBranch.longitude != 0.0) {
@@ -254,6 +575,59 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
           }
         }
 
+        // Evaluate Anti-Fraud & Integrity Score
+        bool hasSecurityViolation = auditLogs.isNotEmpty || isMockLocation;
+        String? violationReason;
+        if (auditLogs.isNotEmpty) {
+          final firstAudit = auditLogs.first;
+          violationReason = firstAudit['violationTitle']?.toString() ??
+              firstAudit['actionType']?.toString() ??
+              'استخدام تطبيق تزييف الموقع (Fake GPS)';
+          device ??= firstAudit['deviceModel']?.toString();
+          ipAddress ??= firstAudit['ipAddress']?.toString();
+          ipIsp ??= firstAudit['ipIsp']?.toString();
+        }
+
+        int trustScore = 100;
+        String integrityStatus = 'none';
+
+        if (checkIn == null) {
+          integrityStatus = 'none';
+          trustScore = 100;
+        } else if (hasSecurityViolation) {
+          integrityStatus = 'violation';
+          trustScore = 15;
+          violationReason ??= 'رصد تزييف موقع (Mock Location / Fake GPS)';
+        } else if (isVpnUsed) {
+          integrityStatus = 'warning';
+          trustScore = 55;
+          violationReason = 'رصد اتصال مشبوه عبر VPN/Proxy';
+        } else if (isInside == false || (distance != null && matchedBranch != null && distance > matchedBranch.geofenceRadius)) {
+          integrityStatus = 'warning';
+          final radius = matchedBranch?.geofenceRadius ?? 100.0;
+          if (distance != null && distance > 500.0) {
+            trustScore = 60;
+            violationReason =
+                'تسجيل من مسافة بعيدة جداً عن الفرع (${distance.toStringAsFixed(0)}م)';
+          } else if (distance != null && distance > radius) {
+            trustScore = 75;
+            violationReason =
+                'تسجيل خارج نطاق الفرع (${distance.toStringAsFixed(0)}م - الحد المسموح: ${radius.toInt()}م)';
+          } else {
+            trustScore = 80;
+            violationReason = 'تسجيل خارج النطاق الجغرافي للفرع';
+          }
+        } else if (isInside == true) {
+          integrityStatus = 'trusted';
+          trustScore = 100;
+          violationReason =
+              'مطابق للنطاق الجغرافي للفرع (${distance?.toStringAsFixed(0) ?? '—'}م) وبدون تنبيهات احتيال';
+        } else {
+          integrityStatus = 'trusted';
+          trustScore = 100;
+          violationReason = 'سليم وبدون تنبيهات احتيال';
+        }
+
         list.add(
           HRAttendanceRecord(
             delegate: d,
@@ -263,18 +637,34 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
             latitude: lat,
             longitude: lng,
             deviceInfo: device,
+            deviceUuid: deviceUuid,
             distanceMeters: distance,
             isInsideGeofence: isInside,
+            isMockLocation: isMockLocation,
+            isVpnUsed: isVpnUsed,
+            hasSecurityViolation: hasSecurityViolation,
+            violationReason: violationReason,
+            trustScore: trustScore,
+            integrityStatus: integrityStatus,
+            ipAddress: ipAddress,
+            ipIsp: ipIsp,
+            isOnApprovedLeave: isOnLeave,
+            leaveReason: leaveReason,
+            leaveType: leaveType,
+            isAutoCheckOut: isAutoCheckOut,
+            autoCheckOutReason: autoCheckOutReason,
           ),
         );
       }
 
-      // Sort: Present first, then Departed, then Absent
+      // Sort: Present first, then Departed, then on approved leave, then Absent
       list.sort((a, b) {
         if (a.isPresent && !b.isPresent) return -1;
         if (!a.isPresent && b.isPresent) return 1;
         if (a.isDeparted && !b.isDeparted) return -1;
         if (!a.isDeparted && b.isDeparted) return 1;
+        if (a.isOnLeave && !b.isOnLeave) return -1;
+        if (!a.isOnLeave && b.isOnLeave) return 1;
         return a.delegate.fullName.compareTo(b.delegate.fullName);
       });
 
@@ -311,7 +701,14 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       // 2. Status Filter
       if (_statusFilter == 'present' && !record.isPresent) return false;
       if (_statusFilter == 'departed' && !record.isDeparted) return false;
-      if (_statusFilter == 'absent' && !record.isAbsent) return false;
+      if (_statusFilter == 'leave' && !record.isOnLeave) return false;
+      if (_statusFilter == 'absent' && (!record.isAbsent || record.isOnLeave)) return false;
+      if (_statusFilter == 'violation' && record.integrityStatus != 'violation') {
+        return false;
+      }
+      if (_statusFilter == 'warning' && record.integrityStatus != 'warning') {
+        return false;
+      }
 
       // 3. Branch Filter
       if (_selectedBranch != 'all' && record.branchName != _selectedBranch) {
@@ -322,8 +719,8 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     }).toList();
   }
 
-  // --- Export Attendance to CSV ---
-  Future<void> _exportToCSV() async {
+  // ── 1. تصدير كشف الحضور اليومي إلى Excel ──
+  Future<void> _exportDailyToExcel() async {
     final filtered = _filteredRecords;
     if (filtered.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -335,7 +732,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
       final csvHeader =
-          '\uFEFFاسم المندوب,رقم الهاتف,التاريخ,وقت الحضور,وقت الانصراف,الفرع,حالة النطاق الجغرافي,المسافة المقدرة بالمتر,حالة الحضور,بيانات الجهاز\n';
+          '\uFEFFاسم المندوب,رقم الهاتف,التاريخ,وقت الحضور,وقت الانصراف,صافي ساعات العمل,الفرع,مؤشر النزاهة (%),حالة النزاهة الرقمية,فحص Fake GPS,فحص الـ VPN,حالة النطاق الجغرافي,المسافة المقدرة بالمتر,حالة الحضور,بيانات الجهاز,معرف الجهاز UUID\n';
 
       final csvRows = filtered.map((r) {
         final name = r.delegate.fullName.replaceAll(',', ' ');
@@ -346,7 +743,23 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         final checkOut = r.checkOutTime != null
             ? DateFormat('HH:mm:ss').format(r.checkOutTime!)
             : 'لم ينصرف';
+        final duration = r.formattedDuration.replaceAll(',', ' ');
         final branch = (r.branchName ?? 'غير محدد').replaceAll(',', ' ');
+
+        final trustScoreStr = '${r.trustScore}%';
+        String integrityStatusStr = 'لم يسجل';
+        if (r.integrityStatus == 'trusted') {
+          integrityStatusStr = 'موثوق بالكامل';
+        } else if (r.integrityStatus == 'warning') {
+          integrityStatusStr = 'تنبيه أمني مشبوه';
+        } else if (r.integrityStatus == 'violation') {
+          integrityStatusStr = 'مخالفة أمنية خطيرة';
+        }
+
+        final fakeGpsStr = (r.isMockLocation || r.hasSecurityViolation)
+            ? 'تم رصد Fake GPS'
+            : 'سليم';
+        final vpnStr = r.isVpnUsed ? 'تم رصد VPN' : 'سليم';
 
         String geofence = 'غير متوفر';
         if (r.isInsideGeofence == true) {
@@ -364,16 +777,19 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
           status = 'حاضر الآن';
         } else if (r.isDeparted) {
           status = 'انصرف';
+        } else if (r.isOnLeave) {
+          status = 'إجازة (${r.formattedLeaveType})';
         }
 
         final device = (r.deviceInfo ?? '-').replaceAll(',', ' ');
+        final uuid = (r.deviceUuid ?? r.delegate.boundDeviceId ?? '-').replaceAll(',', ' ');
 
-        return '$name,$phone,$dateStr,$checkIn,$checkOut,$branch,$geofence,$distance,$status,$device';
+        return '$name,$phone,$dateStr,$checkIn,$checkOut,$duration,$branch,$trustScoreStr,$integrityStatusStr,$fakeGpsStr,$vpnStr,$geofence,$distance,$status,$device,$uuid';
       }).join('\n');
 
       final csvContent = '$csvHeader$csvRows';
       final nowStr = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final fileName = 'hr_attendance_${dateStr}_$nowStr.csv';
+      final fileName = 'hr_attendance_daily_${dateStr}_$nowStr.csv';
 
       await FileDownloadHelper.downloadString(
         content: csvContent,
@@ -385,7 +801,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم تصدير ملف الحضور بنجاح'),
+            content: Text('تم تصدير كشف الحضور اليومي بنجاح'),
             backgroundColor: Color(0xFF2E7D32),
           ),
         );
@@ -393,10 +809,644 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('فشل في تصدير التقرير: $e')),
+          SnackBar(content: Text('فشل في تصدير التقرير اليومي: $e')),
         );
       }
     }
+  }
+
+  // ── 2. تصدير التقرير الشهري التجميعي للشركة إلى Excel ──
+  Future<void> _exportMonthlyConsolidatedToExcel() async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('جاري تجميع وإعداد التقرير الشهري للشركة...'),
+            ],
+          ),
+          duration: Duration(seconds: 4),
+        ),
+      );
+
+      final monthStart =
+          DateTime(_selectedDate.year, _selectedDate.month, 1, 0, 0, 0);
+      final nextMonth =
+          DateTime(_selectedDate.year, _selectedDate.month + 1, 1);
+      final monthEnd = nextMonth.subtract(const Duration(seconds: 1));
+
+      // جلب جميع سجلات الحضور الخاصة بشركة الـ HR خلال الشهر
+      final query = await FirebaseFirestore.instance
+          .collection(kAttendanceCollection)
+          .where('companyId', isEqualTo: widget.hrDelegate.companyUID)
+          .get();
+
+      // خريطة تجميع إحصائيات كل مندوب
+      final Map<String, Map<String, dynamic>> delegateStats = {};
+
+      for (final d in _companyDelegates) {
+        delegateStats[d.uid] = {
+          'delegate': d,
+          'attendedDates': <String>{},
+          'departedDates': <String>{},
+          'totalMinutes': 0,
+          'geofenceViolations': 0,
+          'insideGeofenceCount': 0,
+        };
+      }
+
+      final Map<String, Map<String, List<Map<String, dynamic>>>>
+          logsByDelegateAndDate = {};
+
+      for (final doc in query.docs) {
+        final data = doc.data();
+        final ts = data['timestamp'];
+        if (ts is Timestamp) {
+          final date = ts.toDate();
+          if (date.isBefore(monthStart) || date.isAfter(monthEnd)) {
+            continue;
+          }
+          final delegateId =
+              (data['delegateId'] ?? data['userId'] ?? '').toString();
+          if (delegateId.isEmpty || !delegateStats.containsKey(delegateId)) {
+            continue;
+          }
+
+          final dateKey = DateFormat('yyyy-MM-dd').format(date);
+          logsByDelegateAndDate
+              .putIfAbsent(delegateId, () => {})
+              .putIfAbsent(dateKey, () => [])
+              .add(data);
+        }
+      }
+
+      // حساب الساعات اليومية والمخالفات لكل مندوب
+      for (final entry in logsByDelegateAndDate.entries) {
+        final delegateId = entry.key;
+        final datesMap = entry.value;
+        final stats = delegateStats[delegateId]!;
+
+        for (final dateEntry in datesMap.entries) {
+          final dateKey = dateEntry.key;
+          final logs = dateEntry.value;
+
+          DateTime? inTime;
+          DateTime? outTime;
+          double? lat;
+          double? lng;
+          String? bName;
+
+          for (final log in logs) {
+            final type = (log['type'] ?? '').toString();
+            final ts = log['timestamp'];
+            DateTime? t;
+            if (ts is Timestamp) t = ts.toDate();
+
+            if (type == 'check_in') {
+              if (inTime == null || (t != null && t.isBefore(inTime))) {
+                inTime = t;
+                bName = log['branchName']?.toString();
+                final loc = log['location'];
+                if (loc is Map) {
+                  lat = (loc['latitude'] as num?)?.toDouble();
+                  lng = (loc['longitude'] as num?)?.toDouble();
+                }
+              }
+            } else if (type == 'check_out') {
+              if (outTime == null || (t != null && t.isAfter(outTime))) {
+                outTime = t;
+              }
+            }
+          }
+
+          if (inTime != null) {
+            (stats['attendedDates'] as Set<String>).add(dateKey);
+
+            if (outTime != null) {
+              (stats['departedDates'] as Set<String>).add(dateKey);
+              final diff = outTime.difference(inTime).inMinutes;
+              if (diff > 0) {
+                stats['totalMinutes'] = (stats['totalMinutes'] as int) + diff;
+              }
+            }
+
+            // التحقق من النطاق الجغرافي
+            if (lat != null && lng != null && bName != null) {
+              final matched = _branchesByName[bName.toLowerCase().trim()];
+              if (matched != null && matched.latitude != 0.0) {
+                final dMeters = Geolocator.distanceBetween(
+                  lat,
+                  lng,
+                  matched.latitude,
+                  matched.longitude,
+                );
+                if (dMeters <= matched.geofenceRadius) {
+                  stats['insideGeofenceCount'] =
+                      (stats['insideGeofenceCount'] as int) + 1;
+                } else {
+                  stats['geofenceViolations'] =
+                      (stats['geofenceViolations'] as int) + 1;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      final now = DateTime.now();
+      final isCurrentMonth =
+          _selectedDate.year == now.year && _selectedDate.month == now.month;
+      final activeDaysInMonth = isCurrentMonth
+          ? now.day
+          : nextMonth.subtract(const Duration(days: 1)).day;
+
+      final monthStr = DateFormat('yyyy-MM').format(_selectedDate);
+      final csvHeader =
+          '\uFEFFاسم المندوب,رقم الهاتف,المسمى الوظيفي,الشهر,أيام الحضور الفعلي,أيام الغياب التقريبية,إجمالي ساعات العمل,متوسط الساعات اليومي,مرات الحضور المعتمد داخل النطاق,مخالفات خارج النطاق,مرات عدم تسجيل الانصراف\n';
+
+      final csvRows = delegateStats.values.map((s) {
+        final d = s['delegate'] as Delegate;
+        final name = d.fullName.replaceAll(',', ' ');
+        final phone = d.phoneNumber;
+        final pos = d.position == DelegatePosition.supervisor
+            ? 'مشرف'
+            : 'مندوب / مروج';
+        final attendedCount = (s['attendedDates'] as Set<String>).length;
+        final departedCount = (s['departedDates'] as Set<String>).length;
+        final absentCount =
+            (activeDaysInMonth - attendedCount).clamp(0, activeDaysInMonth);
+        final missedCheckouts =
+            (attendedCount - departedCount).clamp(0, attendedCount);
+
+        final totalMinutes = s['totalMinutes'] as int;
+        final totalHours = totalMinutes ~/ 60;
+        final remMinutes = totalMinutes % 60;
+        final totalDurationStr = '$totalHours س و $remMinutes د';
+
+        final avgHoursPerDay = attendedCount > 0
+            ? (totalMinutes / (attendedCount * 60)).toStringAsFixed(1)
+            : '0.0';
+
+        final insideCount = s['insideGeofenceCount'] as int;
+        final violations = s['geofenceViolations'] as int;
+
+        return '$name,$phone,$pos,$monthStr,$attendedCount,$absentCount,$totalDurationStr,$avgHoursPerDay,$insideCount,$violations,$missedCheckouts';
+      }).join('\n');
+
+      final csvContent = '$csvHeader$csvRows';
+      final nowStr = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final fileName = 'hr_monthly_consolidated_${monthStr}_$nowStr.csv';
+
+      await FileDownloadHelper.downloadString(
+        content: csvContent,
+        fileName: fileName,
+        mimeType: 'text/csv;charset=utf-8',
+        shareText:
+            'التقرير التجميعي الشهري لشركة ${widget.hrDelegate.companyName} ($monthStr)',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تصدير التقرير الشهري التجميعي بنجاح'),
+            backgroundColor: Color(0xFF2E7D32),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشل في تصدير التقرير الشهري: $e')),
+        );
+      }
+    }
+  }
+
+  /// شارة مؤشر النزاهة الرقمية ومكافحة الاحتيال بجانب اسم المندوب
+  Widget _buildSecurityBadge(HRAttendanceRecord record, ColorScheme colorScheme) {
+    if (record.checkInTime == null) return const SizedBox.shrink();
+
+    final status = record.integrityStatus;
+    Color color;
+    IconData icon;
+    String label;
+    String tooltipMsg;
+
+    if (status == 'violation') {
+      color = const Color(0xFFC62828);
+      icon = Icons.gpp_bad_rounded;
+      label = '${record.trustScore}% مخالفة';
+      tooltipMsg =
+          'مخالفة أمنية خطيرة (${record.trustScore}%): ${record.violationReason ?? 'Fake GPS'} - اضغط لعرض تفاصيل الفحص الأمني';
+    } else if (status == 'warning') {
+      color = const Color(0xFFE65100);
+      icon = Icons.warning_amber_rounded;
+      label = '${record.trustScore}% تنبيه';
+      tooltipMsg =
+          'تنبيه أمني مشبوه (${record.trustScore}%): ${record.violationReason ?? 'خارج النطاق الآمن'} - اضغط لعرض تفاصيل الفحص الأمني';
+    } else {
+      color = const Color(0xFF2E7D32);
+      icon = Icons.verified_user_rounded;
+      label = '100% موثوق';
+      tooltipMsg =
+          'موثوق بالكامل (100%): لا توجد أي تنبيهات احتيال ومسافة التسجيل أقل من 50م - اضغط لعرض تفاصيل الفحص الأمني';
+    }
+
+    return Tooltip(
+      message: tooltipMsg,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _showTrustScoreDialog(context, record),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 11, color: color),
+                const SizedBox(width: 3.5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// نافذة منبثقة تفاعلية لعرض تفاصيل الفحص الأمني ومؤشر النزاهة الرقمية
+  void _showTrustScoreDialog(
+    BuildContext context,
+    HRAttendanceRecord record,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    Color statusColor;
+    String statusTitle;
+    String statusSubtitle;
+    IconData statusIcon;
+
+    if (record.integrityStatus == 'violation') {
+      statusColor = const Color(0xFFC62828);
+      statusTitle = 'مخالفة أمنية خطيرة (Fake GPS)';
+      statusSubtitle = 'تم رصد محاولة تلاعب أو تزييف بالموقع الجغرافي';
+      statusIcon = Icons.gpp_bad_rounded;
+    } else if (record.integrityStatus == 'warning') {
+      statusColor = const Color(0xFFE65100);
+      statusTitle = 'تنبيه أمني (سجل مشبوه)';
+      statusSubtitle = 'تم رصد مؤشرات اشتباه أو تسجيل خارج النطاق الآمن';
+      statusIcon = Icons.warning_amber_rounded;
+    } else {
+      statusColor = const Color(0xFF2E7D32);
+      statusTitle = 'موثوق بنسبة 100%';
+      statusSubtitle = 'سجل حضور سليم ومطابق تماماً للنطاق الجغرافي المعتمد';
+      statusIcon = Icons.verified_user_rounded;
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: colorScheme.surface,
+          contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(statusIcon, color: statusColor, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'مؤشر النزاهة الرقمية ومكافحة الاحتيال',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'المندوب: ${record.delegate.fullName}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Trust Score Hero Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          statusColor.withValues(alpha: isDark ? 0.25 : 0.12),
+                          statusColor.withValues(alpha: isDark ? 0.10 : 0.04),
+                        ],
+                        begin: AlignmentDirectional.topStart,
+                        end: AlignmentDirectional.bottomEnd,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: statusColor.withValues(alpha: 0.35),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Circular percentage score
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: statusColor, width: 2.5),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${record.trustScore}%',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                statusTitle,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: statusColor,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                record.violationReason ?? statusSubtitle,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurface,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  Text(
+                    'تفاصيل الفحص الأمني لحظة التسجيل',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // 2. Security Audit Metrics List
+                  _buildAuditMetricRow(
+                    icon: (record.isMockLocation || record.hasSecurityViolation)
+                        ? Icons.location_off_rounded
+                        : Icons.verified_user_rounded,
+                    iconColor: (record.isMockLocation || record.hasSecurityViolation)
+                        ? const Color(0xFFC62828)
+                        : const Color(0xFF2E7D32),
+                    title: 'تطبيقات تزييف الموقع (Fake GPS)',
+                    value: (record.isMockLocation || record.hasSecurityViolation)
+                        ? 'تم رصد Fake GPS / Mock Location ⚠️'
+                        : 'سليم - لم يُرصد أي تزييف للموقع ✅',
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 8),
+
+                  _buildAuditMetricRow(
+                    icon: record.isVpnUsed
+                        ? Icons.vpn_lock_rounded
+                        : Icons.shield_outlined,
+                    iconColor: record.isVpnUsed
+                        ? const Color(0xFFE65100)
+                        : const Color(0xFF2E7D32),
+                    title: 'برامج إخفاء الهوية والبروكسي (VPN)',
+                    value: record.isVpnUsed
+                        ? 'تم رصد استخدام VPN / Proxy ⚠️'
+                        : 'سليم - اتصال محلي مباشر بدون VPN ✅',
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 8),
+
+                  _buildAuditMetricRow(
+                    icon: Icons.store_rounded,
+                    iconColor: (record.distanceMeters != null && record.distanceMeters! <= 50)
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFFE65100),
+                    title: 'المسافة عن الصيدلية / الفرع',
+                    value: record.distanceMeters != null
+                        ? '${record.distanceMeters!.toStringAsFixed(1)} متر (${record.distanceMeters! <= 50 ? 'نطاق دقيق < 50م' : 'خارج النطاق الدقيق'})'
+                        : 'غير متوفرة',
+                    subtitle: 'الفرع المستهدف: ${record.branchName ?? 'غير محدد'}',
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 8),
+
+                  _buildAuditMetricRow(
+                    icon: Icons.phone_android_rounded,
+                    iconColor: colorScheme.primary,
+                    title: 'معلومات الجهاز ومعرف الـ UUID',
+                    value: record.deviceInfo ?? 'غير معروف',
+                    subtitle: 'UUID: ${record.deviceUuid ?? record.delegate.boundDeviceId ?? 'غير مسجل'}',
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 8),
+
+                  _buildAuditMetricRow(
+                    icon: Icons.network_check_rounded,
+                    iconColor: colorScheme.secondary,
+                    title: 'بيانات الشبكة وعنوان IP',
+                    value: record.ipAddress?.isNotEmpty == true
+                        ? record.ipAddress!
+                        : 'اتصال محلي معتمد',
+                    subtitle: record.ipIsp?.isNotEmpty == true
+                        ? 'مزود الخدمة: ${record.ipIsp}'
+                        : null,
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 8),
+
+                  _buildAuditMetricRow(
+                    icon: Icons.access_time_rounded,
+                    iconColor: colorScheme.outline,
+                    title: 'توقيت التسجيل الدقيق',
+                    value: record.checkInTime != null
+                        ? DateFormat('yyyy-MM-dd | hh:mm:ss a', 'ar').format(record.checkInTime!)
+                        : 'لم يسجل حضور',
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('إغلاق'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: statusColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.security_rounded, size: 18),
+              label: const Text('مركز مكافحة الاحتيال'),
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                if (widget.onNavigateToTab != null) {
+                  widget.onNavigateToTab!(5);
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AntiFraudAuditScreen(
+                        delegate: widget.hrDelegate,
+                        showAppBar: true,
+                        initialTab: 'violations',
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAuditMetricRow({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String value,
+    String? subtitle,
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _openGoogleMaps(double lat, double lng) async {
@@ -426,6 +1476,280 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     }
   }
 
+  void _openGoogleMapsDirections(double lat1, double lng1, double lat2, double lng2) async {
+    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&origin=$lat1,$lng1&destination=$lat2,$lng2');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _showGeofenceInspectionDialog(BuildContext context, HRAttendanceRecord record) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final branchName = record.branchName;
+    Branch? matchedBranch;
+    if (branchName != null && branchName.trim().isNotEmpty) {
+      final cleanName = branchName.trim().toLowerCase();
+      matchedBranch = _branchesByName[cleanName];
+      if (matchedBranch == null) {
+        for (final entry in _branchesByName.entries) {
+          if (entry.key.contains(cleanName) || cleanName.contains(entry.key)) {
+            matchedBranch = entry.value;
+            break;
+          }
+        }
+      }
+    }
+
+    if (matchedBranch == null && record.latitude != null && record.longitude != null && _branchesByName.isNotEmpty) {
+      double minD = double.infinity;
+      Branch? closest;
+      for (final b in _branchesByName.values) {
+        if (b.latitude != 0.0 && b.longitude != 0.0) {
+          final d = Geolocator.distanceBetween(record.latitude!, record.longitude!, b.latitude, b.longitude);
+          if (d < minD) {
+            minD = d;
+            closest = b;
+          }
+        }
+      }
+      if (closest != null && minD <= 500.0) {
+        matchedBranch = closest;
+      }
+    }
+
+    final Color statusColor;
+    final IconData statusIcon;
+    final String statusTitle;
+    final String statusSubtitle;
+
+    if (record.isInsideGeofence == true) {
+      statusColor = const Color(0xFF2E7D32);
+      statusIcon = Icons.verified_user_rounded;
+      statusTitle = 'داخل النطاق الجغرافي المعتمد ✅';
+      statusSubtitle =
+          'المندوب سجل حضوره على مسافة ${record.distanceMeters?.toStringAsFixed(1) ?? '—'} متراً من نقطة الفرع، ضمن النطاق المسموح (${matchedBranch?.geofenceRadius.toInt() ?? 100} متر).';
+    } else if (record.isInsideGeofence == false) {
+      statusColor = const Color(0xFFC62828);
+      statusIcon = Icons.warning_amber_rounded;
+      statusTitle = 'خارج النطاق الجغرافي المحدد ⚠️';
+      statusSubtitle =
+          'المندوب سجل حضوره على مسافة ${record.distanceMeters?.toStringAsFixed(1) ?? '—'} متراً من الفرع، متجاوزاً النطاق المحدد (${matchedBranch?.geofenceRadius.toInt() ?? 100} متر).';
+    } else if (record.latitude != null && record.longitude != null) {
+      statusColor = colorScheme.primary;
+      statusIcon = Icons.location_on_rounded;
+      statusTitle = 'إحداثيات الموقع مسجلة 📍';
+      statusSubtitle =
+          'تم تسجيل إحداثيات GPS بدقة، ولم يتم العثور على إحداثيات مطابقة للفرع لمقارنة المسافة.';
+    } else {
+      statusColor = colorScheme.outline;
+      statusIcon = Icons.location_off_outlined;
+      statusTitle = 'لم يتم تسجيل إحداثيات الموقع';
+      statusSubtitle = record.checkInTime != null
+          ? 'سجل المندوب الحضور ولكن لم تتوفر إحداثيات GPS لحظة التسجيل.'
+          : 'لم يقم المندوب بتسجيل الحضور اليوم حتى الآن.';
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: colorScheme.surface,
+          contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(statusIcon, color: statusColor, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'فحص النطاق الجغرافي والموقع',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'المندوب: ${record.delegate.fullName}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status Banner
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          statusColor.withValues(alpha: isDark ? 0.25 : 0.12),
+                          statusColor.withValues(alpha: isDark ? 0.10 : 0.04),
+                        ],
+                        begin: AlignmentDirectional.topStart,
+                        end: AlignmentDirectional.bottomEnd,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: statusColor.withValues(alpha: 0.35),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          statusTitle,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          statusSubtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  Text(
+                    'تفاصيل الموقع والنطاق الجغرافي',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Branch Info
+                  _buildAuditMetricRow(
+                    icon: Icons.store_rounded,
+                    iconColor: colorScheme.primary,
+                    title: 'الفرع المستهدف',
+                    value: branchName ?? 'غير محدد',
+                    subtitle: (matchedBranch != null && matchedBranch.latitude != 0.0)
+                        ? 'إحداثيات الفرع: ${matchedBranch.latitude.toStringAsFixed(6)}, ${matchedBranch.longitude.toStringAsFixed(6)}\nنصف القطر المعتمد: ${matchedBranch.geofenceRadius.toInt()} متر'
+                        : 'لم يتم العثور على إحداثيات مسجلة للفرع',
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Delegate Location Info
+                  _buildAuditMetricRow(
+                    icon: Icons.my_location_rounded,
+                    iconColor: record.latitude != null ? colorScheme.secondary : colorScheme.outline,
+                    title: 'موقع المندوب لحظة الحضور',
+                    value: (record.latitude != null && record.longitude != null)
+                        ? '${record.latitude!.toStringAsFixed(6)}, ${record.longitude!.toStringAsFixed(6)}'
+                        : 'غير متوفر',
+                    subtitle: record.distanceMeters != null
+                        ? 'المسافة المحسوبة عن الفرع: ${record.distanceMeters!.toStringAsFixed(1)} متر'
+                        : null,
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Check In Time
+                  _buildAuditMetricRow(
+                    icon: Icons.access_time_rounded,
+                    iconColor: colorScheme.outline,
+                    title: 'وقت تسجيل الحضور',
+                    value: record.checkInTime != null
+                        ? DateFormat('yyyy-MM-dd | hh:mm:ss a', 'ar').format(record.checkInTime!)
+                        : 'لم يسجل حضور',
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Device Info
+                  _buildAuditMetricRow(
+                    icon: Icons.phone_android_rounded,
+                    iconColor: colorScheme.onSurfaceVariant,
+                    title: 'معلومات الجهاز',
+                    value: record.deviceInfo ?? 'غير معروف',
+                    subtitle: record.deviceUuid != null ? 'معرف الجهاز: ${record.deviceUuid}' : null,
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('إغلاق'),
+            ),
+            if (record.latitude != null && record.longitude != null && matchedBranch != null && matchedBranch.latitude != 0.0)
+              OutlinedButton.icon(
+                icon: const Icon(Icons.directions_rounded, size: 18),
+                label: const Text('مسار السير للفرع'),
+                onPressed: () {
+                  _openGoogleMapsDirections(
+                    record.latitude!,
+                    record.longitude!,
+                    matchedBranch!.latitude,
+                    matchedBranch.longitude,
+                  );
+                },
+              ),
+            if (record.latitude != null && record.longitude != null)
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: statusColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.map_rounded, size: 18),
+                label: const Text('عرض على Google Maps'),
+                onPressed: () {
+                  _openGoogleMaps(record.latitude!, record.longitude!);
+                },
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -437,7 +1761,12 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     final totalCount = _records.length;
     final presentCount = _records.where((r) => r.isPresent).length;
     final departedCount = _records.where((r) => r.isDeparted).length;
-    final absentCount = _records.where((r) => r.isAbsent).length;
+    final absentCount = _records.where((r) => r.isAbsent && !r.isOnLeave).length;
+    final onLeaveCount = _records.where((r) => r.isOnLeave).length;
+    final violationCount =
+        _records.where((r) => r.integrityStatus == 'violation').length;
+    final warningCount =
+        _records.where((r) => r.integrityStatus == 'warning').length;
 
     final isToday = _isSameDay(_selectedDate, DateTime.now());
     final filtered = _filteredRecords;
@@ -446,66 +1775,101 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       onRefresh: _fetchAttendanceForSelectedDate,
       child: Column(
         children: [
-          // ── Top Header Section (KPI Cards + Date Selector) ──
+          // ── Top Header Section (KPI Cards + Date Card) ──
           if (isWideScreen) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // 4 KPI Metrics Cards on the Right (Primary content)
-                  Expanded(
-                    child: Row(
-                      children: [
-                        _buildKpiCard(
-                          title: 'إجمالي',
-                          count: totalCount,
-                          icon: Icons.people_alt_rounded,
-                          color: colorScheme.primary,
-                          theme: theme,
-                          isWide: true,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildKpiCard(
-                          title: 'حاضر الآن',
-                          count: presentCount,
-                          icon: Icons.check_circle_rounded,
-                          color: const Color(0xFF2E7D32),
-                          theme: theme,
-                          isWide: true,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildKpiCard(
-                          title: 'انصرف',
-                          count: departedCount,
-                          icon: Icons.timelapse_rounded,
-                          color: const Color(0xFFE65100),
-                          theme: theme,
-                          isWide: true,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildKpiCard(
-                          title: 'لم يحضر',
-                          count: absentCount,
-                          icon: Icons.cancel_outlined,
-                          color: colorScheme.outline,
-                          theme: theme,
-                          isWide: true,
-                        ),
-                      ],
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildKpiCard(
+                      title: 'إجمالي',
+                      count: totalCount,
+                      icon: Icons.people_alt_rounded,
+                      color: colorScheme.primary,
+                      theme: theme,
+                      isWide: true,
+                      flex: 2,
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  // Compact Date Controller on the Left
-                  _buildDateSelector(theme, colorScheme, isToday),
-                ],
+                    const SizedBox(width: 8),
+                    _buildKpiCard(
+                      title: 'حاضر الآن',
+                      count: presentCount,
+                      icon: Icons.check_circle_rounded,
+                      color: const Color(0xFF2E7D32),
+                      theme: theme,
+                      isWide: true,
+                      flex: 2,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildKpiCard(
+                      title: 'انصرف',
+                      count: departedCount,
+                      icon: Icons.timelapse_rounded,
+                      color: const Color(0xFFE65100),
+                      theme: theme,
+                      isWide: true,
+                      flex: 2,
+                    ),
+                    if (onLeaveCount > 0) ...[
+                      const SizedBox(width: 8),
+                      _buildKpiCard(
+                        title: 'إجازة معتمدة',
+                        count: onLeaveCount,
+                        icon: Icons.event_available_rounded,
+                        color: const Color(0xFF00796B),
+                        theme: theme,
+                        isWide: true,
+                        flex: 2,
+                      ),
+                    ],
+                    const SizedBox(width: 8),
+                    _buildKpiCard(
+                      title: 'لم يحضر',
+                      count: absentCount,
+                      icon: Icons.cancel_outlined,
+                      color: colorScheme.outline,
+                      theme: theme,
+                      isWide: true,
+                      flex: 2,
+                    ),
+                    if (violationCount > 0) ...[
+                      const SizedBox(width: 8),
+                      _buildKpiCard(
+                        title: 'مخالفات أمنية',
+                        count: violationCount,
+                        icon: Icons.gpp_bad_rounded,
+                        color: const Color(0xFFC62828),
+                        theme: theme,
+                        isWide: true,
+                        flex: 2,
+                      ),
+                    ],
+                    const SizedBox(width: 8),
+                    // Date Card (Formatted identically to KPI Cards)
+                    _buildDateCard(
+                      theme,
+                      colorScheme,
+                      isToday,
+                      isWide: true,
+                      flex: 3,
+                    ),
+                  ],
+                ),
               ),
             ),
           ] else ...[
-            // Mobile: Date Selector on top, KPI Cards below
+            // Mobile: Date Card on top, KPI Cards below
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: _buildDateSelector(theme, colorScheme, isToday, isFullWidth: true),
+              child: _buildDateCard(
+                theme,
+                colorScheme,
+                isToday,
+                isWide: false,
+                isFullWidth: true,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
@@ -537,6 +1901,17 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     theme: theme,
                     isWide: false,
                   ),
+                  if (onLeaveCount > 0) ...[
+                    const SizedBox(width: 6),
+                    _buildKpiCard(
+                      title: 'إجازات',
+                      count: onLeaveCount,
+                      icon: Icons.event_available_rounded,
+                      color: const Color(0xFF00796B),
+                      theme: theme,
+                      isWide: false,
+                    ),
+                  ],
                   const SizedBox(width: 6),
                   _buildKpiCard(
                     title: 'لم يحضر',
@@ -546,6 +1921,17 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     theme: theme,
                     isWide: false,
                   ),
+                  if (violationCount > 0) ...[
+                    const SizedBox(width: 6),
+                    _buildKpiCard(
+                      title: 'مخالفات',
+                      count: violationCount,
+                      icon: Icons.gpp_bad_rounded,
+                      color: const Color(0xFFC62828),
+                      theme: theme,
+                      isWide: false,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -558,31 +1944,38 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
               child: Row(
                 children: [
                   SizedBox(
-                    width: 270,
+                    width: 320,
                     child: _buildSearchBar(colorScheme),
                   ),
                   if (_availableBranches.isNotEmpty) ...[
                     const SizedBox(width: 10),
                     _buildBranchSelector(theme, colorScheme),
                   ],
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: _buildStatusButtonGroup(
-                        totalCount,
-                        presentCount,
-                        departedCount,
-                        absentCount,
-                        theme,
-                        colorScheme,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildCsvExportButton(),
+                  const Spacer(),
+                  _buildExportMenuButton(colorScheme, isWide: true),
                   const SizedBox(width: 8),
                   _buildViewModeToggle(colorScheme),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+              child: Row(
+                children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: _buildStatusButtonGroup(
+                      totalCount,
+                      presentCount,
+                      departedCount,
+                      absentCount,
+                      onLeaveCount,
+                      violationCount,
+                      warningCount,
+                      theme,
+                      colorScheme,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -595,7 +1988,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     child: _buildSearchBar(colorScheme),
                   ),
                   const SizedBox(width: 8),
-                  _buildCsvExportButton(),
+                  _buildExportMenuButton(colorScheme, isWide: false),
                   const SizedBox(width: 8),
                   _buildViewModeToggle(colorScheme),
                 ],
@@ -615,6 +2008,9 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     presentCount,
                     departedCount,
                     absentCount,
+                    onLeaveCount,
+                    violationCount,
+                    warningCount,
                     theme,
                     colorScheme,
                   ),
@@ -723,6 +2119,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
+    // Minimum width for the unified 6-column layout
     const double tableMinWidth = 1100.0;
 
     return Padding(
@@ -737,8 +2134,8 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
           boxShadow: [
             BoxShadow(
               color: colorScheme.shadow.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -748,66 +2145,100 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
             final availableWidth = constraints.maxWidth;
             final contentWidth =
                 availableWidth > tableMinWidth ? availableWidth : tableMinWidth;
+            final isScrollable = contentWidth > availableWidth;
 
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: contentWidth,
-                child: Column(
-                  children: [
-                    // ── Table Header ──
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.5),
-                        border: Border(
-                          bottom: BorderSide(
-                            color: colorScheme.outlineVariant
-                                .withValues(alpha: 0.6),
-                            width: 1.5,
+            return Scrollbar(
+              controller: _hScrollCtrl,
+              thumbVisibility: isScrollable,
+              trackVisibility: isScrollable,
+              interactive: isScrollable,
+              thickness: 10.0,
+              radius: const Radius.circular(8),
+              notificationPredicate: (notification) =>
+                  notification.depth == 0 &&
+                  notification.metrics.axis == Axis.horizontal,
+              child: SingleChildScrollView(
+                controller: _hScrollCtrl,
+                scrollDirection: Axis.horizontal,
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  width: contentWidth,
+                  child: Column(
+                    children: [
+                      // ── Table Header (Perfect Symmetry with Data Rows) ──
+                      Container(
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.45),
+                          border: Border(
+                            bottom: BorderSide(
+                              color: colorScheme.outlineVariant
+                                  .withValues(alpha: 0.6),
+                              width: 1.5,
+                            ),
                           ),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          _buildHeaderCell('المندوب / المروج', flex: 22, theme: theme, colorScheme: colorScheme),
-                          _buildHeaderCell('الحالة', flex: 12, theme: theme, colorScheme: colorScheme),
-                          _buildHeaderCell('الفرع', flex: 15, theme: theme, colorScheme: colorScheme),
-                          _buildHeaderCell('الحضور', flex: 10, theme: theme, colorScheme: colorScheme),
-                          _buildHeaderCell('الانصراف', flex: 10, theme: theme, colorScheme: colorScheme),
-                          _buildHeaderCell('النطاق الجغرافي والمسافة', flex: 18, theme: theme, colorScheme: colorScheme),
-                          _buildHeaderCell('الجهاز', flex: 13, theme: theme, colorScheme: colorScheme),
-                          _buildHeaderCell('الإجراءات', flex: 14, theme: theme, colorScheme: colorScheme, isCenter: true),
-                        ],
-                      ),
-                    ),
-
-                    // ── Table Rows ──
-                    Expanded(
-                      child: ListView.separated(
-                        itemCount: records.length,
-                        separatorBuilder: (context, index) => Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: colorScheme.outlineVariant
-                              .withValues(alpha: 0.25),
+                        child: Row(
+                          children: [
+                            _buildHeaderCell('المندوب', flex: 20, theme: theme, colorScheme: colorScheme),
+                            _buildHeaderCell('الحالة', flex: 12, theme: theme, colorScheme: colorScheme, isCenter: true),
+                            _buildHeaderCell('الفرع', flex: 16, theme: theme, colorScheme: colorScheme),
+                            _buildHeaderCell('الحضور • الانصراف • الساعات', flex: 24, theme: theme, colorScheme: colorScheme, isCenter: true),
+                            _buildHeaderCell('النطاق الجغرافي', flex: 16, theme: theme, colorScheme: colorScheme),
+                            _buildHeaderCell('الإجراءات', flex: 12, theme: theme, colorScheme: colorScheme, isCenter: true),
+                          ],
                         ),
-                        itemBuilder: (context, index) {
-                          return _buildTableRow(
-                            records[index],
-                            index.isEven,
-                            theme,
-                            colorScheme,
-                            isWide: availableWidth >= 1050,
-                          );
-                        },
                       ),
-                    ),
-                  ],
+
+                      // ── Table Rows ──
+                      Expanded(
+                        child: ListView.separated(
+                          controller: _vScrollCtrl,
+                          itemCount: records.length,
+                          separatorBuilder: (context, index) => Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: colorScheme.outlineVariant
+                                .withValues(alpha: 0.22),
+                          ),
+                          itemBuilder: (context, index) {
+                            final record = records[index];
+                            return _HRAttendanceTableRowItem(
+                              key: ValueKey('row_${record.delegate.uid}_$index'),
+                              record: record,
+                              isEven: index.isEven,
+                              theme: theme,
+                              colorScheme: colorScheme,
+                              branchesByName: _branchesByName,
+                              hrDelegate: widget.hrDelegate,
+                              selectedDate: _selectedDate,
+                              securityBadgeBuilder: _buildSecurityBadge,
+                              onCallPhone: _callPhone,
+                              onOpenWhatsApp: _openWhatsApp,
+                              onOpenGoogleMaps: _openGoogleMaps,
+                              onInspectGeofence: (rec) => _showGeofenceInspectionDialog(context, rec),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => HRDelegateAttendanceDetailScreen(
+                                      delegate: record.delegate,
+                                      initialMonth: _selectedDate,
+                                      branchesByName: _branchesByName,
+                                      hrDelegate: widget.hrDelegate,
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -826,391 +2257,16 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
   }) {
     return Expanded(
       flex: flex,
-      child: Text(
-        title,
-        textAlign: isCenter ? TextAlign.center : TextAlign.start,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.2,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTableRow(
-    HRAttendanceRecord record,
-    bool isEven,
-    ThemeData theme,
-    ColorScheme colorScheme, {
-    bool isWide = false,
-  }) {
-    final isPresent = record.isPresent;
-    final isDeparted = record.isDeparted;
-
-    Color statusColor;
-    String statusText;
-    IconData statusIcon;
-
-    if (isPresent) {
-      statusColor = const Color(0xFF2E7D32);
-      statusText = 'حاضر الآن';
-      statusIcon = Icons.check_circle_rounded;
-    } else if (isDeparted) {
-      statusColor = const Color(0xFFE65100);
-      statusText = 'انصرف اليوم';
-      statusIcon = Icons.timelapse_rounded;
-    } else {
-      statusColor = colorScheme.outline;
-      statusText = 'لم يسجل حضور';
-      statusIcon = Icons.schedule_rounded;
-    }
-
-    final posName = record.delegate.position == DelegatePosition.supervisor
-        ? 'مشرف'
-        : 'مندوب / مروج';
-
-    final checkInStr = record.checkInTime != null
-        ? DateFormat('hh:mm a', 'ar').format(record.checkInTime!)
-        : '-';
-
-    final checkOutStr = record.checkOutTime != null
-        ? DateFormat('hh:mm a', 'ar').format(record.checkOutTime!)
-        : '-';
-
-    return Material(
-      color: isEven
-          ? colorScheme.surface
-          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
-      child: InkWell(
-        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AttendanceScreen(
-                delegate: record.delegate,
-                viewOnly: true,
-              ),
-            ),
-          );
-        },
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: isWide ? 12 : 10,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // 1. Delegate (Avatar + Name + Phone)
-              Expanded(
-                flex: 22,
-                child: Row(
-                  children: [
-                    AppAvatar(
-                      imageUrl: record.delegate.personalPhotoUrl,
-                      fallbackText: record.delegate.fullName,
-                      radius: isWide ? 20 : 17,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            record.delegate.fullName,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Directionality(
-                                textDirection: TextDirection.ltr,
-                                child: Text(
-                                  record.delegate.phoneNumber,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                ' • $posName',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // 2. Status Badge
-              Expanded(
-                flex: 12,
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: statusColor.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(statusIcon, size: 12, color: statusColor),
-                        const SizedBox(width: 4),
-                        Text(
-                          statusText,
-                          style: TextStyle(
-                            color: statusColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // 3. Branch
-              Expanded(
-                flex: 15,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.storefront_rounded,
-                      size: 15,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        record.branchName ?? 'غير محدد',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // 4. Check-in
-              Expanded(
-                flex: 10,
-                child: record.checkInTime != null
-                    ? Row(
-                        children: [
-                          const Icon(Icons.login_rounded,
-                              size: 14, color: Color(0xFF2E7D32)),
-                          const SizedBox(width: 4),
-                          Directionality(
-                            textDirection: TextDirection.ltr,
-                            child: Text(
-                              checkInStr,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF2E7D32),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Text(
-                        '-',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                        ),
-                      ),
-              ),
-
-              // 5. Check-out
-              Expanded(
-                flex: 10,
-                child: record.checkOutTime != null
-                    ? Row(
-                        children: [
-                          const Icon(Icons.logout_rounded,
-                              size: 14, color: Color(0xFFE65100)),
-                          const SizedBox(width: 4),
-                          Directionality(
-                            textDirection: TextDirection.ltr,
-                            child: Text(
-                              checkOutStr,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFFE65100),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Text(
-                        '-',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                        ),
-                      ),
-              ),
-
-              // 6. Geofence
-              Expanded(
-                flex: 18,
-                child: Row(
-                  children: [
-                    Icon(
-                      record.isInsideGeofence == true
-                          ? Icons.verified_user_rounded
-                          : record.isInsideGeofence == false
-                              ? Icons.warning_amber_rounded
-                              : Icons.location_off_outlined,
-                      size: 14,
-                      color: record.isInsideGeofence == true
-                          ? const Color(0xFF2E7D32)
-                          : record.isInsideGeofence == false
-                              ? const Color(0xFFC62828)
-                              : colorScheme.outline,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        record.isInsideGeofence == true
-                            ? 'داخل النطاق (${record.distanceMeters!.toStringAsFixed(0)}م)'
-                            : record.isInsideGeofence == false
-                                ? 'خارج (${record.distanceMeters!.toStringAsFixed(0)}م)'
-                                : 'لم تسجل',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: record.isInsideGeofence == true
-                              ? const Color(0xFF2E7D32)
-                              : record.isInsideGeofence == false
-                                  ? const Color(0xFFC62828)
-                                  : colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (record.latitude != null && record.longitude != null)
-                      TashilIconButton.standard(
-                        icon: Icons.map_outlined,
-                        tooltip: 'عرض على الخريطة',
-                        size: 28,
-                        iconSize: 15,
-                        onPressed: () => _openGoogleMaps(
-                          record.latitude!,
-                          record.longitude!,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              // 7. Device Info
-              Expanded(
-                flex: 13,
-                child: (record.deviceInfo != null &&
-                        record.deviceInfo!.trim().isNotEmpty)
-                    ? Row(
-                        children: [
-                          Icon(
-                            Icons.smartphone_rounded,
-                            size: 14,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              record.deviceInfo!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontSize: 11,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      )
-                    : Text(
-                        '-',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                        ),
-                      ),
-              ),
-
-              // 8. Actions (Official Google Material Icons in Circular M3 Icon Buttons)
-              Expanded(
-                flex: 14,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (record.delegate.phoneNumber.isNotEmpty) ...[
-                      TashilIconButton.tonal(
-                        icon: Icons.call_outlined,
-                        tooltip: 'اتصال هاتفي',
-                        size: 34,
-                        iconSize: 17,
-                        onPressed: () =>
-                            _callPhone(record.delegate.phoneNumber),
-                      ),
-                      const SizedBox(width: 6),
-                      TashilIconButton.tonal(
-                        icon: Icons.chat_outlined,
-                        tooltip: 'محادثة واتساب',
-                        size: 34,
-                        iconSize: 17,
-                        onPressed: () =>
-                            _openWhatsApp(record.delegate.phoneNumber),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    TashilIconButton.tonal(
-                      icon: Icons.history_rounded,
-                      tooltip: 'السجل الشهري',
-                      size: 34,
-                      iconSize: 17,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AttendanceScreen(
-                              delegate: record.delegate,
-                              viewOnly: true,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Text(
+          title,
+          textAlign: isCenter ? TextAlign.center : TextAlign.start,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.2,
+            fontSize: 12.5,
           ),
         ),
       ),
@@ -1224,55 +2280,67 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     required Color color,
     required ThemeData theme,
     bool isWide = false,
+    int flex = 2,
   }) {
+    final colorScheme = theme.colorScheme;
     return Expanded(
+      flex: flex,
       child: Container(
+        height: isWide ? 74 : 64,
         padding: EdgeInsets.symmetric(
-          vertical: isWide ? 12 : 8,
-          horizontal: isWide ? 10 : 4,
+          vertical: isWide ? 8 : 4,
+          horizontal: isWide ? 8 : 4,
         ),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: color.withValues(alpha: 0.22),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.45),
             width: 1.0,
           ),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: isWide ? 18 : 14, color: color),
-                SizedBox(width: isWide ? 6 : 3),
+                Container(
+                  padding: const EdgeInsets.all(3.5),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: isWide ? 13 : 11, color: color),
+                ),
+                const SizedBox(width: 5),
                 Flexible(
                   child: Text(
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: color,
+                      color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.bold,
-                      fontSize: isWide ? 12 : 10,
+                      fontSize: isWide ? 11.5 : 10,
                     ),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: isWide ? 4 : 2),
+            const SizedBox(height: 3),
             Directionality(
               textDirection: TextDirection.ltr,
               child: Text(
                 '$count',
                 style: (isWide
-                        ? theme.textTheme.headlineSmall
+                        ? theme.textTheme.titleLarge
                         : theme.textTheme.titleMedium)
                     ?.copyWith(
                   fontWeight: FontWeight.w900,
                   color: color,
+                  fontSize: isWide ? 22 : 16,
                 ),
               ),
             ),
@@ -1282,122 +2350,184 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     );
   }
 
-  Widget _buildDateSelector(
+  Widget _buildDateCard(
     ThemeData theme,
     ColorScheme colorScheme,
     bool isToday, {
+    bool isWide = true,
+    int flex = 3,
     bool isFullWidth = false,
   }) {
-    final dateStr = DateFormat('EEEE، d MMMM yyyy', 'ar').format(_selectedDate);
+    final dateStr = DateFormat('EEEE، d MMMM', 'ar').format(_selectedDate);
 
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+    final cardContent = Container(
+      height: isWide ? 74 : 64,
+      padding: EdgeInsets.symmetric(
+        vertical: isWide ? 8 : 4,
+        horizontal: isWide ? 8 : 4,
+      ),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(22),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+          width: 1.0,
         ),
       ),
-      child: Row(
-        mainAxisSize: isFullWidth ? MainAxisSize.max : MainAxisSize.min,
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Previous Day Button
-          TashilIconButton.standard(
-            icon: Icons.chevron_right_rounded,
-            tooltip: 'اليوم السابق',
-            size: 32,
-            iconSize: 20,
-            onPressed: () {
-              setState(() {
-                _selectedDate = _selectedDate.subtract(const Duration(days: 1));
-              });
-              _fetchAttendanceForSelectedDate();
-            },
-          ),
-          const SizedBox(width: 2),
-
-          // Date Display Button (Click to Pick)
-          Flexible(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate,
-                  firstDate: DateTime(2023),
-                  lastDate: DateTime.now().add(const Duration(days: 7)),
-                );
-                if (picked != null && !_isSameDay(picked, _selectedDate)) {
-                  setState(() => _selectedDate = picked);
-                  _fetchAttendanceForSelectedDate();
-                }
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.calendar_month_rounded,
-                      size: 17,
-                      color: colorScheme.primary,
+          // Top: Icon + Title + Quick 'اليوم' badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3.5),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.calendar_month_rounded,
+                  size: isWide ? 13 : 11,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                'التاريخ',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.bold,
+                  fontSize: isWide ? 11.5 : 10,
+                ),
+              ),
+              if (!isToday) ...[
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: () {
+                    setState(() => _selectedDate = DateTime.now());
+                    _fetchAttendanceForSelectedDate();
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      dateStr,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                    child: Text(
+                      'اليوم',
+                      style: TextStyle(
+                        fontSize: 9.5,
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 3),
+
+          // Bottom: Navigation Chevrons + Clickable Date text
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Chevron Previous Day (Right chevron in RTL)
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                  });
+                  _fetchAttendanceForSelectedDate();
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.all(1.5),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: isWide ? 20 : 18,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
+
+              // Date Text (Tap to open DatePicker)
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime(2023),
+                    lastDate: DateTime.now().add(const Duration(days: 7)),
+                  );
+                  if (picked != null && !_isSameDay(picked, _selectedDate)) {
+                    setState(() => _selectedDate = picked);
+                    _fetchAttendanceForSelectedDate();
+                  }
+                },
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  child: Tooltip(
+                    message: 'اضغط لاختيار تاريخ آخر',
+                    child: Text(
+                      dateStr,
+                      style: (isWide
+                              ? theme.textTheme.titleSmall
+                              : theme.textTheme.bodyMedium)
+                          ?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: colorScheme.primary,
+                        fontSize: isWide ? 12.5 : 11,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 2),
+              const SizedBox(width: 2),
 
-          // Next Day Button
-          TashilIconButton.standard(
-            icon: Icons.chevron_left_rounded,
-            tooltip: 'اليوم التالي',
-            size: 32,
-            iconSize: 20,
-            onPressed: isToday
-                ? null
-                : () {
-                    setState(() {
-                      _selectedDate = _selectedDate.add(const Duration(days: 1));
-                    });
-                    _fetchAttendanceForSelectedDate();
-                  },
-          ),
-
-          if (!isToday) ...[
-            const SizedBox(width: 4),
-            TextButton(
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+              // Chevron Next Day (Left chevron in RTL)
+              InkWell(
+                onTap: isToday
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedDate = _selectedDate.add(const Duration(days: 1));
+                        });
+                        _fetchAttendanceForSelectedDate();
+                      },
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.all(1.5),
+                  child: Icon(
+                    Icons.chevron_left_rounded,
+                    size: isWide ? 20 : 18,
+                    color: isToday
+                        ? colorScheme.outlineVariant.withValues(alpha: 0.4)
+                        : colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-              onPressed: () {
-                setState(() => _selectedDate = DateTime.now());
-                _fetchAttendanceForSelectedDate();
-              },
-              child: const Text('اليوم',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            ),
-          ],
+            ],
+          ),
         ],
       ),
+    );
+
+    if (isFullWidth) {
+      return cardContent;
+    }
+    return Expanded(
+      flex: flex,
+      child: cardContent,
     );
   }
 
@@ -1406,10 +2536,24 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       height: 44,
       child: SearchBar(
         controller: _searchController,
+        constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
         hintText: 'بحث باسم المندوب أو الهاتف أو الفرع...',
+        hintStyle: WidgetStateProperty.all(
+          TextStyle(
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
+            fontSize: 12.5,
+            fontWeight: FontWeight.normal,
+          ),
+        ),
+        textStyle: WidgetStateProperty.all(
+          TextStyle(
+            color: colorScheme.onSurface,
+            fontSize: 12.5,
+          ),
+        ),
         elevation: WidgetStateProperty.all(0),
         backgroundColor: WidgetStateProperty.all(
-          colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          colorScheme.surfaceContainerHigh,
         ),
         shape: WidgetStateProperty.all(
           RoundedRectangleBorder(
@@ -1421,8 +2565,8 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         ),
         leading: Icon(
           Icons.search_rounded,
-          size: 18,
-          color: colorScheme.onSurfaceVariant,
+          size: 19,
+          color: colorScheme.primary,
         ),
         trailing: _searchController.text.isNotEmpty
             ? [
@@ -1450,6 +2594,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
 
     return PopupMenuButton<String>(
       tooltip: 'تصفية حسب الفرع',
+      borderRadius: BorderRadius.circular(22),
       offset: const Offset(0, 48),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -1579,6 +2724,9 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     int presentCount,
     int departedCount,
     int absentCount,
+    int onLeaveCount,
+    int violationCount,
+    int warningCount,
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
@@ -1611,6 +2759,14 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
           activeColor: const Color(0xFFE65100),
           activeForegroundColor: Colors.white,
         ),
+        if (onLeaveCount > 0)
+          TashilConnectedButtonItem<String>(
+            value: 'leave',
+            label: 'إجازات معتمدة ($onLeaveCount)',
+            icon: Icons.event_available_rounded,
+            activeColor: const Color(0xFF00796B),
+            activeForegroundColor: Colors.white,
+          ),
         TashilConnectedButtonItem<String>(
           value: 'absent',
           label: 'لم يسجلوا ($absentCount)',
@@ -1618,17 +2774,33 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
           activeColor: colorScheme.outline,
           activeForegroundColor: Colors.white,
         ),
+        if (violationCount > 0)
+          TashilConnectedButtonItem<String>(
+            value: 'violation',
+            label: 'مخالفات أمنية ($violationCount)',
+            icon: Icons.gpp_bad_rounded,
+            activeColor: const Color(0xFFC62828),
+            activeForegroundColor: Colors.white,
+          ),
+        if (warningCount > 0)
+          TashilConnectedButtonItem<String>(
+            value: 'warning',
+            label: 'مشبوه / تنبيه ($warningCount)',
+            icon: Icons.warning_amber_rounded,
+            activeColor: const Color(0xFFE65100),
+            activeForegroundColor: Colors.white,
+          ),
       ],
     );
   }
 
-  Widget _buildCsvExportButton() {
-    return TashilIconButton.tonal(
-      icon: Icons.download_rounded,
-      size: 44,
-      iconSize: 20,
-      tooltip: 'تصدير كشف الحضور (CSV)',
-      onPressed: _exportToCSV,
+  Widget _buildExportMenuButton(ColorScheme colorScheme, {bool isWide = false}) {
+    return _ExportMenuButton(
+      colorScheme: colorScheme,
+      isWide: isWide,
+      selectedDate: _selectedDate,
+      onExportDaily: _exportDailyToExcel,
+      onExportMonthly: _exportMonthlyConsolidatedToExcel,
     );
   }
 
@@ -1671,12 +2843,22 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       statusText = 'حاضر الآن';
       statusIcon = Icons.check_circle_rounded;
     } else if (isDeparted) {
-      statusColor = const Color(0xFFE65100);
-      statusText = 'انصرف اليوم';
-      statusIcon = Icons.timelapse_rounded;
+      if (record.isAutoCheckOut) {
+        statusColor = const Color(0xFFD97706);
+        statusText = 'انصرف (تلقائي)';
+        statusIcon = Icons.auto_mode_rounded;
+      } else {
+        statusColor = const Color(0xFFE65100);
+        statusText = 'انصرف اليوم';
+        statusIcon = Icons.timelapse_rounded;
+      }
+    } else if (record.isOnLeave) {
+      statusColor = const Color(0xFF00796B);
+      statusText = record.formattedLeaveType;
+      statusIcon = Icons.event_available_rounded;
     } else {
       statusColor = colorScheme.outline;
-      statusText = 'لم يسجل حضور';
+      statusText = 'لم يسجل';
       statusIcon = Icons.schedule_rounded;
     }
 
@@ -1722,7 +2904,10 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 3),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -1741,6 +2926,10 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                               color: colorScheme.onSurfaceVariant,
                             ),
                           ),
+                          if (record.checkInTime != null) ...[
+                            const SizedBox(width: 6),
+                            _buildSecurityBadge(record, colorScheme),
+                          ],
                         ],
                       ),
                     ],
@@ -1821,8 +3010,11 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                   // Check-out Time
                   if (record.checkOutTime != null) ...[
                     const SizedBox(width: 12),
-                    Icon(Icons.logout_rounded,
-                        size: 15, color: const Color(0xFFE65100)),
+                    Icon(
+                      record.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
+                      size: 15,
+                      color: record.isAutoCheckOut ? Colors.amber[800] : const Color(0xFFE65100),
+                    ),
                     const SizedBox(width: 4),
                     Directionality(
                       textDirection: TextDirection.ltr,
@@ -1830,74 +3022,142 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         DateFormat('hh:mm a', 'ar').format(record.checkOutTime!),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFFE65100),
+                          color: record.isAutoCheckOut ? Colors.amber[900] : const Color(0xFFE65100),
                         ),
                       ),
                     ),
+                    if (record.isAutoCheckOut) ...[
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.auto_mode_rounded, size: 12, color: Colors.amber[800]),
+                              const SizedBox(width: 3),
+                              Text(
+                                'إغلاق تلقائي (9 س)',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: Colors.amber[900],
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
+              if (record.checkInTime != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      record.isDeparted
+                          ? Icons.timelapse_rounded
+                          : Icons.play_arrow_rounded,
+                      size: 15,
+                      color: record.isDeparted
+                          ? colorScheme.secondary
+                          : const Color(0xFF2E7D32),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'صافي الساعات: ',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      record.formattedDuration,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: record.isDeparted
+                            ? colorScheme.secondary
+                            : const Color(0xFF2E7D32),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
             ],
 
             // ── Anti-Fraud Geofence & Device Details ──
             if (record.latitude != null && record.longitude != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: (record.isInsideGeofence == true)
-                      ? const Color(0xFF2E7D32).withValues(alpha: 0.08)
-                      : (record.isInsideGeofence == false)
-                          ? const Color(0xFFC62828).withValues(alpha: 0.08)
-                          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _showGeofenceInspectionDialog(context, record),
                   borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      record.isInsideGeofence == true
-                          ? Icons.verified_user_rounded
-                          : record.isInsideGeofence == false
-                              ? Icons.warning_amber_rounded
-                              : Icons.location_off_outlined,
-                      size: 16,
-                      color: record.isInsideGeofence == true
-                          ? const Color(0xFF2E7D32)
-                          : record.isInsideGeofence == false
-                              ? const Color(0xFFC62828)
-                              : colorScheme.onSurfaceVariant,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: (record.isInsideGeofence == true)
+                          ? const Color(0xFF2E7D32).withValues(alpha: 0.08)
+                          : (record.isInsideGeofence == false)
+                              ? const Color(0xFFC62828).withValues(alpha: 0.08)
+                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        record.isInsideGeofence == true
-                            ? 'نطاق جغرافي سليم (داخل حدود الفرع: ${record.distanceMeters!.toStringAsFixed(0)}م)'
-                            : record.isInsideGeofence == false
-                                ? 'تنبيه: خارج حدود الفرع بمسافة ${record.distanceMeters!.toStringAsFixed(0)}م'
-                                : 'إحداثيات الحضور مسجلة',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                    child: Row(
+                      children: [
+                        Icon(
+                          record.isInsideGeofence == true
+                              ? Icons.verified_user_rounded
+                              : record.isInsideGeofence == false
+                                  ? Icons.warning_amber_rounded
+                                  : Icons.location_on_outlined,
+                          size: 16,
                           color: record.isInsideGeofence == true
                               ? const Color(0xFF2E7D32)
                               : record.isInsideGeofence == false
                                   ? const Color(0xFFC62828)
-                                  : colorScheme.onSurfaceVariant,
+                                  : colorScheme.primary,
                         ),
-                      ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            record.isInsideGeofence == true
+                                ? 'نطاق جغرافي سليم (داخل حدود الفرع: ${record.distanceMeters!.toStringAsFixed(0)}م)'
+                                : record.isInsideGeofence == false
+                                    ? 'تنبيه: خارج حدود الفرع بمسافة ${record.distanceMeters!.toStringAsFixed(0)}م'
+                                    : 'إحداثيات الحضور مسجلة',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: record.isInsideGeofence == true
+                                  ? const Color(0xFF2E7D32)
+                                  : record.isInsideGeofence == false
+                                      ? const Color(0xFFC62828)
+                                      : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        // Map Icon Button
+                        TashilIconButton.standard(
+                          icon: Icons.map_outlined,
+                          tooltip: 'عرض الإحداثيات على الخريطة',
+                          size: 28,
+                          iconSize: 16,
+                          onPressed: () => _openGoogleMaps(
+                            record.latitude!,
+                            record.longitude!,
+                          ),
+                        ),
+                      ],
                     ),
-                    // Map Icon Button
-                    TashilIconButton.standard(
-                      icon: Icons.map_outlined,
-                      tooltip: 'عرض الإحداثيات على الخريطة',
-                      size: 28,
-                      iconSize: 16,
-                      onPressed: () => _openGoogleMaps(
-                        record.latitude!,
-                        record.longitude!,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -1953,14 +3213,16 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     ),
                   ),
                   icon: const Icon(Icons.history_rounded, size: 16),
-                  label: const Text('السجل الشهري'),
+                  label: const Text('السجل الشهري والتفصيلي'),
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => AttendanceScreen(
+                        builder: (_) => HRDelegateAttendanceDetailScreen(
                           delegate: record.delegate,
-                          viewOnly: true,
+                          initialMonth: _selectedDate,
+                          branchesByName: _branchesByName,
+                          hrDelegate: widget.hrDelegate,
                         ),
                       ),
                     );
@@ -1969,6 +3231,759 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HRAttendanceTableRowItem extends StatefulWidget {
+  final HRAttendanceRecord record;
+  final bool isEven;
+  final ThemeData theme;
+  final ColorScheme colorScheme;
+  final Map<String, Branch> branchesByName;
+  final Delegate hrDelegate;
+  final DateTime selectedDate;
+  final Widget Function(HRAttendanceRecord, ColorScheme) securityBadgeBuilder;
+  final void Function(String) onCallPhone;
+  final void Function(String) onOpenWhatsApp;
+  final void Function(double, double) onOpenGoogleMaps;
+  final void Function(HRAttendanceRecord) onInspectGeofence;
+  final VoidCallback onTap;
+
+  const _HRAttendanceTableRowItem({
+    super.key,
+    required this.record,
+    required this.isEven,
+    required this.theme,
+    required this.colorScheme,
+    required this.branchesByName,
+    required this.hrDelegate,
+    required this.selectedDate,
+    required this.securityBadgeBuilder,
+    required this.onCallPhone,
+    required this.onOpenWhatsApp,
+    required this.onOpenGoogleMaps,
+    required this.onInspectGeofence,
+    required this.onTap,
+  });
+
+  @override
+  State<_HRAttendanceTableRowItem> createState() => _HRAttendanceTableRowItemState();
+}
+
+class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final record = widget.record;
+    final theme = widget.theme;
+    final colorScheme = widget.colorScheme;
+    final isPresent = record.isPresent;
+    final isDeparted = record.isDeparted;
+
+    Color statusColor;
+    String statusText;
+    IconData statusIcon;
+
+    if (isPresent) {
+      statusColor = const Color(0xFF2E7D32);
+      statusText = 'حاضر الآن';
+      statusIcon = Icons.check_circle_rounded;
+    } else if (isDeparted) {
+      if (record.isAutoCheckOut) {
+        statusColor = const Color(0xFFD97706);
+        statusText = 'انصرف (تلقائي)';
+        statusIcon = Icons.auto_mode_rounded;
+      } else {
+        statusColor = const Color(0xFFE65100);
+        statusText = 'انصرف اليوم';
+        statusIcon = Icons.timelapse_rounded;
+      }
+    } else if (record.isOnLeave) {
+      statusColor = const Color(0xFF00796B);
+      statusText = record.formattedLeaveType;
+      statusIcon = Icons.event_available_rounded;
+    } else {
+      statusColor = colorScheme.outline;
+      statusText = 'لم يسجل';
+      statusIcon = Icons.schedule_rounded;
+    }
+
+    final checkInStr = record.checkInTime != null
+        ? DateFormat('hh:mm a', 'ar').format(record.checkInTime!)
+        : '—';
+
+    final checkOutStr = record.checkOutTime != null
+        ? DateFormat('hh:mm a', 'ar').format(record.checkOutTime!)
+        : '—';
+
+    // RTL-aware start border indicator (lights up in Arabic on the right side)
+    final Color startIndicatorColor = isPresent
+        ? const Color(0xFF2E7D32)
+        : isDeparted
+            ? const Color(0xFFE65100)
+            : record.isOnLeave
+                ? const Color(0xFF00796B)
+                : (_isHovered
+                    ? colorScheme.primary.withValues(alpha: 0.35)
+                    : Colors.transparent);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: AppMotionDurations.short3, // 150ms M3 Token
+          curve: AppMotionCurves.standard,
+          constraints: const BoxConstraints(minHeight: 68),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: _isHovered
+                ? colorScheme.primary.withValues(alpha: 0.045)
+                : (widget.isEven
+                    ? colorScheme.surface
+                    : colorScheme.surfaceContainerHighest.withValues(alpha: 0.16)),
+            border: BorderDirectional(
+              start: BorderSide(
+                color: startIndicatorColor,
+                width: 3.5,
+              ),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 1. Delegate (flex: 20) - Avatar + Full Name (Line 1) + Security Integrity Badge (Line 2)
+              Expanded(
+                flex: 20,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Row(
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          AppAvatar(
+                            imageUrl: record.delegate.personalPhotoUrl,
+                            fallbackText: record.delegate.fullName,
+                            radius: 20,
+                          ),
+                          if (isPresent)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                width: 11,
+                                height: 11,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2E7D32),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: colorScheme.surface,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Line 1: Full name
+                            Text(
+                              record.delegate.fullName,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                                letterSpacing: 0.1,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (record.checkInTime != null) ...[
+                              const SizedBox(height: 4),
+                              // Line 2: Security Verification Badge (100% موثوق)
+                              widget.securityBadgeBuilder(record, colorScheme),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // 2. Status Badge (flex: 12) - Centered Pill
+              Expanded(
+                flex: 12,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, size: 13, color: statusColor),
+                          const SizedBox(width: 5),
+                          Text(
+                            statusText,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 3. Branch (flex: 16) - Storefront Icon Container + Branch Name
+              Expanded(
+                flex: 16,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.storefront_rounded,
+                          size: 15,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Tooltip(
+                          message: record.branchName ?? 'غير محدد',
+                          child: Text(
+                            record.branchName ?? 'غير محدد',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // 4. Unified Attendance & Working Hours (flex: 24) - Connected Group Capsule
+              Expanded(
+                flex: 24,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: _buildTimeHoursGroup(
+                    record,
+                    theme,
+                    colorScheme,
+                    checkInStr,
+                    checkOutStr,
+                  ),
+                ),
+              ),
+
+              // 5. Geofence & Distance (flex: 16) - Interactive Status + Map Button
+              Expanded(
+                flex: 16,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => widget.onInspectGeofence(record),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              record.isInsideGeofence == true
+                                  ? Icons.verified_user_rounded
+                                  : record.isInsideGeofence == false
+                                      ? Icons.warning_amber_rounded
+                                      : (record.latitude != null && record.longitude != null)
+                                          ? Icons.location_on_outlined
+                                          : Icons.location_off_outlined,
+                              size: 15,
+                              color: record.isInsideGeofence == true
+                                  ? const Color(0xFF2E7D32)
+                                  : record.isInsideGeofence == false
+                                      ? const Color(0xFFC62828)
+                                      : (record.latitude != null && record.longitude != null)
+                                          ? colorScheme.primary
+                                          : colorScheme.outline,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Tooltip(
+                                message: 'انقر للاطلاع على تفاصيل النطاق الجغرافي والخريطة',
+                                child: Text(
+                                  record.isInsideGeofence == true
+                                      ? 'داخل النطاق (${record.distanceMeters!.toStringAsFixed(0)}م)'
+                                      : record.isInsideGeofence == false
+                                          ? 'خارج النطاق (${record.distanceMeters!.toStringAsFixed(0)}م)'
+                                          : (record.latitude != null && record.longitude != null)
+                                              ? 'موقع مسجل 📍'
+                                              : (record.checkInTime != null ? 'غير محدد' : 'لم يسجل'),
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: record.isInsideGeofence == true
+                                        ? const Color(0xFF2E7D32)
+                                        : record.isInsideGeofence == false
+                                            ? const Color(0xFFC62828)
+                                            : (record.latitude != null && record.longitude != null)
+                                                ? colorScheme.primary
+                                                : colorScheme.onSurfaceVariant,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            if (record.latitude != null && record.longitude != null)
+                              TashilIconButton.standard(
+                                icon: Icons.map_outlined,
+                                tooltip: 'عرض الإحداثيات على الخريطة',
+                                size: 28,
+                                iconSize: 15,
+                                onPressed: () => widget.onOpenGoogleMaps(
+                                  record.latitude!,
+                                  record.longitude!,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 6. Actions (flex: 12) - 3 Centered Tonal Icon Buttons
+              Expanded(
+                flex: 12,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (record.delegate.phoneNumber.isNotEmpty) ...[
+                        TashilIconButton.tonal(
+                          icon: Icons.call_outlined,
+                          tooltip: 'اتصال هاتفي',
+                          size: 32,
+                          iconSize: 16,
+                          onPressed: () => widget.onCallPhone(record.delegate.phoneNumber),
+                        ),
+                        const SizedBox(width: 6),
+                        TashilIconButton.tonal(
+                          icon: Icons.chat_outlined,
+                          tooltip: 'محادثة واتساب',
+                          size: 32,
+                          iconSize: 16,
+                          onPressed: () => widget.onOpenWhatsApp(record.delegate.phoneNumber),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      TashilIconButton.tonal(
+                        icon: Icons.history_rounded,
+                        tooltip: 'السجل الشهري والتفصيلي',
+                        size: 32,
+                        iconSize: 16,
+                        onPressed: widget.onTap,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimeHoursGroup(
+    HRAttendanceRecord record,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    String checkInStr,
+    String checkOutStr,
+  ) {
+    if (record.checkInTime == null) {
+      return Center(
+        child: Text(
+          '—',
+          style: TextStyle(
+            color: colorScheme.outlineVariant,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+
+    final isPresent = record.isPresent;
+    final isDeparted = record.isDeparted;
+
+    final durationColor = isPresent
+        ? const Color(0xFF2E7D32)
+        : (isDeparted ? const Color(0xFFE65100) : colorScheme.onSurfaceVariant);
+
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 1. الحضور (Check-in)
+            Tooltip(
+              message: 'وقت الحضور: $checkInStr',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.login_rounded,
+                    size: 13,
+                    color: Color(0xFF2E7D32),
+                  ),
+                  const SizedBox(width: 4),
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Text(
+                      checkInStr,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2E7D32),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // الفاصل بين الحضور والانصراف
+            Container(
+              height: 16,
+              width: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+
+            // 2. الانصراف (Check-out)
+            Tooltip(
+              message: record.isAutoCheckOut
+                  ? 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً ($checkOutStr)'
+                  : (record.checkOutTime != null
+                      ? 'وقت الانصراف: $checkOutStr'
+                      : 'لم يسجل انصراف بعد'),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    record.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
+                    size: 13,
+                    color: record.isAutoCheckOut
+                        ? Colors.amber[800]
+                        : (record.checkOutTime != null
+                            ? const Color(0xFFE65100)
+                            : colorScheme.outlineVariant),
+                  ),
+                  const SizedBox(width: 4),
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Text(
+                      checkOutStr,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: record.isAutoCheckOut
+                            ? Colors.amber[900]
+                            : (record.checkOutTime != null
+                                ? const Color(0xFFE65100)
+                                : colorScheme.outlineVariant),
+                      ),
+                    ),
+                  ),
+                  if (record.isAutoCheckOut) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                      ),
+                      child: Text(
+                        'تلقائي (9 س)',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber[900],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // الفاصل بين الانصراف وصافي الساعات
+            Container(
+              height: 16,
+              width: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+
+            // 3. صافي الساعات (Working Hours)
+            Tooltip(
+              message: isPresent
+                  ? 'صافي ساعات العمل: ${record.formattedDuration}'
+                  : 'إجمالي ساعات العمل: ${record.formattedDuration}',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: durationColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isPresent
+                          ? Icons.play_arrow_rounded
+                          : Icons.timer_outlined,
+                      size: 13,
+                      color: durationColor,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      record.formattedDuration,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: durationColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExportMenuButton extends StatefulWidget {
+  final ColorScheme colorScheme;
+  final bool isWide;
+  final DateTime selectedDate;
+  final VoidCallback onExportDaily;
+  final VoidCallback onExportMonthly;
+
+  const _ExportMenuButton({
+    required this.colorScheme,
+    required this.isWide,
+    required this.selectedDate,
+    required this.onExportDaily,
+    required this.onExportMonthly,
+  });
+
+  @override
+  State<_ExportMenuButton> createState() => _ExportMenuButtonState();
+}
+
+class _ExportMenuButtonState extends State<_ExportMenuButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = widget.colorScheme;
+    final isWide = widget.isWide;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: PopupMenuButton<String>(
+        tooltip: 'خيارات تصدير Excel',
+        borderRadius: BorderRadius.circular(22),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
+        elevation: 4,
+        onSelected: (val) {
+          if (val == 'daily') {
+            widget.onExportDaily();
+          } else if (val == 'monthly') {
+            widget.onExportMonthly();
+          }
+        },
+        itemBuilder: (ctx) => [
+          PopupMenuItem<String>(
+            value: 'daily',
+            child: Row(
+              children: [
+                Icon(Icons.today_rounded,
+                    color: colorScheme.primary, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'كشف يومي',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      Text(
+                        DateFormat('yyyy-MM-dd').format(widget.selectedDate),
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem<String>(
+            value: 'monthly',
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_month_rounded,
+                    color: Color(0xFF2E7D32), size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'تقرير شهري',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      Text(
+                        DateFormat('MMMM yyyy', 'ar').format(widget.selectedDate),
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        child: AnimatedContainer(
+          duration: AppMotionDurations.short3,
+          curve: AppMotionCurves.standard,
+          height: 44,
+          padding: isWide ? const EdgeInsets.symmetric(horizontal: 14) : null,
+          width: isWide ? null : 44,
+          decoration: BoxDecoration(
+            color: _isHovered
+                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.75)
+                : colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: _isHovered
+                  ? colorScheme.primary.withValues(alpha: 0.45)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.35),
+            ),
+          ),
+          child: isWide
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.arrow_downward_rounded,
+                      size: 18,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Excel',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.expand_more_rounded,
+                      size: 18,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                )
+              : Center(
+                  child: Icon(
+                    Icons.arrow_downward_rounded,
+                    size: 18,
+                    color: colorScheme.primary,
+                  ),
+                ),
         ),
       ),
     );

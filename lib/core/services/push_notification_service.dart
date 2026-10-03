@@ -41,6 +41,7 @@ class PushNotificationService {
   /// Initializes FCM: requests permissions, saves token, subscribes to topics,
   /// and sets up foreground/tap handlers.
   Future<void> initialize(String delegateUid) async {
+    if (kIsWeb) return;
     if (_initializedUid == delegateUid) {
       debugPrint('FCM: Already initialized for delegate $delegateUid');
       return;
@@ -123,6 +124,7 @@ class PushNotificationService {
 
   /// Removes the FCM token from Firestore. Call on logout.
   Future<void> clearToken(String delegateUid) async {
+    if (kIsWeb) return;
     _initializedUid = null;
     try {
       await _tokenRefreshSub?.cancel();

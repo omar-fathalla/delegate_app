@@ -28,19 +28,25 @@ void main() {
       isOnline: true,
       isMockLocationDetected: false,
       offlineBreadcrumbsCount: 0,
+      speed: 35.5,
+      batteryLevel: 82,
+      isMoving: true,
     );
 
     test('should be a subclass of DelegateTrackingSession entity', () {
       expect(testModel, isA<DelegateTrackingSession>());
     });
 
-    test('should correctly serialize toJson and parse fromJson', () {
+    test('should correctly serialize toJson and parse fromJson with telemetry', () {
       final json = testModel.toJson();
       expect(json['delegateId'], 'del_123');
       expect(json['delegateName'], 'أحمد محمود');
       expect(json['currentStatus'], 'inside');
       expect(json['isTrackingEnabled'], true);
       expect(json['isMockLocationDetected'], false);
+      expect(json['speed'], 35.5);
+      expect(json['batteryLevel'], 82);
+      expect(json['isMoving'], true);
 
       final fromJson =
           DelegateTrackingSessionModel.fromJson(json, 'del_123');
@@ -51,6 +57,9 @@ void main() {
       expect(fromJson.isOutside, false);
       expect(fromJson.isOffline, false);
       expect(fromJson.isMockLocationDetected, false);
+      expect(fromJson.speed, 35.5);
+      expect(fromJson.batteryLevel, 82);
+      expect(fromJson.isMoving, true);
     });
 
     test('should handle outside, offline, and mock location statuses correctly', () {

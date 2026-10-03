@@ -13,6 +13,8 @@ class Attendance extends Equatable {
   final bool isSynced;
   final DateTime? localCheckInTime;
   final DateTime? localCheckOutTime;
+  final bool isAutoCheckOut;
+  final String? autoCheckOutReason;
 
   const Attendance({
     required this.id,
@@ -27,7 +29,25 @@ class Attendance extends Equatable {
     this.isSynced = true,
     this.localCheckInTime,
     this.localCheckOutTime,
+    this.isAutoCheckOut = false,
+    this.autoCheckOutReason,
   });
+
+  /// ما إذا كانت هذه الجلسة قد أغلقت تلقائياً (سواء مسجلة كإغلاق تلقائي أو مر عليها أكثر من 9 ساعات)
+  bool get isEffectiveAutoCheckOut =>
+      isAutoCheckOut ||
+      (checkOutTime == null &&
+          DateTime.now().difference(checkInTime) >= const Duration(hours: 9));
+
+  /// وقت الانصراف الفعلي: الانصراف المسجل يدوياً، أو بعد 9 ساعات من الحضور إذا أغلقت تلقائياً
+  DateTime? get effectiveCheckOutTime =>
+      checkOutTime ??
+      (isEffectiveAutoCheckOut
+          ? checkInTime.add(const Duration(hours: 9))
+          : null);
+
+  /// ما إذا كانت الجلسة نشطة حالياً (حاضر الآن ولم تنته وردية الـ 9 ساعات بعد)
+  bool get isActive => checkOutTime == null && !isEffectiveAutoCheckOut;
 
   @override
   List<Object?> get props => [
@@ -43,5 +63,7 @@ class Attendance extends Equatable {
     isSynced,
     localCheckInTime,
     localCheckOutTime,
+    isAutoCheckOut,
+    autoCheckOutReason,
   ];
 }

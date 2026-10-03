@@ -158,11 +158,11 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         }
       },
       (result) {
-        // Check for any active check-in (checkOutTime is null)
+        // Check for any active check-in (within 9h and not checked out)
         Attendance? activeAttendance;
         try {
           activeAttendance = result.items.firstWhere(
-            (element) => element.checkOutTime == null,
+            (element) => element.isActive,
           );
         } catch (_) {
           activeAttendance = null;

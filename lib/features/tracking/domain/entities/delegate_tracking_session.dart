@@ -29,6 +29,10 @@ class DelegateTrackingSession extends Equatable {
   final bool isOnline;
   final bool isMockLocationDetected;
   final int offlineBreadcrumbsCount;
+  final double? speed;
+  final int? batteryLevel;
+  final bool? isMoving;
+  final String? avatarUrl;
 
   const DelegateTrackingSession({
     required this.delegateId,
@@ -53,6 +57,10 @@ class DelegateTrackingSession extends Equatable {
     this.isOnline = true,
     this.isMockLocationDetected = false,
     this.offlineBreadcrumbsCount = 0,
+    this.speed,
+    this.batteryLevel,
+    this.isMoving,
+    this.avatarUrl,
   });
 
   bool get isInside => currentStatus == TrackingStatus.insideZone;
@@ -95,6 +103,10 @@ class DelegateTrackingSession extends Equatable {
     bool? isOnline,
     bool? isMockLocationDetected,
     int? offlineBreadcrumbsCount,
+    double? speed,
+    int? batteryLevel,
+    bool? isMoving,
+    String? avatarUrl,
   }) {
     return DelegateTrackingSession(
       delegateId: delegateId ?? this.delegateId,
@@ -121,6 +133,10 @@ class DelegateTrackingSession extends Equatable {
           isMockLocationDetected ?? this.isMockLocationDetected,
       offlineBreadcrumbsCount:
           offlineBreadcrumbsCount ?? this.offlineBreadcrumbsCount,
+      speed: speed ?? this.speed,
+      batteryLevel: batteryLevel ?? this.batteryLevel,
+      isMoving: isMoving ?? this.isMoving,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
     );
   }
 
@@ -148,5 +164,9 @@ class DelegateTrackingSession extends Equatable {
         isOnline,
         isMockLocationDetected,
         offlineBreadcrumbsCount,
+        speed,
+        batteryLevel,
+        isMoving,
+        avatarUrl,
       ];
 }
