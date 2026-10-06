@@ -155,6 +155,14 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
     }
     throw UnimplementedError();
   }
+
+  @override
+  Stream<AttendanceModel?> streamActiveAttendance(
+    String userId,
+    String organizationId,
+  ) {
+    return const Stream.empty();
+  }
 }
 
 // --- Mock Local Data Source ---

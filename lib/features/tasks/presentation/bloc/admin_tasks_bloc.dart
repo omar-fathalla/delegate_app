@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
+import 'package:delegate_app/features/tasks/domain/usecases/delete_task.dart';
 import 'package:delegate_app/features/tasks/domain/usecases/get_admin_tasks.dart';
 import 'package:delegate_app/features/tasks/domain/usecases/update_task.dart';
 import 'package:delegate_app/features/tasks/domain/usecases/update_task_status.dart';
@@ -10,17 +11,20 @@ class AdminTasksBloc extends Bloc<AdminTasksEvent, AdminTasksState> {
   final GetAdminTasks getAdminTasks;
   final UpdateTaskStatus updateTaskStatus;
   final UpdateTask updateTask;
+  final DeleteTask deleteTask;
 
   AdminTasksBloc({
     required this.getAdminTasks,
     required this.updateTaskStatus,
     required this.updateTask,
+    required this.deleteTask,
   }) : super(AdminTasksInitial()) {
     on<LoadAdminTasksRequested>(_onLoadTasks);
     on<LoadMoreAdminTasksRequested>(_onLoadMoreTasks);
     on<StatusFilterChanged>(_onStatusFilterChanged);
     on<AdminTaskStatusUpdateRequested>(_onUpdateStatus);
     on<UpdateTaskRequested>(_onUpdateTask);
+    on<DeleteTaskRequested>(_onDeleteTask);
   }
 
   static const int _pageSize = 20;
@@ -177,6 +181,34 @@ class AdminTasksBloc extends Bloc<AdminTasksEvent, AdminTasksState> {
           final updatedTasks = currentState.tasks.map((t) {
             return t.uid == event.task.uid ? event.task : t;
           }).toList();
+          emit(currentState.copyWith(tasks: updatedTasks));
+        }
+      },
+    );
+  }
+
+  Future<void> _onDeleteTask(
+    DeleteTaskRequested event,
+    Emitter<AdminTasksState> emit,
+  ) async {
+    final result = await deleteTask(event.organizationId, event.taskId);
+    result.fold(
+      (failure) => emit(
+        AdminTasksError(
+          message: failure.message,
+          statusFilter: (state is AdminTasksLoaded)
+              ? (state as AdminTasksLoaded).statusFilter
+              : (state is AdminTasksLoading)
+              ? (state as AdminTasksLoading).statusFilter
+              : null,
+        ),
+      ),
+      (_) {
+        if (state is AdminTasksLoaded) {
+          final currentState = state as AdminTasksLoaded;
+          final updatedTasks = currentState.tasks
+              .where((t) => t.uid != event.taskId)
+              .toList();
           emit(currentState.copyWith(tasks: updatedTasks));
         }
       },

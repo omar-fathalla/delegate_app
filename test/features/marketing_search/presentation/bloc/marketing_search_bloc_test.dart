@@ -4,6 +4,7 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/models/pagination_response.dart';
 import 'package:delegate_app/features/admin/domain/entities/company.dart';
 import 'package:delegate_app/features/marketing_search/domain/usecases/search_company_by_code.dart';
+import 'package:delegate_app/features/marketing_search/domain/usecases/search_delegate_by_name.dart';
 import 'package:delegate_app/features/marketing_search/domain/usecases/search_delegate_by_phone.dart';
 import 'package:delegate_app/features/marketing_search/presentation/bloc/marketing_search_bloc.dart';
 import 'package:delegate_app/features/marketing_search/presentation/bloc/marketing_search_event.dart';
@@ -13,26 +14,32 @@ import 'package:mocktail/mocktail.dart';
 
 class MockSearchCompanyByCode extends Mock implements SearchCompanyByCode {}
 class MockSearchDelegateByPhone extends Mock implements SearchDelegateByPhone {}
+class MockSearchDelegateByName extends Mock implements SearchDelegateByName {}
 
 void main() {
   late MarketingSearchBloc bloc;
   late MockSearchCompanyByCode mockSearchCompanyByCode;
   late MockSearchDelegateByPhone mockSearchDelegateByPhone;
+  late MockSearchDelegateByName mockSearchDelegateByName;
 
   setUpAll(() {
     registerFallbackValue(SearchCompanyByCodeParams(
         organizationUID: 'test', companyName: 'test'));
     registerFallbackValue(SearchDelegateByPhoneParams(
         organizationUID: 'test', phoneNumber: 'test'));
+    registerFallbackValue(SearchDelegateByNameParams(
+        organizationUID: 'test', name: 'test'));
   });
 
   setUp(() {
     mockSearchCompanyByCode = MockSearchCompanyByCode();
     mockSearchDelegateByPhone = MockSearchDelegateByPhone();
+    mockSearchDelegateByName = MockSearchDelegateByName();
 
     bloc = MarketingSearchBloc(
       searchCompanyByCode: mockSearchCompanyByCode,
       searchDelegateByPhone: mockSearchDelegateByPhone,
+      searchDelegateByName: mockSearchDelegateByName,
     );
   });
 

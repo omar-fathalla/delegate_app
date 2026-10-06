@@ -2,6 +2,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
+import 'package:delegate_app/features/tasks/domain/usecases/delete_task.dart';
 import 'package:delegate_app/features/tasks/domain/usecases/get_admin_tasks.dart';
 import 'package:delegate_app/features/tasks/domain/usecases/update_task.dart';
 import 'package:delegate_app/features/tasks/domain/usecases/update_task_status.dart';
@@ -14,6 +15,7 @@ import 'package:mocktail/mocktail.dart';
 class MockGetAdminTasks extends Mock implements GetAdminTasks {}
 class MockUpdateTaskStatus extends Mock implements UpdateTaskStatus {}
 class MockUpdateTask extends Mock implements UpdateTask {}
+class MockDeleteTask extends Mock implements DeleteTask {}
 class FakeTaskEntity extends Fake implements TaskEntity {}
 
 void main() {
@@ -21,6 +23,7 @@ void main() {
   late MockGetAdminTasks mockGetAdminTasks;
   late MockUpdateTaskStatus mockUpdateTaskStatus;
   late MockUpdateTask mockUpdateTask;
+  late MockDeleteTask mockDeleteTask;
 
   setUpAll(() {
     registerFallbackValue(FakeTaskEntity());
@@ -31,11 +34,13 @@ void main() {
     mockGetAdminTasks = MockGetAdminTasks();
     mockUpdateTaskStatus = MockUpdateTaskStatus();
     mockUpdateTask = MockUpdateTask();
+    mockDeleteTask = MockDeleteTask();
 
     bloc = AdminTasksBloc(
       getAdminTasks: mockGetAdminTasks,
       updateTaskStatus: mockUpdateTaskStatus,
       updateTask: mockUpdateTask,
+      deleteTask: mockDeleteTask,
     );
   });
 
@@ -133,6 +138,25 @@ void main() {
     expect: () => [
       AdminTasksLoaded(
         tasks: [tTaskEntity.copyWith(title: 'Updated Title')], 
+        statusFilter: null, 
+        lastDoc: tTasks.last.createdAt, 
+        hasReachedMax: true,
+      ),
+    ],
+  );
+
+  blocTest<AdminTasksBloc, AdminTasksState>(
+    'should delete task and remove from state if Loaded',
+    build: () {
+      when(() => mockDeleteTask(any(), any()))
+          .thenAnswer((_) async => const Right(null));
+      return bloc;
+    },
+    seed: () => AdminTasksLoaded(tasks: tTasks, statusFilter: null, lastDoc: tTasks.last.createdAt, hasReachedMax: true),
+    act: (bloc) => bloc.add(const DeleteTaskRequested(organizationId: 'org1', taskId: 'task123')),
+    expect: () => [
+      AdminTasksLoaded(
+        tasks: const [], 
         statusFilter: null, 
         lastDoc: tTasks.last.createdAt, 
         hasReachedMax: true,

@@ -81,3 +81,29 @@ class PhotoPermissionError extends PhotoPermissionState {
 }
 
 class PhotoDeleteSuccess extends PhotoPermissionState {}
+
+class PhotoBatchUploadInProgress extends PhotoPermissionState {
+  final int current;
+  final int total;
+
+  const PhotoBatchUploadInProgress({
+    required this.current,
+    required this.total,
+  });
+
+  @override
+  List<Object?> get props => [current, total];
+}
+
+class PhotoBatchUploadSuccess extends PhotoPermissionState {
+  final int uploadedCount;
+  final bool isOffline;
+
+  const PhotoBatchUploadSuccess({
+    required this.uploadedCount,
+    this.isOffline = false,
+  });
+
+  @override
+  List<Object?> get props => [uploadedCount, isOffline];
+}

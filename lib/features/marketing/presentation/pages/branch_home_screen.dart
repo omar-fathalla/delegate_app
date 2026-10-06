@@ -12,6 +12,8 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
+import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/marketing/data/models/floor_verification_model.dart';
 import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
@@ -922,7 +924,11 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     final displayRecords = searchFilteredRecords.where((r) {
       final dId = r['delegateId'] as String? ?? '';
       final vItem = _floorVerifications[dId];
-      if (currentFilter == 'remaining') {
+      if (currentFilter == 'not_checked_out') {
+        return r['checkOutTime'] == null;
+      } else if (currentFilter == 'checked_out') {
+        return r['checkOutTime'] != null;
+      } else if (currentFilter == 'remaining') {
         return vItem == null || (!vItem.isVerified && !vItem.isMissing);
       } else if (currentFilter == 'verified') {
         return vItem?.isVerified == true;
@@ -1053,6 +1059,28 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                         ),
                       ),
                       const SizedBox(width: 4),
+                      // زر تصدير Excel للفرع
+                      IconButton(
+                        icon: const Icon(
+                          Icons.table_chart_rounded,
+                          color: Color(0xFF2E7D32),
+                          size: 20,
+                        ),
+                        tooltip: 'تصدير كشف الفرع إلى Excel',
+                        style: IconButton.styleFrom(
+                          backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
+                          padding: const EdgeInsets.all(6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => _showExportExcelModal(
+                          context,
+                          preselectedBranch: branchName,
+                          branchRecords: {branchName: records},
+                          initialOnlyNotCheckedOut: currentFilter == 'not_checked_out',
+                        ),
+                      ),
+                      const SizedBox(width: 4),
                       // زر حذف الفرع المباشر
                       IconButton(
                         icon: Icon(
@@ -1109,6 +1137,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                               verifiedCount: verifiedCount,
                               missingCount: missingCount,
                               remainingCount: remainingCount,
+                              presentCount: presentCount,
+                              checkedOutCount: checkedOutCount,
                               currentFilter: currentFilter,
                             )))
                   : const SizedBox.shrink(),
@@ -1201,6 +1231,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     required int verifiedCount,
     required int missingCount,
     required int remainingCount,
+    required int presentCount,
+    required int checkedOutCount,
     required String currentFilter,
   }) {
     final totalCount = allRecords.length;
@@ -1306,6 +1338,22 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                           },
                         ),
                         const SizedBox(width: 6),
+                        // فلتر الذين لم يسجلوا انصراف (حاضر بالفرع)
+                        _buildFloorFilterChip(
+                          label: 'لم ينصرف',
+                          count: presentCount,
+                          icon: Icons.pending_actions_rounded,
+                          isSelected: currentFilter == 'not_checked_out',
+                          colorScheme: colorScheme,
+                          badgeColor: presentCount > 0 ? const Color(0xFFE65100) : null,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _branchFilter[branchName] = 'not_checked_out';
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 6),
                         _buildFloorFilterChip(
                           label: 'المتبقي للمرور',
                           count: remainingCount,
@@ -1348,6 +1396,23 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                               HapticFeedback.selectionClick();
                               setState(() {
                                 _branchFilter[branchName] = 'missing';
+                              });
+                            },
+                          ),
+                        ],
+                        if (checkedOutCount > 0 || currentFilter == 'checked_out') ...[
+                          const SizedBox(width: 6),
+                          _buildFloorFilterChip(
+                            label: 'منصرف',
+                            count: checkedOutCount,
+                            icon: Icons.output_rounded,
+                            isSelected: currentFilter == 'checked_out',
+                            colorScheme: colorScheme,
+                            badgeColor: colorScheme.onSurfaceVariant,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _branchFilter[branchName] = 'checked_out';
                               });
                             },
                           ),
@@ -1451,7 +1516,13 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
 
     String msg = 'لا توجد عناصر مطابقة';
     IconData icon = Icons.info_outline_rounded;
-    if (filter == 'verified') {
+    if (filter == 'not_checked_out') {
+      msg = 'جميع المناديب في هذا الفرع قاموا بتسجيل الانصراف';
+      icon = Icons.check_circle_outline_rounded;
+    } else if (filter == 'checked_out') {
+      msg = 'لم يقم أي مندوب بتسجيل الانصراف بعد';
+      icon = Icons.access_time_rounded;
+    } else if (filter == 'verified') {
       msg = 'لم يتم التحقق من أي مندوب بعد';
       icon = Icons.check_circle_outline_rounded;
     } else if (filter == 'missing') {
@@ -2553,6 +2624,69 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       },
     );
   }
+
+  // ─── Export Attendance to Excel Modal ──────────────────────────────────────
+  Future<void> _showExportExcelModal(
+    BuildContext context, {
+    String? preselectedBranch,
+    Map<String, List<Map<String, dynamic>>>? branchRecords,
+    bool initialOnlyNotCheckedOut = false,
+  }) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDesktop = MediaQuery.sizeOf(context).width > 768;
+
+    final targetBranchRecords = branchRecords ?? (_lastLoadedState?.data ?? {});
+    final branches = preselectedBranch != null
+        ? [preselectedBranch]
+        : (targetBranchRecords.isNotEmpty
+            ? targetBranchRecords.keys.toList()
+            : _favoriteBranches);
+
+    if (branches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا توجد فروع لتصدير بياناتها')),
+      );
+      return;
+    }
+
+    if (isDesktop) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogCtx) => Dialog(
+          backgroundColor: colorScheme.surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: _ExportExcelBottomSheet(
+              selectedDate: _selectedDate,
+              branches: branches,
+              branchRecords: targetBranchRecords,
+              preselectedBranch: preselectedBranch,
+              initialOnlyNotCheckedOut: initialOnlyNotCheckedOut,
+              floorVerifications: _floorVerifications,
+              isDesktop: true,
+            ),
+          ),
+        ),
+      );
+    } else {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetCtx) => _ExportExcelBottomSheet(
+          selectedDate: _selectedDate,
+          branches: branches,
+          branchRecords: targetBranchRecords,
+          preselectedBranch: preselectedBranch,
+          initialOnlyNotCheckedOut: initialOnlyNotCheckedOut,
+          floorVerifications: _floorVerifications,
+          isDesktop: false,
+        ),
+      );
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3134,3 +3268,622 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Export Attendance to Excel Modal Bottom Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+class _ExportExcelBottomSheet extends StatefulWidget {
+  final DateTime selectedDate;
+  final List<String> branches;
+  final Map<String, List<Map<String, dynamic>>> branchRecords;
+  final String? preselectedBranch;
+  final bool initialOnlyNotCheckedOut;
+  final Map<String, FloorVerificationItem> floorVerifications;
+  final bool isDesktop;
+
+  const _ExportExcelBottomSheet({
+    required this.selectedDate,
+    required this.branches,
+    required this.branchRecords,
+    this.preselectedBranch,
+    this.initialOnlyNotCheckedOut = false,
+    required this.floorVerifications,
+    required this.isDesktop,
+  });
+
+  @override
+  State<_ExportExcelBottomSheet> createState() => _ExportExcelBottomSheetState();
+}
+
+class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
+  late String? _selectedBranch;
+  late bool _onlyNotCheckedOut;
+  bool _isExporting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedBranch = widget.preselectedBranch;
+    _onlyNotCheckedOut = widget.initialOnlyNotCheckedOut;
+  }
+
+  List<Map<String, dynamic>> _getTargetRecords() {
+    final List<Map<String, dynamic>> result = [];
+    if (_selectedBranch != null) {
+      final list = widget.branchRecords[_selectedBranch] ?? [];
+      for (final r in list) {
+        final withBranch = Map<String, dynamic>.from(r);
+        withBranch['branchName'] ??= _selectedBranch;
+        result.add(withBranch);
+      }
+    } else {
+      widget.branchRecords.forEach((bName, list) {
+        for (final r in list) {
+          final withBranch = Map<String, dynamic>.from(r);
+          withBranch['branchName'] ??= bName;
+          result.add(withBranch);
+        }
+      });
+    }
+
+    if (_onlyNotCheckedOut) {
+      return result.where((r) => r['checkOutTime'] == null).toList();
+    }
+    return result;
+  }
+
+  int _getPresentCount() {
+    int count = 0;
+    if (_selectedBranch != null) {
+      final list = widget.branchRecords[_selectedBranch] ?? [];
+      count += list.where((r) => r['checkOutTime'] == null).length;
+    } else {
+      widget.branchRecords.forEach((_, list) {
+        count += list.where((r) => r['checkOutTime'] == null).length;
+      });
+    }
+    return count;
+  }
+
+  int _getTotalCount() {
+    int count = 0;
+    if (_selectedBranch != null) {
+      count = (widget.branchRecords[_selectedBranch] ?? []).length;
+    } else {
+      widget.branchRecords.forEach((_, list) {
+        count += list.length;
+      });
+    }
+    return count;
+  }
+
+  Future<void> _handleExport() async {
+    if (_isExporting) return;
+    final records = _getTargetRecords();
+    if (records.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا توجد سجلات مطابقة للخيارات المحددة')),
+      );
+      return;
+    }
+
+    setState(() => _isExporting = true);
+
+    try {
+      final buffer = StringBuffer();
+      // UTF-8 BOM for Arabic support in Microsoft Excel
+      buffer.write('\uFEFF');
+
+      final dayName = DateFormat('EEEE', 'ar').format(widget.selectedDate);
+      final dateStr = DateFormat('yyyy-MM-dd', 'en').format(widget.selectedDate);
+      final branchTitle = _selectedBranch ?? 'جميع الفروع المتابعة';
+      final filterTitle = _onlyNotCheckedOut ? 'المناديب الذين لم ينصرفوا فقط' : 'كشف الحضور الكامل';
+
+      // Header metadata
+      buffer.writeln('كشف متابعة حضور الفروع');
+      buffer.writeln('الفرع:,"$branchTitle"');
+      buffer.writeln('اليوم:,"$dayName"');
+      buffer.writeln('التاريخ:,"$dateStr"');
+      buffer.writeln('نوع الكشف:,"$filterTitle"');
+      buffer.writeln('إجمالي المناديب:,"${records.length}"');
+      buffer.writeln('');
+
+      // Columns requested by user:
+      // اسم الشركة, اسم المندوب, اليوم, رقم التليفون + التفاصيل الميدانية
+      buffer.writeln('م,اسم الشركة,اسم المندوب,اليوم,التاريخ,رقم التليفون,الفرع,وقت الحضور,وقت الانصراف,حالة الانصراف,التحقق الميداني بالصالة');
+
+      for (var i = 0; i < records.length; i++) {
+        final r = records[i];
+        final companyName = (r['companyName'] as String? ?? 'غير محدد').replaceAll('"', '""');
+        final fullName = (r['fullName'] as String? ?? 'مندوب').replaceAll('"', '""');
+        final rawPhone = (r['phoneNumber'] as String? ?? '').replaceAll('"', '""');
+        // Prepend tab so Excel strictly preserves leading zero
+        final phone = rawPhone.isNotEmpty ? '\t$rawPhone' : 'غير مسجل';
+        final branch = (r['branchName'] as String? ?? branchTitle).replaceAll('"', '""');
+
+        final checkIn = r['checkInTime'] as Timestamp?;
+        final checkOut = r['checkOutTime'] as Timestamp?;
+
+        final checkInStr = checkIn != null
+            ? DateFormat('hh:mm a', 'ar').format(checkIn.toDate())
+            : 'لم يسجل';
+        final checkOutStr = checkOut != null
+            ? DateFormat('hh:mm a', 'ar').format(checkOut.toDate())
+            : 'لم يسجل انصراف';
+        final statusStr = checkOut != null ? 'منصرف' : 'حاضر (لم ينصرف)';
+
+        final dId = r['delegateId'] as String? ?? '';
+        final vItem = widget.floorVerifications[dId];
+        final floorStr = vItem?.isVerified == true
+            ? 'تم التحقق بالصالة'
+            : (vItem?.isMissing == true ? 'غير متواجد' : 'لم يتم المرور');
+
+        buffer.writeln(
+          '${i + 1},"$companyName","$fullName","$dayName","$dateStr","$phone","$branch","$checkInStr","$checkOutStr","$statusStr","$floorStr"',
+        );
+      }
+
+      final safeBranch = branchTitle
+          .replaceAll(RegExp(r'[\/\\?%*:|"<> ]'), '_')
+          .trim();
+      final suffix = _onlyNotCheckedOut ? '_لم_ينصرفوا' : '_كامل';
+      final fileName = 'كشف_حضور_$safeBranch${suffix}_$dateStr.csv';
+
+      await FileDownloadHelper.downloadString(
+        content: buffer.toString(),
+        fileName: fileName,
+        mimeType: 'text/csv;charset=utf-8',
+        shareText: 'كشف حضور $branchTitle - $dayName $dateStr',
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('تم تصدير كشف Excel بنجاح: $fileName')),
+              ],
+            ),
+            backgroundColor: const Color(0xFF2E7D32),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isExporting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ أثناء التصدير: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final presentCount = _getPresentCount();
+    final totalCount = _getTotalCount();
+
+    final contentWidget = Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        widget.isDesktop ? 20 : 12,
+        20,
+        widget.isDesktop ? 20 : (20 + MediaQuery.of(context).viewInsets.bottom),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Drag handle for mobile
+          if (!widget.isDesktop) ...[
+            Center(
+              child: Container(
+                width: 38,
+                height: 4.5,
+                decoration: BoxDecoration(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Title & Icon Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF2E7D32).withValues(alpha: 0.25),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.table_chart_rounded,
+                  color: Color(0xFF2E7D32),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'تصدير كشف الحضور إلى Excel',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      DateFormat('EEEE، d MMMM yyyy', 'ar').format(widget.selectedDate),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Branch selection dropdown (if multiple branches and not preselected)
+          if (widget.preselectedBranch == null && widget.branches.length > 1) ...[
+            Text(
+              'الفرع المستهدف:',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outlineVariant),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  value: _selectedBranch,
+                  isExpanded: true,
+                  icon: const Icon(Icons.expand_more_rounded),
+                  items: [
+                    DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('جميع الفروع المتابعة (${widget.branches.length})'),
+                    ),
+                    ...widget.branches.map(
+                      (b) => DropdownMenuItem<String?>(
+                        value: b,
+                        child: Text(b),
+                      ),
+                    ),
+                  ],
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedBranch = val;
+                    });
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          Text(
+            'نطاق التصدير:',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Option 1: المناديب الذين لم ينصرفوا فقط (الأولوية لطلب المستخدم)
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _onlyNotCheckedOut = true);
+            },
+            child: AnimatedContainer(
+              duration: AppMotionDurations.short3,
+              curve: AppMotionCurves.standard,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _onlyNotCheckedOut
+                    ? const Color(0xFFE65100).withValues(alpha: 0.08)
+                    : colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _onlyNotCheckedOut
+                      ? const Color(0xFFE65100)
+                      : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  width: _onlyNotCheckedOut ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE65100).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.pending_actions_rounded,
+                      color: Color(0xFFE65100),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'المناديب الذين لم ينصرفوا فقط',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE65100).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '$presentCount حاضر',
+                                style: const TextStyle(
+                                  color: Color(0xFFE65100),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'تصدير اسم الشركة، المندوب، اليوم، ورقم التليفون للمتواجدين بالفرع',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    _onlyNotCheckedOut
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: _onlyNotCheckedOut
+                        ? const Color(0xFFE65100)
+                        : colorScheme.outlineVariant,
+                    size: 22,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Option 2: كشف الحضور الكامل
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _onlyNotCheckedOut = false);
+            },
+            child: AnimatedContainer(
+              duration: AppMotionDurations.short3,
+              curve: AppMotionCurves.standard,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: !_onlyNotCheckedOut
+                    ? const Color(0xFF2E7D32).withValues(alpha: 0.08)
+                    : colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: !_onlyNotCheckedOut
+                      ? const Color(0xFF2E7D32)
+                      : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  width: !_onlyNotCheckedOut ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.groups_rounded,
+                      color: Color(0xFF2E7D32),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'كشف الحضور الكامل (الكل)',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2E7D32).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '$totalCount مندوب',
+                                style: const TextStyle(
+                                  color: Color(0xFF2E7D32),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'يشمل كافة المناديب الحاضرين والمنصرفين خلال اليوم',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    !_onlyNotCheckedOut
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: !_onlyNotCheckedOut
+                        ? const Color(0xFF2E7D32)
+                        : colorScheme.outlineVariant,
+                    size: 22,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Connected Action Button Group
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+                width: 1.0,
+              ),
+            ),
+            child: Row(
+              children: [
+                // زر التصدير
+                Expanded(
+                  child: InkWell(
+                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(24)),
+                    onTap: _isExporting ? null : _handleExport,
+                    child: Center(
+                      child: _isExporting
+                          ? const AppLoadingIndicator(size: 20, color: Color(0xFF2E7D32))
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.file_download_rounded,
+                                  size: 18,
+                                  color: Color(0xFF2E7D32),
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'تصدير Excel',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF2E7D32),
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+
+                // Vertical Divider
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  indent: 8,
+                  endIndent: 8,
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                ),
+
+                // زر الإلغاء
+                Expanded(
+                  child: InkWell(
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(24)),
+                    onTap: _isExporting ? null : () => Navigator.of(context).pop(),
+                    child: Center(
+                      child: Text(
+                        'إلغاء',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (widget.isDesktop) {
+      return contentWidget;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+          width: 0.8,
+        ),
+      ),
+      child: contentWidget,
+    );
+  }
+}
+

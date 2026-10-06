@@ -81,12 +81,16 @@ class AdminTaskStatusUpdateRequested extends AdminTasksEvent {
 }
 
 class DeleteTaskRequested extends AdminTasksEvent {
+  final String organizationId;
   final String taskId;
 
-  const DeleteTaskRequested({required this.taskId});
+  const DeleteTaskRequested({
+    required this.organizationId,
+    required this.taskId,
+  });
 
   @override
-  List<Object?> get props => [taskId];
+  List<Object?> get props => [organizationId, taskId];
 }
 
 class UpdateTaskRequested extends AdminTasksEvent {

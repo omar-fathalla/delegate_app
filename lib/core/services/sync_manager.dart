@@ -43,15 +43,18 @@ class SyncManager {
   SyncManager({
     required this.offlineDataSource,
     required this.remoteDataSource,
+    bool isBackground = false,
   }) {
     refreshPendingCount();
 
-    // Listen for internet connection restoration when the app is in foreground
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
-      if (results.contains(ConnectivityResult.mobile) || results.contains(ConnectivityResult.wifi)) {
-        syncPendingPhotos();
-      }
-    });
+    if (!isBackground) {
+      // Listen for internet connection restoration when the app is in foreground
+      _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
+        if (results.contains(ConnectivityResult.mobile) || results.contains(ConnectivityResult.wifi)) {
+          syncPendingPhotos();
+        }
+      });
+    }
   }
 
   void dispose() {
@@ -106,7 +109,7 @@ class SyncManager {
             continue;
           }
 
-          // Attempt to upload
+          // Attempt to upload with strict timeout
           await remoteDataSource.uploadPhoto(
             organizationUID: photoData['organizationUID'],
             companyUID: photoData['companyUID'],
@@ -121,7 +124,7 @@ class SyncManager {
             comment: photoData['comment'] ?? '',
             latitude: photoData['latitude'] ?? 0.0,
             longitude: photoData['longitude'] ?? 0.0,
-          );
+          ).timeout(const Duration(seconds: 12));
 
           // If upload succeeds, delete the local record and the local file
           await offlineDataSource.deletePendingPhoto(id);

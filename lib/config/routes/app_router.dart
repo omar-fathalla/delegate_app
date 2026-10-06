@@ -12,6 +12,7 @@ import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/company.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/marketing_main_screen.dart';
 import 'package:delegate_app/features/accountant/presentation/pages/accountant_main_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_login_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_main_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
@@ -38,6 +39,7 @@ import 'package:delegate_app/features/photo_permission/presentation/pages/delega
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
+import 'package:delegate_app/features/hr/presentation/pages/delegate_leaves_and_requests_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -54,6 +56,13 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => AppMotionPage.fadeThrough(
         state: state,
         child: const LoginScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/hr/login',
+      pageBuilder: (context, state) => AppMotionPage.fadeThrough(
+        state: state,
+        child: const HrLoginScreen(),
       ),
     ),
     GoRoute(
@@ -352,6 +361,16 @@ final appRouter = GoRouter(
             create: (_) => di.sl<PhotoPermissionBloc>(),
             child: DelegateCameraCaptureScreen(delegate: delegate),
           ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/delegate/leaves-and-requests',
+      pageBuilder: (context, state) {
+        final delegate = state.extra as Delegate;
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: DelegateLeavesAndRequestsScreen(delegate: delegate),
         );
       },
     ),

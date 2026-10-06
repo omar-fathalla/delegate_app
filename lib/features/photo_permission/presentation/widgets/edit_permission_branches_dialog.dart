@@ -36,7 +36,14 @@ class _EditPermissionBranchesDialogState extends State<EditPermissionBranchesDia
           .collection('branches')
           .get();
       if (mounted) {
-        final docs = snapshot.docs.toList();
+        final pOrgUID = widget.permission.organizationUID.trim();
+        final docs = snapshot.docs.where((doc) {
+          if (pOrgUID.isEmpty) return true;
+          final data = doc.data();
+          final bOrgUID = (data['organizationUID'] as String?)?.trim() ?? '';
+          return bOrgUID.isEmpty || bOrgUID == pOrgUID;
+        }).toList();
+
         docs.sort((a, b) {
           final dataA = a.data();
           final dataB = b.data();

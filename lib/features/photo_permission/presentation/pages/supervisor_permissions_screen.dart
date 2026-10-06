@@ -916,7 +916,19 @@ class _CreateRequestBottomSheetState extends State<_CreateRequestBottomSheet> {
           builder: (context, state) {
             List<Branch> branches = [];
             if (state is BranchLoaded) {
-              branches = state.branches;
+              final allBranches = state.branches;
+              final orgUID = widget.supervisorDelegate.organizationUID.trim();
+              final orgName = widget.supervisorDelegate.organizationName.trim().toLowerCase();
+
+              branches = allBranches.where((b) {
+                final matchUID = orgUID.isNotEmpty && (b.organizationUID ?? '').trim() == orgUID;
+                final matchName = orgName.isNotEmpty &&
+                    b.organizationName != null &&
+                    (b.organizationName!.trim().toLowerCase() == orgName ||
+                        b.organizationName!.trim().toLowerCase().contains(orgName) ||
+                        orgName.contains(b.organizationName!.trim().toLowerCase()));
+                return matchUID || matchName;
+              }).toList();
             }
 
             final isLoadingBranches = state is BranchLoading;
@@ -1067,7 +1079,7 @@ class _CreateRequestBottomSheetState extends State<_CreateRequestBottomSheet> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // كارت توضيح سريان الإذن على جميع الفروع تلقائياً
+                  // كارت توضيح سريان الإذن على جميع فروع المؤسسة تلقائياً
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -1107,7 +1119,9 @@ class _CreateRequestBottomSheetState extends State<_CreateRequestBottomSheet> {
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
-                                  'جميع الفروع (${branches.length})',
+                                  widget.supervisorDelegate.organizationName.isNotEmpty
+                                      ? 'فروع ${widget.supervisorDelegate.organizationName} (${branches.length})'
+                                      : 'جميع الفروع (${branches.length})',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -1119,7 +1133,9 @@ class _CreateRequestBottomSheetState extends State<_CreateRequestBottomSheet> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'سيتم تطبيق إذن التصوير تلقائياً على كافة فروع الشركة بدون استثناء.',
+                          widget.supervisorDelegate.organizationName.isNotEmpty
+                              ? 'سيتم تطبيق إذن التصوير تلقائياً على كافة فروع (${widget.supervisorDelegate.organizationName}) فقط.'
+                              : 'سيتم تطبيق إذن التصوير تلقائياً على كافة فروع الشركة بدون استثناء.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -1154,9 +1170,11 @@ class _CreateRequestBottomSheetState extends State<_CreateRequestBottomSheet> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'إرسال الطلب للاعتماد (شامل كل الفروع)',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    child: Text(
+                      widget.supervisorDelegate.organizationName.isNotEmpty
+                          ? 'إرسال الطلب للاعتماد (فروع ${widget.supervisorDelegate.organizationName})'
+                          : 'إرسال الطلب للاعتماد (شامل كل الفروع)',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),
                 ],

@@ -323,4 +323,34 @@ When building or updating enterprise screens (HR System, Backoffice, Management 
 - Cards and table rows must derive all surfaces, borders, and hover states strictly from `Theme.of(context).colorScheme` (Purple primary theme in Tashil).
 - Status semantic colors (green, amber, red) are restricted to badges, pills, and 3.5px start border accents. The card background remains `colorScheme.surface` and outer border remains `colorScheme.outlineVariant`.
 
+### 4. Mobile-First Modal Bottom Sheets & Connected Action Button Groups (No Floating Bubbles on Mobile)
+- **Strict Prohibition**: Detail sheets, editing cards, and form modals on mobile viewports (`maxWidth <= 768px`) must NEVER be floating center dialogs (`AlertDialog`).
+- **Standard**: Always use `showModalBottomSheet`:
+  - `isScrollControlled: true`, `useSafeArea: true`, `backgroundColor: colorScheme.surface`.
+  - Shape: `RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28)))`.
+  - Top Drag Handle: Centered container `width: 38`, `height: 4.5`, radius `3`, color `colorScheme.outlineVariant.withValues(alpha: 0.6)`.
+  - Height Factor: Typically `MediaQuery.size.height * 0.78` to `0.85` (fills ~80% of screen).
+  - Soft Keyboard Inset: `padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom)`.
+  - **Connected Action Button Group**: Bottom actions (e.g. Save / Edit / Close) must be housed in a unified dual-button capsule container:
+    ```dart
+    Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6), width: 1.2),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          Expanded(flex: 2, child: InkWell(onTap: onCancel, child: Center(child: Row(children: [Icon(Icons.close_rounded), Text('إلغاء')])))),
+          Container(width: 1.2, height: 28, color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
+          Expanded(flex: 3, child: Material(color: colorScheme.primary, child: InkWell(onTap: onConfirm, child: Center(child: Row(children: [Icon(Icons.check_rounded, color: Colors.white), Text('تأكيد', style: TextStyle(color: Colors.white))]))))),
+        ],
+      ),
+    )
+    ```
+- **Responsive Web/Desktop Fallback**: On desktop (`maxWidth > 768px`), the exact same component adapts into a centered `Dialog` (max width `520px` - `560px`, `borderRadius: 24px`).
+
+
 

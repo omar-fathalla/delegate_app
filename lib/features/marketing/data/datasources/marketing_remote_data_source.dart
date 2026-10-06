@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/core/error/failures.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 
 abstract class MarketingRemoteDataSource {
@@ -17,6 +18,12 @@ abstract class MarketingRemoteDataSource {
   });
 
   Future<List<DelegateModel>> getDelegates(
+    String organizationUID,
+    String? companyUID,
+  );
+
+  /// Emits real-time updates for delegates/promoters
+  Stream<List<DelegateModel>> streamDelegates(
     String organizationUID,
     String? companyUID,
   );
@@ -55,7 +62,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           .collection('organizations')
           .doc(organizationUID)
           .collection('companies')
-          .get();
+          .getResilient(forceServer: true);
 
       // Get list of companies with their data
       final companies = snapshot.docs
@@ -72,7 +79,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
               .where('companyUID', isEqualTo: company['uid'])
               .where('role', isEqualTo: 'marketing')
               .limit(1)
-              .get();
+              .getResilient(forceServer: true);
 
           if (userQuery.docs.isNotEmpty) {
             final userData = userQuery.docs.first.data();
@@ -115,7 +122,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         query = query.startAfterDocument(lastDocument);
       }
 
-      final snapshot = await query.get();
+      final snapshot = await query.getResilient(forceServer: true);
 
       // Check if there are more companies
       final hasMore = snapshot.docs.length > limit;
@@ -176,7 +183,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             .collection('companies')
             .doc(companyUID)
             .collection('delegates')
-            .get();
+            .getResilient(forceServer: true);
         return snapshot.docs
             .map((doc) => DelegateModel.fromJson(doc.data(), doc.id))
             .toList();
@@ -186,7 +193,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         final snapshot = await firestore
             .collectionGroup('delegates')
             .where('organizationUID', isEqualTo: organizationUID)
-            .get();
+            .getResilient(forceServer: true);
         return snapshot.docs
             .map((doc) => DelegateModel.fromJson(doc.data(), doc.id))
             .toList();
@@ -198,6 +205,29 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
     }
   }
 
+  @override
+  Stream<List<DelegateModel>> streamDelegates(
+    String organizationUID,
+    String? companyUID,
+  ) {
+    final Query<Map<String, dynamic>> query = companyUID != null
+        ? firestore
+            .collection('organizations')
+            .doc(organizationUID)
+            .collection('companies')
+            .doc(companyUID)
+            .collection('delegates')
+        : firestore
+            .collectionGroup('delegates')
+            .where('organizationUID', isEqualTo: organizationUID);
+
+    return query.streamResilient(includeMetadataChanges: true).map((snapshot) {
+      return snapshot.docs
+          .map((doc) => DelegateModel.fromJson(doc.data(), doc.id))
+          .toList();
+    });
+  }
+
   // ─────────────────────────────────────────────
   // Branch Features
   // ─────────────────────────────────────────────
@@ -207,7 +237,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
     try {
       final snapshot = await firestore
           .collection('branches')
-          .get();
+          .getResilient(forceServer: true);
       final list = snapshot.docs
           .map((doc) {
             final data = doc.data();

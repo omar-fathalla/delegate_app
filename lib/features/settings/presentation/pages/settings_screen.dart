@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/core/services/review_service.dart';
+import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -439,55 +439,6 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showLogoutConfirmation(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.logout_rounded, color: colorScheme.error, size: 24),
-            const SizedBox(width: 8),
-            Text(l10n.logout),
-          ],
-        ),
-        content: Text(
-          localeProvider.isArabic
-              ? 'هل أنت متأكد من تسجيل الخروج؟'
-              : 'Are you sure you want to logout?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              localeProvider.isArabic ? 'إلغاء' : 'Cancel',
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              foregroundColor: colorScheme.onError,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () {
-              // Clear FCM token before logout
-              sl<PushNotificationService>().clearToken(delegate.uid).catchError(
-                (e) {
-                  debugPrint('FCM clear token error: $e');
-                },
-              );
-              Navigator.pop(dialogContext);
-              context.go('/login');
-            },
-            child: Text(l10n.logout),
-          ),
-        ],
-      ),
-    );
+    AppLogoutModal.show(context, delegate: delegate);
   }
 }

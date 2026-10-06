@@ -619,625 +619,112 @@ class _HRDelegateAttendanceDetailScreenState
   }
 
   void _showSessionDetailsDialog(DelegateAttendanceSession session) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final dateStr = DateFormat('EEEE، d MMMM yyyy', 'ar').format(session.checkInTime);
-    final inTimeStr = DateFormat('hh:mm:ss a', 'ar').format(session.checkInTime);
-    final outTimeStr = session.checkOutTime != null
-        ? (session.isAutoCheckOut
-            ? '${DateFormat('hh:mm:ss a', 'ar').format(session.checkOutTime!)} (إغلاق تلقائي)'
-            : DateFormat('hh:mm:ss a', 'ar').format(session.checkOutTime!))
-        : 'لم يتم تسجيل انصراف';
+    final isWide = MediaQuery.of(context).size.width > 768;
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: colorScheme.primaryContainer,
-              child: Icon(Icons.info_outline_rounded, color: colorScheme.primary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('تفاصيل جلسة الحضور', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text(dateStr, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
-                ],
-              ),
-            ),
-          ],
+    if (!isWide) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        barrierColor: Colors.black54,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        content: SizedBox(
-          width: 480,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (session.isAutoCheckOut) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.amber.shade300),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.auto_mode_rounded, size: 18, color: Colors.amber.shade900),
-                            const SizedBox(width: 8),
-                            Text(
-                              'تم إغلاق الانصراف تلقائياً (نظام الـ 9 ساعات)',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: Colors.amber.shade900,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          session.autoCheckOutReason ??
-                              'تم إغلاق الجلسة أوتوماتيكياً لاكتمال مدة الشفت (9 ساعات) دون تسجيل انصراف يدوي من المندوب.',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF451A03)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                if (session.isManuallyAdjusted) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.amber.shade300),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.edit_note_rounded, size: 18, color: Colors.amber.shade900),
-                            const SizedBox(width: 8),
-                            Text(
-                              'تم تعديل هذه الجلسة إدارياً',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: Colors.amber.shade900,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'المسؤول: ${session.lastAdjustedBy ?? "إدارة الموارد البشرية"}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF451A03)),
-                        ),
-                        if (session.adjustmentReason != null && session.adjustmentReason!.isNotEmpty)
-                          Text(
-                            'السبب: ${session.adjustmentReason}',
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF451A03)),
-                          ),
-                        if (session.lastAdjustedAt != null)
-                          Text(
-                            'تاريخ التعديل: ${DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(session.lastAdjustedAt!)}',
-                            style: TextStyle(fontSize: 11, color: Colors.amber.shade800),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-                _buildDialogDetailRow(Icons.store_rounded, 'الفرع', session.branchName),
-                const Divider(height: 16),
-                _buildDialogDetailRow(Icons.login_rounded, 'وقت الحضور الدقيق', inTimeStr, valueColor: Colors.green.shade700),
-                if (session.latitude != null && session.longitude != null)
-                  _buildDialogDetailRow(
-                    Icons.location_on_outlined,
-                    'إحداثيات الحضور',
-                    '${session.latitude!.toStringAsFixed(6)}, ${session.longitude!.toStringAsFixed(6)}',
-                  ),
-                if (session.deviceInfo != null)
-                  _buildDialogDetailRow(Icons.smartphone_rounded, 'جهاز الحضور', session.deviceInfo!),
-                const Divider(height: 16),
-                _buildDialogDetailRow(
-                  Icons.logout_rounded,
-                  'وقت الانصراف الدقيق',
-                  outTimeStr,
-                  valueColor: session.checkOutTime != null ? Colors.orange.shade800 : colorScheme.error,
-                ),
-                if (session.checkOutLatitude != null && session.checkOutLongitude != null)
-                  _buildDialogDetailRow(
-                    Icons.location_on_outlined,
-                    'إحداثيات الانصراف',
-                    '${session.checkOutLatitude!.toStringAsFixed(6)}, ${session.checkOutLongitude!.toStringAsFixed(6)}',
-                  ),
-                if (session.checkOutDeviceInfo != null)
-                  _buildDialogDetailRow(Icons.smartphone_rounded, 'جهاز الانصراف', session.checkOutDeviceInfo!),
-                const Divider(height: 16),
-                _buildDialogDetailRow(Icons.timer_outlined, 'إجمالي مدة العمل', session.formattedDuration, valueColor: colorScheme.primary),
-                if (session.distanceMeters != null)
-                  _buildDialogDetailRow(
-                    Icons.radar_rounded,
-                    'المسافة من الفرع',
-                    '${session.distanceMeters!.round()} متر (${session.isInsideGeofence == true ? 'داخل النطاق الجغرافي' : 'خارج النطاق الجغرافي'})',
-                    valueColor: session.isInsideGeofence == true ? Colors.green.shade700 : Colors.red.shade700,
-                  ),
-              ],
+        builder: (ctx) => _SessionDetailsSheet(
+          session: session,
+          delegate: widget.delegate,
+          isBottomSheet: true,
+          onEdit: () => _showEditAttendanceDialog(session),
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520, maxHeight: 720),
+            child: _SessionDetailsSheet(
+              session: session,
+              delegate: widget.delegate,
+              isBottomSheet: false,
+              onEdit: () => _showEditAttendanceDialog(session),
             ),
           ),
         ),
-        actions: [
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _showEditAttendanceDialog(session);
-            },
-            icon: const Icon(Icons.edit_calendar_rounded, size: 16),
-            label: const Text('تعديل التوقيت'),
-          ),
-          FilledButton.tonal(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إغلاق'),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 
   void _showEditAttendanceDialog(DelegateAttendanceSession session) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final dateStr = DateFormat('EEEE، d MMMM yyyy', 'ar').format(session.checkInTime);
+    final isWide = MediaQuery.of(context).size.width > 768;
 
-    TimeOfDay selectedCheckInTime = TimeOfDay.fromDateTime(session.checkInTime);
-    bool hasCheckOut = session.checkOutTime != null;
-    TimeOfDay selectedCheckOutTime = session.checkOutTime != null
-        ? TimeOfDay.fromDateTime(session.checkOutTime!)
-        : const TimeOfDay(hour: 17, minute: 0);
-
-    const List<String> adjustmentReasons = [
-      'نسيان تسجيل الانصراف من قِبل المندوب',
-      'عطل في هاتف المندوب أو نفاد البطارية',
-      'مشكلة تقنية في تطبيق المندوب أو الاتصال',
-      'توجيه إداري بتمديد أو تعديل فترة العمل',
-      'إذن مسبق وموافق عليه من المشرف الميداني',
-      'تصحيح توقيت الحضور (حضور مبكر/متأخر معتمد)',
-      'أخرى (يرجى التوضيح في الملاحظات الإدارية)',
-    ];
-
-    String selectedReason = adjustmentReasons.first;
-    final notesController = TextEditingController();
-    bool isSaving = false;
-    String? localValidationError;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final newInDateTime = DateTime(
-            session.checkInTime.year,
-            session.checkInTime.month,
-            session.checkInTime.day,
-            selectedCheckInTime.hour,
-            selectedCheckInTime.minute,
-          );
-
-          final newOutDateTime = hasCheckOut
-              ? DateTime(
-                  session.checkInTime.year,
-                  session.checkInTime.month,
-                  session.checkInTime.day,
-                  selectedCheckOutTime.hour,
-                  selectedCheckOutTime.minute,
-                )
-              : null;
-
-          final bool isNegativeDuration = hasCheckOut && newOutDateTime!.isBefore(newInDateTime);
-          final Duration? newDuration = hasCheckOut && !isNegativeDuration
-              ? newOutDateTime!.difference(newInDateTime)
-              : null;
-
-          String? durationDiffText;
-          Color? durationDiffColor;
-          if (newDuration != null) {
-            final oldDurationMins = session.duration?.inMinutes ?? 0;
-            final newDurationMins = newDuration.inMinutes;
-            final diffMins = newDurationMins - oldDurationMins;
-            if (diffMins != 0) {
-              final isPositive = diffMins > 0;
-              final absMins = diffMins.abs();
-              final h = absMins ~/ 60;
-              final m = absMins % 60;
-              final formattedDiff = h > 0 ? '$h س ${m > 0 ? "و $m د" : ""}' : '$m دقيقة';
-              durationDiffText = '${isPositive ? "+" : "-"}$formattedDiff';
-              durationDiffColor = isPositive ? Colors.green.shade700 : Colors.red.shade700;
-            } else {
-              durationDiffText = 'بدون تغيير في المدة';
-              durationDiffColor = colorScheme.onSurfaceVariant;
-            }
-          }
-
-          String formatTime(TimeOfDay t) {
-            final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
-            final m = t.minute.toString().padLeft(2, '0');
-            final period = t.period == DayPeriod.am ? 'ص' : 'م';
-            return '$h:$m $period';
-          }
-
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.edit_calendar_rounded, color: Colors.amber.shade900, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'تعديل توقيت جلسة الحضور',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${widget.delegate.fullName} • $dateStr',
-                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: 520,
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Info banner
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.store_rounded, size: 18, color: colorScheme.primary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'الفرع: ${session.branchName}',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Time adjustments card
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'ضبط الأوقات',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // 1. Check-in picker
-                          Row(
-                            children: [
-                              Icon(Icons.login_rounded, size: 18, color: Colors.green.shade700),
-                              const SizedBox(width: 8),
-                              const Expanded(
-                                child: Text('وقت تسجيل الحضور:', style: TextStyle(fontSize: 13)),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: isSaving ? null : () async {
-                                  final picked = await showTimePicker(
-                                    context: context,
-                                    initialTime: selectedCheckInTime,
-                                  );
-                                  if (picked != null) {
-                                    setDialogState(() {
-                                      selectedCheckInTime = picked;
-                                      localValidationError = null;
-                                    });
-                                  }
-                                },
-                                icon: const Icon(Icons.access_time_rounded, size: 16),
-                                label: Text(
-                                  formatTime(selectedCheckInTime),
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          const Divider(height: 1),
-                          const SizedBox(height: 14),
-
-                          // 2. Check-out toggle & picker
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.logout_rounded,
-                                size: 18,
-                                color: hasCheckOut ? Colors.orange.shade800 : colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text('تسجيل الانصراف:', style: TextStyle(fontSize: 13)),
-                                    if (session.checkOutTime == null)
-                                      Text(
-                                        'لم يسجل المندوب انصرافاً',
-                                        style: TextStyle(fontSize: 11, color: Colors.red.shade700),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              Switch.adaptive(
-                                value: hasCheckOut,
-                                onChanged: isSaving ? null : (val) {
-                                  setDialogState(() {
-                                    hasCheckOut = val;
-                                    localValidationError = null;
-                                  });
-                                },
-                              ),
-                              if (hasCheckOut) ...[
-                                const SizedBox(width: 8),
-                                OutlinedButton.icon(
-                                  onPressed: isSaving ? null : () async {
-                                    final picked = await showTimePicker(
-                                      context: context,
-                                      initialTime: selectedCheckOutTime,
-                                    );
-                                    if (picked != null) {
-                                      setDialogState(() {
-                                        selectedCheckOutTime = picked;
-                                        localValidationError = null;
-                                      });
-                                    }
-                                  },
-                                  icon: const Icon(Icons.access_time_rounded, size: 16),
-                                  label: Text(
-                                    formatTime(selectedCheckOutTime),
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Duration Comparison Preview
-                    if (isNegativeDuration)
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.red.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'تنبيه: وقت الانصراف يجب أن يكون بعد وقت الحضور!',
-                                style: TextStyle(fontSize: 12, color: Colors.red.shade900, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else if (hasCheckOut && newDuration != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.timelapse_rounded, size: 20, color: colorScheme.primary),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        'المدة الجديدة: ',
-                                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-                                      ),
-                                      Text(
-                                        '${newDuration.inHours} س و ${newDuration.inMinutes.remainder(60)} د',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: colorScheme.primary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (durationDiffText != null)
-                                    Text(
-                                      'الفارق عن السابق: $durationDiffText (سابقاً: ${session.formattedDuration})',
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: durationDiffColor),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-
-                    // Mandatory Adjustment Reason
-                    const Text(
-                      'سبب التعديل الإداري (إلزامي للتدقيق):',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedReason,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      ),
-                      items: adjustmentReasons
-                          .map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13))))
-                          .toList(),
-                      onChanged: isSaving ? null : (val) {
-                        if (val != null) {
-                          setDialogState(() => selectedReason = val);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Additional Notes
-                    const Text(
-                      'ملاحظات إضافية (اختياري):',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: notesController,
-                      enabled: !isSaving,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        hintText: 'أدخل أي تفاصيل إدارية توضيحية لتسجيلها في ملف التدقيق...',
-                        hintStyle: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
-                    ),
-
-                    if (localValidationError != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        localValidationError!,
-                        style: TextStyle(fontSize: 12, color: colorScheme.error, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ],
-                ),
+    if (!isWide) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        barrierColor: Colors.black54,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (ctx) => _EditAttendanceSheet(
+          session: session,
+          delegate: widget.delegate,
+          hrDelegate: widget.hrDelegate,
+          isBottomSheet: true,
+          onSave: ({
+            required newInTime,
+            required newOutTime,
+            required hasCheckOut,
+            required reason,
+            required notes,
+          }) => _executeAttendanceAdjustment(
+            session: session,
+            newInTime: newInTime,
+            newOutTime: newOutTime,
+            hasCheckOut: hasCheckOut,
+            reason: reason,
+            notes: notes,
+          ),
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520, maxHeight: 720),
+            child: _EditAttendanceSheet(
+              session: session,
+              delegate: widget.delegate,
+              hrDelegate: widget.hrDelegate,
+              isBottomSheet: false,
+              onSave: ({
+                required newInTime,
+                required newOutTime,
+                required hasCheckOut,
+                required reason,
+                required notes,
+              }) => _executeAttendanceAdjustment(
+                session: session,
+                newInTime: newInTime,
+                newOutTime: newOutTime,
+                hasCheckOut: hasCheckOut,
+                reason: reason,
+                notes: notes,
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
-                child: const Text('إلغاء'),
-              ),
-              FilledButton.icon(
-                onPressed: (isSaving || isNegativeDuration)
-                    ? null
-                    : () async {
-                        final bool checkInChanged = newInDateTime != session.checkInTime;
-                        final bool checkOutChanged = (session.checkOutTime == null && hasCheckOut) ||
-                            (session.checkOutTime != null && (!hasCheckOut || newOutDateTime != session.checkOutTime));
-
-                        if (!checkInChanged && !checkOutChanged) {
-                          setDialogState(() {
-                            localValidationError = 'لم تقم بتغيير وقت الحضور أو الانصراف.';
-                          });
-                          return;
-                        }
-
-                        if (selectedReason.startsWith('أخرى') && notesController.text.trim().isEmpty) {
-                          setDialogState(() {
-                            localValidationError = 'يرجى كتابة الملاحظات الإدارية عند اختيار سبب أخرى.';
-                          });
-                          return;
-                        }
-
-                        setDialogState(() {
-                          isSaving = true;
-                          localValidationError = null;
-                        });
-
-                        try {
-                          await _executeAttendanceAdjustment(
-                            session: session,
-                            newInTime: newInDateTime,
-                            newOutTime: newOutDateTime,
-                            hasCheckOut: hasCheckOut,
-                            reason: selectedReason,
-                            notes: notesController.text.trim(),
-                          );
-                          if (dialogCtx.mounted) {
-                            Navigator.pop(dialogCtx);
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            setDialogState(() {
-                              isSaving = false;
-                              localValidationError = 'حدث خطأ أثناء حفظ التعديل: $e';
-                            });
-                          }
-                        }
-                      },
-                icon: isSaving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.check_rounded, size: 18),
-                label: Text(isSaving ? 'جارٍ الحفظ والاعتماد...' : 'حفظ التعديل والاعتماد'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _executeAttendanceAdjustment({
@@ -1408,30 +895,15 @@ class _HRDelegateAttendanceDetailScreenState
     }
   }
 
-  Widget _buildDialogDetailRow(IconData icon, String label, String value, {Color? valueColor}) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 140,
-            child: Text(label, style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant)),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: valueColor ?? colorScheme.onSurface,
-              ),
-            ),
-          ),
-        ],
+  void _navigateToAdjustments() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HRAttendanceAdjustmentsScreen(
+          hrDelegate: widget.hrDelegate ?? widget.delegate,
+          initialDelegateUID: widget.delegate.uid,
+          showAppBar: true,
+        ),
       ),
     );
   }
@@ -1444,36 +916,119 @@ class _HRDelegateAttendanceDetailScreenState
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
-        title: const Text('سجل الحضور والانصراف التفصيلي', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isWide ? 'سجل الحضور والانصراف التفصيلي' : 'سجل حضور المندوب',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              widget.delegate.fullName,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.normal,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
         centerTitle: false,
         actions: [
-          Padding(
-            padding: const EdgeInsetsDirectional.only(end: 8),
-            child: FilledButton.tonalIcon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => HRAttendanceAdjustmentsScreen(
-                      hrDelegate: widget.hrDelegate ?? widget.delegate,
-                      initialDelegateUID: widget.delegate.uid,
-                      showAppBar: true,
+          if (isWide) ...[
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8),
+              child: FilledButton.tonalIcon(
+                onPressed: _navigateToAdjustments,
+                icon: const Icon(Icons.history_edu_rounded, size: 18),
+                label: const Text('سجل التعديلات الإدارية'),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 12),
+              child: FilledButton.tonalIcon(
+                onPressed: _exportMonthlyReportToCSV,
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: const Text('تصدير التقرير الشهري (CSV)'),
+              ),
+            ),
+          ] else ...[
+            Container(
+              height: 38,
+              margin: const EdgeInsetsDirectional.only(end: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(19),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(19),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Tooltip(
+                      message: 'سجل التعديلات الإدارية',
+                      child: InkWell(
+                        onTap: _navigateToAdjustments,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.history_edu_rounded, size: 16, color: colorScheme.primary),
+                              const SizedBox(width: 4),
+                              Text(
+                                'التعديلات',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.history_edu_rounded, size: 18),
-              label: Text(isWide ? 'سجل التعديلات الإدارية' : 'التعديلات'),
+                    Container(
+                      width: 1,
+                      height: 18,
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
+                    Tooltip(
+                      message: 'تصدير التقرير الشهري (CSV)',
+                      child: InkWell(
+                        onTap: _exportMonthlyReportToCSV,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.download_rounded, size: 16, color: colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text(
+                                'تصدير',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsetsDirectional.only(end: 8),
-            child: FilledButton.tonalIcon(
-              onPressed: _exportMonthlyReportToCSV,
-              icon: const Icon(Icons.download_rounded, size: 18),
-              label: Text(isWide ? 'تصدير التقرير الشهري (CSV)' : 'تصدير'),
-            ),
-          ),
+          ],
         ],
       ),
       body: _isLoading
@@ -1561,7 +1116,7 @@ class _HRDelegateAttendanceDetailScreenState
                       Text(
                         widget.delegate.fullName,
                         style: TextStyle(
-                          fontSize: isWide ? 20 : 17,
+                          fontSize: isWide ? 20 : 16.5,
                           fontWeight: FontWeight.bold,
                           color: colorScheme.onSurface,
                         ),
@@ -1600,26 +1155,28 @@ class _HRDelegateAttendanceDetailScreenState
                 ],
               ),
             ),
-            if (isWide) ...[
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TashilIconButton(
-                    icon: Icons.call_rounded,
-                    color: Colors.green,
-                    tooltip: 'اتصال هاتفي',
-                    onPressed: () => _makePhoneCall(widget.delegate.phoneNumber),
-                  ),
-                  const SizedBox(width: 8),
-                  TashilIconButton(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    color: Colors.teal,
-                    tooltip: 'مراسلة عبر واتساب',
-                    onPressed: () => _openWhatsApp(widget.delegate.phoneNumber),
-                  ),
-                ],
-              ),
-            ],
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TashilIconButton(
+                  icon: Icons.call_rounded,
+                  color: Colors.green.shade700,
+                  size: isWide ? 40 : 34,
+                  iconSize: isWide ? 20 : 17,
+                  tooltip: 'اتصال هاتفي بالمندوب',
+                  onPressed: () => _makePhoneCall(widget.delegate.phoneNumber),
+                ),
+                const SizedBox(width: 6),
+                TashilIconButton(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  color: Colors.teal.shade700,
+                  size: isWide ? 40 : 34,
+                  iconSize: isWide ? 20 : 17,
+                  tooltip: 'مراسلة عبر واتساب',
+                  onPressed: () => _openWhatsApp(widget.delegate.phoneNumber),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1710,7 +1267,7 @@ class _HRDelegateAttendanceDetailScreenState
     );
   }
 
-  // --- 3. Monthly Analytics KPI Cards ---
+  // --- 3. Monthly Analytics KPI Cards (No horizontal scroll, 2x2 responsive grid on mobile) ---
   Widget _buildMonthlyKpiCards(ColorScheme colorScheme, bool isWide) {
     final kpis = [
       _KpiItem(
@@ -1725,7 +1282,7 @@ class _HRDelegateAttendanceDetailScreenState
         value: '$_completedCheckOutsCount مرة',
         subtitle: 'جلسات مكتملة',
         icon: Icons.logout_rounded,
-        color: Colors.orange,
+        color: Colors.indigo,
       ),
       _KpiItem(
         title: 'إجمالي الساعات',
@@ -1735,7 +1292,7 @@ class _HRDelegateAttendanceDetailScreenState
         color: colorScheme.primary,
       ),
       _KpiItem(
-        title: 'متوسط الساعات اليومي',
+        title: 'متوسط الساعات',
         value: _formattedAverageDailyHours,
         subtitle: 'لكل يوم عمل',
         icon: Icons.speed_rounded,
@@ -1762,19 +1319,118 @@ class _HRDelegateAttendanceDetailScreenState
         }).toList(),
       );
     } else {
-      return SizedBox(
-        height: 110,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: kpis.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (_, i) => SizedBox(
-            width: 170,
-            child: _buildSingleKpiCard(kpis[i], colorScheme),
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: _buildCompactKpiCard(kpis[0], colorScheme)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildCompactKpiCard(kpis[1], colorScheme)),
+            ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _buildCompactKpiCard(kpis[2], colorScheme)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildCompactKpiCard(kpis[3], colorScheme)),
+            ],
+          ),
+          if (_branchesInCurrentMonth.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.storefront_rounded, size: 15, color: Colors.deepPurple.shade600),
+                  const SizedBox(width: 6),
+                  Text(
+                    'الفروع المزارة (${_branchesInCurrentMonth.length}): ',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                  ),
+                  Expanded(
+                    child: Text(
+                      _branchesInCurrentMonth.join('، '),
+                      style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       );
     }
+  }
+
+  Widget _buildCompactKpiCard(_KpiItem kpi, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  kpi.title,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: kpi.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(kpi.icon, size: 14, color: kpi.color),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            kpi.value,
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            kpi.subtitle,
+            style: TextStyle(
+              fontSize: 9.5,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSingleKpiCard(_KpiItem kpi, ColorScheme colorScheme) {
@@ -1833,22 +1489,35 @@ class _HRDelegateAttendanceDetailScreenState
     );
   }
 
-  // --- 4. Filter Bar (Unified Design across Branch Selector, Status Filters, & Records Count) ---
+  // --- 4. Filter Bar (Single Row: Branch Dropdown + Status Button Group + Compact Count Badge) ---
   Widget _buildFilterBar(ColorScheme colorScheme, bool isWide) {
     final branches = ['all', ..._branchesInCurrentMonth];
 
-    return Wrap(
-      spacing: 12,
-      runSpacing: 10,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    if (isWide) {
+      return Row(
+        children: [
+          _buildBranchFilterControl(branches, colorScheme),
+          const SizedBox(width: 10),
+          _buildStatusFilterControl(colorScheme),
+          const SizedBox(width: 10),
+          _buildRecordCountBadge(colorScheme),
+        ],
+      );
+    }
+
+    return Row(
       children: [
-        // 1. Branch Selector (Unified Capsule Track)
-        _buildBranchFilterControl(branches, colorScheme),
+        // 1. Branch Selector (Right in RTL, expands naturally)
+        Expanded(
+          child: _buildBranchFilterControl(branches, colorScheme),
+        ),
+        const SizedBox(width: 6),
 
-        // 2. Status Filter Group (Unified Capsule Track)
+        // 2. Status Filter Group (Center in RTL)
         _buildStatusFilterControl(colorScheme),
+        const SizedBox(width: 6),
 
-        // 3. Record Count Badge (Unified Capsule Track)
+        // 3. Compact Count Badge (Left in RTL, shows: عدد: X)
         _buildRecordCountBadge(colorScheme),
       ],
     );
@@ -1861,10 +1530,10 @@ class _HRDelegateAttendanceDetailScreenState
         : selectedBranch;
 
     return Container(
-      height: 40,
+      height: 38,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(19),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
           width: 1.0,
@@ -1889,16 +1558,19 @@ class _HRDelegateAttendanceDetailScreenState
                   color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  b == 'all' ? 'جميع الفروع (${_branchesInCurrentMonth.length})' : b,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                Expanded(
+                  child: Text(
+                    b == 'all' ? 'جميع الفروع (${_branchesInCurrentMonth.length})' : b,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (isSelected) ...[
-                  const Spacer(),
+                  const SizedBox(width: 6),
                   Icon(Icons.check_rounded, size: 18, color: colorScheme.primary),
                 ],
               ],
@@ -1906,22 +1578,26 @@ class _HRDelegateAttendanceDetailScreenState
           );
         }).toList(),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.storefront_rounded, size: 17, color: colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
+              Icon(Icons.storefront_rounded, size: 16, color: colorScheme.primary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
-              const SizedBox(width: 6),
-              Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Icon(Icons.keyboard_arrow_down_rounded, size: 17, color: colorScheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -1931,7 +1607,8 @@ class _HRDelegateAttendanceDetailScreenState
 
   Widget _buildStatusFilterControl(ColorScheme colorScheme) {
     return TashilConnectedButtonGroup<String>(
-      height: 40,
+      height: 38,
+      itemPadding: const EdgeInsets.symmetric(horizontal: 7),
       items: const [
         TashilConnectedButtonItem(value: 'all', label: 'الكل'),
         TashilConnectedButtonItem(value: 'completed', label: 'مكتمل'),
@@ -1946,11 +1623,11 @@ class _HRDelegateAttendanceDetailScreenState
 
   Widget _buildRecordCountBadge(ColorScheme colorScheme) {
     return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(19),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
           width: 1.0,
@@ -1959,13 +1636,13 @@ class _HRDelegateAttendanceDetailScreenState
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.receipt_long_rounded, size: 17, color: colorScheme.primary),
-          const SizedBox(width: 8),
+          Icon(Icons.receipt_long_rounded, size: 15, color: colorScheme.primary),
+          const SizedBox(width: 5),
           Text(
-            'عدد السجلات: ${_filteredMonthlySessions.length}',
+            'عدد: ${_filteredMonthlySessions.length}',
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
               color: colorScheme.onSurface,
             ),
           ),
@@ -1974,7 +1651,7 @@ class _HRDelegateAttendanceDetailScreenState
     );
   }
 
-  // --- 5. Attendance History Section (Desktop Table / Mobile Cards) ---
+  // --- 5. Attendance History Section (Table View on Mobile & Web) ---
   Widget _buildHistorySection(ColorScheme colorScheme, bool isWide) {
     final sessions = _filteredMonthlySessions;
 
@@ -2017,25 +1694,20 @@ class _HRDelegateAttendanceDetailScreenState
       );
     }
 
-    if (isWide) {
-      return _buildDesktopTable(sessions, colorScheme);
-    } else {
-      return _buildMobileCardsList(sessions, colorScheme);
-    }
+    return _buildAttendanceTable(sessions, colorScheme);
   }
 
-  // Desktop / Web Table Column Flex Constants (Guaranteed 1:1 Header/Row Synchronization)
-  static const int _colFlexDate = 14;        // التاريخ واليوم
-  static const int _colFlexBranch = 14;      // الفرع
-  static const int _colFlexInTime = 13;      // تسجيل الحضور
-  static const int _colFlexOutTime = 13;     // تسجيل الانصراف
-  static const int _colFlexDuration = 12;    // مدة العمل
-  static const int _colFlexStatus = 16;      // الحالة
-  static const int _colFlexDevice = 17;      // الجهاز والمسافة
-  static const int _colFlexActions = 11;     // التعديل والتفاصيل
+  // Desktop & Mobile Table Column Flex Constants (Guaranteed 1:1 Header/Row Synchronization)
+  static const int _colFlexDate = 15;        // التاريخ واليوم
+  static const int _colFlexBranch = 15;      // الفرع
+  static const int _colFlexInTime = 14;      // تسجيل الحضور
+  static const int _colFlexOutTime = 18;     // تسجيل الانصراف
+  static const int _colFlexDuration = 13;    // مدة العمل
+  static const int _colFlexStatus = 15;      // الحالة
+  static const int _colFlexActions = 10;     // الإجراءات
 
-  // Desktop / Web Table
-  Widget _buildDesktopTable(List<DelegateAttendanceSession> sessions, ColorScheme colorScheme) {
+  // Table View (Responsive on Mobile with Smooth Horizontal Scroll & Direct on Desktop)
+  Widget _buildAttendanceTable(List<DelegateAttendanceSession> sessions, ColorScheme colorScheme) {
     return Card(
       elevation: 0,
       color: colorScheme.surface,
@@ -2046,7 +1718,7 @@ class _HRDelegateAttendanceDetailScreenState
       clipBehavior: Clip.antiAlias,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          const double minTableWidth = 980.0;
+          const double minTableWidth = 840.0;
           final bool needsScroll = constraints.maxWidth < minTableWidth;
           final double tableWidth = needsScroll ? minTableWidth : constraints.maxWidth;
 
@@ -2067,7 +1739,6 @@ class _HRDelegateAttendanceDetailScreenState
                       _buildHeaderCell('تسجيل الانصراف', flex: _colFlexOutTime),
                       _buildHeaderCell('مدة العمل', flex: _colFlexDuration),
                       _buildHeaderCell('الحالة', flex: _colFlexStatus),
-                      _buildHeaderCell('الجهاز والمسافة', flex: _colFlexDevice),
                       _buildHeaderCell('الإجراءات', flex: _colFlexActions, alignment: AlignmentDirectional.center),
                     ],
                   ),
@@ -2093,277 +1764,233 @@ class _HRDelegateAttendanceDetailScreenState
                         ? DateFormat('hh:mm a', 'ar').format(s.checkOutTime!)
                         : '-';
 
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    return Material(
                       color: isEven
                           ? colorScheme.surface
                           : colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
-                      child: Row(
-                        children: [
-                          // 1. Date & Day
-                          Expanded(
-                            flex: _colFlexDate,
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 12),
-                              child: Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      dayStr,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      child: InkWell(
+                        onTap: () => _showSessionDetailsDialog(s),
+                        hoverColor: colorScheme.primary.withValues(alpha: 0.04),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              // 1. Date & Day
+                              Expanded(
+                                flex: _colFlexDate,
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.only(end: 12),
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerStart,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          dayStr,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          dateStr,
+                                          style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      dateStr,
-                                      style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
 
-                          // 2. Branch
-                          Expanded(
-                            flex: _colFlexBranch,
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 12),
-                              child: Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.storefront_rounded, size: 16, color: colorScheme.primary),
-                                    const SizedBox(width: 6),
-                                    Flexible(
-                                      child: Text(
-                                        s.branchName,
-                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // 3. Check-in Time
-                          Expanded(
-                            flex: _colFlexInTime,
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 12),
-                              child: Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.login_rounded, size: 16, color: Colors.green.shade700),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      inTimeStr,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                        color: Colors.green.shade800,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // 4. Check-out Time
-                          Expanded(
-                            flex: _colFlexOutTime,
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 12),
-                              child: Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      s.isAutoCheckOut
-                                          ? Icons.auto_mode_rounded
-                                          : Icons.logout_rounded,
-                                      size: 16,
-                                      color: s.isAutoCheckOut
-                                          ? Colors.amber.shade800
-                                          : (s.checkOutTime != null
-                                              ? Colors.orange.shade800
-                                              : colorScheme.error.withValues(alpha: 0.6)),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      outTimeStr,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                        color: s.isAutoCheckOut
-                                            ? Colors.amber.shade900
-                                            : (s.checkOutTime != null
-                                                ? Colors.orange.shade900
-                                                : colorScheme.onSurfaceVariant),
-                                      ),
-                                    ),
-                                    if (s.isAutoCheckOut) ...[
-                                      const SizedBox(width: 6),
-                                      Tooltip(
-                                        message: 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً',
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                          decoration: BoxDecoration(
-                                            color: Colors.amber.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
-                                          ),
+                              // 2. Branch
+                              Expanded(
+                                flex: _colFlexBranch,
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.only(end: 12),
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerStart,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.storefront_rounded, size: 16, color: colorScheme.primary),
+                                        const SizedBox(width: 6),
+                                        Flexible(
                                           child: Text(
-                                            'تلقائي (9 س)',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.amber.shade900,
-                                            ),
+                                            s.branchName,
+                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ],
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
 
-                          // 5. Work Duration
-                          Expanded(
-                            flex: _colFlexDuration,
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 12),
-                              child: Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.schedule_rounded,
-                                      size: 15,
-                                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      s.formattedDuration,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: colorScheme.onSurface,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // 6. Status Badge
-                          Expanded(
-                            flex: _colFlexStatus,
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 12),
-                              child: Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: _buildStatusBadge(s, colorScheme),
-                              ),
-                            ),
-                          ),
-
-                          // 7. Device & Distance
-                          Expanded(
-                            flex: _colFlexDevice,
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 12),
-                              child: Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (s.deviceInfo != null && s.deviceInfo!.isNotEmpty)
-                                      Text(
-                                        s.deviceInfo!,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: colorScheme.onSurfaceVariant,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    if (s.distanceMeters != null) ...[
-                                      const SizedBox(height: 2),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            s.isInsideGeofence == true
-                                                ? Icons.check_circle_outline_rounded
-                                                : Icons.location_off_rounded,
-                                            size: 11,
-                                            color: s.isInsideGeofence == true
-                                                ? Colors.green.shade700
-                                                : Colors.red.shade700,
+                              // 3. Check-in Time
+                              Expanded(
+                                flex: _colFlexInTime,
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.only(end: 12),
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerStart,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.login_rounded, size: 16, color: Colors.green.shade700),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          inTimeStr,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                            color: Colors.green.shade800,
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            '${s.distanceMeters!.round()} م (${s.isInsideGeofence == true ? 'داخل النطاق' : 'خارج'})',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
-                                              color: s.isInsideGeofence == true
-                                                  ? Colors.green.shade700
-                                                  : Colors.red.shade700,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              // 4. Check-out Time (Wrapped with generous flex to eliminate overflow, clear non-orange colors)
+                              Expanded(
+                                flex: _colFlexOutTime,
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.only(end: 12),
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerStart,
+                                    child: Wrap(
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      spacing: 6,
+                                      runSpacing: 3,
+                                      children: [
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              s.isAutoCheckOut
+                                                  ? Icons.auto_mode_rounded
+                                                  : Icons.logout_rounded,
+                                              size: 16,
+                                              color: s.isAutoCheckOut
+                                                  ? Colors.deepPurple.shade700
+                                                  : (s.checkOutTime != null
+                                                      ? Colors.indigo.shade700
+                                                      : colorScheme.error.withValues(alpha: 0.6)),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              outTimeStr,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 12.5,
+                                                color: s.isAutoCheckOut
+                                                    ? Colors.deepPurple.shade900
+                                                    : (s.checkOutTime != null
+                                                        ? Colors.indigo.shade900
+                                                        : colorScheme.onSurfaceVariant),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (s.isAutoCheckOut)
+                                          Tooltip(
+                                            message: 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً',
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: Colors.deepPurple.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(color: Colors.deepPurple.withValues(alpha: 0.3)),
+                                              ),
+                                              child: Text(
+                                                'تلقائي (9 س)',
+                                                style: TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.deepPurple.shade800,
+                                                ),
+                                              ),
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
 
-                          // 8. Actions (Edit & Details)
-                          Expanded(
-                            flex: _colFlexActions,
-                            child: Align(
-                              alignment: AlignmentDirectional.center,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  TashilIconButton(
-                                    icon: Icons.edit_calendar_rounded,
-                                    size: 32,
-                                    iconSize: 16,
-                                    tooltip: 'تعديل توقيت الجلسة',
-                                    onPressed: () => _showEditAttendanceDialog(s),
+                              // 5. Work Duration
+                              Expanded(
+                                flex: _colFlexDuration,
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.only(end: 12),
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerStart,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.schedule_rounded,
+                                          size: 15,
+                                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          s.formattedDuration,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  const SizedBox(width: 4),
-                                  TashilIconButton(
-                                    icon: Icons.info_outline_rounded,
-                                    size: 32,
-                                    iconSize: 16,
-                                    tooltip: 'عرض تفاصيل الجلسة',
-                                    onPressed: () => _showSessionDetailsDialog(s),
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
+
+                              // 6. Status Badge
+                              Expanded(
+                                flex: _colFlexStatus,
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.only(end: 12),
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerStart,
+                                    child: _buildStatusBadge(s, colorScheme),
+                                  ),
+                                ),
+                              ),
+
+                              // 7. Actions (Edit & Details)
+                              Expanded(
+                                flex: _colFlexActions,
+                                child: Align(
+                                  alignment: AlignmentDirectional.center,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      TashilIconButton(
+                                        icon: Icons.edit_calendar_rounded,
+                                        size: 32,
+                                        iconSize: 16,
+                                        tooltip: 'تعديل توقيت الجلسة',
+                                        onPressed: () => _showEditAttendanceDialog(s),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      TashilIconButton(
+                                        icon: Icons.info_outline_rounded,
+                                        size: 32,
+                                        iconSize: 16,
+                                        tooltip: 'عرض تفاصيل الجلسة',
+                                        onPressed: () => _showSessionDetailsDialog(s),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     );
                   },
@@ -2410,142 +2037,6 @@ class _HRDelegateAttendanceDetailScreenState
     );
   }
 
-  // Mobile Cards List
-  Widget _buildMobileCardsList(List<DelegateAttendanceSession> sessions, ColorScheme colorScheme) {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: sessions.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (ctx, index) {
-        final s = sessions[index];
-        final dateStr = DateFormat('EEEE، d MMMM yyyy', 'ar').format(s.checkInTime);
-        final inTimeStr = DateFormat('hh:mm a', 'ar').format(s.checkInTime);
-        final outTimeStr = s.checkOutTime != null
-            ? DateFormat('hh:mm a', 'ar').format(s.checkOutTime!)
-            : 'لم يسجل انصراف';
-
-        return Card(
-          elevation: 0,
-          color: colorScheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () => _showSessionDetailsDialog(s),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(dateStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      _buildStatusBadge(s, colorScheme),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.store_rounded, size: 16, color: colorScheme.primary),
-                      const SizedBox(width: 6),
-                      Text(s.branchName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Icon(Icons.login_rounded, size: 14, color: Colors.green.shade700),
-                            const SizedBox(width: 4),
-                            Text('حضور: $inTimeStr', style: const TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Icon(
-                              s.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
-                              size: 14,
-                              color: s.isAutoCheckOut ? Colors.amber.shade800 : Colors.orange.shade800,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                'انصراف: $outTimeStr',
-                                style: const TextStyle(fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (s.isAutoCheckOut) ...[
-                              const SizedBox(width: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
-                                ),
-                                child: Text(
-                                  'تلقائي',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.amber.shade900,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.timer_outlined, size: 14, color: colorScheme.primary),
-                          const SizedBox(width: 4),
-                          Text(
-                            'مدة العمل: ${s.formattedDuration}',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.primary),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_calendar_rounded, size: 18),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            tooltip: 'تعديل التوقيت',
-                            onPressed: () => _showEditAttendanceDialog(s),
-                          ),
-                          const SizedBox(width: 10),
-                          Icon(Icons.chevron_left_rounded, size: 18, color: colorScheme.onSurfaceVariant),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildStatusBadge(DelegateAttendanceSession s, ColorScheme colorScheme) {
     final bool isCompleted = s.checkOutTime != null;
     final bool isOngoing = s.isOngoing;
@@ -2557,9 +2048,9 @@ class _HRDelegateAttendanceDetailScreenState
     final String label;
 
     if (s.isAutoCheckOut) {
-      bgColor = Colors.amber.shade50;
-      borderColor = Colors.amber.shade200;
-      textColor = Colors.amber.shade900;
+      bgColor = Colors.deepPurple.shade50;
+      borderColor = Colors.deepPurple.shade200;
+      textColor = Colors.deepPurple.shade900;
       icon = Icons.auto_mode_rounded;
       label = 'مكتمل (تلقائي)';
     } else if (isCompleted) {
@@ -2619,21 +2110,21 @@ class _HRDelegateAttendanceDetailScreenState
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.amber.shade50,
+            color: Colors.blueGrey.shade50,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.amber.shade300, width: 0.8),
+            border: Border.all(color: Colors.blueGrey.shade200, width: 0.8),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.edit_note_rounded, size: 11, color: Colors.amber.shade900),
+              Icon(Icons.edit_note_rounded, size: 11, color: Colors.blueGrey.shade800),
               const SizedBox(width: 3),
               Text(
                 'مُعدّل إدارياً',
                 style: TextStyle(
                   fontSize: 9.5,
                   fontWeight: FontWeight.bold,
-                  color: Colors.amber.shade900,
+                  color: Colors.blueGrey.shade800,
                 ),
               ),
             ],
@@ -2659,3 +2150,1291 @@ class _KpiItem {
     required this.color,
   });
 }
+
+// ============================================================================
+// Modern Material 3 Attendance Time Adjustment Bottom Sheet / Dialog
+// ============================================================================
+class _EditAttendanceSheet extends StatefulWidget {
+  final DelegateAttendanceSession session;
+  final Delegate delegate;
+  final Delegate? hrDelegate;
+  final bool isBottomSheet;
+  final Future<void> Function({
+    required DateTime newInTime,
+    required DateTime? newOutTime,
+    required bool hasCheckOut,
+    required String reason,
+    required String notes,
+  }) onSave;
+
+  const _EditAttendanceSheet({
+    required this.session,
+    required this.delegate,
+    this.hrDelegate,
+    required this.isBottomSheet,
+    required this.onSave,
+  });
+
+  @override
+  State<_EditAttendanceSheet> createState() => _EditAttendanceSheetState();
+}
+
+class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
+  static const List<String> _adjustmentReasons = [
+    'نسيان تسجيل الانصراف من قِبل المندوب',
+    'عطل في هاتف المندوب أو نفاد البطارية',
+    'مشكلة تقنية في تطبيق المندوب أو الاتصال',
+    'توجيه إداري بتمديد أو تعديل فترة العمل',
+    'إذن مسبق وموافق عليه من المشرف الميداني',
+    'تصحيح توقيت الحضور (حضور مبكر/متأخر معتمد)',
+    'أخرى (يرجى التوضيح في الملاحظات الإدارية)',
+  ];
+
+  late TimeOfDay _selectedCheckInTime;
+  late bool _hasCheckOut;
+  late TimeOfDay _selectedCheckOutTime;
+  late String _selectedReason;
+  final TextEditingController _notesController = TextEditingController();
+  bool _isSaving = false;
+  String? _localValidationError;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCheckInTime = TimeOfDay.fromDateTime(widget.session.checkInTime);
+    _hasCheckOut = widget.session.checkOutTime != null;
+    _selectedCheckOutTime = widget.session.checkOutTime != null
+        ? TimeOfDay.fromDateTime(widget.session.checkOutTime!)
+        : const TimeOfDay(hour: 17, minute: 0);
+    _selectedReason = _adjustmentReasons.first;
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  String _formatTime(TimeOfDay t) {
+    final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final m = t.minute.toString().padLeft(2, '0');
+    final period = t.period == DayPeriod.am ? 'ص' : 'م';
+    return '$h:$m $period';
+  }
+
+  IconData _getReasonIcon(String reason) {
+    if (reason.contains('نسيان')) return Icons.timer_off_rounded;
+    if (reason.contains('عطل') || reason.contains('البطارية')) return Icons.battery_alert_rounded;
+    if (reason.contains('مشكلة تقنية') || reason.contains('الاتصال')) {
+      return Icons.phonelink_erase_rounded;
+    }
+    if (reason.contains('توجيه إداري')) return Icons.assignment_turned_in_rounded;
+    if (reason.contains('إذن مسبق')) return Icons.verified_user_rounded;
+    if (reason.contains('تصحيح توقيت')) return Icons.edit_calendar_rounded;
+    return Icons.more_horiz_rounded;
+  }
+
+  Future<void> _handleSave() async {
+    final newInDateTime = DateTime(
+      widget.session.checkInTime.year,
+      widget.session.checkInTime.month,
+      widget.session.checkInTime.day,
+      _selectedCheckInTime.hour,
+      _selectedCheckInTime.minute,
+    );
+
+    final newOutDateTime = _hasCheckOut
+        ? DateTime(
+            widget.session.checkInTime.year,
+            widget.session.checkInTime.month,
+            widget.session.checkInTime.day,
+            _selectedCheckOutTime.hour,
+            _selectedCheckOutTime.minute,
+          )
+        : null;
+
+    final bool checkInChanged = newInDateTime != widget.session.checkInTime;
+    final bool checkOutChanged = (widget.session.checkOutTime == null && _hasCheckOut) ||
+        (widget.session.checkOutTime != null &&
+            (!_hasCheckOut || newOutDateTime != widget.session.checkOutTime));
+
+    if (!checkInChanged && !checkOutChanged) {
+      setState(() {
+        _localValidationError = 'لم تقم بتغيير وقت الحضور أو الانصراف.';
+      });
+      return;
+    }
+
+    if (_selectedReason.startsWith('أخرى') && _notesController.text.trim().isEmpty) {
+      setState(() {
+        _localValidationError = 'يرجى كتابة الملاحظات الإدارية عند اختيار سبب أخرى.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _localValidationError = null;
+    });
+
+    try {
+      await widget.onSave(
+        newInTime: newInDateTime,
+        newOutTime: newOutDateTime,
+        hasCheckOut: _hasCheckOut,
+        reason: _selectedReason,
+        notes: _notesController.text.trim(),
+      );
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _localValidationError = 'حدث خطأ أثناء حفظ التعديل: $e';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final dateStr = DateFormat('EEEE، d MMMM yyyy', 'ar').format(widget.session.checkInTime);
+    final mediaQuery = MediaQuery.of(context);
+
+    final newInDateTime = DateTime(
+      widget.session.checkInTime.year,
+      widget.session.checkInTime.month,
+      widget.session.checkInTime.day,
+      _selectedCheckInTime.hour,
+      _selectedCheckInTime.minute,
+    );
+
+    final newOutDateTime = _hasCheckOut
+        ? DateTime(
+            widget.session.checkInTime.year,
+            widget.session.checkInTime.month,
+            widget.session.checkInTime.day,
+            _selectedCheckOutTime.hour,
+            _selectedCheckOutTime.minute,
+          )
+        : null;
+
+    final bool isNegativeDuration = _hasCheckOut &&
+        newOutDateTime != null &&
+        (newOutDateTime.isBefore(newInDateTime) || newOutDateTime.isAtSameMomentAs(newInDateTime));
+
+    final Duration? newDuration = _hasCheckOut && !isNegativeDuration && newOutDateTime != null
+        ? newOutDateTime.difference(newInDateTime)
+        : null;
+
+    String? durationDiffText;
+    Color? durationDiffColor;
+    if (newDuration != null) {
+      final oldDurationMins = widget.session.duration?.inMinutes ?? 0;
+      final newDurationMins = newDuration.inMinutes;
+      final diffMins = newDurationMins - oldDurationMins;
+      if (diffMins != 0) {
+        final isPositive = diffMins > 0;
+        final absMins = diffMins.abs();
+        final h = absMins ~/ 60;
+        final m = absMins % 60;
+        final formattedDiff = h > 0 ? '$h س ${m > 0 ? "و $m د" : ""}' : '$m دقيقة';
+        durationDiffText = '${isPositive ? "+" : "-"}$formattedDiff';
+        durationDiffColor = isPositive ? Colors.green.shade700 : Colors.red.shade700;
+      } else {
+        durationDiffText = 'بدون تغيير في المدة';
+        durationDiffColor = colorScheme.onSurfaceVariant;
+      }
+    }
+
+    final bool canSave = !_isSaving && !isNegativeDuration;
+
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Drag handle on mobile bottom sheet
+        if (widget.isBottomSheet)
+          Center(
+            child: Container(
+              width: 38,
+              height: 4.5,
+              margin: const EdgeInsets.only(top: 10, bottom: 6),
+              decoration: BoxDecoration(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+
+        // 2. Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.edit_calendar_rounded, color: colorScheme.primary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'تعديل توقيت جلسة الحضور',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      '${widget.delegate.fullName} • $dateStr',
+                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                tooltip: 'إغلاق',
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+
+        // 3. Scrollable Body
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Branch Banner
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.storefront_rounded, size: 18, color: colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'الفرع: ${widget.session.branchName}',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Time Adjustment Section (Cohesive Dual Connected Cards)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Section Header with Checkout Toggle
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.schedule_rounded, size: 18, color: colorScheme.primary),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'ضبط الأوقات',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _hasCheckOut ? 'تسجيل الانصراف' : 'بدون انصراف',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: _hasCheckOut
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Switch.adaptive(
+                                value: _hasCheckOut,
+                                activeTrackColor: colorScheme.primary.withValues(alpha: 0.5),
+                                activeThumbColor: colorScheme.primary,
+                                onChanged: _isSaving
+                                    ? null
+                                    : (val) {
+                                        setState(() {
+                                          _hasCheckOut = val;
+                                          _localValidationError = null;
+                                        });
+                                      },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Symmetrical Connected Dual-Tile Box (Button group style)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Row(
+                          children: [
+                            // 1. Check-in Time Tile
+                            Expanded(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _isSaving
+                                      ? null
+                                      : () async {
+                                          final picked = await showTimePicker(
+                                            context: context,
+                                            initialTime: _selectedCheckInTime,
+                                          );
+                                          if (picked != null) {
+                                            setState(() {
+                                              _selectedCheckInTime = picked;
+                                              _localValidationError = null;
+                                            });
+                                          }
+                                        },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 8,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.login_rounded,
+                                              size: 15,
+                                              color: Colors.green.shade700,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'وقت الحضور',
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.green.shade800,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: Colors.green.withValues(alpha: 0.3),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.access_time_rounded,
+                                                size: 14,
+                                                color: Colors.green.shade800,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                _formatTime(_selectedCheckInTime),
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.green.shade900,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'انقر للتعديل',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.green.shade700.withValues(alpha: 0.8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Vertical Divider
+                            Container(
+                              width: 1,
+                              height: 64,
+                              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                            ),
+
+                            // 2. Check-out Time Tile
+                            Expanded(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: (!_hasCheckOut || _isSaving)
+                                      ? null
+                                      : () async {
+                                          final picked = await showTimePicker(
+                                            context: context,
+                                            initialTime: _selectedCheckOutTime,
+                                          );
+                                          if (picked != null) {
+                                            setState(() {
+                                              _selectedCheckOutTime = picked;
+                                              _localValidationError = null;
+                                            });
+                                          }
+                                        },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 8,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.logout_rounded,
+                                              size: 15,
+                                              color: _hasCheckOut
+                                                  ? Colors.indigo.shade700
+                                                  : colorScheme.onSurfaceVariant,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'وقت الانصراف',
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: _hasCheckOut
+                                                    ? Colors.indigo.shade900
+                                                    : colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _hasCheckOut
+                                                ? Colors.indigo.withValues(alpha: 0.08)
+                                                : colorScheme.surfaceContainerHighest.withValues(
+                                                    alpha: 0.4,
+                                                  ),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: _hasCheckOut
+                                                  ? Colors.indigo.withValues(alpha: 0.25)
+                                                  : colorScheme.outlineVariant.withValues(
+                                                      alpha: 0.25,
+                                                    ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.access_time_rounded,
+                                                size: 14,
+                                                color: _hasCheckOut
+                                                    ? Colors.indigo.shade700
+                                                    : colorScheme.onSurfaceVariant,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                _hasCheckOut
+                                                    ? _formatTime(_selectedCheckOutTime)
+                                                    : 'غير مسجل',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: _hasCheckOut
+                                                      ? Colors.indigo.shade900
+                                                      : colorScheme.onSurfaceVariant,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _hasCheckOut ? 'انقر للتعديل' : 'تفعيل من المفتاح',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: _hasCheckOut
+                                                ? Colors.indigo.shade700
+                                                : colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Duration Comparison Preview
+                if (isNegativeDuration)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'تنبيه: وقت الانصراف يجب أن يكون بعد وقت الحضور!',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.red.shade900,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (_hasCheckOut && newDuration != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.timelapse_rounded, size: 20, color: colorScheme.primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'المدة الجديدة: ',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${newDuration.inHours} س و ${newDuration.inMinutes.remainder(60)} د',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (durationDiffText != null)
+                                Text(
+                                  'الفارق عن السابق: $durationDiffText (سابقاً: ${widget.session.formattedDuration})',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: durationDiffColor,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 14),
+
+                // Reason Dropdown (Material 3 Animated Popup Menu)
+                const Text(
+                  'سبب التعديل الإداري (إلزامي للتدقيق):',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  child: PopupMenuButton<String>(
+                    tooltip: 'تحديد سبب التعديل',
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 4,
+                    color: colorScheme.surfaceContainerHigh,
+                    initialValue: _selectedReason,
+                    onSelected: _isSaving
+                        ? null
+                        : (val) {
+                            setState(() {
+                              _selectedReason = val;
+                              _localValidationError = null;
+                            });
+                          },
+                    itemBuilder: (ctx) => _adjustmentReasons.map((r) {
+                      final isSelected = r == _selectedReason;
+                      return PopupMenuItem<String>(
+                        value: r,
+                        child: Row(
+                          children: [
+                            Icon(
+                              _getReasonIcon(r),
+                              size: 18,
+                              color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                r,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            if (isSelected) ...[
+                              const SizedBox(width: 6),
+                              Icon(Icons.check_rounded, size: 18, color: colorScheme.primary),
+                            ],
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: [
+                          Icon(_getReasonIcon(_selectedReason), size: 18, color: colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _selectedReason,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 20,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Additional Notes (Optional)
+                const Text(
+                  'ملاحظات إضافية (اختياري):',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _notesController,
+                  enabled: !_isSaving,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'أدخل أي تفاصيل إدارية توضيحية لتسجيلها في ملف التدقيق...',
+                    hintStyle: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+
+                if (_localValidationError != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.errorContainer.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: colorScheme.error.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, size: 18, color: colorScheme.error),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _localValidationError!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colorScheme.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+
+        // 4. Pinned Bottom Action Button Group (Connected Dual Buttons)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                width: 1.2,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Row(
+              children: [
+                // Cancel Button (إلغاء)
+                Expanded(
+                  flex: 2,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _isSaving ? null : () => Navigator.pop(context),
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close_rounded, size: 18, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 6),
+                            Text(
+                              'إلغاء',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Vertical Divider
+                Container(
+                  width: 1.2,
+                  height: 28,
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                ),
+
+                // Save Button (حفظ التعديل)
+                Expanded(
+                  flex: 3,
+                  child: Material(
+                    color: canSave
+                        ? colorScheme.primary
+                        : colorScheme.onSurface.withValues(alpha: 0.12),
+                    child: InkWell(
+                      onTap: canSave ? _handleSave : null,
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_isSaving)
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            else
+                              Icon(
+                                Icons.check_rounded,
+                                size: 18,
+                                color: canSave
+                                    ? colorScheme.onPrimary
+                                    : colorScheme.onSurface.withValues(alpha: 0.38),
+                              ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _isSaving ? 'جارٍ الحفظ...' : 'حفظ التعديل',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: canSave
+                                    ? colorScheme.onPrimary
+                                    : colorScheme.onSurface.withValues(alpha: 0.38),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (widget.isBottomSheet) {
+      final double sheetHeight = mediaQuery.size.height * 0.82;
+      return SizedBox(
+        height: sheetHeight,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
+          child: content,
+        ),
+      );
+    }
+
+    return content;
+  }
+}
+
+// ============================================================================
+// Modern Material 3 Attendance Session Details Bottom Sheet / Dialog
+// ============================================================================
+class _SessionDetailsSheet extends StatelessWidget {
+  final DelegateAttendanceSession session;
+  final Delegate delegate;
+  final bool isBottomSheet;
+  final VoidCallback onEdit;
+
+  const _SessionDetailsSheet({
+    required this.session,
+    required this.delegate,
+    required this.isBottomSheet,
+    required this.onEdit,
+  });
+
+  Widget _buildDetailRow(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 130,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12.5, color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: valueColor ?? colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final dateStr = DateFormat('EEEE، d MMMM yyyy', 'ar').format(session.checkInTime);
+    final inTimeStr = DateFormat('hh:mm:ss a', 'ar').format(session.checkInTime);
+    final outTimeStr = session.checkOutTime != null
+        ? (session.isAutoCheckOut
+            ? '${DateFormat('hh:mm:ss a', 'ar').format(session.checkOutTime!)} (إغلاق تلقائي)'
+            : DateFormat('hh:mm:ss a', 'ar').format(session.checkOutTime!))
+        : 'لم يتم تسجيل انصراف';
+
+    final mediaQuery = MediaQuery.of(context);
+
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Drag handle on mobile bottom sheet
+        if (isBottomSheet)
+          Center(
+            child: Container(
+              width: 38,
+              height: 4.5,
+              margin: const EdgeInsets.only(top: 10, bottom: 6),
+              decoration: BoxDecoration(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+
+        // 2. Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: colorScheme.primaryContainer,
+                child: Icon(Icons.info_outline_rounded, color: colorScheme.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'تفاصيل جلسة الحضور',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      '${delegate.fullName} • $dateStr',
+                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                tooltip: 'إغلاق',
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+
+        // 3. Scrollable Body
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (session.isAutoCheckOut) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.deepPurple.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.deepPurple.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.auto_mode_rounded, size: 18, color: Colors.deepPurple.shade900),
+                            const SizedBox(width: 8),
+                            Text(
+                              'تم إغلاق الانصراف تلقائياً (نظام الـ 9 ساعات)',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Colors.deepPurple.shade900,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          session.autoCheckOutReason ??
+                              'تم إغلاق الجلسة أوتوماتيكياً لاكتمال مدة الشفت (9 ساعات) دون تسجيل انصراف يدوي من المندوب.',
+                          style: TextStyle(fontSize: 12, color: Colors.deepPurple.shade900),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (session.isManuallyAdjusted) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.blueGrey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blueGrey.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.edit_note_rounded, size: 18, color: Colors.blueGrey.shade900),
+                            const SizedBox(width: 8),
+                            Text(
+                              'تم تعديل هذه الجلسة إدارياً',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Colors.blueGrey.shade900,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'المسؤول: ${session.lastAdjustedBy ?? "إدارة الموارد البشرية"}',
+                          style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade900),
+                        ),
+                        if (session.adjustmentReason != null && session.adjustmentReason!.isNotEmpty)
+                          Text(
+                            'السبب: ${session.adjustmentReason}',
+                            style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade900),
+                          ),
+                        if (session.lastAdjustedAt != null)
+                          Text(
+                            'تاريخ التعديل: ${DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(session.lastAdjustedAt!)}',
+                            style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade700),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                _buildDetailRow(context, Icons.store_rounded, 'الفرع', session.branchName),
+                const Divider(height: 16),
+                _buildDetailRow(
+                  context,
+                  Icons.login_rounded,
+                  'وقت الحضور الدقيق',
+                  inTimeStr,
+                  valueColor: Colors.green.shade700,
+                ),
+                if (session.latitude != null && session.longitude != null)
+                  _buildDetailRow(
+                    context,
+                    Icons.location_on_outlined,
+                    'إحداثيات الحضور',
+                    '${session.latitude!.toStringAsFixed(6)}, ${session.longitude!.toStringAsFixed(6)}',
+                  ),
+                if (session.deviceInfo != null)
+                  _buildDetailRow(context, Icons.smartphone_rounded, 'جهاز الحضور', session.deviceInfo!),
+                const Divider(height: 16),
+                _buildDetailRow(
+                  context,
+                  Icons.logout_rounded,
+                  'وقت الانصراف الدقيق',
+                  outTimeStr,
+                  valueColor: session.checkOutTime != null ? Colors.indigo.shade800 : colorScheme.error,
+                ),
+                if (session.checkOutLatitude != null && session.checkOutLongitude != null)
+                  _buildDetailRow(
+                    context,
+                    Icons.location_on_outlined,
+                    'إحداثيات الانصراف',
+                    '${session.checkOutLatitude!.toStringAsFixed(6)}, ${session.checkOutLongitude!.toStringAsFixed(6)}',
+                  ),
+                if (session.checkOutDeviceInfo != null)
+                  _buildDetailRow(context, Icons.smartphone_rounded, 'جهاز الانصراف', session.checkOutDeviceInfo!),
+                const Divider(height: 16),
+                _buildDetailRow(
+                  context,
+                  Icons.timer_outlined,
+                  'إجمالي مدة العمل',
+                  session.formattedDuration,
+                  valueColor: colorScheme.primary,
+                ),
+                if (session.distanceMeters != null)
+                  _buildDetailRow(
+                    context,
+                    Icons.radar_rounded,
+                    'المسافة من الفرع',
+                    '${session.distanceMeters!.round()} متر (${session.isInsideGeofence == true ? 'داخل النطاق الجغرافي' : 'خارج النطاق الجغرافي'})',
+                    valueColor: session.isInsideGeofence == true ? Colors.green.shade700 : Colors.red.shade700,
+                  ),
+              ],
+            ),
+          ),
+        ),
+
+        // 4. Pinned Bottom Action Button Group (Connected Dual Buttons)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                width: 1.2,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Row(
+              children: [
+                // Close Button (إغلاق)
+                Expanded(
+                  flex: 2,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(context),
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close_rounded, size: 18, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 6),
+                            Text(
+                              'إغلاق',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Vertical Divider
+                Container(
+                  width: 1.2,
+                  height: 28,
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                ),
+
+                // Edit Time Button (تعديل التوقيت)
+                Expanded(
+                  flex: 3,
+                  child: Material(
+                    color: colorScheme.primary,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(context);
+                        onEdit();
+                      },
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.edit_calendar_rounded, size: 18, color: colorScheme.onPrimary),
+                            const SizedBox(width: 6),
+                            Text(
+                              'تعديل التوقيت',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (isBottomSheet) {
+      final double sheetHeight = mediaQuery.size.height * 0.78;
+      return SizedBox(
+        height: sheetHeight,
+        child: content,
+      );
+    }
+
+    return content;
+  }
+}
+
+

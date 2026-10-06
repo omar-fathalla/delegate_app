@@ -16,16 +16,18 @@ class PhotoCacheManager {
       cacheKey,
       stalePeriod: const Duration(days: 365),
       maxNrOfCacheObjects: 3000,
-      repo: JsonCacheInfoRepository(databaseName: cacheKey),
       fileService: HttpFileService(),
     ),
   );
 
   /// Pre-caches a list of photo URLs in the background into persistent disk cache
-  static void precachePhotos(Iterable<String> photoUrls) {
+  static void precachePhotos(Iterable<String> photoUrls, {int maxBatch = 20}) {
+    int count = 0;
     for (final url in photoUrls) {
+      if (count >= maxBatch) break;
       if (url.startsWith('http://') || url.startsWith('https://')) {
         instance.downloadFile(url).ignore();
+        count++;
       }
     }
   }

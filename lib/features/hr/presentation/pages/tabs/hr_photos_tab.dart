@@ -22,10 +22,10 @@ class HRPhotosTab extends StatefulWidget {
   const HRPhotosTab({super.key, required this.hrDelegate});
 
   @override
-  State<HRPhotosTab> createState() => _HRPhotosTabState();
+  State<HRPhotosTab> createState() => HRPhotosTabState();
 }
 
-class _HRPhotosTabState extends State<HRPhotosTab> {
+class HRPhotosTabState extends State<HRPhotosTab> {
   int _selectedView = 0; // 0 = الصور الميدانية, 1 = أذونات التصوير
   final TextEditingController _searchController = TextEditingController();
 
@@ -37,6 +37,7 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
   String _selectedPermissionFilter = 'all'; // all, active, pending, expired
 
   late PhotoPermissionBloc _photoBloc;
+  List<CapturedPhoto> _cachedPhotos = [];
 
   @override
   void initState() {
@@ -50,6 +51,11 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
     _searchController.dispose();
     _photoBloc.close();
     super.dispose();
+  }
+
+  /// Exposes refresh capability to parent screen AppBar or header controls
+  void refreshData() {
+    _refreshData();
   }
 
   void _refreshData() {
@@ -488,11 +494,39 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
           }
         },
         builder: (context, state) {
+          if (state is CapturedPhotosLoaded) {
+            _cachedPhotos = state.photos;
+          }
+
+          final currentPhotos = (state is CapturedPhotosLoaded)
+              ? state.photos
+              : _cachedPhotos;
+
+          final uniqueBranches = <String>{};
+          final uniqueDelegates = <String>{};
+          final branchCounts = <String, int>{};
+          final delegateCounts = <String, int>{};
+
+          for (final p in currentPhotos) {
+            if (p.branchName.trim().isNotEmpty) {
+              final b = p.branchName.trim();
+              uniqueBranches.add(b);
+              branchCounts[b] = (branchCounts[b] ?? 0) + 1;
+            }
+            if (p.delegateName.trim().isNotEmpty) {
+              final d = p.delegateName.trim();
+              uniqueDelegates.add(d);
+              delegateCounts[d] = (delegateCounts[d] ?? 0) + 1;
+            }
+          }
+          final sortedBranches = uniqueBranches.toList()..sort();
+          final sortedDelegates = uniqueDelegates.toList()..sort();
+
           return Column(
             children: [
-              // ── Top Header with M3 Connected Button Group & Actions ──
+              // ── Top Header with M3 2-Row Control Bar ──
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: colorScheme.surface,
                   boxShadow: [
@@ -505,11 +539,14 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
                 ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isNarrow = constraints.maxWidth < 680;
+                    final isDesktop = constraints.maxWidth >= 768;
+
+                    final actionButtonsGroup = _buildM3ActionButtonsGroup(colorScheme, height: 40);
 
                     final buttonGroup = TashilConnectedButtonGroup<int>(
-                      isScrollable: true,
-                      height: 44,
+                      isScrollable: false,
+                      height: 36,
+                      itemPadding: const EdgeInsets.symmetric(horizontal: 10),
                       selectedValue: _selectedView,
                       items: const [
                         TashilConnectedButtonItem(
@@ -535,45 +572,104 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
                       },
                     );
 
-                    final actionButtons = Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildM3ActionButtonsGroup(colorScheme),
-                        const SizedBox(width: 8),
-                        IconButton.filledTonal(
-                          style: IconButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            minimumSize: const Size(44, 44),
-                          ),
-                          tooltip: 'تحديث البيانات',
-                          onPressed: _refreshData,
-                          icon: const Icon(Icons.refresh_rounded, size: 20),
-                        ),
-                      ],
+                    final branchDropdown = _buildM3BranchDropdown(
+                      sortedBranches: sortedBranches,
+                      branchCounts: branchCounts,
+                      colorScheme: colorScheme,
+                      totalPhotos: currentPhotos.length,
+                      height: 40,
                     );
 
-                    if (isNarrow) {
+                    final delegateDropdown = _buildM3DelegateDropdown(
+                      sortedDelegates: sortedDelegates,
+                      delegateCounts: delegateCounts,
+                      colorScheme: colorScheme,
+                      totalPhotos: currentPhotos.length,
+                      height: 36,
+                    );
+
+                    if (_selectedView == 0) {
+                      // TAB 0: الصور الميدانية
+                      // Row 1: طلب إذن تصوير + التقرير الشهري مع جميع الفروع
+                      // Row 2: الصور الميدانية + أذونات التصوير مع جميع المناديب
+                      if (isDesktop) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                actionButtonsGroup,
+                                const SizedBox(width: 12),
+                                SizedBox(
+                                  width: 240,
+                                  child: branchDropdown,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                buttonGroup,
+                                const SizedBox(width: 12),
+                                SizedBox(
+                                  width: 240,
+                                  child: delegateDropdown,
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+
                       return Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Center(child: buttonGroup),
-                          const SizedBox(height: 10),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: actionButtons,
+                          Row(
+                            children: [
+                              actionButtonsGroup,
+                              const SizedBox(width: 8),
+                              Expanded(child: branchDropdown),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              buttonGroup,
+                              const SizedBox(width: 8),
+                              Expanded(child: delegateDropdown),
+                            ],
+                          ),
+                        ],
+                      );
+                    } else {
+                      // TAB 1: أذونات التصوير
+                      if (isDesktop) {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            buttonGroup,
+                            actionButtonsGroup,
+                          ],
+                        );
+                      }
+
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              actionButtonsGroup,
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              buttonGroup,
+                            ],
                           ),
                         ],
                       );
                     }
-
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        buttonGroup,
-                        actionButtons,
-                      ],
-                    );
                   },
                 ),
               ),
@@ -625,35 +721,7 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
-    // Extract unique branch and delegate names and calculate counts
-    final uniqueBranches = <String>{};
-    final uniqueDelegates = <String>{};
-    final branchCounts = <String, int>{};
-    final delegateCounts = <String, int>{};
-
-    for (final p in photos) {
-      if (p.branchName.trim().isNotEmpty) {
-        final b = p.branchName.trim();
-        uniqueBranches.add(b);
-        branchCounts[b] = (branchCounts[b] ?? 0) + 1;
-      }
-      if (p.delegateName.trim().isNotEmpty) {
-        final d = p.delegateName.trim();
-        uniqueDelegates.add(d);
-        delegateCounts[d] = (delegateCounts[d] ?? 0) + 1;
-      }
-    }
-    final sortedBranches = uniqueBranches.toList()..sort();
-    final sortedDelegates = uniqueDelegates.toList()..sort();
-
-    final query = _searchController.text.trim().toLowerCase();
     final filtered = photos.where((p) {
-      if (query.isNotEmpty) {
-        final matchesName = p.delegateName.toLowerCase().contains(query);
-        final matchesBranch = p.branchName.toLowerCase().contains(query);
-        final matchesComment = p.comment.toLowerCase().contains(query);
-        if (!matchesName && !matchesBranch && !matchesComment) return false;
-      }
       if (_selectedBranch != 'all' && p.branchName != _selectedBranch) {
         return false;
       }
@@ -663,281 +731,156 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
       return true;
     }).toList();
 
-    return Column(
-      children: [
-        // Filter Controls Header
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            border: Border(
-              bottom: BorderSide(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                width: 1.0,
+    if (filtered.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.photo_library_outlined,
+              size: 56,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              photos.isEmpty
+                  ? 'لا توجد صور معاينة ميدانية مسجلة حتى الآن'
+                  : 'لا توجد صور معاينة ميدانية مطابقة للفلتر',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
-          ),
-          child: Column(
-            children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isDesktop = constraints.maxWidth >= 768;
-
-                  if (isDesktop) {
-                    return Row(
-                      children: [
-                        // Search Bar (flex 4)
-                        Expanded(
-                          flex: 4,
-                          child: _buildPhotosSearchBar(colorScheme),
-                        ),
-                        const SizedBox(width: 10),
-                        // Branch Dropdown (flex 3)
-                        Expanded(
-                          flex: 3,
-                          child: _buildM3BranchDropdown(
-                            sortedBranches: sortedBranches,
-                            branchCounts: branchCounts,
-                            colorScheme: colorScheme,
-                            totalPhotos: photos.length,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Delegate Dropdown (flex 3)
-                        Expanded(
-                          flex: 3,
-                          child: _buildM3DelegateDropdown(
-                            sortedDelegates: sortedDelegates,
-                            delegateCounts: delegateCounts,
-                            colorScheme: colorScheme,
-                            totalPhotos: photos.length,
-                          ),
-                        ),
-                      ],
-                    );
-                  }
-
-                  // Narrow / Mobile screen layout
-                  return Column(
-                    children: [
-                      _buildPhotosSearchBar(colorScheme),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildM3BranchDropdown(
-                              sortedBranches: sortedBranches,
-                              branchCounts: branchCounts,
-                              colorScheme: colorScheme,
-                              totalPhotos: photos.length,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildM3DelegateDropdown(
-                              sortedDelegates: sortedDelegates,
-                              delegateCounts: delegateCounts,
-                              colorScheme: colorScheme,
-                              totalPhotos: photos.length,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
+            if (_selectedBranch != 'all' || _selectedDelegate != 'all') ...[
+              const SizedBox(height: 12),
+              FilledButton.tonal(
+                onPressed: () {
+                  setState(() {
+                    _selectedBranch = 'all';
+                    _selectedDelegate = 'all';
+                  });
                 },
+                child: const Text('إلغاء الفلاتر وإظهار الكل'),
               ),
-
-              // Summary & Clear Filters Bar
-              if (_selectedBranch != 'all' || _selectedDelegate != 'all' || _searchController.text.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'النتائج المعروضة: ${filtered.length} من أصل ${photos.length}',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _selectedBranch = 'all';
-                          _selectedDelegate = 'all';
-                          _searchController.clear();
-                        });
-                      },
-                      child: Text(
-                        'إلغاء الفلاتر',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colorScheme.error,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ],
-          ),
+          ],
         ),
+      );
+    }
 
-        // Grid Content
-        Expanded(
-          child: filtered.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.photo_library_outlined,
-                        size: 56,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        photos.isEmpty
-                            ? 'لا توجد صور معاينة ميدانية مسجلة حتى الآن'
-                            : 'لا توجد صور معاينة ميدانية مطابقة للبحث أو الفلتر',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+    return RefreshIndicator(
+      onRefresh: () async => _refreshData(),
+      child: GridView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 260,
+          childAspectRatio: 0.78,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        itemCount: filtered.length,
+        itemBuilder: (context, index) {
+          final photo = filtered[index];
+          return InkWell(
+            onTap: () => _openPhotoDetail(photo),
+            borderRadius: BorderRadius.circular(16),
+            child: Card(
+              elevation: 0,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  AppPhotoImage(
+                    photoUrl: photo.photoUrl,
+                    isThumbnail: true,
+                    fit: BoxFit.cover,
+                  ),
+                  // Gradient Overlay
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.25),
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.8),
+                          ],
+                          stops: const [0.0, 0.4, 1.0],
                         ),
                       ),
-                      if (_selectedBranch != 'all' || _selectedDelegate != 'all' || _searchController.text.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        FilledButton.tonal(
-                          onPressed: () {
-                            setState(() {
-                              _selectedBranch = 'all';
-                              _selectedDelegate = 'all';
-                              _searchController.clear();
-                            });
-                          },
-                          child: const Text('إلغاء الفلاتر وإظهار الكل'),
+                    ),
+                  ),
+
+                  // Bottom Info
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    right: 8,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          photo.delegateName.isNotEmpty ? photo.delegateName : 'مندوب',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Icon(Icons.storefront_rounded, size: 12, color: Colors.amber),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                photo.branchName,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          DateFormat('MM/dd - hh:mm a', 'ar').format(photo.capturedAt),
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 10,
+                          ),
                         ),
                       ],
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: () async => _refreshData(),
-                  child: GridView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 260,
-                      childAspectRatio: 0.78,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
                     ),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      final photo = filtered[index];
-                      return InkWell(
-                        onTap: () => _openPhotoDetail(photo),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Card(
-                          elevation: 0,
-                          clipBehavior: Clip.antiAlias,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(
-                              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              AppPhotoImage(
-                                photoUrl: photo.photoUrl,
-                                isThumbnail: true,
-                                fit: BoxFit.cover,
-                              ),
-                              // Gradient Overlay
-                              Positioned.fill(
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        Colors.black.withValues(alpha: 0.25),
-                                        Colors.transparent,
-                                        Colors.black.withValues(alpha: 0.8),
-                                      ],
-                                      stops: const [0.0, 0.4, 1.0],
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              // Bottom Info
-                              Positioned(
-                                bottom: 8,
-                                left: 8,
-                                right: 8,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      photo.delegateName.isNotEmpty ? photo.delegateName : 'مندوب',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.storefront_rounded, size: 12, color: Colors.amber),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: Text(
-                                            photo.branchName,
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 11,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      DateFormat('MM/dd - hh:mm a', 'ar').format(photo.capturedAt),
-                                      style: const TextStyle(
-                                        color: Colors.white54,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
                   ),
-                ),
-        ),
-      ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
   // ── M3 Connected Action Button Group (طلب إذن تصوير + التقرير الشهري) ──
-  Widget _buildM3ActionButtonsGroup(ColorScheme colorScheme) {
+  Widget _buildM3ActionButtonsGroup(ColorScheme colorScheme, {double height = 40}) {
     return Container(
-      height: 44,
+      height: height,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(height / 2),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.5),
           width: 1,
@@ -955,20 +898,20 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
               onTap: () => _showCreateRequestSheet(context),
               hoverColor: colorScheme.onPrimary.withValues(alpha: 0.12),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.add_a_photo_rounded,
-                      size: 18,
+                      size: 15,
                       color: colorScheme.onPrimary,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 5),
                     Text(
                       'طلب إذن تصوير',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onPrimary,
                       ),
@@ -1003,20 +946,20 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
               },
               hoverColor: colorScheme.primary.withValues(alpha: 0.08),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.calendar_month_rounded,
-                      size: 18,
+                      size: 15,
                       color: colorScheme.primary,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 5),
                     Text(
                       'التقرير الشهري',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
                       ),
@@ -1031,96 +974,28 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
     );
   }
 
-  // ── M3 Web Search Bar (Height 44dp) ──
-  Widget _buildPhotosSearchBar(
-    ColorScheme colorScheme, {
-    String hintText = 'بحث باسم المندوب أو الفرع أو ملاحظات...',
-  }) {
-    final hasText = _searchController.text.isNotEmpty;
-    return Container(
-      height: 44,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: hasText
-              ? colorScheme.primary
-              : colorScheme.outlineVariant.withValues(alpha: 0.35),
-          width: hasText ? 1.5 : 1,
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        children: [
-          Icon(
-            Icons.search_rounded,
-            size: 19,
-            color: colorScheme.primary,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w500,
-                color: colorScheme.onSurface,
-              ),
-              decoration: InputDecoration(
-                hintText: hintText,
-                hintStyle: TextStyle(
-                  fontSize: 12,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-          if (hasText)
-            InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () {
-                _searchController.clear();
-                setState(() {});
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(4.0),
-                child: Icon(
-                  Icons.clear_rounded,
-                  size: 16,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ── M3 Branch Filter Dropdown (Height 44dp, LayoutBuilder matching width) ──
+  // ── M3 Branch Filter Dropdown ──
   Widget _buildM3BranchDropdown({
     required List<String> sortedBranches,
     required Map<String, int> branchCounts,
     required ColorScheme colorScheme,
     required int totalPhotos,
+    double height = 40,
   }) {
     final isFiltered = _selectedBranch != 'all';
     final currentLabel = isFiltered ? _selectedBranch : 'جميع الفروع';
 
     return LayoutBuilder(
       builder: (context, menuConstraints) {
-        final menuWidth = menuConstraints.maxWidth;
+        final menuWidth = menuConstraints.maxWidth.clamp(180.0, 320.0);
         return SizedBox(
-          height: 44,
+          height: height,
           child: PopupMenuButton<String>(
             tooltip: 'تصفية حسب الفرع',
-            offset: const Offset(0, 48),
+            offset: Offset(0, height + 4),
             constraints: BoxConstraints(
               minWidth: menuWidth,
-              maxWidth: menuWidth,
+              maxWidth: 320,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -1158,10 +1033,10 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
               ];
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(height / 2),
                 border: Border.all(
                   color: isFiltered
                       ? colorScheme.primary
@@ -1173,17 +1048,17 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
                 children: [
                   Icon(
                     Icons.storefront_rounded,
-                    size: 18,
+                    size: 16,
                     color: isFiltered
                         ? colorScheme.primary
                         : colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       currentLabel,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         color: isFiltered
                             ? colorScheme.primary
@@ -1195,7 +1070,7 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
                   ),
                   Icon(
                     Icons.expand_more_rounded,
-                    size: 20,
+                    size: 18,
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ],
@@ -1207,27 +1082,28 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
     );
   }
 
-  // ── M3 Delegate Filter Dropdown (Height 44dp, LayoutBuilder matching width) ──
+  // ── M3 Delegate Filter Dropdown ──
   Widget _buildM3DelegateDropdown({
     required List<String> sortedDelegates,
     required Map<String, int> delegateCounts,
     required ColorScheme colorScheme,
     required int totalPhotos,
+    double height = 36,
   }) {
     final isFiltered = _selectedDelegate != 'all';
     final currentLabel = isFiltered ? _selectedDelegate : 'جميع المناديب';
 
     return LayoutBuilder(
       builder: (context, menuConstraints) {
-        final menuWidth = menuConstraints.maxWidth;
+        final menuWidth = menuConstraints.maxWidth.clamp(180.0, 320.0);
         return SizedBox(
-          height: 44,
+          height: height,
           child: PopupMenuButton<String>(
             tooltip: 'تصفية حسب المناديب',
-            offset: const Offset(0, 48),
+            offset: Offset(0, height + 4),
             constraints: BoxConstraints(
               minWidth: menuWidth,
-              maxWidth: menuWidth,
+              maxWidth: 320,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -1265,10 +1141,10 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
               ];
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(height / 2),
                 border: Border.all(
                   color: isFiltered
                       ? colorScheme.primary
@@ -1280,17 +1156,17 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
                 children: [
                   Icon(
                     Icons.person_rounded,
-                    size: 18,
+                    size: 16,
                     color: isFiltered
                         ? colorScheme.primary
                         : colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       currentLabel,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         color: isFiltered
                             ? colorScheme.primary
@@ -1302,7 +1178,7 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
                   ),
                   Icon(
                     Icons.expand_more_rounded,
-                    size: 20,
+                    size: 18,
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ],
@@ -1417,20 +1293,11 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
       baseList = expiredList;
     }
 
-    final query = _searchController.text.trim().toLowerCase();
-    final filtered = baseList.where((p) {
-      if (query.isNotEmpty) {
-        final matchesBranch = p.branchNames.any((b) => b.toLowerCase().contains(query));
-        final matchesCode = (p.companyCode?.toString() ?? '').toLowerCase().contains(query);
-        final matchesDept = (p.department ?? '').toLowerCase().contains(query);
-        if (!matchesBranch && !matchesCode && !matchesDept) return false;
-      }
-      return true;
-    }).toList();
+    final filtered = baseList;
 
     return Column(
       children: [
-        // Search & Filter Bar
+        // Filter Bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
@@ -1448,14 +1315,9 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
                 builder: (context, constraints) {
                   final isDesktop = constraints.maxWidth >= 768;
 
-                  final searchBar = _buildPhotosSearchBar(
-                    colorScheme,
-                    hintText: 'بحث باسم الفرع أو كود الإذن أو القسم...',
-                  );
-
                   final filterGroup = TashilConnectedButtonGroup<String>(
-                    height: 44,
-                    isScrollable: true,
+                    height: 40,
+                    isScrollable: false,
                     selectedValue: _selectedPermissionFilter,
                     items: [
                       TashilConnectedButtonItem(
@@ -1487,33 +1349,21 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
                   if (isDesktop) {
                     return Row(
                       children: [
-                        Expanded(
-                          flex: 4,
-                          child: searchBar,
-                        ),
-                        const SizedBox(width: 12),
                         filterGroup,
                       ],
                     );
                   }
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      searchBar,
-                      const SizedBox(height: 10),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        child: filterGroup,
-                      ),
-                    ],
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: filterGroup,
                   );
                 },
               ),
 
               // Summary & Clear Filters Bar
-              if (_selectedPermissionFilter != 'all' || _searchController.text.isNotEmpty) ...[
+              if (_selectedPermissionFilter != 'all') ...[
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1529,7 +1379,6 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
                       onTap: () {
                         setState(() {
                           _selectedPermissionFilter = 'all';
-                          _searchController.clear();
                         });
                       },
                       child: Text(
@@ -1563,7 +1412,7 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
                       Text(
                         permissions.isEmpty
                             ? 'لا توجد أذونات تصوير مسجلة للشركة حالياً'
-                            : 'لا توجد أذونات مطابقة للبحث أو الفلتر المختار',
+                            : 'لا توجد أذونات مطابقة للفلتر المختار',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -1648,6 +1497,7 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Top Row: Icon + Company/Branch + Status Badge
             Row(
@@ -1775,7 +1625,7 @@ class _HRPhotosTabState extends State<HRPhotosTab> {
             const SizedBox(height: 2),
             _HRBranchNamesList(branchNames: perm.branchNames),
 
-            const Spacer(),
+            const SizedBox(height: 12),
             const Divider(height: 16),
 
             // Action Buttons

@@ -273,3 +273,52 @@ class UpdatePhotoPermissionDatesRequested extends PhotoPermissionEvent {
       ];
 }
 
+class UploadBatchPhotosRequested extends PhotoPermissionEvent {
+  final String organizationUID;
+  final String companyUID;
+  final String companyName;
+  final int? companyCode;
+  final String permissionId;
+  final String branchId;
+  final String branchName;
+  final String delegateUID;
+  final String delegateName;
+  final List<File> imageFiles;
+  final String comment;
+  final double latitude;
+  final double longitude;
+
+  const UploadBatchPhotosRequested({
+    required this.organizationUID,
+    required this.companyUID,
+    this.companyName = '',
+    this.companyCode,
+    required this.permissionId,
+    required this.branchId,
+    required this.branchName,
+    required this.delegateUID,
+    required this.delegateName,
+    required this.imageFiles,
+    required this.comment,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  @override
+  List<Object?> get props => [
+        organizationUID,
+        companyUID,
+        companyName,
+        companyCode,
+        permissionId,
+        branchId,
+        branchName,
+        delegateUID,
+        delegateName,
+        imageFiles,
+        comment,
+        latitude,
+        longitude,
+      ];
+}
+

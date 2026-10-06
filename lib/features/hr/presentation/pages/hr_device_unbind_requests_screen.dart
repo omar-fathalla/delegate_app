@@ -4,7 +4,6 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
-import 'package:delegate_app/core/widgets/tashil_button_group.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// شاشة إدارة واعتماد طلبات فك وربط أجهزة المناديب لمسؤولي الموارد البشرية (HR)
@@ -147,192 +146,168 @@ class _HRDeviceUnbindRequestsScreenState
 
           return Column(
             children: [
-              // ── 1. Top KPI Summary Cards ──
+              // ── 1. Status Filter Cards (2x2 Grid on Mobile, 4 columns on Desktop) ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final isWide = constraints.maxWidth >= 768;
-                    final kpis = [
-                      _buildKpiCard(
-                        title: 'إجمالي الطلبات',
-                        value: '${allRequests.length}',
-                        subtitle: 'طلبات مسجلة',
-                        icon: Icons.phonelink_lock_rounded,
-                        color: colorScheme.primary,
-                        colorScheme: colorScheme,
-                      ),
-                      _buildKpiCard(
-                        title: 'قيد المراجعة',
-                        value: '$pendingCount',
-                        subtitle: 'تحتاج إجراء من الإدارة',
-                        icon: Icons.hourglass_top_rounded,
-                        color: pendingCount > 0 ? const Color(0xFFD97706) : colorScheme.outline,
-                        colorScheme: colorScheme,
-                      ),
-                      _buildKpiCard(
-                        title: 'الطلبات المعتمدة',
-                        value: '$approvedCount',
-                        subtitle: 'تمت الموافقة وفك الربط',
-                        icon: Icons.check_circle_rounded,
-                        color: const Color(0xFF2E7D32),
-                        colorScheme: colorScheme,
-                      ),
-                      _buildKpiCard(
-                        title: 'الطلبات المرفوضة',
-                        value: '$rejectedCount',
-                        subtitle: 'تم رفض طلب الفك',
-                        icon: Icons.cancel_outlined,
-                        color: rejectedCount > 0 ? const Color(0xFFC62828) : colorScheme.outline,
-                        colorScheme: colorScheme,
-                      ),
-                    ];
+
+                    final pendingCard = _buildFilterCard(
+                      statusKey: 'pending',
+                      title: 'قيد المراجعة',
+                      value: '$pendingCount',
+                      subtitle: pendingCount > 0
+                          ? 'تحتاج إجراء من الإدارة'
+                          : 'لا توجد طلبات معلقة',
+                      icon: Icons.hourglass_top_rounded,
+                      color: pendingCount > 0
+                          ? const Color(0xFFD97706)
+                          : colorScheme.outline,
+                      colorScheme: colorScheme,
+                      theme: theme,
+                    );
+
+                    final approvedCard = _buildFilterCard(
+                      statusKey: 'approved',
+                      title: 'المعتمدة',
+                      value: '$approvedCount',
+                      subtitle: 'تمت الموافقة وفك الربط',
+                      icon: Icons.check_circle_rounded,
+                      color: const Color(0xFF2E7D32),
+                      colorScheme: colorScheme,
+                      theme: theme,
+                    );
+
+                    final rejectedCard = _buildFilterCard(
+                      statusKey: 'rejected',
+                      title: 'المرفوضة',
+                      value: '$rejectedCount',
+                      subtitle: 'تم رفض طلب الفك',
+                      icon: Icons.cancel_outlined,
+                      color: rejectedCount > 0
+                          ? const Color(0xFFC62828)
+                          : colorScheme.outline,
+                      colorScheme: colorScheme,
+                      theme: theme,
+                    );
+
+                    final allCard = _buildFilterCard(
+                      statusKey: 'all',
+                      title: 'الكل',
+                      value: '${allRequests.length}',
+                      subtitle: 'إجمالي الطلبات المسجلة',
+                      icon: Icons.devices_rounded,
+                      color: colorScheme.primary,
+                      colorScheme: colorScheme,
+                      theme: theme,
+                    );
 
                     if (isWide) {
                       return IntrinsicHeight(
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: kpis.map((k) => Expanded(child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: k,
-                          ))).toList(),
+                          children: [
+                            Expanded(child: pendingCard),
+                            const SizedBox(width: 8),
+                            Expanded(child: approvedCard),
+                            const SizedBox(width: 8),
+                            Expanded(child: rejectedCard),
+                            const SizedBox(width: 8),
+                            Expanded(child: allCard),
+                          ],
                         ),
                       );
                     }
 
-                    return SizedBox(
-                      height: 100,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: kpis.length,
-                        separatorBuilder: (_, _) => const SizedBox(width: 8),
-                        itemBuilder: (_, i) => SizedBox(width: 190, child: kpis[i]),
-                      ),
+                    // Mobile: 2x2 Grid (No horizontal scrolling)
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: pendingCard),
+                            const SizedBox(width: 8),
+                            Expanded(child: approvedCard),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(child: rejectedCard),
+                            const SizedBox(width: 8),
+                            Expanded(child: allCard),
+                          ],
+                        ),
+                      ],
                     );
                   },
                 ),
               ),
 
-              // ── 2. Unified Single-Row Toolbar ──
+              // ── 2. Unified Search Toolbar ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isDesktop = constraints.maxWidth >= 850;
-
-                    final searchWidget = SizedBox(
-                      height: 44,
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (val) =>
-                            setState(() => _searchQuery = val.trim()),
-                        textAlignVertical: TextAlignVertical.center,
-                        style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
-                        decoration: InputDecoration(
-                          hintText: 'بحث باسم المندوب أو الهاتف أو نوع الجهاز...',
-                          hintStyle: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            size: 19,
-                            color: colorScheme.primary,
-                          ),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 16),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                )
-                              : null,
-                          filled: true,
-                          fillColor: colorScheme.surfaceContainerHigh,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                          isDense: true,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(
-                              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(
-                              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-                          ),
+                child: SizedBox(
+                  height: 44,
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) =>
+                        setState(() => _searchQuery = val.trim()),
+                    textAlignVertical: TextAlignVertical.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurface,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'بحث باسم المندوب أو الهاتف أو نوع الجهاز...',
+                      hintStyle: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.7),
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        size: 19,
+                        color: colorScheme.primary,
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 16),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: colorScheme.surfaceContainerHigh,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 0,
+                      ),
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        borderSide: BorderSide(
+                          color:
+                              colorScheme.outlineVariant.withValues(alpha: 0.35),
                         ),
                       ),
-                    );
-
-                    final statusButtonGroup = TashilConnectedButtonGroup<String>(
-                      height: 44.0,
-                      isScrollable: true,
-                      selectedValue: _selectedStatusFilter,
-                      onSelected: (val) {
-                        setState(() => _selectedStatusFilter = val);
-                      },
-                      items: [
-                        TashilConnectedButtonItem<String>(
-                          value: 'pending',
-                          label: 'قيد المراجعة ($pendingCount)',
-                          icon: Icons.hourglass_top_rounded,
-                          activeColor: pendingCount > 0
-                              ? const Color(0xFFD97706)
-                              : colorScheme.primary,
-                          activeForegroundColor: Colors.white,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        borderSide: BorderSide(
+                          color:
+                              colorScheme.outlineVariant.withValues(alpha: 0.35),
                         ),
-                        TashilConnectedButtonItem<String>(
-                          value: 'approved',
-                          label: 'المعتمدة ($approvedCount)',
-                          icon: Icons.check_circle_rounded,
-                          activeColor: const Color(0xFF2E7D32),
-                          activeForegroundColor: Colors.white,
-                        ),
-                        TashilConnectedButtonItem<String>(
-                          value: 'rejected',
-                          label: 'المرفوضة ($rejectedCount)',
-                          icon: Icons.cancel_outlined,
-                          activeColor: colorScheme.outline,
-                          activeForegroundColor: Colors.white,
-                        ),
-                        TashilConnectedButtonItem<String>(
-                          value: 'all',
-                          label: 'الكل (${allRequests.length})',
-                          icon: Icons.list_alt_rounded,
-                        ),
-                      ],
-                    );
-
-                    if (isDesktop) {
-                      return Row(
-                        children: [
-                          Expanded(child: searchWidget),
-                          const SizedBox(width: 12),
-                          statusButtonGroup,
-                        ],
-                      );
-                    }
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        searchWidget,
-                        const SizedBox(height: 10),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: statusButtonGroup,
-                        ),
-                      ],
-                    );
-                  },
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        borderSide:
+                            BorderSide(color: colorScheme.primary, width: 1.5),
+                      ),
+                    ),
+                  ),
                 ),
               ),
 
@@ -714,42 +689,165 @@ class _HRDeviceUnbindRequestsScreenState
     final compId = requestData['companyUID']?.toString() ??
         widget.hrDelegate.companyUID;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(
-              Icons.check_circle_outline_rounded,
-              color: Color(0xFF2E7D32),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'تأكيد فك الارتباط',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    final isMobile = MediaQuery.of(context).size.width <= 768;
+
+    Widget buildContent(BuildContext ctx) {
+      final theme = Theme.of(ctx);
+      final colorScheme = theme.colorScheme;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (isMobile) ...[
+            Center(
+              child: Container(
+                width: 38,
+                height: 4.5,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
             ),
           ],
-        ),
-        content: Text(
-          'هل تريد الموافقة على طلب فك ارتباط جهاز "$delegateName"؟\n\n'
-          'سيتم إلغاء قفل الجهاز القديم فوراً، وإشعار المندوب ليتمكن من الدخول من جهازه الجديد واعتماده تلقائياً.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.check_circle_outline_rounded,
+                  color: Color(0xFF2E7D32),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'تأكيد فك الارتباط',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF2E7D32),
+          const SizedBox(height: 14),
+          Text(
+            'هل تريد الموافقة على طلب فك ارتباط جهاز "$delegateName"؟\n\n'
+            'سيتم إلغاء قفل الجهاز القديم فوراً، وإشعار المندوب ليتمكن من الدخول من جهازه الجديد واعتماده تلقائياً.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.5,
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('اعتماد وفك الارتباط'),
+          ),
+          const SizedBox(height: 20),
+          // Connected Action Button Group
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(ctx, false),
+                      child: Center(
+                        child: Text(
+                          'إلغاء',
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Material(
+                    color: const Color(0xFF2E7D32),
+                    child: InkWell(
+                      onTap: () => Navigator.pop(ctx, true),
+                      child: const Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
+                            SizedBox(width: 6),
+                            Text(
+                              'اعتماد وفك الارتباط',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
-      ),
-    );
+      );
+    }
+
+    final bool? confirm;
+    if (isMobile) {
+      confirm = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (ctx) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            20 + MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: buildContent(ctx),
+        ),
+      );
+    } else {
+      confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: buildContent(ctx),
+            ),
+          ),
+        ),
+      );
+    }
 
     if (confirm != true || !mounted) return;
 
@@ -789,53 +887,176 @@ class _HRDeviceUnbindRequestsScreenState
         requestData['delegateName']?.toString() ?? 'المندوب';
 
     final reasonController = TextEditingController();
+    final isMobile = MediaQuery.of(context).size.width <= 768;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.cancel_outlined, color: Theme.of(ctx).colorScheme.error),
-            const SizedBox(width: 8),
-            const Text(
-              'رفض طلب فك الارتباط',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('هل أنت متأكد من رفض طلب المندوب "$delegateName"؟'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'سبب الرفض (اختياري)',
-                hintText: 'مثال: يرجى مراجعة إدارة الفرع أولاً...',
-                border: OutlineInputBorder(),
+    Widget buildContent(BuildContext ctx) {
+      final theme = Theme.of(ctx);
+      final colorScheme = theme.colorScheme;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (isMobile) ...[
+            Center(
+              child: Container(
+                width: 38,
+                height: 4.5,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(3),
+                ),
               ),
-              maxLines: 2,
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colorScheme.error.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.cancel_outlined,
+                  color: colorScheme.error,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'رفض طلب فك الارتباط',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
+          const SizedBox(height: 14),
+          Text(
+            'هل أنت متأكد من رفض طلب المندوب "$delegateName"؟',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('تأكيد الرفض'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: reasonController,
+            decoration: InputDecoration(
+              labelText: 'سبب الرفض (اختياري)',
+              hintText: 'مثال: يرجى مراجعة إدارة الفرع أولاً...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            ),
+            maxLines: 2,
+          ),
+          const SizedBox(height: 20),
+          // Connected Action Button Group
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(ctx, false),
+                      child: Center(
+                        child: Text(
+                          'إلغاء',
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                ),
+                Expanded(
+                  child: Material(
+                    color: colorScheme.error,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(ctx, true),
+                      child: const Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close_rounded, size: 18, color: Colors.white),
+                            SizedBox(width: 6),
+                            Text(
+                              'تأكيد الرفض',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
-      ),
-    );
+      );
+    }
+
+    final bool? confirm;
+    if (isMobile) {
+      confirm = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (ctx) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            20 + MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: buildContent(ctx),
+        ),
+      );
+    } else {
+      confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: buildContent(ctx),
+            ),
+          ),
+        ),
+      );
+    }
 
     if (confirm != true || !mounted) return;
 
@@ -868,68 +1089,107 @@ class _HRDeviceUnbindRequestsScreenState
     }
   }
 
-  Widget _buildKpiCard({
+  Widget _buildFilterCard({
+    required String statusKey,
     required String title,
     required String value,
     required String subtitle,
     required IconData icon,
     required Color color,
     required ColorScheme colorScheme,
+    required ThemeData theme,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+    final isSelected = _selectedStatusFilter == statusKey;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedStatusFilter = statusKey;
+        });
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withValues(alpha: 0.08)
+              : colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? color
+                : colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: isSelected ? 2.0 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.w600,
+                      color: isSelected ? color : colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: isSelected ? color : color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    isSelected ? Icons.check_rounded : icon,
+                    size: 15,
+                    color: isSelected ? Colors.white : color,
+                  ),
                 ),
-                child: Icon(icon, size: 16, color: color),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? color : colorScheme.onSurface,
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 11,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 10.5,
+                color: isSelected
+                    ? color.withValues(alpha: 0.85)
+                    : colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

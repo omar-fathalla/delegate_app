@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/photo_permission/presentation/widgets/sync_status_banner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -12,15 +13,18 @@ import 'package:delegate_app/features/attendance/domain/entities/attendance.dart
 import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:delegate_app/features/hr/presentation/pages/delegate_leaves_and_requests_screen.dart';
 
 class DelegateHomeScreen extends StatefulWidget {
   final Delegate delegate;
   final VoidCallback? onNavigateToAttendance;
+  final VoidCallback? onNavigateToLeaves;
 
   const DelegateHomeScreen({
     super.key,
     required this.delegate,
     this.onNavigateToAttendance,
+    this.onNavigateToLeaves,
   });
 
   @override
@@ -84,7 +88,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           final supDoc = await FirebaseFirestore.instance
               .collection('users')
               .doc(directSupervisorUid)
-              .get();
+              .getResilient(forceServer: forceRefresh);
           if (supDoc.exists) {
             final sData = supDoc.data()!;
             final name = _extractPersonName(sData, companyName);
@@ -114,7 +118,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           final phoneSnap = await FirebaseFirestore.instance
               .collection('users')
               .where('phoneNumber', isEqualTo: cleanPhone)
-              .get();
+              .getResilient(forceServer: forceRefresh);
           if (phoneSnap.docs.isNotEmpty) {
             final sData = phoneSnap.docs.first.data();
             final name = _extractPersonName(sData, companyName);
@@ -140,7 +144,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             .doc(orgId)
             .collection('companies')
             .doc(compId)
-            .get();
+            .getResilient(forceServer: forceRefresh);
 
         if (compDoc.exists) {
           final compData = compDoc.data();
@@ -193,7 +197,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         final snapshot = await FirebaseFirestore.instance
             .collection('users')
             .where('companyUID', isEqualTo: compId)
-            .get();
+            .getResilient(forceServer: forceRefresh);
 
         if (snapshot.docs.isNotEmpty) {
           for (final doc in snapshot.docs) {
@@ -238,7 +242,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               .doc(compId)
               .collection('delegates')
               .where('position', whereIn: ['supervisor', 'Supervisor', 'مشرف'])
-              .get();
+              .getResilient(forceServer: forceRefresh);
 
           for (final doc in delSnapshot.docs) {
             final delData = doc.data();
@@ -276,14 +280,14 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           var phoneSnapshot = await FirebaseFirestore.instance
               .collection('users')
               .where('phoneNumber', isEqualTo: cleanPhone)
-              .get();
+              .getResilient(forceServer: forceRefresh);
 
           if (phoneSnapshot.docs.isEmpty && cleanPhone.startsWith('0')) {
             final altPhone = cleanPhone.substring(1);
             phoneSnapshot = await FirebaseFirestore.instance
                 .collection('users')
                 .where('phoneNumber', isEqualTo: altPhone)
-                .get();
+                .getResilient(forceServer: forceRefresh);
           }
 
           if (phoneSnapshot.docs.isNotEmpty) {
@@ -416,6 +420,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               _buildWelcomeHeroCard(context),
               const SizedBox(height: 16),
               _buildMonthlyAttendanceSummaryCard(context),
+              const SizedBox(height: 14),
+              _buildLeavesAndRequestsCard(context),
               const SizedBox(height: 16),
               ..._buildSupervisorsList(context),
               const SizedBox(height: 12),
@@ -1272,6 +1278,138 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLeavesAndRequestsCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('leave_requests')
+          .where('companyUID', isEqualTo: widget.delegate.companyUID)
+          .where('delegateUid', isEqualTo: widget.delegate.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final docs = snapshot.data?.docs ?? [];
+        int pendingCount = 0;
+        for (final doc in docs) {
+          final data = doc.data();
+          if (data['status'] == 'pending') {
+            pendingCount++;
+          }
+        }
+
+        return Card(
+          elevation: 0,
+          color: colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(
+              color: pendingCount > 0
+                  ? Colors.amber.withValues(alpha: 0.6)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.45),
+              width: pendingCount > 0 ? 1.5 : 1.0,
+            ),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () {
+              if (widget.onNavigateToLeaves != null) {
+                widget.onNavigateToLeaves!();
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DelegateLeavesAndRequestsScreen(
+                      delegate: widget.delegate,
+                    ),
+                  ),
+                );
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      Icons.event_note_rounded,
+                      size: 26,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              isArabic
+                                  ? 'طلباتي (الإجازات والأعذار)'
+                                  : 'My Requests & Leaves',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            if (pendingCount > 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade800,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$pendingCount معلق',
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isArabic
+                              ? 'تقديم ومتابعة طلبات الإجازة والأعذار ورصيدك السنوي'
+                              : 'Submit & track your leave and excuse requests',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    isArabic
+                        ? Icons.chevron_left_rounded
+                        : Icons.chevron_right_rounded,
+                    color: colorScheme.outline,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

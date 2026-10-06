@@ -61,6 +61,7 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     on<ApprovePermissionRequested>(_onApprovePermission);
     on<TogglePermissionRequested>(_onTogglePermission);
     on<UploadPhotoRequested>(_onUploadPhoto);
+    on<UploadBatchPhotosRequested>(_onUploadBatchPhotos);
     on<LoadCapturedPhotosRequested>(_onLoadCapturedPhotos);
     on<LoadDelegateCapturedPhotosRequested>(_onLoadDelegateCapturedPhotos);
     on<LoadCompanyCapturedPhotosRequested>(_onLoadCompanyCapturedPhotos);
@@ -281,6 +282,115 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
       GetIt.I<SyncManager>().syncPendingPhotos();
     } catch (e) {
       emit(PhotoPermissionError(message: 'فشل في حفظ الصورة: $e'));
+    }
+  }
+
+  Future<void> _onUploadBatchPhotos(
+    UploadBatchPhotosRequested event,
+    Emitter<PhotoPermissionState> emit,
+  ) async {
+    if (event.imageFiles.isEmpty) {
+      emit(const PhotoPermissionError(message: 'يرجى التقاط صورة واحدة على الأقل قبل الحفظ.'));
+      return;
+    }
+
+    final total = event.imageFiles.length;
+    emit(PhotoBatchUploadInProgress(current: 0, total: total));
+
+    bool isConnected = false;
+    try {
+      final connectivityResults = await Connectivity().checkConnectivity();
+      isConnected = connectivityResults.any((r) =>
+          r == ConnectivityResult.mobile ||
+          r == ConnectivityResult.wifi ||
+          r == ConnectivityResult.ethernet);
+    } catch (_) {
+      isConnected = true;
+    }
+
+    int processedCount = 0;
+    int offlineCount = 0;
+
+    for (int i = 0; i < total; i++) {
+      final file = event.imageFiles[i];
+      emit(PhotoBatchUploadInProgress(current: i + 1, total: total));
+
+      bool photoUploaded = false;
+
+      if (isConnected) {
+        try {
+          final result = await uploadCapturedPhoto(
+            UploadCapturedPhotoParams(
+              organizationUID: event.organizationUID,
+              companyUID: event.companyUID,
+              companyName: event.companyName,
+              companyCode: event.companyCode,
+              permissionId: event.permissionId,
+              branchId: event.branchId,
+              branchName: event.branchName,
+              delegateUID: event.delegateUID,
+              delegateName: event.delegateName,
+              imageFile: file,
+              comment: event.comment,
+              latitude: event.latitude,
+              longitude: event.longitude,
+            ),
+          );
+
+          if (result.isRight()) {
+            photoUploaded = true;
+            processedCount++;
+          }
+        } catch (_) {
+          // If upload fails mid-batch, fallback to offline persistence for this photo
+          photoUploaded = false;
+        }
+      }
+
+      if (!photoUploaded) {
+        try {
+          final offlineDataSource = GetIt.I<PhotoOfflineDataSource>();
+          final persistentImagePath =
+              await offlineDataSource.saveImageToPersistentDirectory(file);
+
+          await offlineDataSource.savePendingPhoto({
+            'organizationUID': event.organizationUID,
+            'companyUID': event.companyUID,
+            'companyName': event.companyName,
+            'companyCode': event.companyCode,
+            'permissionId': event.permissionId,
+            'branchId': event.branchId,
+            'branchName': event.branchName,
+            'delegateUID': event.delegateUID,
+            'delegateName': event.delegateName,
+            'imagePath': persistentImagePath,
+            'comment': event.comment,
+            'latitude': event.latitude,
+            'longitude': event.longitude,
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          });
+
+          offlineCount++;
+          processedCount++;
+        } catch (_) {
+          // Continue to attempt saving remaining photos
+        }
+      }
+    }
+
+    if (offlineCount > 0) {
+      try {
+        GetIt.I<SyncManager>().syncPendingPhotos();
+      } catch (_) {}
+    }
+
+    if (processedCount > 0) {
+      emit(PhotoBatchUploadSuccess(
+        uploadedCount: processedCount,
+        isOffline: offlineCount > 0,
+      ));
+    } else {
+      emit(const PhotoPermissionError(message: 'فشل في رفع وحفظ الصور، يرجى المحاولة مرة أخرى.'));
     }
   }
 

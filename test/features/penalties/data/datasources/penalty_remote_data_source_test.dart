@@ -58,6 +58,7 @@ void main() {
   final tDate = DateTime(2023, 1, 1);
 
   setUpAll(() {
+    registerFallbackValue(const GetOptions());
     registerFallbackValue(PenaltyModel(
       penaltyId: 'test_id',
       companyId: 'company_123',
@@ -88,8 +89,17 @@ void main() {
       storage: mockStorage,
     );
 
+    final emptySnap = MockQuerySnapshot();
+    when(() => emptySnap.docs).thenReturn([]);
+    final mockRulesRef = MockCollectionReference();
+    final mockRulesQuery = MockQuery();
     when(() => mockFirestore.collection(any())).thenReturn(mockCollectionReference);
+    when(() => mockFirestore.collection('penalty_rules')).thenReturn(mockRulesRef);
+    when(() => mockRulesRef.where(any(), isEqualTo: any(named: 'isEqualTo'))).thenReturn(mockRulesQuery);
+    when(() => mockRulesQuery.get(any())).thenAnswer((_) async => emptySnap);
     when(() => mockCollectionReference.doc(any())).thenReturn(mockDocumentReference);
+    when(() => mockCollectionReference.get(any())).thenAnswer((_) async => emptySnap);
+    when(() => mockQuery.get(any())).thenAnswer((_) async => emptySnap);
   });
 
   final tPenaltyModel = PenaltyModel(
@@ -136,7 +146,7 @@ void main() {
     test('should return list of PenaltyModel when successful', () async {
       when(() => mockCollectionReference.where('companyId', isEqualTo: 'company_123'))
           .thenReturn(mockQuery);
-      when(() => mockQuery.get()).thenAnswer((_) async => mockQuerySnapshot);
+      when(() => mockQuery.get(any())).thenAnswer((_) async => mockQuerySnapshot);
       when(() => mockQuerySnapshot.docs).thenReturn([mockQueryDocumentSnapshot]);
       
       when(() => mockQueryDocumentSnapshot.id).thenReturn('test_id');
@@ -164,7 +174,7 @@ void main() {
     test('should return empty list on generic exception', () async {
       when(() => mockCollectionReference.where('companyId', isEqualTo: 'company_123'))
           .thenReturn(mockQuery);
-      when(() => mockQuery.get())
+      when(() => mockQuery.get(any()))
           .thenThrow(Exception('generic'));
 
       final result = await dataSource.getCompanyPenalties('company_123');
@@ -175,7 +185,7 @@ void main() {
     test('should throw ServerException on FirebaseException', () async {
       when(() => mockCollectionReference.where('companyId', isEqualTo: 'company_123'))
           .thenReturn(mockQuery);
-      when(() => mockQuery.get())
+      when(() => mockQuery.get(any()))
           .thenThrow(FirebaseException(plugin: 'firestore'));
 
       final call = dataSource.getCompanyPenalties;
@@ -186,7 +196,7 @@ void main() {
 
   group('getAllPenalties', () {
     test('should return list of PenaltyModel when successful', () async {
-      when(() => mockCollectionReference.get()).thenAnswer((_) async => mockQuerySnapshot);
+      when(() => mockCollectionReference.get(any())).thenAnswer((_) async => mockQuerySnapshot);
       when(() => mockQuerySnapshot.docs).thenReturn([mockQueryDocumentSnapshot]);
       
       when(() => mockQueryDocumentSnapshot.id).thenReturn('test_id');
@@ -212,7 +222,7 @@ void main() {
     });
 
     test('should return empty list on generic exception', () async {
-      when(() => mockCollectionReference.get())
+      when(() => mockCollectionReference.get(any()))
           .thenThrow(Exception('generic'));
 
       final result = await dataSource.getAllPenalties();
@@ -221,7 +231,7 @@ void main() {
     });
 
     test('should throw ServerException on FirebaseException', () async {
-      when(() => mockCollectionReference.get())
+      when(() => mockCollectionReference.get(any()))
           .thenThrow(FirebaseException(plugin: 'firestore'));
 
       final call = dataSource.getAllPenalties;

@@ -29,6 +29,7 @@ class AppAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (radius <= 0) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final bg = backgroundColor ?? theme.colorScheme.primaryContainer;
     final fg = foregroundColor ?? theme.colorScheme.onPrimaryContainer;
@@ -131,6 +132,10 @@ class AppAvatar extends StatelessWidget {
             ),
           ),
         ),
+        errorListener: (error) {
+          // التعامل بمرونة مع أخطاء الروابط المنتهية (403 أو 404 أو انقطاع النت)
+          // يمنع نهائياً تسجيل استثناء غير معالج في DevTools أو كونسول الفحص
+        },
         errorWidget: (context, url, error) {
           // التعامل بمرونة مع أخطاء الروابط المنتهية (403 أو 404 أو انقطاع النت)
           // يمنع نهائياً طباعة خطأ HttpException 403 باللون الأحمر في كونسول الفحص

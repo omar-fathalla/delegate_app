@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/failures.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -73,32 +74,66 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // (will be replaced by admin auth if admin is found)
       await signInAnonymously();
 
-      // Safe query helper to eliminate Future.catchError type mismatch errors and handle timeouts
+      // Safe resilient query helper for login:
+      // Tries live server first with 12s timeout for mobile data latency.
+      // If server times out or fails, it only uses local cache if cache actually has docs;
+      // otherwise it reports a network/timeout error so the user isn't falsely told their phone is not registered.
       Future<QuerySnapshot<Map<String, dynamic>>?> safeQuery(
-        Future<QuerySnapshot<Map<String, dynamic>>> queryFuture,
+        Query<Map<String, dynamic>> query,
         String debugLabel,
       ) async {
         try {
-          return await queryFuture.timeout(const Duration(seconds: 10));
-        } catch (e) {
-          debugPrint('$debugLabel query error: $e');
-          return null;
+          return await query
+              .get(const GetOptions(source: Source.server))
+              .timeout(const Duration(seconds: 12));
+        } catch (serverError) {
+          debugPrint('$debugLabel server query error ($serverError). Trying serverAndCache fallback.');
+          try {
+            final fallbackSnap = await query
+                .get(const GetOptions(source: Source.serverAndCache))
+                .timeout(const Duration(seconds: 8));
+            return fallbackSnap;
+          } catch (e) {
+            debugPrint('$debugLabel fallback error: $e');
+            // If offline, check local cache. If cache actually has docs, use it.
+            try {
+              final cacheSnap = await query.get(const GetOptions(source: Source.cache));
+              if (cacheSnap.docs.isNotEmpty) {
+                return cacheSnap;
+              }
+            } catch (_) {}
+
+            // Re-throw meaningful network/timeout failure
+            final errStr = serverError.toString().toLowerCase();
+            if (errStr.contains('timeout')) {
+              throw const ServerFailure(
+                'انتهت مهلة الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.',
+              );
+            } else if (errStr.contains('socket') ||
+                errStr.contains('network') ||
+                errStr.contains('unavailable')) {
+              throw const ServerFailure(
+                'تعذر الاتصال بالإنترنت. يرجى التأكد من تشغيل البيانات أو الواي فاي والمحاولة ثانية.',
+              );
+            }
+            throw const ServerFailure(
+              'تعذر التحقق من الحساب حالياً بسبب ضعف الاتصال. يرجى المحاولة مرة أخرى.',
+            );
+          }
         }
       }
 
       final delegatesFuture = safeQuery(
         firestore
             .collectionGroup('delegates')
-            .where('phoneNumber', isEqualTo: normalizedPhone)
-            .get(),
+            .where('phoneNumber', isEqualTo: normalizedPhone),
         'delegates collectionGroup',
       );
 
       final usersFuture = safeQuery(
         firestore
             .collection('users')
-            .where('phoneNumber', isEqualTo: normalizedPhone)
-            .get(),
+            .where('phoneNumber', isEqualTo: normalizedPhone),
         'users collection',
       );
 
@@ -137,8 +172,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             final fallbackQuery = await firestore
                 .collection('users')
                 .where('phoneNumber', isEqualTo: phoneNumber.trim())
-                .get()
-                .timeout(const Duration(seconds: 8));
+                .getResilient(
+                  timeout: const Duration(seconds: 5),
+                  forceServer: true,
+                );
             docs = fallbackQuery.docs.toList();
           } catch (_) {}
         }
@@ -418,10 +455,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       await firebaseAuth
           .signInAnonymously()
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(seconds: 12));
     } catch (_) {
-      // If anonymous sign-in fails, continue anyway
-      // (might already be signed in or in test environment)
+      try {
+        if (firebaseAuth.currentUser == null) {
+          await firebaseAuth
+              .signInAnonymously()
+              .timeout(const Duration(seconds: 8));
+        }
+      } catch (_) {}
     }
   }
 
@@ -436,8 +478,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           .collection('users')
           .where('email', isEqualTo: cleanEmail)
           .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 4));
+          .getResilient(
+            timeout: const Duration(seconds: 4),
+            forceServer: true,
+          );
 
       if (query.docs.isNotEmpty) {
         final userData = query.docs.first.data();
@@ -496,16 +540,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       var query = await firestore
           .collection('users')
           .where('phoneNumber', isEqualTo: normalizedPhone)
-          .get()
-          .timeout(const Duration(seconds: 8));
+          .getResilient(
+            timeout: const Duration(seconds: 5),
+            forceServer: true,
+          );
 
       var docs = query.docs;
       if (docs.isEmpty && phoneNumber.trim() != normalizedPhone) {
         query = await firestore
             .collection('users')
             .where('phoneNumber', isEqualTo: phoneNumber.trim())
-            .get()
-            .timeout(const Duration(seconds: 8));
+            .getResilient(
+              timeout: const Duration(seconds: 5),
+              forceServer: true,
+            );
         docs = query.docs;
       }
 

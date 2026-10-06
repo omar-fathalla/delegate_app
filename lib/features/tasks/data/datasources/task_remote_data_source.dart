@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/tasks/data/models/task_model.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
 
@@ -29,6 +30,16 @@ abstract class TaskRemoteDataSource {
     int? limit,
     dynamic lastDoc,
   });
+  Stream<List<TaskModel>> streamDelegateTasks(
+    String organizationId,
+    String delegateId,
+    String companyId,
+    String delegateRoleName,
+  );
+  Stream<List<TaskModel>> streamAdminTasks(
+    String organizationId,
+    String companyId,
+  );
   Future<void> updateTask(String organizationId, TaskModel task);
 
   Future<void> deleteTask(String organizationId, String taskId);
@@ -121,8 +132,63 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       query = query.limit(limit);
     }
 
-    final snapshot = await query.get();
+    final snapshot = await query.getResilient();
     return snapshot.docs.map((doc) => TaskModel.fromFirestore(doc)).toList();
+  }
+
+  @override
+  Stream<List<TaskModel>> streamAdminTasks(
+    String organizationId,
+    String companyId,
+  ) {
+    return _taskCollection(organizationId)
+        .where('companyId', isEqualTo: companyId)
+        .orderBy('createdAt', descending: true)
+        .limit(100)
+        .snapshots(includeMetadataChanges: true)
+        .map((snapshot) => snapshot.docs.map((doc) => TaskModel.fromFirestore(doc)).toList());
+  }
+
+  @override
+  Stream<List<TaskModel>> streamDelegateTasks(
+    String organizationId,
+    String delegateId,
+    String companyId,
+    String delegateRoleName,
+  ) {
+    Query query = _taskCollection(organizationId)
+        .where('companyId', isEqualTo: companyId);
+
+    if (delegateRoleName == 'marketing') {
+      query = query.where(
+        Filter.or(
+          Filter('assignedTo', isEqualTo: delegateId),
+          Filter('assignedTo', isEqualTo: 'all'),
+          Filter('assignedTo', isEqualTo: 'all_branch_marketing'),
+        ),
+      );
+    } else if (delegateRoleName == 'marketingPromotion') {
+      query = query.where(
+        Filter.or(
+          Filter('assignedTo', isEqualTo: delegateId),
+          Filter('assignedTo', isEqualTo: 'all'),
+          Filter('assignedTo', isEqualTo: 'all_marketing_promotion'),
+        ),
+      );
+    } else {
+      query = query.where(
+        Filter.or(
+          Filter('assignedTo', isEqualTo: delegateId),
+          Filter('assignedTo', isEqualTo: 'all'),
+        ),
+      );
+    }
+
+    return query
+        .orderBy('createdAt', descending: true)
+        .limit(100)
+        .snapshots(includeMetadataChanges: true)
+        .map((snapshot) => snapshot.docs.map((doc) => TaskModel.fromFirestore(doc)).toList());
   }
 
   @override
@@ -177,7 +243,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       query = query.limit(limit);
     }
 
-    final snapshot = await query.get();
+    final snapshot = await query.getResilient();
     return snapshot.docs.map((doc) => TaskModel.fromFirestore(doc)).toList();
   }
 

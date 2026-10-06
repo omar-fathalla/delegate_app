@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/core/error/exceptions.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/penalties/data/models/penalty_model.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
 
@@ -16,6 +17,10 @@ abstract class PenaltyRemoteDataSource {
     String? companyId,
     String? phoneNumber,
     String? fullName,
+  });
+  Stream<List<PenaltyModel>> streamDelegatePenalties({
+    required String delegateId,
+    String? companyId,
   });
   Future<List<PenaltyModel>> getAllPenalties();
   Future<void> updatePenaltyStatus({
@@ -423,7 +428,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
     try {
       final rulesSnap = await _penaltyRulesRef
           .where('isConfidential', isEqualTo: true)
-          .get();
+          .getResilient(forceServer: true);
       final titles = <String>{};
       for (final doc in rulesSnap.docs) {
         final data = doc.data();
@@ -490,7 +495,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
     try {
       final snapshot = await _penaltiesRef
           .where('companyId', isEqualTo: companyId)
-          .get();
+          .getResilient(forceServer: true);
 
       final list = snapshot.docs
           .map((doc) => PenaltyModel.fromFirestore(doc))
@@ -519,7 +524,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
       try {
         final snap = await _penaltiesRef
             .where('targetDelegateId', isEqualTo: delegateId)
-            .get();
+            .getResilient(forceServer: true);
         for (var doc in snap.docs) {
           results[doc.id] = PenaltyModel.fromFirestore(doc);
         }
@@ -530,7 +535,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
         try {
           final compSnap = await _penaltiesRef
               .where('companyId', isEqualTo: companyId)
-              .get();
+              .getResilient(forceServer: true);
           for (var doc in compSnap.docs) {
             final model = PenaltyModel.fromFirestore(doc);
             if (_isPenaltyMatchingDelegate(
@@ -554,6 +559,23 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
     } catch (_) {
       return [];
     }
+  }
+
+  @override
+  Stream<List<PenaltyModel>> streamDelegatePenalties({
+    required String delegateId,
+    String? companyId,
+  }) {
+    return _penaltiesRef
+        .where('targetDelegateId', isEqualTo: delegateId)
+        .streamResilient(includeMetadataChanges: true)
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => PenaltyModel.fromFirestore(doc))
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   bool _isPenaltyMatchingDelegate(
@@ -591,7 +613,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
   @override
   Future<List<PenaltyModel>> getAllPenalties() async {
     try {
-      final snapshot = await _penaltiesRef.get();
+      final snapshot = await _penaltiesRef.getResilient(forceServer: true);
       final list = snapshot.docs
           .map((doc) => PenaltyModel.fromFirestore(doc))
           .toList();
@@ -837,11 +859,15 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
   @override
   Future<List<PenaltyRuleModel>> getPenaltyRules() async {
     try {
-      final snapshot = await _penaltyRulesRef.orderBy('createdAt', descending: false).get();
+      final snapshot = await _penaltyRulesRef
+          .orderBy('createdAt', descending: false)
+          .getResilient(forceServer: true);
       if (snapshot.docs.isEmpty) {
         // Auto seed default standard violations to Firestore
         await seedDefaultPenaltyRules();
-        final seeded = await _penaltyRulesRef.orderBy('createdAt', descending: false).get();
+        final seeded = await _penaltyRulesRef
+            .orderBy('createdAt', descending: false)
+            .getResilient(forceServer: true);
         if (seeded.docs.isNotEmpty) {
           return seeded.docs.map((doc) => PenaltyRuleModel.fromFirestore(doc)).toList();
         }

@@ -22,8 +22,10 @@ import 'dart:async';
 import 'package:delegate_app/features/admin/presentation/pages/manage_organizations_page.dart';
 import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
 import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/delegate_leaves_and_requests_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
+import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 
@@ -98,46 +100,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.logout_rounded, color: colorScheme.error, size: 24),
-            const SizedBox(width: 8),
-            Text(l10n.logout),
-          ],
-        ),
-        content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              l10n.cancel,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              foregroundColor: colorScheme.onError,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              context.go('/login');
-            },
-            child: Text(l10n.logout),
-          ),
-        ],
-      ),
-    );
+    AppLogoutModal.show(context, delegate: widget.delegate);
   }
 
   @override
@@ -236,6 +199,23 @@ class _MainScreenState extends State<MainScreen> {
             );
           } else if (value == 'org_switch') {
             _showOrgSwitcher(context, colorScheme);
+          } else if (value == 'tasks') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => BlocProvider(
+                  create: (context) => di.sl<DelegateTasksBloc>(),
+                  child: DelegateTasksScreen(delegate: delegate),
+                ),
+              ),
+            );
+          } else if (value == 'leaves_and_requests') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => DelegateLeavesAndRequestsScreen(
+                  delegate: delegate,
+                ),
+              ),
+            );
           } else if (value == 'logout') {
             _showLogoutDialog(context);
           } else if (value == 'settings') {
@@ -331,6 +311,16 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ],
           PopupMenuItem<String>(
+            value: 'tasks',
+            child: Row(
+              children: [
+                Icon(Icons.task_alt_rounded, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                Text(l10n.tasks),
+              ],
+            ),
+          ),
+          PopupMenuItem<String>(
             value: 'logout',
             child: Row(
               children: [
@@ -385,8 +375,8 @@ class _MainScreenState extends State<MainScreen> {
                   label: l10n.attendance,
                 ),
                 NavigationDestination(
-                  icon: const Icon(Icons.task_alt_rounded),
-                  label: l10n.tasks,
+                  icon: const Icon(Icons.event_note_rounded),
+                  label: isArabic ? 'طلباتي' : 'My Requests',
                 ),
                 NavigationDestination(
                   icon: const Icon(Icons.photo_library_rounded),
@@ -413,6 +403,12 @@ class _MainScreenState extends State<MainScreen> {
               _initializedTabs.add(1);
             });
           },
+          onNavigateToLeaves: () {
+            setState(() {
+              _currentIndex = 2;
+              _initializedTabs.add(2);
+            });
+          },
         ),
 
         // Tab 1: Attendance
@@ -421,11 +417,11 @@ class _MainScreenState extends State<MainScreen> {
         else
           const SizedBox.shrink(),
 
-        // Tab 2: Tasks
+        // Tab 2: Leaves & Requests (طلباتي)
         if (_initializedTabs.contains(2))
-          BlocProvider(
-            create: (context) => di.sl<DelegateTasksBloc>(),
-            child: DelegateTasksScreen(delegate: delegate),
+          DelegateLeavesAndRequestsScreen(
+            delegate: delegate,
+            showAppBar: false,
           )
         else
           const SizedBox.shrink(),

@@ -47,6 +47,7 @@ import 'package:delegate_app/features/marketing_search/data/repositories/marketi
 import 'package:delegate_app/features/marketing_search/domain/repositories/marketing_search_repository.dart';
 import 'package:delegate_app/features/marketing_search/domain/usecases/search_company_by_code.dart';
 import 'package:delegate_app/features/marketing_search/domain/usecases/search_delegate_by_phone.dart';
+import 'package:delegate_app/features/marketing_search/domain/usecases/search_delegate_by_name.dart';
 import 'package:delegate_app/features/marketing_search/presentation/bloc/marketing_search_bloc.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
@@ -381,6 +382,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       getAdminTasks: sl(),
       updateTaskStatus: sl(),
       updateTask: sl(),
+      deleteTask: sl(),
     ),
   );
   sl.registerFactory(
@@ -484,12 +486,14 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
     () => MarketingSearchBloc(
       searchCompanyByCode: sl(),
       searchDelegateByPhone: sl(),
+      searchDelegateByName: sl(),
     ),
   );
 
   // Use cases
   sl.registerLazySingleton(() => SearchCompanyByCode(sl()));
   sl.registerLazySingleton(() => SearchDelegateByPhone(sl()));
+  sl.registerLazySingleton(() => SearchDelegateByName(sl()));
 
   // Repository
   sl.registerLazySingleton<MarketingSearchRepository>(
@@ -639,6 +643,7 @@ Future<void> initBackgroundSync() async {
       () => SyncManager(
         offlineDataSource: sl(),
         remoteDataSource: sl(),
+        isBackground: true,
       ),
     );
   }

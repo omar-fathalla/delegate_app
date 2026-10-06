@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import '../models/photo_permission_model.dart';
 import '../models/captured_photo_model.dart';
 
@@ -38,6 +39,11 @@ abstract class PhotoPermissionRemoteDataSource {
   });
 
   Future<List<PhotoPermissionModel>> getPermissions({
+    required String organizationUID,
+    required String companyUID,
+  });
+
+  Stream<List<PhotoPermissionModel>> streamPermissions({
     required String organizationUID,
     required String companyUID,
   });
@@ -120,14 +126,18 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
   Future<void> _ensureAuth() async {
     final auth = FirebaseAuth.instance;
     if (auth.currentUser == null) {
-      await auth.signInAnonymously();
+      try {
+        await auth.signInAnonymously().timeout(const Duration(seconds: 5));
+      } catch (_) {}
     } else {
       try {
-        await auth.currentUser!.getIdToken(true);
+        await auth.currentUser!.getIdToken(false).timeout(const Duration(seconds: 3));
       } catch (_) {
         if (auth.currentUser?.isAnonymous == true) {
-          await auth.signOut();
-          await auth.signInAnonymously();
+          try {
+            await auth.signOut().timeout(const Duration(seconds: 3));
+            await auth.signInAnonymously().timeout(const Duration(seconds: 5));
+          } catch (_) {}
         }
       }
     }
@@ -267,6 +277,42 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
   }
 
   @override
+  Stream<List<PhotoPermissionModel>> streamPermissions({
+    required String organizationUID,
+    required String companyUID,
+  }) {
+    if (companyUID.isEmpty) {
+      return firestore
+          .collectionGroup('photo_permissions')
+          .orderBy('createdAt', descending: true)
+          .limit(100)
+          .snapshots(includeMetadataChanges: true)
+          .map((snapshot) {
+        final docs = snapshot.docs
+            .map((doc) => PhotoPermissionModel.fromFirestore(doc))
+            .toList();
+        docs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return docs;
+      });
+    } else {
+      return firestore
+          .collection('organizations')
+          .doc(organizationUID)
+          .collection('companies')
+          .doc(companyUID)
+          .collection('photo_permissions')
+          .snapshots(includeMetadataChanges: true)
+          .map((snapshot) {
+        final docs = snapshot.docs
+            .map((doc) => PhotoPermissionModel.fromFirestore(doc))
+            .toList();
+        docs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return docs;
+      });
+    }
+  }
+
+  @override
   Future<List<PhotoPermissionModel>> getPermissions({
     required String organizationUID,
     required String companyUID,
@@ -280,7 +326,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
             .collectionGroup('photo_permissions')
             .orderBy('createdAt', descending: true)
             .limit(100)
-            .get();
+            .getResilient();
 
         final docs = snapshot.docs
             .map((doc) => PhotoPermissionModel.fromFirestore(doc))
@@ -297,7 +343,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
             .collection('companies')
             .doc(companyUID)
             .collection('photo_permissions')
-            .get();
+            .getResilient();
 
         final docs = snapshot.docs
             .map((doc) => PhotoPermissionModel.fromFirestore(doc))
@@ -323,7 +369,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         query = query.where('organizationUID', isEqualTo: organizationUID);
       }
 
-      final snapshot = await query.get();
+      final snapshot = await query.getResilient();
 
       final now = DateTime.now();
       final todayStart = DateTime(now.year, now.month, now.day);
@@ -420,13 +466,16 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
           .doc(permissionId)
           .collection('captured_photos')
           .orderBy('capturedAt', descending: true)
-          .get();
+          .getResilient(timeout: const Duration(seconds: 6));
 
       return snapshot.docs
           .map((doc) => CapturedPhotoModel.fromFirestore(doc))
           .toList();
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في جلب الصور المسجلة للإذن.');
+    } catch (e) {
+      debugPrint('Error fetching captured photos: $e');
+      throw const ServerFailure('فشل في جلب الصور المسجلة للإذن.');
     }
   }
 
@@ -440,7 +489,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         final snapshot = await firestore
             .collectionGroup('captured_photos')
             .where('delegateUID', isEqualTo: delegateUID)
-            .get();
+            .getResilient();
 
         final docs = snapshot.docs
             .map((doc) => CapturedPhotoModel.fromFirestore(doc))
@@ -485,7 +534,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         if (companyUID.isNotEmpty) {
           query = query.where('companyUID', isEqualTo: companyUID);
         }
-        final snapshot = await query.get();
+        final snapshot = await query.getResilient();
 
         final docs = snapshot.docs
             .map((doc) => CapturedPhotoModel.fromFirestore(doc))

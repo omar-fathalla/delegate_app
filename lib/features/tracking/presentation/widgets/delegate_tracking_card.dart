@@ -230,7 +230,52 @@ class _DelegateTrackingCardState extends State<DelegateTrackingCard> {
                 );
               }
 
-              // Compact 2-row layout for narrower screens / tablets
+              if (constraints.maxWidth < 650) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Row 1: Identity + Tracking switch
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDelegateIdentity(
+                            colorScheme: colorScheme,
+                            textTheme: textTheme,
+                            checkInStr: checkInStr,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildTrackingSwitch(
+                          colorScheme: colorScheme,
+                          textTheme: textTheme,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Row 2: Status Pill + Actions (Call, WhatsApp, Map, Ping, Close)
+                    Row(
+                      children: [
+                        Flexible(
+                          child: _buildGeofencePill(
+                            statusColor: statusColor,
+                            statusBgColor: statusBgColor,
+                            statusTitle: statusTitle,
+                            statusIcon: statusIcon,
+                            colorScheme: colorScheme,
+                          ),
+                        ),
+                        const Spacer(),
+                        _buildActions(context: context, colorScheme: colorScheme),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // Row 3: Telemetry bar spanning cleanly across the card
+                    _buildTelemetryBar(colorScheme: colorScheme),
+                  ],
+                );
+              }
+
+              // Tablet layout (650 <= width < 960)
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -444,9 +489,12 @@ class _DelegateTrackingCardState extends State<DelegateTrackingCard> {
           width: 0.8,
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
           // Battery
           Tooltip(
             message: 'نسبة شحن البطارية: ${batteryLvl != null ? "$batteryLvl%" : "غير متوفر"}',
@@ -535,7 +583,8 @@ class _DelegateTrackingCardState extends State<DelegateTrackingCard> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildTrackingSwitch({
@@ -597,9 +646,12 @@ class _DelegateTrackingCardState extends State<DelegateTrackingCard> {
     required ColorScheme colorScheme,
   }) {
     final session = widget.session;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
         if (session.delegatePhone.isNotEmpty) ...[
           IconButton.filledTonal(
             onPressed: () => _makeCall(context),
@@ -677,6 +729,7 @@ class _DelegateTrackingCardState extends State<DelegateTrackingCard> {
           ),
         ],
       ],
-    );
+    ),
+  );
   }
 }

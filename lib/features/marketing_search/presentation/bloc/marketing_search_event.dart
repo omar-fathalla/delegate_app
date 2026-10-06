@@ -27,18 +27,20 @@ class LoadMoreCompaniesRequested extends MarketingSearchEvent {
   const LoadMoreCompaniesRequested();
 }
 
-/// Event to search for a delegate by phone number (first batch)
+/// Event to search for a delegate by name and/or phone number (first batch)
 class SearchDelegateRequested extends MarketingSearchEvent {
   final String organizationUID;
-  final String phoneNumber;
+  final String? phoneNumber;
+  final String? name;
 
   const SearchDelegateRequested({
     required this.organizationUID,
-    required this.phoneNumber,
+    this.phoneNumber,
+    this.name,
   });
 
   @override
-  List<Object?> get props => [organizationUID, phoneNumber];
+  List<Object?> get props => [organizationUID, phoneNumber, name];
 }
 
 /// Event to load more delegates (pagination)

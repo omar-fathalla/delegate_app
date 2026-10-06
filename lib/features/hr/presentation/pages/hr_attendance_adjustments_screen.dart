@@ -499,14 +499,24 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       );
     }
 
-    return SizedBox(
-      height: 110,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: kpis.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (_, i) => SizedBox(width: 220, child: _buildKpiCard(kpis[i], colorScheme)),
-      ),
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _buildKpiCard(kpis[0], colorScheme)),
+            const SizedBox(width: 8),
+            Expanded(child: _buildKpiCard(kpis[1], colorScheme)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(child: _buildKpiCard(kpis[2], colorScheme)),
+            const SizedBox(width: 8),
+            Expanded(child: _buildKpiCard(kpis[3], colorScheme)),
+          ],
+        ),
+      ],
     );
   }
 
@@ -514,60 +524,61 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
         ),
       ),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                kpi.title,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
+              Flexible(
+                child: Text(
+                  kpi.title,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 4),
               Container(
-                padding: const EdgeInsets.all(7),
+                padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
                   color: kpi.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(kpi.icon, size: 16, color: kpi.color),
+                child: Icon(kpi.icon, size: 14, color: kpi.color),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                kpi.value,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                kpi.subtitle,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+          const SizedBox(height: 6),
+          Text(
+            kpi.value,
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            kpi.subtitle,
+            style: TextStyle(
+              fontSize: 9.5,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -582,233 +593,277 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
     required ColorScheme colorScheme,
     required bool isWide,
   }) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        // 1. Search Input Field (Height 44)
-        SizedBox(
-          width: isWide ? 260 : double.infinity,
-          height: 44,
-          child: TextField(
-            controller: _searchController,
-            style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
-            textAlignVertical: TextAlignVertical.center,
-            decoration: InputDecoration(
-              hintText: 'بحث باسم المندوب أو الهاتف...',
-              hintStyle: TextStyle(
-                fontSize: 12,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+    if (isWide) {
+      return Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          SizedBox(
+            width: 260,
+            height: 42,
+            child: _buildSearchTextField(colorScheme),
+          ),
+          TashilConnectedButtonGroup<String>(
+            height: 42.0,
+            selectedValue: _selectedPeriodFilter,
+            items: const [
+              TashilConnectedButtonItem(value: 'all', label: 'الكل'),
+              TashilConnectedButtonItem(value: 'today', label: 'اليوم'),
+              TashilConnectedButtonItem(value: 'this_week', label: 'الأسبوع'),
+              TashilConnectedButtonItem(value: 'this_month', label: 'الشهر'),
+            ],
+            onSelected: (val) => setState(() => _selectedPeriodFilter = val),
+          ),
+          _buildReasonSelector(distinctReasons, colorScheme),
+          _buildCountAndExportGroup(recordCount, onExport, colorScheme),
+        ],
+      );
+    } else {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 42,
+            child: _buildSearchTextField(colorScheme),
+          ),
+          const SizedBox(height: 8),
+          TashilConnectedButtonGroup<String>(
+            height: 40.0,
+            width: double.infinity,
+            selectedValue: _selectedPeriodFilter,
+            items: const [
+              TashilConnectedButtonItem(value: 'all', label: 'الكل'),
+              TashilConnectedButtonItem(value: 'today', label: 'اليوم'),
+              TashilConnectedButtonItem(value: 'this_week', label: 'الأسبوع'),
+              TashilConnectedButtonItem(value: 'this_month', label: 'الشهر'),
+            ],
+            onSelected: (val) => setState(() => _selectedPeriodFilter = val),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildReasonSelector(distinctReasons, colorScheme),
               ),
-              prefixIcon: Icon(Icons.search_rounded, size: 19, color: colorScheme.primary),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 16),
-                      tooltip: 'مسح البحث',
-                      onPressed: () => _searchController.clear(),
-                    )
-                  : null,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-              isDense: true,
-              filled: true,
-              fillColor: colorScheme.surfaceContainerHigh,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(22),
-                borderSide: BorderSide(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(22),
-                borderSide: BorderSide(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(22),
-                borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-              ),
-            ),
+              const SizedBox(width: 8),
+              _buildCountAndExportGroup(recordCount, onExport, colorScheme),
+            ],
+          ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildSearchTextField(ColorScheme colorScheme) {
+    return TextField(
+      controller: _searchController,
+      style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+      textAlignVertical: TextAlignVertical.center,
+      decoration: InputDecoration(
+        hintText: 'بحث باسم المندوب أو الهاتف...',
+        hintStyle: TextStyle(
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+        ),
+        prefixIcon: Icon(Icons.search_rounded, size: 19, color: colorScheme.primary),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear_rounded, size: 16),
+                tooltip: 'مسح البحث',
+                onPressed: () => _searchController.clear(),
+              )
+            : null,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+        isDense: true,
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHigh,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(21),
+          borderSide: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
           ),
         ),
-
-        // 2. Period Button Group (Height 44)
-        TashilConnectedButtonGroup<String>(
-          height: 44.0,
-          selectedValue: _selectedPeriodFilter,
-          items: const [
-            TashilConnectedButtonItem(value: 'all', label: 'الكل'),
-            TashilConnectedButtonItem(value: 'today', label: 'اليوم'),
-            TashilConnectedButtonItem(value: 'this_week', label: 'الأسبوع'),
-            TashilConnectedButtonItem(value: 'this_month', label: 'الشهر'),
-          ],
-          onSelected: (val) => setState(() => _selectedPeriodFilter = val),
-        ),
-
-        // 3. Reason Selector Dropdown (Height 44)
-        Container(
-          height: 44,
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: _selectedReasonFilter != 'all'
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant.withValues(alpha: 0.35),
-              width: _selectedReasonFilter != 'all' ? 1.4 : 1.0,
-            ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(21),
+          borderSide: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
           ),
-          child: PopupMenuButton<String>(
-            tooltip: 'تصفية حسب السبب',
-            color: colorScheme.surfaceContainerHigh,
-            elevation: 3,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
-            initialValue: _selectedReasonFilter,
-            onSelected: (val) => setState(() => _selectedReasonFilter = val),
-            itemBuilder: (ctx) {
-              final reasonsList = ['all', ...distinctReasons];
-              return reasonsList.map((r) {
-                final isSelected = r == _selectedReasonFilter;
-                return PopupMenuItem<String>(
-                  value: r,
-                  child: Row(
-                    children: [
-                      Icon(
-                        r == 'all' ? Icons.filter_alt_rounded : Icons.label_outline_rounded,
-                        size: 17,
-                        color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          r == 'all' ? 'جميع الأسباب' : r,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected ? colorScheme.primary : colorScheme.onSurface,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (isSelected) ...[
-                        const SizedBox(width: 6),
-                        Icon(Icons.check_rounded, size: 16, color: colorScheme.primary),
-                      ],
-                    ],
-                  ),
-                );
-              }).toList();
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(21),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReasonSelector(Set<String> distinctReasons, ColorScheme colorScheme) {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _selectedReasonFilter != 'all'
+              ? colorScheme.primary
+              : colorScheme.outlineVariant.withValues(alpha: 0.35),
+          width: _selectedReasonFilter != 'all' ? 1.4 : 1.0,
+        ),
+      ),
+      child: PopupMenuButton<String>(
+        tooltip: 'تصفية حسب السبب',
+        color: colorScheme.surfaceContainerHigh,
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+          ),
+        ),
+        initialValue: _selectedReasonFilter,
+        onSelected: (val) => setState(() => _selectedReasonFilter = val),
+        itemBuilder: (ctx) {
+          final reasonsList = ['all', ...distinctReasons];
+          return reasonsList.map((r) {
+            final isSelected = r == _selectedReasonFilter;
+            return PopupMenuItem<String>(
+              value: r,
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.tune_rounded,
-                    size: 16,
-                    color: _selectedReasonFilter != 'all'
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
+                    r == 'all' ? Icons.filter_alt_rounded : Icons.label_outline_rounded,
+                    size: 17,
+                    color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 8),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 160),
+                  Expanded(
                     child: Text(
-                      _selectedReasonFilter == 'all' ? 'جميع الأسباب' : _selectedReasonFilter,
+                      r == 'all' ? 'جميع الأسباب' : r,
                       style: TextStyle(
                         fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: _selectedReasonFilter != 'all'
-                            ? colorScheme.primary
-                            : colorScheme.onSurface,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? colorScheme.primary : colorScheme.onSurface,
                       ),
                       overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.expand_more_rounded,
-                    size: 18,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                  if (isSelected) ...[
+                    const SizedBox(width: 6),
+                    Icon(Icons.check_rounded, size: 16, color: colorScheme.primary),
+                  ],
                 ],
               ),
-            ),
-          ),
-        ),
-
-        // 4. Record Count Badge (Height 44)
-        Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-              width: 1.0,
-            ),
-          ),
-          alignment: Alignment.center,
+            );
+          }).toList();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.receipt_long_rounded, size: 16, color: colorScheme.primary),
+              Icon(
+                Icons.tune_rounded,
+                size: 16,
+                color: _selectedReasonFilter != 'all'
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 8),
-              Text(
-                'عدد السجلات: $recordCount',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
+              Expanded(
+                child: Text(
+                  _selectedReasonFilter == 'all' ? 'جميع الأسباب' : _selectedReasonFilter,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _selectedReasonFilter != 'all'
+                        ? colorScheme.primary
+                        : colorScheme.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: colorScheme.onSurfaceVariant,
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
 
-        // 5. CSV Export Button (Height 44, Only "CSV" + Arrow icon, no "تصدير")
-        Container(
-          height: 44,
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-              width: 1.0,
+  Widget _buildCountAndExportGroup(int recordCount, VoidCallback onExport, ColorScheme colorScheme) {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+          width: 1.0,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 1. Record Count Badge
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 11),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.receipt_long_rounded, size: 15, color: colorScheme.primary),
+                const SizedBox(width: 5),
+                Text(
+                  'عدد: $recordCount',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Material(
+
+          // Divider
+          SizedBox(
+            height: 20,
+            child: VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+            ),
+          ),
+
+          // 2. CSV Export Button
+          Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: onExport,
-              borderRadius: BorderRadius.circular(22),
               hoverColor: colorScheme.primary.withValues(alpha: 0.08),
               child: Tooltip(
                 message: 'تصدير ملف CSV',
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 11),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.arrow_downward_rounded,
-                        size: 16,
+                        size: 14,
                         color: colorScheme.primary,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       Text(
                         'CSV',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: colorScheme.primary,
                           letterSpacing: 0.5,
@@ -820,8 +875,8 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1027,7 +1082,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                       ? DateFormat('hh:mm a', 'ar').format(r.newCheckOutTime!)
                                       : 'لم يسجل',
                                   wasModified: r.wasCheckOutModified || r.isNewCheckOutCreated,
-                                  activeColor: const Color(0xFFE65100),
+                                  activeColor: Colors.indigo.shade800,
                                   colorScheme: colorScheme,
                                 ),
                               ),
@@ -1455,7 +1510,11 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                             const SizedBox(height: 2),
                             Text(
                               r.newCheckOutTime != null ? DateFormat('hh:mm a', 'ar').format(r.newCheckOutTime!) : 'لم يسجل',
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: r.newCheckOutTime != null ? Colors.indigo.shade800 : colorScheme.error,
+                              ),
                             ),
                           ],
                         ),
@@ -1580,7 +1639,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                   Icons.logout_rounded,
                   'وقت الانصراف',
                   'الأصلي: ${r.originalCheckOutTime != null ? DateFormat('hh:mm a', 'ar').format(r.originalCheckOutTime!) : 'لم يسجل'} ➔ الجديد: ${r.newCheckOutTime != null ? DateFormat('hh:mm a', 'ar').format(r.newCheckOutTime!) : 'لم يسجل'}',
-                  valueColor: Colors.orange.shade800,
+                  valueColor: r.newCheckOutTime != null ? Colors.indigo.shade800 : colorScheme.error,
                 ),
                 const SizedBox(height: 6),
                 _buildModalRow(

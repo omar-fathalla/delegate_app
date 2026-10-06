@@ -28,6 +28,7 @@ import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.d
 import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
+import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
@@ -40,8 +41,15 @@ import 'package:delegate_app/features/marketing_search/presentation/pages/market
 import 'package:delegate_app/features/marketing/presentation/pages/branches_marketing_home_screen.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_session_control_screen.dart';
 import 'package:delegate_app/features/tracking/presentation/pages/delegate_tracking_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_device_unbind_requests_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_field_photos_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuses_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_monthly_payroll_screen.dart';
 
 class AdminMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -255,13 +263,71 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         );
         break;
       case 'hr_system':
-        context.push('/hr/home', extra: widget.delegate);
+      case 'hr_attendance':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => HRAttendanceScreen(
+              hrDelegate: widget.delegate,
+              showAppBar: true,
+            ),
+          ),
+        );
         break;
       case 'delegate_tracking':
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => DelegateTrackingScreen(
               adminDelegate: widget.delegate,
+            ),
+          ),
+        );
+        break;
+      case 'leaves_and_excuses':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => HRLeavesAndExcusesScreen(
+              hrDelegate: widget.delegate,
+              showAppBar: true,
+            ),
+          ),
+        );
+        break;
+      case 'monthly_payroll':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => HRMonthlyPayrollScreen(
+              hrDelegate: widget.delegate,
+              showAppBar: true,
+            ),
+          ),
+        );
+        break;
+      case 'device_unbind_requests':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => HRDeviceUnbindRequestsScreen(
+              hrDelegate: widget.delegate,
+              showAppBar: true,
+            ),
+          ),
+        );
+        break;
+      case 'field_photos':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => HRFieldPhotosScreen(
+              hrDelegate: widget.delegate,
+              showAppBar: true,
+            ),
+          ),
+        );
+        break;
+      case 'attendance_adjustments':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => HRAttendanceAdjustmentsScreen(
+              hrDelegate: widget.delegate,
+              showAppBar: true,
             ),
           ),
         );
@@ -412,46 +478,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.logout_rounded, color: colorScheme.error, size: 24),
-            const SizedBox(width: 8),
-            Text(l10n.logout),
-          ],
-        ),
-        content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              'إلغاء',
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              foregroundColor: colorScheme.onError,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              context.go('/login');
-            },
-            child: Text(l10n.logout),
-          ),
-        ],
-      ),
-    );
+    AppLogoutModal.show(context, delegate: widget.delegate);
   }
 
   bool get isSuperAdmin => widget.delegate.role == UserRole.superAdmin;
@@ -513,9 +540,37 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ? l10n.tasks
               : l10n.photoPermissions);
 
+    Widget buildBadgeIcon(IconData icon, String collection) {
+      if (widget.delegate.companyUID.isEmpty) {
+        return Icon(icon, size: 20);
+      }
+      return StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection(collection)
+            .where('companyUID', isEqualTo: widget.delegate.companyUID)
+            .where('status', isEqualTo: 'pending')
+            .snapshots(),
+        builder: (context, snapshot) {
+          final count = snapshot.data?.docs.length ?? 0;
+          final iconWidget = Icon(icon, size: 20);
+          if (count == 0) return iconWidget;
+          return Badge(
+            label: Text(
+              '$count',
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            textColor: Theme.of(context).colorScheme.onError,
+            child: iconWidget,
+          );
+        },
+      );
+    }
+
     PopupMenuItem<String> buildPopupItem({
       required String value,
-      required IconData icon,
+      IconData? icon,
+      Widget? customIcon,
       required String title,
       Color? color,
     }) {
@@ -523,7 +578,13 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         value: value,
         child: Row(
           children: [
-            Icon(icon, size: 20, color: color),
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Center(
+                child: customIcon ?? Icon(icon, size: 20, color: color),
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -602,14 +663,44 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               title: 'طلبات اشتراك واعتماد المناديب',
             ),
             buildPopupItem(
-              value: 'hr_system',
-              icon: Icons.badge_outlined,
-              title: isArabic ? 'نظام الموارد البشرية (HR)' : 'HR System',
+              value: 'hr_attendance',
+              icon: Icons.co_present_rounded,
+              title: isArabic ? 'سجل الحضور والانصراف' : 'Attendance & Departure',
             ),
             buildPopupItem(
               value: 'delegate_tracking',
               icon: Icons.radar_rounded,
-              title: 'تتبع نطاق المناديب (Live Tracking)',
+              title: 'Live Tracking',
+            ),
+            buildPopupItem(
+              value: 'leaves_and_excuses',
+              customIcon: buildBadgeIcon(Icons.event_note_rounded, 'leave_requests'),
+              title: 'طلبات الإجازات والأعذار',
+            ),
+            buildPopupItem(
+              value: 'monthly_payroll',
+              icon: Icons.account_balance_wallet_rounded,
+              title: 'مسير الرواتب والعمولات',
+            ),
+            buildPopupItem(
+              value: 'device_unbind_requests',
+              customIcon: buildBadgeIcon(Icons.phonelink_lock_rounded, 'device_unbind_requests'),
+              title: 'طلبات فك وربط الأجهزة',
+            ),
+            buildPopupItem(
+              value: 'anti_fraud',
+              icon: Icons.security_rounded,
+              title: 'تدقيق الأمان ومكافحة الاحتيال',
+            ),
+            buildPopupItem(
+              value: 'field_photos',
+              icon: Icons.photo_library_rounded,
+              title: 'الصور والزيارات الميدانية',
+            ),
+            buildPopupItem(
+              value: 'attendance_adjustments',
+              icon: Icons.history_edu_rounded,
+              title: isArabic ? 'سجل تعديلات الحضور والانصراف' : 'Attendance Adjustments Log',
             ),
           ],
           if (isSuperAdmin || isTechnicalSupport) ...[
@@ -720,12 +811,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             ),
           ],
 
-          buildPopupItem(
-            value: 'logout',
-            icon: Icons.logout_rounded,
-            title: l10n.logout,
-            color: Theme.of(context).colorScheme.error,
-          ),
           const PopupMenuDivider(),
           // الإعدادات دائماً في أسفل القائمة
           buildPopupItem(

@@ -73,7 +73,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surfaceContainerLowest,
       appBar: AppBar(
-        title: const SizedBox.shrink(),
+        title: Text(l10n.tasks),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(110),
           child: _FilterBarDelegate(delegate: widget.delegate),

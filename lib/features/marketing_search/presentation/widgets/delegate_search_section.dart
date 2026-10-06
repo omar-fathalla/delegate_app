@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// قسم البحث عن المندوبين
-/// Delegate search section widget
+/// قسم البحث عن المندوبين بالاسم ورقم الموبايل
+/// Delegate search section widget (Search by Name and Phone)
 class DelegateSearchSection extends StatelessWidget {
-  final TextEditingController controller;
+  final TextEditingController nameController;
+  final TextEditingController phoneController;
   final VoidCallback onSearch;
 
   const DelegateSearchSection({
     super.key,
-    required this.controller,
+    required this.nameController,
+    required this.phoneController,
     required this.onSearch,
   });
 
@@ -49,46 +51,97 @@ class DelegateSearchSection extends StatelessWidget {
 
         const SizedBox(height: 16),
 
+        // حقل إدخال اسم المندوب
+        ListenableBuilder(
+          listenable: nameController,
+          builder: (context, _) {
+            return TextField(
+              controller: nameController,
+              keyboardType: TextInputType.text,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: 'اسم المندوب',
+                hintText: 'أدخل اسم المندوب (مثال: أحمد محمد)',
+                hintStyle: TextStyle(color: colorScheme.outline),
+                prefixIcon: Icon(
+                  Icons.badge_rounded,
+                  color: colorScheme.secondary,
+                ),
+                suffixIcon: nameController.text.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.clear_rounded, color: colorScheme.outline),
+                        onPressed: () {
+                          nameController.clear();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: colorScheme.outline),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: colorScheme.outline),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: colorScheme.secondary, width: 2),
+                ),
+                filled: true,
+                fillColor: colorScheme.surface,
+              ),
+              onSubmitted: (_) => onSearch(),
+            );
+          },
+        ),
+
+        const SizedBox(height: 12),
+
         // حقل إدخال رقم الموبايل
-        TextField(
-          controller: controller,
-          keyboardType: TextInputType.phone,
-          textDirection: TextDirection.ltr,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s]')),
-          ],
-          decoration: InputDecoration(
-            labelText: 'رقم الموبايل',
-            hintText: 'أدخل رقم الموبايل',
-            hintStyle: TextStyle(color: colorScheme.outline),
-            prefixIcon: Icon(
-              Icons.phone_android_rounded,
-              color: colorScheme.secondary,
-            ),
-            suffixIcon: controller.text.isNotEmpty
-                ? IconButton(
-                    icon: Icon(Icons.clear_rounded, color: colorScheme.outline),
-                    onPressed: () {
-                      controller.clear();
-                    },
-                  )
-                : null,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: colorScheme.outline),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: colorScheme.outline),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: colorScheme.secondary, width: 2),
-            ),
-            filled: true,
-            fillColor: colorScheme.surface,
-          ),
-          onSubmitted: (_) => onSearch(),
+        ListenableBuilder(
+          listenable: phoneController,
+          builder: (context, _) {
+            return TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              textDirection: TextDirection.ltr,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s]')),
+              ],
+              decoration: InputDecoration(
+                labelText: 'رقم الموبايل',
+                hintText: 'أدخل رقم الموبايل (اختياري)',
+                hintStyle: TextStyle(color: colorScheme.outline),
+                prefixIcon: Icon(
+                  Icons.phone_android_rounded,
+                  color: colorScheme.secondary,
+                ),
+                suffixIcon: phoneController.text.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.clear_rounded, color: colorScheme.outline),
+                        onPressed: () {
+                          phoneController.clear();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: colorScheme.outline),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: colorScheme.outline),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: colorScheme.secondary, width: 2),
+                ),
+                filled: true,
+                fillColor: colorScheme.surface,
+              ),
+              onSubmitted: (_) => onSearch(),
+            );
+          },
         ),
 
         const SizedBox(height: 16),

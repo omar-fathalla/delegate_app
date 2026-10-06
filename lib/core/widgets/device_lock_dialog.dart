@@ -83,18 +83,47 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
       );
 
       if (!mounted) return;
-      setState(() {
-        _isSubmitting = false;
-        _isPending = true;
-      });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      final primaryColor = Theme.of(context).colorScheme.primary;
+
+      // إغلاق النافذة المنبثقة تلقائياً فور إرسال الطلب كما طلب المستخدم
+      Navigator.of(context).pop();
+
+      final message = success
+          ? 'تم إرسال طلب فك الارتباط بنجاح، وسيتم فك الارتباط خلال 5 دقائق لتتمكن من تسجيل الدخول.'
+          : 'طلب فك الارتباط قيد المراجعة لدى الإدارة بالفعل، وسيتم فك الارتباط خلال 5 دقائق.';
+
+      scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text(success
-              ? 'تم إرسال طلب فك الارتباط للإدارة بنجاح'
-              : 'طلبك قيد المراجعة لدى الإدارة بالفعل'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
+          content: Row(
+            children: [
+              Icon(
+                success ? Icons.check_circle_rounded : Icons.hourglass_top_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: primaryColor,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          duration: const Duration(seconds: 5),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       );
     } catch (e) {
@@ -105,6 +134,9 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
           content: Text('حدث خطأ أثناء إرسال الطلب: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       );
     }
@@ -288,7 +320,7 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'تم استلام طلبك وهو بانتظار موافقة الإدارة. ستصلك رسالة فور فك الارتباط لتتمكن من تسجيل الدخول.',
+                              'تم استلام طلبك وبانتظار موافقة الإدارة. سيتم فك الارتباط خلال 5 دقائق لتتمكن من تسجيل الدخول.',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 color: colorScheme.onPrimaryContainer.withValues(alpha: 0.85),

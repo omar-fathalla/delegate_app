@@ -6,7 +6,7 @@ import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../profile/domain/entities/delegate.dart';
 import '../../data/services/delegate_tracking_service.dart';
 import '../../domain/entities/delegate_tracking_session.dart';
-import '../widgets/delegate_tracking_card.dart';
+import '../widgets/delegate_tracking_table.dart';
 import '../widgets/tracking_live_map_view.dart';
 import '../widgets/tracking_stats_overview.dart';
 import '../../../../core/widgets/tashil_button_group.dart';
@@ -38,6 +38,7 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
   bool _isSyncing = false;
   late bool _isMapView;
   bool _isBulkUpdating = false;
+  String? _selectedDelegateId;
 
   @override
   void initState() {
@@ -299,7 +300,7 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
       appBar: widget.showAppBar
           ? AppBar(
         title: Text(
-          'تتبع نطاق المناديب (Live Tracking)',
+          'Live Tracking',
           style: textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
             color: colorScheme.onSurface,
@@ -316,7 +317,12 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
             ),
             tooltip: _isMapView ? 'عرض القائمة' : 'عرض الخريطة الحية',
             onPressed: () {
-              setState(() => _isMapView = !_isMapView);
+              setState(() {
+                if (_isMapView) {
+                  _selectedDelegateId = null;
+                }
+                _isMapView = !_isMapView;
+              });
             },
           ),
           if (_isSyncing || _isBulkUpdating)
@@ -403,6 +409,7 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
           if (_isMapView) {
             content = TrackingLiveMapView(
               sessions: filteredSessions,
+              initialSelectedDelegateId: _selectedDelegateId,
               onToggleTracking: (session) {
                 _handleToggleTracking(session, !session.isTrackingEnabled);
               },
@@ -522,13 +529,14 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
                               ),
                               if (allSessions.isNotEmpty) ...[
                                 const SizedBox(height: 8),
-                                Align(
-                                  alignment: AlignmentDirectional.centerStart,
+                                SizedBox(
+                                  width: double.infinity,
                                   child: _buildBulkActionButton(
                                     colorScheme: colorScheme,
                                     allAreActive: allAreActive,
                                     totalCount: totalCount,
                                     allSessions: allSessions,
+                                    isFullWidth: true,
                                   ),
                                 ),
                               ],
@@ -600,30 +608,34 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
                     ),
                   )
                 else
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final session = filteredSessions[index];
-                        return DelegateTrackingCard(
-                          session: session,
-                          onToggleTracking: (val) =>
-                              _handleToggleTracking(session, val),
-                          onRefreshPing: () async {
-                            AppSnackBar.showInfo(
-                              context,
-                              'جاري إرسال إشارة استعلام لموقع المندوب...',
-                            );
-                            await _trackingService.updateLocationAndCheckGeofence(
-                              delegateId: session.delegateId,
-                              currentLat: session.lastLatitude ??
-                                  session.branchLat,
-                              currentLng: session.lastLongitude ??
-                                  session.branchLng,
-                            );
-                          },
-                        );
-                      },
-                      childCount: filteredSessions.length,
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                          16.0, 4.0, 16.0, 24.0),
+                      child: DelegateTrackingTable(
+                        sessions: filteredSessions,
+                        onSelectDelegate: (session) {
+                          setState(() {
+                            _selectedDelegateId = session.delegateId;
+                            _isMapView = true;
+                          });
+                        },
+                        onToggleTracking: (session, val) =>
+                            _handleToggleTracking(session, val),
+                        onRefreshPing: (session) async {
+                          AppSnackBar.showInfo(
+                            context,
+                            'جاري إرسال إشارة استعلام لموقع المندوب...',
+                          );
+                          await _trackingService.updateLocationAndCheckGeofence(
+                            delegateId: session.delegateId,
+                            currentLat: session.lastLatitude ??
+                                session.branchLat,
+                            currentLng: session.lastLongitude ??
+                                session.branchLng,
+                          );
+                        },
+                      ),
                     ),
                   ),
 
@@ -951,10 +963,12 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
     required bool allAreActive,
     required int totalCount,
     required List<DelegateTrackingSession> allSessions,
+    bool isFullWidth = false,
   }) {
     if (allAreActive) {
       return SizedBox(
         height: 44,
+        width: isFullWidth ? double.infinity : null,
         child: OutlinedButton.icon(
           onPressed: _isBulkUpdating
               ? null
@@ -994,6 +1008,7 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
 
     return SizedBox(
       height: 44,
+      width: isFullWidth ? double.infinity : null,
       child: FilledButton.tonalIcon(
         onPressed: _isBulkUpdating
             ? null
@@ -1107,7 +1122,7 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
   final colorScheme = theme.colorScheme;
 
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
     decoration: BoxDecoration(
       color: colorScheme.surface,
       border: Border(
@@ -1117,82 +1132,92 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
         ),
       ),
     ),
-    child: Row(
-      textDirection: TextDirection.rtl,
-      children: [
-        // View Switcher (Map vs List) using standard TashilConnectedButtonGroup
-        TashilConnectedButtonGroup<bool>(
-          height: 38,
-          selectedValue: _isMapView,
-          onSelected: (val) {
-            setState(() => _isMapView = val);
-          },
-          items: [
-            const TashilConnectedButtonItem<bool>(
-              value: true,
-              label: 'الخريطة الحية',
-              icon: Icons.map_rounded,
-            ),
-            TashilConnectedButtonItem<bool>(
-              value: false,
-              label: 'قائمة تفصيلية ($totalCount)',
-              icon: Icons.view_list_rounded,
-            ),
-          ],
-        ),
-        const SizedBox(width: 16),
-        // Live status chips
-        if (totalCount > 0) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '🟢 $insideCount داخل',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2E7D32),
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        textDirection: TextDirection.rtl,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // View Switcher (Map vs List) using standard TashilConnectedButtonGroup
+          TashilConnectedButtonGroup<bool>(
+            height: 38,
+            selectedValue: _isMapView,
+            onSelected: (val) {
+              setState(() {
+                if (!val) {
+                  _selectedDelegateId = null;
+                }
+                _isMapView = val;
+              });
+            },
+            items: [
+              const TashilConnectedButtonItem<bool>(
+                value: true,
+                label: 'الخريطة الحية',
+                icon: Icons.map_rounded,
               ),
-            ),
+              TashilConnectedButtonItem<bool>(
+                value: false,
+                label: 'قائمة تفصيلية ($totalCount)',
+                icon: Icons.view_list_rounded,
+              ),
+            ],
           ),
-          const SizedBox(width: 6),
-          if (outsideCount > 0)
+          const SizedBox(width: 10),
+          // Live status chips
+          if (totalCount > 0) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFFC65102).withValues(alpha: 0.12),
+                color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '🟠 $outsideCount خارج',
+                '🟢 $insideCount داخل',
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFFC65102),
+                  color: Color(0xFF2E7D32),
                 ),
               ),
             ),
+            const SizedBox(width: 6),
+            if (outsideCount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC65102).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '🟠 $outsideCount خارج',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFC65102),
+                  ),
+                ),
+              ),
+            const SizedBox(width: 10),
+          ],
+          // Refresh Button
+          if (_isSyncing || _isBulkUpdating)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            IconButton.filledTonal(
+              iconSize: 18,
+              visualDensity: VisualDensity.compact,
+              tooltip: 'تحديث بيانات الحاضرين',
+              onPressed: _populateInitialData,
+              icon: const Icon(Icons.sync_rounded),
+            ),
         ],
-        const Spacer(),
-        // Refresh Button
-        if (_isSyncing || _isBulkUpdating)
-          const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        else
-          IconButton.filledTonal(
-            iconSize: 18,
-            visualDensity: VisualDensity.compact,
-            tooltip: 'تحديث بيانات الحاضرين',
-            onPressed: _populateInitialData,
-            icon: const Icon(Icons.sync_rounded),
-          ),
-      ],
+      ),
     ),
   );
 }

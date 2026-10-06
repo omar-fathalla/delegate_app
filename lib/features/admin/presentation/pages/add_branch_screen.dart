@@ -931,7 +931,6 @@ class _AddBranchViewState extends State<_AddBranchView> {
                       const SizedBox(height: 6),
                       Material(
                         color: colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(16),
                         elevation: 3,
                         shadowColor: Colors.black.withValues(alpha: 0.15),
                         clipBehavior: Clip.antiAlias,

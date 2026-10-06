@@ -46,11 +46,32 @@ class _CapturedPhotosViewContent extends StatefulWidget {
 class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> {
   String? _selectedBranchId;
   String? _selectedDelegateUID;
+  int _visibleCount = 24;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadPhotos();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
+      if (mounted) {
+        setState(() {
+          _visibleCount += 24;
+        });
+      }
+    }
   }
 
   void _loadPhotos() {
@@ -291,7 +312,10 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                       child: Text(e.value, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
                                     )),
                               ],
-                              onChanged: (val) => setState(() => _selectedBranchId = val),
+                              onChanged: (val) => setState(() {
+                                _selectedBranchId = val;
+                                _visibleCount = 24;
+                              }),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -316,7 +340,10 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                       child: Text(e.value, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
                                     )),
                               ],
-                              onChanged: (val) => setState(() => _selectedDelegateUID = val),
+                              onChanged: (val) => setState(() {
+                                _selectedDelegateUID = val;
+                                _visibleCount = 24;
+                              }),
                             ),
                           ),
                         ],
@@ -338,6 +365,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                 setState(() {
                                   _selectedBranchId = null;
                                   _selectedDelegateUID = null;
+                                  _visibleCount = 24;
                                 });
                               },
                               child: Text(
@@ -355,7 +383,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                   ),
                 ),
                 
-                // Grid Content
+                // Grid Content with pagination
                 Expanded(
                   child: filteredPhotos.isEmpty
                       ? Center(
@@ -369,6 +397,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                           ),
                         )
                       : GridView.builder(
+                          controller: _scrollController,
                           padding: const EdgeInsets.all(16),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
@@ -376,7 +405,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                             mainAxisSpacing: 12,
                             childAspectRatio: 0.75,
                           ),
-                          itemCount: filteredPhotos.length,
+                          itemCount: filteredPhotos.take(_visibleCount).length,
                           itemBuilder: (context, index) {
                             final photo = filteredPhotos[index];
                             return GestureDetector(
@@ -483,6 +512,27 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                           },
                         ),
                 ),
+                if (filteredPhotos.length > _visibleCount)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerLow,
+                      border: Border(top: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                    ),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _visibleCount += 24;
+                        });
+                      },
+                      icon: const Icon(Icons.expand_more_rounded),
+                      label: Text(
+                        'عرض المزيد (${filteredPhotos.length - _visibleCount} صورة إضافية)',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
               ],
             );
           }

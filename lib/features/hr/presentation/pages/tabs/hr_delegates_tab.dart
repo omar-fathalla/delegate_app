@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -28,6 +29,8 @@ class HRDelegatesTab extends StatefulWidget {
 
 class _HRDelegatesTabState extends State<HRDelegatesTab> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _hScrollCtrl = ScrollController();
+  final ScrollController _vScrollCtrl = ScrollController();
   DelegateStatus? _selectedStatus;
   HRDelegatesViewMode _viewMode = HRDelegatesViewMode.table;
   late AdminDelegatesBloc _delegatesBloc;
@@ -43,6 +46,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
   @override
   void dispose() {
     _searchController.dispose();
+    _hScrollCtrl.dispose();
+    _vScrollCtrl.dispose();
     _delegatesBloc.close();
     super.dispose();
   }
@@ -101,6 +106,297 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             initialTabIndex: initialTabIndex,
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showAnnualLeaveManagementDialog(Delegate delegate) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    bool isEnabled = delegate.isAnnualLeaveEnabled;
+    int quota = delegate.annualLeaveQuota > 0 ? delegate.annualLeaveQuota : 21;
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: !isSaving,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+            actionsPadding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isEnabled
+                        ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                        : Colors.amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isEnabled
+                        ? Icons.beach_access_rounded
+                        : Icons.event_repeat_rounded,
+                    color: isEnabled
+                        ? const Color(0xFF2E7D32)
+                        : Colors.amber.shade900,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'إدارة نظام الإجازات',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        delegate.fullName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.normal,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    // كارت توضيحي لحالة المندوب
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isEnabled
+                            ? const Color(0xFF2E7D32).withValues(alpha: 0.08)
+                            : Colors.amber.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isEnabled
+                              ? const Color(0xFF2E7D32).withValues(alpha: 0.25)
+                              : Colors.amber.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            isEnabled
+                                ? Icons.check_circle_outline_rounded
+                                : Icons.info_outline_rounded,
+                            size: 20,
+                            color: isEnabled
+                                ? const Color(0xFF2E7D32)
+                                : Colors.amber.shade900,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isEnabled
+                                      ? 'مفعّل له رصيد الإجازات السنوية ($quota يوم)'
+                                      : 'نظام الإجازات الأسبوعية فقط',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: isEnabled
+                                        ? const Color(0xFF2E7D32)
+                                        : Colors.amber.shade900,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  isEnabled
+                                      ? 'المندوب مثبت ويحق له التقديم على إجازات اعتيادية تُخصم من رصيده السنوي.'
+                                      : 'المندوب جديد أو في فترة اختبار؛ يحصل على الإجازات الأسبوعية الاعتيادية فقط (يوم أسبوعياً بمعدل 4 أيام شهرياً). لا يظهر له رصيد الـ 21 يوماً السنوي.',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: colorScheme.onSurfaceVariant,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // مفتاح التفعيل M3 SwitchListTile
+                    Container(
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: SwitchListTile.adaptive(
+                        value: isEnabled,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        activeTrackColor: colorScheme.primary,
+                        activeThumbColor: colorScheme.onPrimary,
+                        title: const Text(
+                          'تفعيل الإجازات السنوية',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          isEnabled
+                              ? 'إتاحة رصيد الإجازات السنوي والتقديم الاعتيادي'
+                              : 'اقتصار المندوب على الإجازات الأسبوعية فقط',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        onChanged: (val) {
+                          setDialogState(() => isEnabled = val);
+                        },
+                      ),
+                    ),
+
+                    if (isEnabled) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        'إجمالي رصيد الإجازات السنوية (أيام):',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        initialValue: quota.toString(),
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: '21',
+                          suffixText: 'يوم',
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onChanged: (val) {
+                          final parsed = int.tryParse(val.trim());
+                          if (parsed != null && parsed >= 0) {
+                            quota = parsed;
+                          }
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(dialogContext),
+                child: const Text('إلغاء'),
+              ),
+              FilledButton.icon(
+                icon: isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.check_rounded, size: 18),
+                label: Text(isSaving ? 'جارٍ الحفظ...' : 'حفظ التغييرات'),
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        setDialogState(() => isSaving = true);
+                        try {
+                          final updatePayload = {
+                            'isAnnualLeaveEnabled': isEnabled,
+                            'annualLeaveQuota': quota,
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          };
+
+                          // 1. Update in company delegates subcollection if scoped
+                          final orgUid = delegate.organizationUID.isNotEmpty
+                              ? delegate.organizationUID
+                              : widget.hrDelegate.organizationUID;
+                          final compUid = delegate.companyUID.isNotEmpty
+                              ? delegate.companyUID
+                              : widget.hrDelegate.companyUID;
+                          if (orgUid.isNotEmpty && compUid.isNotEmpty) {
+                            await FirebaseFirestore.instance
+                                .collection('organizations')
+                                .doc(orgUid)
+                                .collection('companies')
+                                .doc(compUid)
+                                .collection('delegates')
+                                .doc(delegate.uid)
+                                .set(updatePayload, SetOptions(merge: true));
+                          }
+
+                          // 2. Safely update in users collection if document exists
+                          final userRef = FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(delegate.uid);
+                          final userDoc = await userRef.get();
+                          if (userDoc.exists) {
+                            await userRef.set(updatePayload, SetOptions(merge: true));
+                          }
+
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          }
+                          if (mounted) {
+                            AppSnackBar.showSuccess(
+                              context,
+                              isEnabled
+                                  ? 'تم تفعيل رصيد الإجازات السنوية للمندوب ($quota يوم)'
+                                  : 'تم ضبط المندوب على نظام الإجازات الأسبوعية فقط',
+                            );
+                            _loadDelegates();
+                          }
+                        } catch (e) {
+                          setDialogState(() => isSaving = false);
+                          if (mounted) {
+                            AppSnackBar.showError(
+                              context,
+                              'حدث خطأ أثناء حفظ الإعدادات: $e',
+                            );
+                          }
+                        }
+                      },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -258,17 +554,23 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       children: [
                         Row(
                           children: [
-                            Expanded(child: searchBar),
-                            const SizedBox(width: 8),
-                            viewModeButtonGroup,
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: statusButtonGroup,
+                              ),
+                            ),
                             const SizedBox(width: 8),
                             refreshButton,
                           ],
                         ),
                         const SizedBox(height: 10),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: statusButtonGroup,
+                        Row(
+                          children: [
+                            Expanded(child: searchBar),
+                            const SizedBox(width: 8),
+                            viewModeButtonGroup,
+                          ],
                         ),
                       ],
                     );
@@ -366,11 +668,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
-    const minWidth = 1140.0;
+    const minWidth = 1200.0;
 
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Container(
         decoration: BoxDecoration(
           color: colorScheme.surface,
@@ -381,305 +682,337 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
           boxShadow: [
             BoxShadow(
               color: colorScheme.shadow.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         clipBehavior: Clip.antiAlias,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final width =
-                constraints.maxWidth > minWidth ? constraints.maxWidth : minWidth;
+            final availableWidth = constraints.maxWidth;
+            final contentWidth =
+                availableWidth > minWidth ? availableWidth : minWidth;
+            final isScrollable = contentWidth > availableWidth;
 
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: width,
-                child: Column(
-                  children: [
-                    // Table Header
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-                      child: const Row(
-                        children: [
-                          Expanded(
-                            flex: 4,
-                            child: Center(
-                              child: Text('#', style: TextStyle(fontWeight: FontWeight.bold)),
+            return Scrollbar(
+              controller: _hScrollCtrl,
+              thumbVisibility: isScrollable,
+              trackVisibility: isScrollable,
+              interactive: isScrollable,
+              thickness: 10.0,
+              radius: const Radius.circular(8),
+              notificationPredicate: (notification) =>
+                  notification.depth == 0 &&
+                  notification.metrics.axis == Axis.horizontal,
+              child: SingleChildScrollView(
+                controller: _hScrollCtrl,
+                scrollDirection: Axis.horizontal,
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  width: contentWidth,
+                  child: Column(
+                    children: [
+                      // ── Table Header (Fixed at top) ──
+                      Container(
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.45),
+                          border: Border(
+                            bottom: BorderSide(
+                              color: colorScheme.outlineVariant
+                                  .withValues(alpha: 0.6),
+                              width: 1.5,
                             ),
                           ),
-                          Expanded(
-                            flex: 22,
-                            child: Text('المندوب / المروج', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          Expanded(
-                            flex: 16,
-                            child: Text('الرقم القومي', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          Expanded(
-                            flex: 15,
-                            child: Text('رقم الهاتف', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          Expanded(
-                            flex: 15,
-                            child: Text('المدينة / المحافظة', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          Expanded(
-                            flex: 10,
-                            child: Center(
-                              child: Text('الحالة', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 28,
-                            child: Center(
-                              child: Text('الإجراءات والملف', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                        ],
+                        ),
+                        child: Row(
+                          children: [
+                            _buildHeaderCell('#', flex: 4, theme: theme, colorScheme: colorScheme, isCenter: true),
+                            _buildHeaderCell('المندوب / المروج', flex: 20, theme: theme, colorScheme: colorScheme),
+                            _buildHeaderCell('الرقم القومي', flex: 15, theme: theme, colorScheme: colorScheme),
+                            _buildHeaderCell('رقم الهاتف', flex: 14, theme: theme, colorScheme: colorScheme),
+                            _buildHeaderCell('المدينة / المحافظة', flex: 13, theme: theme, colorScheme: colorScheme),
+                            _buildHeaderCell('الحالة', flex: 10, theme: theme, colorScheme: colorScheme, isCenter: true),
+                            _buildHeaderCell('الإجراءات والملف', flex: 34, theme: theme, colorScheme: colorScheme, isCenter: true),
+                          ],
+                        ),
                       ),
-                    ),
-                    const Divider(height: 1),
-                    // Table Rows
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: delegates.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final delegate = delegates[index];
-                        final isActive = delegate.status == DelegateStatus.active;
-                        final statusColor =
-                            isActive ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
-                        final statusText = isActive ? 'نشط' : 'متوقف';
 
-                        final posName = delegate.position == DelegatePosition.supervisor
-                            ? 'مشرف'
-                            : 'مندوب / مروج';
+                      // ── Table Rows (Recycled Virtual ListView) ──
+                      Expanded(
+                        child: ListView.separated(
+                          controller: _vScrollCtrl,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: delegates.length,
+                          separatorBuilder: (context, index) => Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: colorScheme.outlineVariant
+                                .withValues(alpha: 0.22),
+                          ),
+                          itemBuilder: (context, index) {
+                            final delegate = delegates[index];
+                            final isActive = delegate.status == DelegateStatus.active;
+                            final statusColor =
+                                isActive ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
+                            final statusText = isActive ? 'نشط' : 'متوقف';
 
-                        return InkWell(
-                          onTap: () => _openProfile(delegate),
-                          hoverColor: colorScheme.primaryContainer.withValues(alpha: 0.12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            color: index.isEven
-                                ? colorScheme.surface
-                                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
-                            child: Row(
-                              children: [
-                                // # Index
-                                Expanded(
-                                  flex: 4,
-                                  child: Center(
-                                    child: Text(
-                                      '${index + 1}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: colorScheme.onSurfaceVariant,
+                            final posName = delegate.position == DelegatePosition.supervisor
+                                ? 'مشرف'
+                                : 'مندوب / مروج';
+
+                            return InkWell(
+                              onTap: () => _openProfile(delegate),
+                              hoverColor: colorScheme.primaryContainer.withValues(alpha: 0.12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                color: index.isEven
+                                    ? colorScheme.surface
+                                    : colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
+                                child: Row(
+                                  children: [
+                                    // # Index
+                                    Expanded(
+                                      flex: 4,
+                                      child: Center(
+                                        child: Text(
+                                          '${index + 1}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ),
 
-                                // Delegate Info (Avatar + Name + Role)
-                                Expanded(
-                                  flex: 22,
-                                  child: Row(
-                                    children: [
-                                      AppAvatar(
-                                        imageUrl: delegate.personalPhotoUrl,
-                                        fallbackText: delegate.fullName,
-                                        radius: 20,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              delegate.fullName,
-                                              style: theme.textTheme.bodyMedium?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                                color: colorScheme.onSurface,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              posName,
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                color: colorScheme.primary,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 11,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // National ID
-                                Expanded(
-                                  flex: 16,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.badge_outlined,
-                                        size: 15,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: SelectableText(
-                                          delegate.nationalityID.isNotEmpty
-                                              ? delegate.nationalityID
-                                              : '—',
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            fontFamily: 'monospace',
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
-                                            letterSpacing: 0.5,
-                                          ),
-                                          textAlign: TextAlign.start,
-                                        ),
-                                      ),
-                                      if (delegate.nationalityID.isNotEmpty)
-                                        IconButton(
-                                          icon: const Icon(Icons.copy_rounded, size: 14),
-                                          tooltip: 'نسخ الرقم القومي',
-                                          visualDensity: VisualDensity.compact,
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                                          onPressed: () => _copyNationalId(delegate.nationalityID),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Phone Number
-                                Expanded(
-                                  flex: 15,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.phone_iphone_rounded,
-                                        size: 15,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: SelectableText(
-                                          delegate.phoneNumber.isNotEmpty
-                                              ? delegate.phoneNumber
-                                              : '—',
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            fontFamily: 'monospace',
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
-                                            letterSpacing: 0.3,
-                                          ),
-                                          textAlign: TextAlign.start,
-                                        ),
-                                      ),
-                                      if (delegate.phoneNumber.isNotEmpty)
-                                        IconButton(
-                                          icon: const Icon(Icons.copy_rounded, size: 14),
-                                          tooltip: 'نسخ رقم الهاتف',
-                                          visualDensity: VisualDensity.compact,
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                                          onPressed: () => _copyPhoneNumber(delegate.phoneNumber),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-
-                                // City / Location
-                                Expanded(
-                                  flex: 15,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.location_on_outlined,
-                                        size: 15,
-                                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                                      ),
-                                      const SizedBox(width: 5),
-                                      Expanded(
-                                        child: Text(
-                                          delegate.city.isNotEmpty
-                                              ? delegate.city
-                                              : (delegate.companyName.isNotEmpty
-                                                  ? delegate.companyName
-                                                  : '—'),
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            color: colorScheme.onSurface,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Status Badge
-                                Expanded(
-                                  flex: 10,
-                                  child: Center(
-                                    child: Container(
-                                      padding:
-                                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border:
-                                            Border.all(color: statusColor.withValues(alpha: 0.3)),
-                                      ),
+                                    // Delegate Info (Avatar + Name + Role)
+                                    Expanded(
+                                      flex: 20,
                                       child: Row(
-                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.circle, size: 7, color: statusColor),
-                                          const SizedBox(width: 5),
-                                          Text(
-                                            statusText,
-                                            style: TextStyle(
-                                              color: statusColor,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
+                                          AppAvatar(
+                                            imageUrl: delegate.personalPhotoUrl,
+                                            fallbackText: delegate.fullName,
+                                            radius: 20,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  delegate.fullName,
+                                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: colorScheme.onSurface,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  posName,
+                                                  style: theme.textTheme.bodySmall?.copyWith(
+                                                    color: colorScheme.primary,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                  ),
-                                ),
 
-                                // Actions (Call + WhatsApp + Attendance + Profile)
-                                Expanded(
-                                  flex: 28,
-                                  child: Center(
-                                    child: _buildTableActionsButtonGroup(delegate, colorScheme),
-                                  ),
+                                    // National ID
+                                    Expanded(
+                                      flex: 15,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.badge_outlined,
+                                            size: 15,
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: SelectableText(
+                                              delegate.nationalityID.isNotEmpty
+                                                  ? delegate.nationalityID
+                                                  : '—',
+                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                fontFamily: 'monospace',
+                                                fontWeight: FontWeight.w600,
+                                                color: colorScheme.onSurface,
+                                                letterSpacing: 0.5,
+                                              ),
+                                              textAlign: TextAlign.start,
+                                            ),
+                                          ),
+                                          if (delegate.nationalityID.isNotEmpty)
+                                            IconButton(
+                                              icon: const Icon(Icons.copy_rounded, size: 14),
+                                              tooltip: 'نسخ الرقم القومي',
+                                              visualDensity: VisualDensity.compact,
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                              onPressed: () => _copyNationalId(delegate.nationalityID),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Phone Number
+                                    Expanded(
+                                      flex: 14,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.phone_iphone_rounded,
+                                            size: 15,
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: SelectableText(
+                                              delegate.phoneNumber.isNotEmpty
+                                                  ? delegate.phoneNumber
+                                                  : '—',
+                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                fontFamily: 'monospace',
+                                                fontWeight: FontWeight.w600,
+                                                color: colorScheme.onSurface,
+                                                letterSpacing: 0.3,
+                                              ),
+                                              textAlign: TextAlign.start,
+                                            ),
+                                          ),
+                                          if (delegate.phoneNumber.isNotEmpty)
+                                            IconButton(
+                                              icon: const Icon(Icons.copy_rounded, size: 14),
+                                              tooltip: 'نسخ رقم الهاتف',
+                                              visualDensity: VisualDensity.compact,
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                              onPressed: () => _copyPhoneNumber(delegate.phoneNumber),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // City / Location
+                                    Expanded(
+                                      flex: 13,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.location_on_outlined,
+                                            size: 15,
+                                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Expanded(
+                                            child: Text(
+                                              delegate.city.isNotEmpty
+                                                  ? delegate.city
+                                                  : (delegate.companyName.isNotEmpty
+                                                      ? delegate.companyName
+                                                      : '—'),
+                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                color: colorScheme.onSurface,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Status Badge
+                                    Expanded(
+                                      flex: 10,
+                                      child: Center(
+                                        child: Container(
+                                          padding:
+                                              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border:
+                                                Border.all(color: statusColor.withValues(alpha: 0.3)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.circle, size: 7, color: statusColor),
+                                              const SizedBox(width: 5),
+                                              Text(
+                                                statusText,
+                                                style: TextStyle(
+                                                  color: statusColor,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+                                    // Actions (Call + WhatsApp + Leaves + Attendance + Profile)
+                                    Expanded(
+                                      flex: 34,
+                                      child: Center(
+                                        child: _buildTableActionsButtonGroup(delegate, colorScheme),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
                 ),
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderCell(
+    String title, {
+    required int flex,
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    bool isCenter = false,
+  }) {
+    return Expanded(
+      flex: flex,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Text(
+          title,
+          textAlign: isCenter ? TextAlign.center : TextAlign.start,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.2,
+            fontSize: 12.5,
+          ),
         ),
       ),
     );
@@ -785,6 +1118,48 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.primary,
                           fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: delegate.isAnnualLeaveEnabled
+                              ? const Color(0xFF2E7D32).withValues(alpha: 0.1)
+                              : Colors.amber.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: delegate.isAnnualLeaveEnabled
+                                ? const Color(0xFF2E7D32).withValues(alpha: 0.25)
+                                : Colors.amber.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              delegate.isAnnualLeaveEnabled
+                                  ? Icons.beach_access_rounded
+                                  : Icons.event_repeat_rounded,
+                              size: 10,
+                              color: delegate.isAnnualLeaveEnabled
+                                  ? const Color(0xFF2E7D32)
+                                  : Colors.amber.shade900,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              delegate.isAnnualLeaveEnabled
+                                  ? 'سنوي (${delegate.annualLeaveQuota} يوم)'
+                                  : 'أسبوعي فقط (تجربة)',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: delegate.isAnnualLeaveEnabled
+                                    ? const Color(0xFF2E7D32)
+                                    : Colors.amber.shade900,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       if (delegate.nationalityID.isNotEmpty)
@@ -921,6 +1296,54 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
               color: colorScheme.outlineVariant.withValues(alpha: 0.45),
             ),
           ],
+          // زر إدارة الإجازات السنوية والأسبوعية
+          Material(
+            color: Colors.transparent,
+            child: Tooltip(
+              message: delegate.isAnnualLeaveEnabled
+                  ? 'الإجازات السنوية: مفعّلة (${delegate.annualLeaveQuota} يوم) - اضغط للتعديل'
+                  : 'الإجازات السنوية: غير مفعّلة (أسبوعية فقط) - اضغط للتفعيل',
+              child: InkWell(
+                onTap: () => _showAnnualLeaveManagementDialog(delegate),
+                hoverColor: (delegate.isAnnualLeaveEnabled
+                        ? const Color(0xFF2E7D32)
+                        : Colors.amber.shade800)
+                    .withValues(alpha: 0.1),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        delegate.isAnnualLeaveEnabled
+                            ? Icons.beach_access_rounded
+                            : Icons.event_repeat_rounded,
+                        size: 14,
+                        color: delegate.isAnnualLeaveEnabled
+                            ? const Color(0xFF2E7D32)
+                            : Colors.amber.shade800,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        delegate.isAnnualLeaveEnabled ? 'سنوية' : 'أسبوعية',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: delegate.isAnnualLeaveEnabled
+                              ? const Color(0xFF2E7D32)
+                              : Colors.amber.shade800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Container(
+            width: 1,
+            color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+          ),
           // زر سجل الحضور
           Material(
             color: Colors.transparent,

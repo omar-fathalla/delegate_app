@@ -15,12 +15,14 @@ class TrackingLiveMapView extends StatefulWidget {
   final List<DelegateTrackingSession> sessions;
   final ValueChanged<DelegateTrackingSession> onToggleTracking;
   final VoidCallback? onRefresh;
+  final String? initialSelectedDelegateId;
 
   const TrackingLiveMapView({
     super.key,
     required this.sessions,
     required this.onToggleTracking,
     this.onRefresh,
+    this.initialSelectedDelegateId,
   });
 
   @override
@@ -45,12 +47,40 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _statusFilter = 'all'; // all, inside, outside, offline
+  bool _isLegendExpanded = false;
 
   @override
   void initState() {
     super.initState();
     _loadCustomMarkers();
     _checkMapsAvailability();
+    _initInitialSession();
+  }
+
+  void _initInitialSession() {
+    final initialId = widget.initialSelectedDelegateId;
+    if (initialId != null && initialId.isNotEmpty) {
+      for (final s in widget.sessions) {
+        if (s.delegateId == initialId) {
+          _selectSession(s);
+          break;
+        }
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant TrackingLiveMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialSelectedDelegateId != null &&
+        widget.initialSelectedDelegateId != oldWidget.initialSelectedDelegateId) {
+      for (final s in widget.sessions) {
+        if (s.delegateId == widget.initialSelectedDelegateId) {
+          _selectSession(s);
+          break;
+        }
+      }
+    }
   }
 
   void _checkMapsAvailability() {
@@ -381,101 +411,111 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
               size: 18,
             ),
           ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    session.delegateName,
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'مسار اليوم',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        session.delegateName,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.timeline_rounded, size: 13, color: colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 3),
-                  Text(
-                    '$pointsCount نقطة',
-                    style: textTheme.bodySmall?.copyWith(
-                      fontSize: 11,
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(Icons.straighten_rounded, size: 13, color: colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 3),
-                  Text(
-                    '$distanceKmStr كم',
-                    style: textTheme.bodySmall?.copyWith(
-                      fontSize: 11,
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (speed != null && speed > 0) ...[
-                    const SizedBox(width: 8),
-                    Icon(Icons.speed_rounded, size: 13, color: colorScheme.primary),
-                    const SizedBox(width: 3),
-                    Text(
-                      '${speed.toStringAsFixed(1)} كم/س',
-                      style: textTheme.bodySmall?.copyWith(
-                        fontSize: 11,
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'مسار اليوم',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
                       ),
                     ),
                   ],
-                  if (battery != null) ...[
-                    const SizedBox(width: 8),
-                    Icon(
-                      battery > 20 ? Icons.battery_charging_full_rounded : Icons.battery_alert_rounded,
-                      size: 13,
-                      color: battery > 50
-                          ? const Color(0xFF2E7D32)
-                          : (battery > 20 ? const Color(0xFFEF6C00) : const Color(0xFFD32F2F)),
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      '$battery%',
-                      style: textTheme.bodySmall?.copyWith(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                ),
+                const SizedBox(height: 2),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.timeline_rounded, size: 12, color: colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 3),
+                      Text(
+                        '$pointsCount نقطة',
+                        style: textTheme.bodySmall?.copyWith(
+                          fontSize: 10.5,
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
+                      const SizedBox(width: 6),
+                      Icon(Icons.straighten_rounded, size: 12, color: colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 3),
+                      Text(
+                        '$distanceKmStr كم',
+                        style: textTheme.bodySmall?.copyWith(
+                          fontSize: 10.5,
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (speed != null && speed > 0) ...[
+                        const SizedBox(width: 6),
+                        Icon(Icons.speed_rounded, size: 12, color: colorScheme.primary),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${speed.toStringAsFixed(1)} كم/س',
+                          style: textTheme.bodySmall?.copyWith(
+                            fontSize: 10.5,
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                      if (battery != null) ...[
+                        const SizedBox(width: 6),
+                        Icon(
+                          battery > 20 ? Icons.battery_charging_full_rounded : Icons.battery_alert_rounded,
+                          size: 12,
+                          color: battery > 50
+                              ? const Color(0xFF2E7D32)
+                              : (battery > 20 ? const Color(0xFFEF6C00) : const Color(0xFFD32F2F)),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '$battery%',
+                          style: textTheme.bodySmall?.copyWith(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           if (_isLoadingTrail) ...[
-            const SizedBox(width: 12),
+            const SizedBox(width: 6),
             SizedBox(
               width: 14,
               height: 14,
@@ -485,49 +525,56 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
               ),
             ),
           ],
-          const SizedBox(width: 10),
-          IconButton(
-            icon: const Icon(Icons.center_focus_strong_rounded, size: 18),
-            color: colorScheme.primary,
-            tooltip: 'توسيط نطاق المسار والمندوب',
-            visualDensity: VisualDensity.compact,
-            style: IconButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(28, 28),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: () {
-              if (_activeBreadcrumbs.isNotEmpty) {
-                _fitTrailBounds(_activeBreadcrumbs);
-              } else {
-                _focusOnDelegate(session);
-              }
-            },
-          ),
-          // زر محاكاة وبث حركة وتيليمتري حية للتجربة السريعة
-          IconButton(
-            icon: const Icon(Icons.play_circle_filled_rounded, size: 20),
-            color: colorScheme.primary,
-            tooltip: 'محاكاة وبث حركة وتيليمتري حية للتجربة',
-            visualDensity: VisualDensity.compact,
-            style: IconButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(28, 28),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: () => _simulateMovementForSession(session),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close_rounded, size: 18),
-            color: colorScheme.onSurfaceVariant,
-            tooltip: 'إغلاق المسار',
-            visualDensity: VisualDensity.compact,
-            style: IconButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(28, 28),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: () => _selectSession(null),
+          const SizedBox(width: 6),
+          // Action Buttons Group
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.center_focus_strong_rounded, size: 18),
+                color: colorScheme.primary,
+                tooltip: 'توسيط نطاق المسار والمندوب',
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(28, 28),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () {
+                  if (_activeBreadcrumbs.isNotEmpty) {
+                    _fitTrailBounds(_activeBreadcrumbs);
+                  } else {
+                    _focusOnDelegate(session);
+                  }
+                },
+              ),
+              const SizedBox(width: 2),
+              IconButton(
+                icon: const Icon(Icons.play_circle_filled_rounded, size: 20),
+                color: colorScheme.primary,
+                tooltip: 'محاكاة وبث حركة وتيليمتري حية للتجربة',
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(28, 28),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => _simulateMovementForSession(session),
+              ),
+              const SizedBox(width: 2),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, size: 18),
+                color: colorScheme.onSurfaceVariant,
+                tooltip: 'إغلاق المسار',
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(28, 28),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => _selectSession(null),
+              ),
+            ],
           ),
         ],
       ),
@@ -624,21 +671,45 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
       );
     }
 
-    return Stack(
-      children: [
-        _buildMapContent(context),
-        if (widget.sessions.isNotEmpty)
-          PositionedDirectional(
-            bottom: _selectedSession != null ? 240 : 20,
-            start: 16,
-            child: FloatingActionButton.extended(
-              heroTag: 'mobile_delegates_sheet_btn',
-              onPressed: () => _showMobileDelegatesSheet(context),
-              icon: const Icon(Icons.people_alt_rounded),
-              label: Text('المناديب الحاضرين (${widget.sessions.length})'),
-            ),
-          ),
-      ],
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final hasSelected = _selectedSession != null;
+        // حساب موضع زر المناديب ليكون متجاوباً تماماً فوق بطاقة المندوب دون الطفو لمنتصف الشاشة
+        final double bottomOffset;
+        if (hasSelected) {
+          bottomOffset = constraints.maxHeight < 620 ? 155 : 180;
+        } else {
+          bottomOffset = 20;
+        }
+
+        return Stack(
+          children: [
+            _buildMapContent(context),
+            if (widget.sessions.isNotEmpty)
+              PositionedDirectional(
+                bottom: bottomOffset,
+                start: 16,
+                child: FloatingActionButton.extended(
+                  heroTag: 'mobile_delegates_sheet_btn',
+                  elevation: 3,
+                  backgroundColor: colorScheme.surfaceContainerHigh,
+                  foregroundColor: colorScheme.primary,
+                  onPressed: () => _showMobileDelegatesSheet(context),
+                  icon: const Icon(Icons.people_alt_rounded, size: 20),
+                  label: Text(
+                    hasSelected
+                        ? 'المناديب (${widget.sessions.length})'
+                        : 'المناديب الحاضرين (${widget.sessions.length})',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -884,7 +955,14 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
           mapToolbarEnabled: false,
           onMapCreated: (controller) {
             _mapController = controller;
-            _fitMapBounds();
+            if (_selectedSession != null) {
+              _focusOnDelegate(_selectedSession!);
+              if (_activeBreadcrumbs.isNotEmpty) {
+                _fitTrailBounds(_activeBreadcrumbs);
+              }
+            } else {
+              _fitMapBounds();
+            }
           },
           onTap: (_) {
             if (_selectedSession != null) {
@@ -895,7 +973,7 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
 
         // أزرار التحكم الطافية (إعادة الضبط والتحديث)
         Positioned(
-          top: 16,
+          top: activeSession != null ? 76 : 16,
           left: 16,
           child: Column(
             children: [
@@ -923,49 +1001,18 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
 
         // دليل ألوان الدبابيس الثلاثي (Legend)
         Positioned(
-          top: 16,
+          top: activeSession != null ? 76 : 16,
           right: 16,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: colorScheme.surface.withValues(alpha: 0.94),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildLegendItem('داخل النطاق', const Color(0xFF2E7D32)),
-                const SizedBox(height: 5),
-                _buildLegendItem('خارج النطاق', const Color(0xFFC65102)),
-                const SizedBox(height: 5),
-                _buildLegendItem('غير متصل / لم يسجل', const Color(0xFF757575)),
-              ],
-            ),
-          ),
+          child: _buildLegendWidget(colorScheme),
         ),
 
         // شريط إحصائيات مسار المندوب الطافي في أعلى الخريطة
         if (activeSession != null)
           Positioned(
-            top: 16,
-            left: 76,
-            right: 180,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: _buildRouteTrailHeader(colorScheme, textTheme, activeSession),
-            ),
+            top: 12,
+            left: 12,
+            right: 12,
+            child: _buildRouteTrailHeader(colorScheme, textTheme, activeSession),
           ),
 
         // بطاقة المندوب المختار الحية أسفل الخريطة
@@ -1426,6 +1473,104 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildLegendWidget(ColorScheme colorScheme) {
+    return InkWell(
+      onTap: () => setState(() => _isLegendExpanded = !_isLegendExpanded),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: colorScheme.surface.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: _isLegendExpanded
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 13, color: colorScheme.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        'دليل الألوان',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(Icons.expand_less_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  _buildLegendItem('داخل النطاق', const Color(0xFF2E7D32)),
+                  const SizedBox(height: 4),
+                  _buildLegendItem('خارج النطاق', const Color(0xFFC65102)),
+                  const SizedBox(height: 4),
+                  _buildLegendItem('غير متصل', const Color(0xFF757575)),
+                ],
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF2E7D32),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFC65102),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF757575),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'دليل الألوان',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.expand_more_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                ],
+              ),
+      ),
     );
   }
 

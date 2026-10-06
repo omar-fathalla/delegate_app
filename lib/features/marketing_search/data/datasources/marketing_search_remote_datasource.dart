@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../../core/models/pagination_response.dart';
+import '../../../../core/services/firestore_resilience_helper.dart';
 import '../../../admin/data/models/company_model.dart';
 import '../../../profile/data/models/delegate_model.dart';
 
@@ -22,6 +23,16 @@ abstract class MarketingSearchRemoteDataSource {
   Future<PaginationResponse<DelegateModel>> searchDelegateByPhone({
     required String organizationUID,
     required String phoneNumber,
+    int limit = 20,
+    DocumentSnapshot? startAfterDoc,
+  });
+
+  /// Search for delegates by name in Firestore
+  /// [startAfterDoc] is used for pagination - pass the last document from previous batch
+  Future<PaginationResponse<DelegateModel>> searchDelegateByName({
+    required String organizationUID,
+    required String name,
+    String? phoneNumber,
     int limit = 20,
     DocumentSnapshot? startAfterDoc,
   });
@@ -64,10 +75,10 @@ class MarketingSearchRemoteDataSourceImpl
         // إذا كان الإدخال رقماً، نقوم بتنفيذ 3 استعلامات مختلفة دمجاً لنتائجها
         // للبرهنة على عدم حاجتنا لإنشاء Index معقد في فايربيز
         final futures = await Future.wait([
-          companiesRef.where('code', isEqualTo: numericCode).limit(limit + 1).get(),
-          companiesRef.where('companyCodeInOrg', isEqualTo: numericCode).limit(limit + 1).get(),
+          companiesRef.where('code', isEqualTo: numericCode).limit(limit + 1).getResilient(forceServer: true),
+          companiesRef.where('companyCodeInOrg', isEqualTo: numericCode).limit(limit + 1).getResilient(forceServer: true),
           companiesRef.where('companyCodeInOrg', isGreaterThanOrEqualTo: searchCode)
-              .where('companyCodeInOrg', isLessThanOrEqualTo: '$searchCode\uf8ff').limit(limit + 1).get(),
+              .where('companyCodeInOrg', isLessThanOrEqualTo: '$searchCode\uf8ff').limit(limit + 1).getResilient(forceServer: true),
         ]);
 
         for (var snapshot in futures) {
@@ -79,7 +90,7 @@ class MarketingSearchRemoteDataSourceImpl
             .where('companyCodeInOrg', isGreaterThanOrEqualTo: searchCode)
             .where('companyCodeInOrg', isLessThanOrEqualTo: '$searchCode\uf8ff')
             .limit(limit + 1)
-            .get();
+            .getResilient(forceServer: true);
         allDocs.addAll(snapshot.docs);
       }
 
@@ -165,7 +176,7 @@ class MarketingSearchRemoteDataSourceImpl
         query = query.startAfterDocument(startAfterDoc);
       }
 
-      final snapshot = await query.get();
+      final snapshot = await query.getResilient(forceServer: true);
 
       // Check if we have more items than the limit
       final hasMore = snapshot.docs.length > limit;
@@ -206,6 +217,107 @@ class MarketingSearchRemoteDataSourceImpl
       developer.log('❌ خطأ في البحث عن المندوب: $e');
       developer.log('Stack trace: $stackTrace');
       throw Exception('Failed to search delegate: $e');
+    }
+  }
+
+  /// تطبيع النصوص العربية لتسهيل وتوسيع دقة البحث
+  String _normalizeArabic(String text) {
+    return text
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[إأآا]'), 'ا')
+        .replaceAll('ة', 'ه')
+        .replaceAll('ى', 'ي')
+        .replaceAll(RegExp(r'[\u064B-\u065F\u0640]'), '') // حذف التشكيل والتطويل
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  @override
+  Future<PaginationResponse<DelegateModel>> searchDelegateByName({
+    required String organizationUID,
+    required String name,
+    String? phoneNumber,
+    int limit = 20,
+    DocumentSnapshot? startAfterDoc,
+  }) async {
+    try {
+      final cleanName = name.trim();
+      final normalizedQuery = _normalizeArabic(cleanName);
+      final queryWords = normalizedQuery.split(' ').where((w) => w.isNotEmpty).toList();
+
+      final normalizedPhone = phoneNumber != null && phoneNumber.trim().isNotEmpty
+          ? _normalizePhoneNumber(phoneNumber)
+          : null;
+
+      developer.log('═══════════════════════════════════════════════════');
+      developer.log('🔍 [Marketing] البحث عن مندوب بالاسم');
+      developer.log('Organization UID: $organizationUID');
+      developer.log('Name Query: "$cleanName" (Normalized: "$normalizedQuery")');
+      if (normalizedPhone != null) {
+        developer.log('Phone Filter: "$normalizedPhone"');
+      }
+      developer.log('Limit: $limit');
+      developer.log('═══════════════════════════════════════════════════');
+
+      // جلب مناديب المنظمة بالكامل عبر collectionGroup
+      final snapshot = await firestore
+          .collectionGroup('delegates')
+          .where('organizationUID', isEqualTo: organizationUID)
+          .getResilient(forceServer: true);
+
+      // مطابقة الأسماء ذكياً باللغة العربية مع دعم المقاطع المختلفة
+      final matchedDocs = snapshot.docs.where((doc) {
+        final data = doc.data();
+
+        // تصفية الهاتف إن وجد
+        if (normalizedPhone != null) {
+          final docPhone = (data['phoneNumber'] as String?) ?? '';
+          final normDocPhone = _normalizePhoneNumber(docPhone);
+          if (!normDocPhone.contains(normalizedPhone)) {
+            return false;
+          }
+        }
+
+        final rawFullName = (data['fullName'] as String?)?.trim() ?? '';
+        final first = (data['firstName'] as String?)?.trim() ?? '';
+        final middle = (data['middleName'] as String?)?.trim() ?? '';
+        final last = (data['lastName'] as String?)?.trim() ?? '';
+        final altName = (data['name'] as String?)?.trim() ?? '';
+        final combined = [first, middle, last].where((s) => s.isNotEmpty).join(' ');
+
+        final target = _normalizeArabic('$rawFullName $combined $altName');
+
+        // يجب أن يحتوي النص الهدف على جميع كلمات البحث المدخلة
+        return queryWords.every((word) => target.contains(word));
+      }).toList();
+
+      developer.log('📊 إجمالي المناديب المطابقين للاسم: ${matchedDocs.length}');
+
+      // تطبيق التصفح Pagination باستخدام startAfterDoc
+      int startIndex = 0;
+      if (startAfterDoc != null) {
+        final lastIndex = matchedDocs.indexWhere((d) => d.id == startAfterDoc.id);
+        if (lastIndex != -1) {
+          startIndex = lastIndex + 1;
+        }
+      }
+
+      final pageDocs = matchedDocs.skip(startIndex).take(limit).toList();
+      final hasMore = (startIndex + pageDocs.length) < matchedDocs.length;
+
+      final delegates = pageDocs
+          .map((doc) => DelegateModel.fromJson(doc.data(), doc.id))
+          .toList();
+
+      return PaginationResponse<DelegateModel>(
+        items: delegates,
+        hasReachedMax: !hasMore,
+        lastDoc: pageDocs.isNotEmpty ? pageDocs.last : null,
+      );
+    } catch (e, stackTrace) {
+      developer.log('❌ خطأ في البحث عن المندوب بالاسم: $e');
+      developer.log('Stack trace: $stackTrace');
+      throw Exception('Failed to search delegate by name: $e');
     }
   }
 

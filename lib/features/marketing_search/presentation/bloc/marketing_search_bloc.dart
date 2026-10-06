@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/usecases/search_company_by_code.dart';
+import '../../domain/usecases/search_delegate_by_name.dart';
 import '../../domain/usecases/search_delegate_by_phone.dart';
 import 'marketing_search_event.dart';
 import 'marketing_search_state.dart';
@@ -10,15 +11,18 @@ class MarketingSearchBloc
     extends Bloc<MarketingSearchEvent, MarketingSearchState> {
   final SearchCompanyByCode searchCompanyByCode;
   final SearchDelegateByPhone searchDelegateByPhone;
+  final SearchDelegateByName searchDelegateByName;
 
   // Store current search parameters for pagination
   String? _currentOrganizationUID;
   String? _currentCompanyName;
   String? _currentPhoneNumber;
+  String? _currentDelegateName;
 
   MarketingSearchBloc({
     required this.searchCompanyByCode,
     required this.searchDelegateByPhone,
+    required this.searchDelegateByName,
   }) : super(const MarketingSearchInitial()) {
     on<SearchCompanyRequested>(_onSearchCompanyRequested);
     on<LoadMoreCompaniesRequested>(_onLoadMoreCompaniesRequested);
@@ -112,15 +116,32 @@ class MarketingSearchBloc
     // Store search parameters for pagination
     _currentOrganizationUID = event.organizationUID;
     _currentPhoneNumber = event.phoneNumber;
+    _currentDelegateName = event.name;
 
     emit(const MarketingSearchLoading(searchType: 'delegate'));
 
-    final result = await searchDelegateByPhone(
-      SearchDelegateByPhoneParams(
-        organizationUID: event.organizationUID,
-        phoneNumber: event.phoneNumber,
-      ),
-    );
+    final searchLabel = [
+      if (event.name != null && event.name!.isNotEmpty) event.name!,
+      if (event.phoneNumber != null && event.phoneNumber!.isNotEmpty) event.phoneNumber!,
+    ].join(' - ');
+
+    final dynamic result;
+    if (event.name != null && event.name!.trim().isNotEmpty) {
+      result = await searchDelegateByName(
+        SearchDelegateByNameParams(
+          organizationUID: event.organizationUID,
+          name: event.name!.trim(),
+          phoneNumber: event.phoneNumber,
+        ),
+      );
+    } else {
+      result = await searchDelegateByPhone(
+        SearchDelegateByPhoneParams(
+          organizationUID: event.organizationUID,
+          phoneNumber: event.phoneNumber ?? '',
+        ),
+      );
+    }
 
     result.fold(
       (failure) => emit(MarketingSearchError(message: failure.message)),
@@ -129,14 +150,14 @@ class MarketingSearchBloc
           emit(
             MarketingSearchEmpty(
               searchType: 'delegate',
-              searchQuery: event.phoneNumber,
+              searchQuery: searchLabel,
             ),
           );
         } else {
           emit(
             DelegateSearchSuccess(
               delegates: paginationResponse.items,
-              searchQuery: event.phoneNumber,
+              searchQuery: searchLabel,
               hasReachedMax: paginationResponse.hasReachedMax,
               lastDoc: paginationResponse.lastDoc,
             ),
@@ -158,13 +179,25 @@ class MarketingSearchBloc
     // Emit loading more state
     emit(currentState.copyWith(isLoadingMore: true));
 
-    final result = await searchDelegateByPhone(
-      SearchDelegateByPhoneParams(
-        organizationUID: _currentOrganizationUID!,
-        phoneNumber: _currentPhoneNumber!,
-        startAfterDoc: currentState.lastDoc,
-      ),
-    );
+    final dynamic result;
+    if (_currentDelegateName != null && _currentDelegateName!.trim().isNotEmpty) {
+      result = await searchDelegateByName(
+        SearchDelegateByNameParams(
+          organizationUID: _currentOrganizationUID!,
+          name: _currentDelegateName!.trim(),
+          phoneNumber: _currentPhoneNumber,
+          startAfterDoc: currentState.lastDoc,
+        ),
+      );
+    } else {
+      result = await searchDelegateByPhone(
+        SearchDelegateByPhoneParams(
+          organizationUID: _currentOrganizationUID!,
+          phoneNumber: _currentPhoneNumber ?? '',
+          startAfterDoc: currentState.lastDoc,
+        ),
+      );
+    }
 
     result.fold(
       (failure) => emit(MarketingSearchError(message: failure.message)),
@@ -190,6 +223,7 @@ class MarketingSearchBloc
     _currentOrganizationUID = null;
     _currentCompanyName = null;
     _currentPhoneNumber = null;
+    _currentDelegateName = null;
 
     emit(const MarketingSearchInitial());
   }

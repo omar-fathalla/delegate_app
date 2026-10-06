@@ -24,7 +24,7 @@ class MarketingPermissionsScreen extends StatefulWidget {
 
 class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String _selectedStatusFilter = 'all'; // 'all', 'active', 'pending', 'expired'
+  String _selectedStatusFilter = 'active'; // افتراضياً الأذونات النشطة فقط
   Set<String> _selectedDepartments = {}; // مجموعة الأقسام المحددة (فارغة = الكل)
   bool _isPinned = false; // هل الفلتر الحالي مثبت كافتراضي
   String _searchQuery = '';
@@ -928,7 +928,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
-        title: const Text('إدارة واعتماد أذونات التصوير'),
+        title: Text(
+          !_canApproveOrReject
+              ? 'أذونات التصوير النشطة'
+              : 'إدارة واعتماد أذونات التصوير',
+        ),
         centerTitle: true,
         backgroundColor: colorScheme.surfaceContainer,
         elevation: 0,
@@ -1172,7 +1176,10 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
           p.isSupervisorEnabled == false).toList();
 
       List<PhotoPermission> filtered = [];
-      if (_selectedStatusFilter == 'active') {
+      if (!_canApproveOrReject) {
+        // مستخدم التسويق ليس له أحقية سوى في رؤية الأذونات النشطة فقط
+        filtered = activeList;
+      } else if (_selectedStatusFilter == 'active') {
         filtered = activeList;
       } else if (_selectedStatusFilter == 'pending') {
         filtered = pendingList;
@@ -1226,63 +1233,64 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             ),
           ),
 
-          // فلاتر الحالة
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  ChoiceChip(
-                    label: Text('الكل (${permissions.length})'),
-                    selected: _selectedStatusFilter == 'all',
-                    onSelected: (val) {
-                      if (val) setState(() => _selectedStatusFilter = 'all');
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: Text('النشطة (${activeList.length})'),
-                    selected: _selectedStatusFilter == 'active',
-                    selectedColor: Colors.green.withValues(alpha: 0.2),
-                    labelStyle: TextStyle(
-                      color: _selectedStatusFilter == 'active' ? Colors.green.shade800 : null,
-                      fontWeight: FontWeight.bold,
+          // فلاتر الحالة (تظهر فقط لمن له صلاحية الاعتماد والإدارة - أما موظف التسويق فيرى النشطة فقط بدون فلتر)
+          if (_canApproveOrReject)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ChoiceChip(
+                      label: Text('الكل (${permissions.length})'),
+                      selected: _selectedStatusFilter == 'all',
+                      onSelected: (val) {
+                        if (val) setState(() => _selectedStatusFilter = 'all');
+                      },
                     ),
-                    onSelected: (val) {
-                      if (val) setState(() => _selectedStatusFilter = 'active');
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: Text('المعلقة (${pendingList.length})'),
-                    selected: _selectedStatusFilter == 'pending',
-                    selectedColor: Colors.orange.withValues(alpha: 0.2),
-                    labelStyle: TextStyle(
-                      color: _selectedStatusFilter == 'pending' ? Colors.orange.shade800 : null,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: Text('النشطة (${activeList.length})'),
+                      selected: _selectedStatusFilter == 'active',
+                      selectedColor: Colors.green.withValues(alpha: 0.2),
+                      labelStyle: TextStyle(
+                        color: _selectedStatusFilter == 'active' ? Colors.green.shade800 : null,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      onSelected: (val) {
+                        if (val) setState(() => _selectedStatusFilter = 'active');
+                      },
                     ),
-                    onSelected: (val) {
-                      if (val) setState(() => _selectedStatusFilter = 'pending');
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: Text('المنتهية / المرفوضة (${expiredList.length})'),
-                    selected: _selectedStatusFilter == 'expired',
-                    selectedColor: Colors.red.withValues(alpha: 0.2),
-                    labelStyle: TextStyle(
-                      color: _selectedStatusFilter == 'expired' ? Colors.red.shade800 : null,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: Text('المعلقة (${pendingList.length})'),
+                      selected: _selectedStatusFilter == 'pending',
+                      selectedColor: Colors.orange.withValues(alpha: 0.2),
+                      labelStyle: TextStyle(
+                        color: _selectedStatusFilter == 'pending' ? Colors.orange.shade800 : null,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      onSelected: (val) {
+                        if (val) setState(() => _selectedStatusFilter = 'pending');
+                      },
                     ),
-                    onSelected: (val) {
-                      if (val) setState(() => _selectedStatusFilter = 'expired');
-                    },
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: Text('المنتهية / المرفوضة (${expiredList.length})'),
+                      selected: _selectedStatusFilter == 'expired',
+                      selectedColor: Colors.red.withValues(alpha: 0.2),
+                      labelStyle: TextStyle(
+                        color: _selectedStatusFilter == 'expired' ? Colors.red.shade800 : null,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      onSelected: (val) {
+                        if (val) setState(() => _selectedStatusFilter = 'expired');
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
           // شريط فلترة الأقسام وخاصية التثبيت
           Padding(
@@ -1298,7 +1306,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         ? 'لا توجد نتائج تطابق "$_searchQuery"'
                         : (_selectedDepartments.isNotEmpty
                             ? 'لا توجد أذونات تصوير في الأقسام المحددة'
-                            : 'لا توجد أذونات تصوير في الوقت الحالي'),
+                            : (!_canApproveOrReject
+                                ? 'لا توجد أذونات تصوير نشطة في الوقت الحالي'
+                                : 'لا توجد أذونات تصوير في الوقت الحالي')),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),

@@ -48,6 +48,8 @@ class DelegateModel extends Delegate {
     super.supervisorPhone,
     super.supervisorUid,
     super.allOrganizationNames = const [],
+    super.isAnnualLeaveEnabled = false,
+    super.annualLeaveQuota = 21,
   });
 
   DelegateModel copyWith({
@@ -95,6 +97,8 @@ class DelegateModel extends Delegate {
     String? supervisorPhone,
     String? supervisorUid,
     List<String>? allOrganizationNames,
+    bool? isAnnualLeaveEnabled,
+    int? annualLeaveQuota,
   }) {
     return DelegateModel(
       uid: uid ?? this.uid,
@@ -141,6 +145,8 @@ class DelegateModel extends Delegate {
       supervisorPhone: supervisorPhone ?? this.supervisorPhone,
       supervisorUid: supervisorUid ?? this.supervisorUid,
       allOrganizationNames: allOrganizationNames ?? this.allOrganizationNames,
+      isAnnualLeaveEnabled: isAnnualLeaveEnabled ?? this.isAnnualLeaveEnabled,
+      annualLeaveQuota: annualLeaveQuota ?? this.annualLeaveQuota,
     );
   }
 
@@ -386,6 +392,10 @@ class DelegateModel extends Delegate {
               .map((e) => e.toString())
               .toList()
           : const <String>[],
+      isAnnualLeaveEnabled: parseBool(json['isAnnualLeaveEnabled'], false),
+      annualLeaveQuota: (json['annualLeaveQuota'] is num)
+          ? (json['annualLeaveQuota'] as num).toInt()
+          : 21,
     );
   }
 
@@ -488,6 +498,8 @@ class DelegateModel extends Delegate {
       if (supervisorUid != null) 'supervisorUid': supervisorUid,
       if (allOrganizationNames.isNotEmpty)
         'allOrganizationNames': allOrganizationNames,
+      'isAnnualLeaveEnabled': isAnnualLeaveEnabled,
+      'annualLeaveQuota': annualLeaveQuota,
     };
   }
 
@@ -566,6 +578,8 @@ class DelegateModel extends Delegate {
       if (supervisorUid != null) 'supervisorUid': supervisorUid,
       if (allOrganizationNames.isNotEmpty)
         'allOrganizationNames': allOrganizationNames,
+      'isAnnualLeaveEnabled': isAnnualLeaveEnabled,
+      'annualLeaveQuota': annualLeaveQuota,
     };
   }
 }

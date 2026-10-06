@@ -60,6 +60,31 @@ class MarketingSearchRepositoryImpl implements MarketingSearchRepository {
     }
   }
 
+  @override
+  Future<Either<Failure, PaginationResponse<Delegate>>> searchDelegateByName({
+    required String organizationUID,
+    required String name,
+    String? phoneNumber,
+    int limit = 20,
+    DocumentSnapshot? startAfterDoc,
+  }) async {
+    try {
+      final result = await remoteDataSource.searchDelegateByName(
+        organizationUID: organizationUID,
+        name: name,
+        phoneNumber: phoneNumber,
+        limit: limit,
+        startAfterDoc: startAfterDoc,
+      );
+
+      return Right(result);
+    } on FirebaseException catch (e) {
+      return Left(ServerFailure(_mapFirebaseError(e)));
+    } catch (e) {
+      return Left(ServerFailure('حدث خطأ غير متوقع أثناء البحث عن المندوب بالاسم: $e'));
+    }
+  }
+
   /// Map Firebase errors to user-friendly messages
   String _mapFirebaseError(FirebaseException e) {
     switch (e.code) {

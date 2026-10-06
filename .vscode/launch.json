@@ -27,6 +27,21 @@
             "request": "launch",
             "type": "dart",
             "program": "lib/main.dart"
+        },
+        {
+            "name": "Tashil Mobile (Device / Emulator 2)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Tashil Both Mobiles (Run 1 & 2)",
+            "configurations": [
+                "Tashil Mobile (Device / Emulator)",
+                "Tashil Mobile (Device / Emulator 2)"
+            ]
         }
     ]
 }

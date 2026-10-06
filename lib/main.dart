@@ -32,16 +32,25 @@ void callbackDispatcher() {
     try {
       debugPrint("Native called background task: $task");
       WidgetsFlutterBinding.ensureInitialized();
-      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-      await di.initBackgroundSync();
 
-      final syncManager = di.sl<SyncManager>();
-      await syncManager.syncPendingPhotos();
-      
-      return Future.value(true);
+      return await Future.sync(() async {
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
+            .timeout(const Duration(seconds: 8));
+        await di.initBackgroundSync();
+
+        final syncManager = di.sl<SyncManager>();
+        await syncManager.syncPendingPhotos();
+        return true;
+      }).timeout(
+        const Duration(seconds: 25),
+        onTimeout: () {
+          debugPrint("Background sync exceeded 25s timeout - completing task to prevent ANR.");
+          return false;
+        },
+      );
     } catch (err) {
       debugPrint("Background sync error: $err");
-      return Future.value(false);
+      return false;
     }
   });
 }

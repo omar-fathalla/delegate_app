@@ -27,4 +27,15 @@ abstract class MarketingSearchRepository {
     int limit = 20,
     DocumentSnapshot? startAfterDoc,
   });
+
+  /// Search for a delegate by name (and optionally phone number)
+  /// Returns a paginated list of delegates matching the name
+  /// [startAfterDoc] is used for pagination - pass the last document from previous batch
+  Future<Either<Failure, PaginationResponse<Delegate>>> searchDelegateByName({
+    required String organizationUID,
+    required String name,
+    String? phoneNumber,
+    int limit = 20,
+    DocumentSnapshot? startAfterDoc,
+  });
 }

@@ -10,9 +10,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:delegate_app/features/wallet/presentation/pages/super_admin_wallets_screen.dart';
-import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
-import 'package:delegate_app/features/wallet/data/models/user_wallet_model.dart';
 
 /// صفحة ومنظومة التحصيلات والفواتير الرسمية المعكوسة على الرصيد المتبقي مع الطباعة والمشاركة
 class SuperAdminCollectionsScreen extends StatefulWidget {
@@ -52,8 +49,21 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
   // Aggregated Billing Data from Delegates
   int _totalDueReceiptsCount = 0;
 
-  // Recorded Collection Transactions for the selected period
-  List<Map<String, dynamic>> _collectionTransactions = [];
+  // Recorded Collection Transactions across all months
+  List<Map<String, dynamic>> _allCollectionTransactions = [];
+  bool _filterTransactionsByCurrentMonth = false;
+  int _transactionsPage = 0;
+  static const int _transactionsPageSize = 12;
+
+  List<Map<String, dynamic>> get _currentPeriodTransactions =>
+      _allCollectionTransactions.where((t) => (t['periodKey'] ?? '') == _periodKey).toList();
+
+  List<Map<String, dynamic>> get _displayedTransactions {
+    if (_filterTransactionsByCurrentMonth) {
+      return _currentPeriodTransactions;
+    }
+    return _allCollectionTransactions;
+  }
 
   @override
   void initState() {
@@ -242,28 +252,60 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
           if (mData['accountantPercentage'] != null) {
             _accountantPercentage = (mData['accountantPercentage'] as num).toDouble();
           }
+        } else {
+          // If this month does not have configuration yet in Firestore, inherit from the latest configured month
+          final latestDocs = await firestore
+              .collection('monthly_collections')
+              .orderBy(FieldPath.documentId, descending: true)
+              .limit(5)
+              .get();
+
+          for (final doc in latestDocs.docs) {
+            if (doc.id != _periodKey && doc.data()['adCompanyCount'] != null) {
+              final prevData = doc.data();
+              _adCompanyCount = (prevData['adCompanyCount'] as num?)?.toInt() ?? _adCompanyCount;
+              _adCompanyUnitPrice = (prevData['adCompanyUnitPrice'] as num?)?.toDouble() ?? _adCompanyUnitPrice;
+              _receiptUnitPrice = (prevData['receiptUnitPrice'] as num?)?.toDouble() ?? _receiptUnitPrice;
+              _eventsAnalyticsUnitPrice = (prevData['eventsAnalyticsUnitPrice'] as num?)?.toDouble() ?? _eventsAnalyticsUnitPrice;
+              _eventsAnalyticsCount = (prevData['eventsAnalyticsCount'] as num?)?.toInt() ?? _eventsAnalyticsCount;
+              _eventsAnalyticsTitle = prevData['eventsAnalyticsTitle']?.toString() ?? _eventsAnalyticsTitle;
+              _settlementAmount = (prevData['settlementAmount'] as num?)?.toDouble() ?? _settlementAmount;
+              _settlementTitle = prevData['settlementTitle']?.toString() ?? _settlementTitle;
+              _tashilPercentage = (prevData['tashilPercentage'] as num?)?.toDouble() ?? _tashilPercentage;
+              _marketPercentage = (prevData['marketPercentage'] as num?)?.toDouble() ?? _marketPercentage;
+              _accountantPercentage = (prevData['accountantPercentage'] as num?)?.toDouble() ?? _accountantPercentage;
+              break;
+            }
+          }
         }
       } catch (e) {
         debugPrint('Month doc fetch notice: $e');
       }
 
-      // 3. Fetch recorded collection transactions for this specific month
-      List<Map<String, dynamic>> transactions = [];
+      // 3. Fetch recorded collection transactions across all months
+      List<Map<String, dynamic>> allTransactions = [];
       try {
-        final transactionsSnapshot = await firestore
-            .collection('monthly_collections')
-            .doc(_periodKey)
-            .collection('transactions')
-            .orderBy('createdAt', descending: true)
-            .get();
+        final monthsSnapshot = await firestore.collection('monthly_collections').get();
+        for (final mDoc in monthsSnapshot.docs) {
+          final txSnapshot = await mDoc.reference
+              .collection('transactions')
+              .get();
 
-        transactions = transactionsSnapshot.docs.map((doc) {
-          final d = doc.data();
-          return {
-            'id': doc.id,
-            ...d,
-          };
-        }).toList();
+          for (final doc in txSnapshot.docs) {
+            final d = doc.data();
+            allTransactions.add({
+              'id': doc.id,
+              'periodKey': d['periodKey'] ?? mDoc.id,
+              ...d,
+            });
+          }
+        }
+
+        allTransactions.sort((a, b) {
+          final aTime = (a['createdAt'] as Timestamp?)?.toDate() ?? DateTime(2000);
+          final bTime = (b['createdAt'] as Timestamp?)?.toDate() ?? DateTime(2000);
+          return bTime.compareTo(aTime); // Latest first
+        });
       } catch (e) {
         debugPrint('Transactions fetch notice: $e');
       }
@@ -271,7 +313,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
       if (mounted) {
         setState(() {
           _totalDueReceiptsCount = totalElectronicReceipts;
-          _collectionTransactions = transactions;
+          _allCollectionTransactions = allTransactions;
           _isLoading = false;
           _errorMessage = null;
         });
@@ -301,10 +343,10 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     }
   }
 
-  // --- Financial Calculations ---
+  // --- Financial Calculations (Cumulative across all collections) ---
   int get _totalCollectedReceiptsCount {
     int sum = 0;
-    for (final t in _collectionTransactions) {
+    for (final t in _allCollectionTransactions) {
       sum += (t['receiptsCount'] as num? ?? 0).toInt();
     }
     return sum;
@@ -312,7 +354,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
   int get _totalCollectedAdCompaniesCount {
     int sum = 0;
-    for (final t in _collectionTransactions) {
+    for (final t in _allCollectionTransactions) {
       sum += (t['adCompaniesCount'] as num? ?? 0).toInt();
     }
     return sum;
@@ -320,7 +362,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
   int get _totalCollectedEventsAnalyticsCount {
     int sum = 0;
-    for (final t in _collectionTransactions) {
+    for (final t in _allCollectionTransactions) {
       sum += (t['eventsAnalyticsCount'] as num? ?? 0).toInt();
     }
     return sum;
@@ -328,7 +370,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
   double get _totalCollectedSettlementAmount {
     double sum = 0.0;
-    for (final t in _collectionTransactions) {
+    for (final t in _allCollectionTransactions) {
       sum += (t['settlementAmount'] as num? ?? 0.0).toDouble();
     }
     return sum;
@@ -336,7 +378,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
   double get _totalCollectedAmount {
     double sum = 0.0;
-    for (final t in _collectionTransactions) {
+    for (final t in _allCollectionTransactions) {
       sum += (t['collectedAmount'] as num? ?? 0.0).toDouble();
     }
     return sum;
@@ -1005,6 +1047,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     required double eventsAnalyticsAmount,
     required double settlementAmount,
     required double totalAmount,
+    String? transactionPeriodKey,
   }) async {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -1027,7 +1070,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Are you sure you want to delete this collection entry amounting to ${_formatCurrency(totalAmount)}?',
+                'Are you sure you want to delete this invoice amounting to ${_formatCurrency(totalAmount)}?',
                 style: const TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 8),
@@ -1077,9 +1120,12 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
 
     if (confirmed == true) {
       try {
+        final targetPeriod = (transactionPeriodKey != null && transactionPeriodKey.isNotEmpty)
+            ? transactionPeriodKey
+            : _periodKey;
         await FirebaseFirestore.instance
             .collection('monthly_collections')
-            .doc(_periodKey)
+            .doc(targetPeriod)
             .collection('transactions')
             .doc(docId)
             .delete();
@@ -1087,7 +1133,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Collection entry deleted and balances restored.'),
+              content: Text('Invoice deleted and balances restored.'),
             ),
           );
           _fetchBillingAndCollectionsData();
@@ -1096,7 +1142,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error deleting collection entry: $e'),
+              content: Text('Error deleting invoice: $e'),
               backgroundColor: colorScheme.error,
             ),
           );
@@ -1446,24 +1492,6 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     );
   }
 
-  Future<void> _pickServicePeriod() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedPeriod,
-      firstDate: DateTime(2023),
-      lastDate: DateTime(now.year + 2),
-      helpText: 'Select collection month & year',
-    );
-
-    if (picked != null) {
-      setState(() {
-        _selectedPeriod = DateTime(picked.year, picked.month, 1);
-      });
-      _fetchBillingAndCollectionsData();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1479,24 +1507,6 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
-              tooltip: 'إدارة محافظ المستحقات (Wallets)',
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SuperAdminWalletsScreen(
-                      adminDelegate: widget.delegate,
-                      initialRemainingBalance: _remainingBalanceAmount,
-                      initialPeriodKey: _periodKey,
-                    ),
-                  ),
-                );
-              },
-            ),
             IconButton(
               icon: const Icon(Icons.tune_rounded, size: 20),
               tooltip: 'Pricing & Ratios Settings',
@@ -1564,12 +1574,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1. Service Period Selector Header
-                      _buildPeriodSelectorHeader(colorScheme),
-
-                      const SizedBox(height: 12),
-
-                      // 2. Financial Pulse Cards (Total Due | Collected | Remaining)
+                      // 1. Financial Pulse Cards (Total Due | Collected | Remaining)
                       _buildTripleFinancialCards(colorScheme),
 
                       const SizedBox(height: 16),
@@ -1668,25 +1673,54 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                               Icon(Icons.history_edu_rounded, color: colorScheme.secondary, size: 20),
                               const SizedBox(width: 6),
                               Text(
-                                'Collection & Deduction Log (${_collectionTransactions.length})',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                'Collection Log (${_displayedTransactions.length})',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                               ),
                             ],
                           ),
-                          TextButton.icon(
-                            onPressed: _showAddCollectionDialog,
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            icon: const Icon(Icons.add_rounded, size: 16),
-                            label: const Text('Add Entry', style: TextStyle(fontSize: 12)),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SegmentedButton<bool>(
+                                segments: const [
+                                  ButtonSegment<bool>(
+                                    value: false,
+                                    label: Text('All', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                  ),
+                                  ButtonSegment<bool>(
+                                    value: true,
+                                    label: Text('This Month', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                                selected: {_filterTransactionsByCurrentMonth},
+                                onSelectionChanged: (val) {
+                                  setState(() {
+                                    _filterTransactionsByCurrentMonth = val.first;
+                                    _transactionsPage = 0;
+                                  });
+                                },
+                                style: const ButtonStyle(
+                                  visualDensity: VisualDensity.compact,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              TextButton.icon(
+                                onPressed: _showAddCollectionDialog,
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                icon: const Icon(Icons.add_rounded, size: 16),
+                                label: const Text('Add', style: TextStyle(fontSize: 11)),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
 
-                      if (_collectionTransactions.isEmpty)
+                      if (_displayedTransactions.isEmpty)
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(18),
@@ -1700,29 +1734,117 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                             children: [
                               Icon(Icons.pending_actions_rounded, size: 36, color: colorScheme.outline),
                               const SizedBox(height: 6),
-                              const Text(
-                                'No collection transactions recorded for this month.',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              Text(
+                                _filterTransactionsByCurrentMonth
+                                    ? 'No collection transactions for ${DateFormat('MMMM yyyy', 'en_US').format(_selectedPeriod)}.'
+                                    : 'No collection transactions recorded yet.',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Tap "Record" below to deduct receipts and amounts.',
+                                'Tap "Record" below to record new collections.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(fontSize: 10.5, color: colorScheme.onSurfaceVariant),
                               ),
+                              if (_filterTransactionsByCurrentMonth && _allCollectionTransactions.isNotEmpty) ...[
+                                const SizedBox(height: 10),
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      _filterTransactionsByCurrentMonth = false;
+                                      _transactionsPage = 0;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.list_alt_rounded, size: 15),
+                                  label: Text(
+                                    'Show All Months (${_allCollectionTransactions.length} records)',
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         )
-                      else
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _collectionTransactions.length,
-                          itemBuilder: (context, index) {
-                            final item = _collectionTransactions[index];
-                            return _buildTransactionCard(item, colorScheme, index + 1);
+                      else ...[
+                        Builder(
+                          builder: (context) {
+                            final totalCount = _displayedTransactions.length;
+                            final totalPages = ((totalCount - 1) ~/ _transactionsPageSize) + 1;
+                            final safePage = _transactionsPage.clamp(0, totalPages - 1);
+                            final startIndex = safePage * _transactionsPageSize;
+                            final endIndex = (startIndex + _transactionsPageSize < totalCount)
+                                ? startIndex + _transactionsPageSize
+                                : totalCount;
+                            final pageItems = _displayedTransactions.sublist(startIndex, endIndex);
+
+                            return Column(
+                              children: [
+                                ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: pageItems.length,
+                                  itemBuilder: (context, index) {
+                                    final item = pageItems[index];
+                                    return _buildTransactionCard(
+                                      item,
+                                      colorScheme,
+                                      startIndex + index + 1,
+                                    );
+                                  },
+                                ),
+                                if (totalPages > 1) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.surfaceContainer,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        IconButton.filledTonal(
+                                          icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                                          tooltip: 'Previous Page',
+                                          visualDensity: VisualDensity.compact,
+                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                          padding: EdgeInsets.zero,
+                                          onPressed: safePage > 0
+                                              ? () => setState(() => _transactionsPage = safePage - 1)
+                                              : null,
+                                        ),
+                                        Text(
+                                          'Page ${safePage + 1} of $totalPages  ($totalCount total)',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                        ),
+                                        IconButton.filledTonal(
+                                          icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                                          tooltip: 'Next Page',
+                                          visualDensity: VisualDensity.compact,
+                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                          padding: EdgeInsets.zero,
+                                          onPressed: safePage < totalPages - 1
+                                              ? () => setState(() => _transactionsPage = safePage + 1)
+                                              : null,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            );
                           },
                         ),
+                      ],
                     ],
                   ),
                 ),
@@ -1731,64 +1853,6 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     );
   }
 
-  Widget _buildPeriodSelectorHeader(ColorScheme colorScheme) {
-    final periodName = DateFormat('MMMM yyyy', 'en_US').format(_selectedPeriod);
-    final periodCode = DateFormat('MMM-yy', 'en_US').format(_selectedPeriod);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.calendar_month_rounded, color: colorScheme.onPrimaryContainer, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Service & Collection Period:',
-                  style: TextStyle(fontSize: 10.5, color: colorScheme.onSurfaceVariant),
-                ),
-                Text(
-                  '$periodName ($periodCode)',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 6),
-          OutlinedButton.icon(
-            onPressed: _pickServicePeriod,
-            icon: const Icon(Icons.edit_calendar_rounded, size: 14),
-            label: const Text('Change Month', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              visualDensity: VisualDensity.compact,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              side: BorderSide(color: colorScheme.outlineVariant),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// البطاقات المالية المنسقة والمدمجة (المستحق الكلي | تم تحصيله | المتبقي)
   Widget _buildTripleFinancialCards(ColorScheme colorScheme) {
@@ -1970,186 +2034,228 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
         const SizedBox(height: 10),
 
         // 2. Collected & Remaining Cards (Dynamic M3 ColorScheme Tonal Containers)
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Collected Card
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.check_circle_rounded, size: 15, color: colorScheme.onTertiaryContainer),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Collected',
-                          style: TextStyle(
-                            color: colorScheme.onTertiaryContainer,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$_totalCollectedReceiptsCount Rec • $_totalCollectedAdCompaniesCount Ad${_totalCollectedEventsAnalyticsCount > 0 ? ' • $_totalCollectedEventsAnalyticsCount Ev' : ''}',
-                      style: TextStyle(
-                        color: colorScheme.onTertiaryContainer.withValues(alpha: 0.8),
-                        fontSize: 9.0,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatCurrency(_totalCollectedAmount),
-                      style: TextStyle(
-                        color: colorScheme.onTertiaryContainer,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 2,
-                      children: [
-                        Text(
-                          'Tashil: ${_formatAmountOnly(_tashilCollectedAmount)}',
-                          style: TextStyle(
-                            color: colorScheme.onTertiaryContainer.withValues(alpha: 0.75),
-                            fontSize: 8.5,
-                          ),
-                        ),
-                        Text(
-                          '| Fathalla: ${_formatAmountOnly(_marketCollectedAmount)}',
-                          style: TextStyle(
-                            color: colorScheme.onTertiaryContainer.withValues(alpha: 0.75),
-                            fontSize: 8.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // Remaining Card
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.hourglass_top_rounded, size: 15, color: colorScheme.onErrorContainer),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Remaining',
-                          style: TextStyle(
-                            color: colorScheme.onErrorContainer,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$_remainingReceiptsCount Rec • $_remainingAdCompaniesCount Ad${_remainingEventsAnalyticsCount > 0 ? ' • $_remainingEventsAnalyticsCount Ev' : ''}',
-                      style: TextStyle(
-                        color: colorScheme.onErrorContainer.withValues(alpha: 0.8),
-                        fontSize: 9.0,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatCurrency(_remainingBalanceAmount),
-                      style: TextStyle(
-                        color: colorScheme.onErrorContainer,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 2,
-                      children: [
-                        Text(
-                          'Tashil: ${_formatAmountOnly(_tashilRemainingAmount)}',
-                          style: TextStyle(
-                            color: colorScheme.onErrorContainer.withValues(alpha: 0.75),
-                            fontSize: 8.5,
-                          ),
-                        ),
-                        Text(
-                          '| Fathalla: ${_formatAmountOnly(_marketRemainingAmount)}',
-                          style: TextStyle(
-                            color: colorScheme.onErrorContainer.withValues(alpha: 0.75),
-                            fontSize: 8.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: colorScheme.onErrorContainer.withValues(alpha: 0.2)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Collected Card
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.tertiaryContainer,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.account_balance_wallet_rounded, size: 11, color: colorScheme.onErrorContainer),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              'Accountant (${_accountantPercentage.toStringAsFixed(0)}%): ${_formatCurrency(_accountantRemainingAmount)}',
-                              style: TextStyle(
-                                color: colorScheme.onErrorContainer,
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.bold,
+                          Row(
+                            children: [
+                              Icon(Icons.check_circle_rounded, size: 15, color: colorScheme.onTertiaryContainer),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Collected',
+                                style: TextStyle(
+                                  color: colorScheme.onTertiaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$_totalCollectedReceiptsCount Rec • $_totalCollectedAdCompaniesCount Ad${_totalCollectedEventsAnalyticsCount > 0 ? ' • $_totalCollectedEventsAnalyticsCount Ev' : ''}',
+                            style: TextStyle(
+                              color: colorScheme.onTertiaryContainer.withValues(alpha: 0.8),
+                              fontSize: 9.0,
+                              fontWeight: FontWeight.w500,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatCurrency(_totalCollectedAmount),
+                            style: TextStyle(
+                              color: colorScheme.onTertiaryContainer,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 2,
+                            children: [
+                              Text(
+                                'Tashil: ${_formatAmountOnly(_tashilCollectedAmount)}',
+                                style: TextStyle(
+                                  color: colorScheme.onTertiaryContainer.withValues(alpha: 0.75),
+                                  fontSize: 8.5,
+                                ),
+                              ),
+                              Text(
+                                '| Fathalla: ${_formatAmountOnly(_marketCollectedAmount)}',
+                                style: TextStyle(
+                                  color: colorScheme.onTertiaryContainer.withValues(alpha: 0.75),
+                                  fontSize: 8.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: colorScheme.onTertiaryContainer.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.pie_chart_rounded, size: 11, color: colorScheme.onTertiaryContainer),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'Progress: ${_collectionProgressPercentage.toStringAsFixed(1)}%',
+                                style: TextStyle(
+                                  color: colorScheme.onTertiaryContainer,
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+
+              // Remaining Card
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.hourglass_top_rounded, size: 15, color: colorScheme.onErrorContainer),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Remaining',
+                                style: TextStyle(
+                                  color: colorScheme.onErrorContainer,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$_remainingReceiptsCount Rec • $_remainingAdCompaniesCount Ad${_remainingEventsAnalyticsCount > 0 ? ' • $_remainingEventsAnalyticsCount Ev' : ''}',
+                            style: TextStyle(
+                              color: colorScheme.onErrorContainer.withValues(alpha: 0.8),
+                              fontSize: 9.0,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatCurrency(_remainingBalanceAmount),
+                            style: TextStyle(
+                              color: colorScheme.onErrorContainer,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 2,
+                            children: [
+                              Text(
+                                'Tashil: ${_formatAmountOnly(_tashilRemainingAmount)}',
+                                style: TextStyle(
+                                  color: colorScheme.onErrorContainer.withValues(alpha: 0.75),
+                                  fontSize: 8.5,
+                                ),
+                              ),
+                              Text(
+                                '| Fathalla: ${_formatAmountOnly(_marketRemainingAmount)}',
+                                style: TextStyle(
+                                  color: colorScheme.onErrorContainer.withValues(alpha: 0.75),
+                                  fontSize: 8.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: colorScheme.onErrorContainer.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.account_balance_wallet_rounded, size: 11, color: colorScheme.onErrorContainer),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'Accountant (${_accountantPercentage.toStringAsFixed(0)}%): ${_formatCurrency(_accountantRemainingAmount)}',
+                                style: TextStyle(
+                                  color: colorScheme.onErrorContainer,
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
 
         const SizedBox(height: 10),
@@ -2197,109 +2303,6 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
               ),
             ],
           ),
-        ),
-
-        const SizedBox(height: 10),
-
-        // 3. Allocated Wallets Summary & Quick Access (Fully Responsive M3 Surface)
-        StreamBuilder<List<UserWalletModel>>(
-          stream: WalletRemoteDataSourceImpl().streamAllWallets(),
-          builder: (context, walletSnap) {
-            final wallets = walletSnap.data ?? [];
-            final totalAllocated = wallets.fold<double>(0.0, (s, w) => s + w.currentBalance);
-            final activeWalletsCount = wallets.where((w) => w.isWalletEnabled).length;
-            final netFreeRemaining = (_remainingBalanceAmount - totalAllocated).clamp(0.0, double.infinity);
-
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.secondaryContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: colorScheme.onSecondaryContainer,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'محافظ المستحقات ($activeWalletsCount مفعلة)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: colorScheme.onSurface,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 2,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              _formatCurrency(totalAllocated),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12.5,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            Text(
-                              '• صافي الحر: ${_formatCurrency(netFreeRemaining)}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.tonal(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SuperAdminWalletsScreen(
-                            adminDelegate: widget.delegate,
-                            initialRemainingBalance: _remainingBalanceAmount,
-                            initialPeriodKey: _periodKey,
-                          ),
-                        ),
-                      );
-                    },
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      visualDensity: VisualDensity.compact,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text(
-                      'إدارة المحافظ',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
         ),
       ],
     );
@@ -2848,6 +2851,20 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     int index,
   ) {
     final docId = item['id']?.toString() ?? '';
+    final itemPeriodKey = item['periodKey']?.toString() ?? '';
+    String periodBadge = '';
+    if (itemPeriodKey.isNotEmpty) {
+      final parts = itemPeriodKey.split('_');
+      if (parts.length == 2) {
+        final y = int.tryParse(parts[0]);
+        final m = int.tryParse(parts[1]);
+        if (y != null && m != null) {
+          periodBadge = DateFormat('MMM yyyy', 'en_US').format(DateTime(y, m, 1));
+        }
+      }
+    }
+    final isCurrentPeriod = itemPeriodKey == _periodKey;
+
     final recQty = (item['receiptsCount'] as num? ?? 0).toInt();
     final recAmt = (item['receiptsAmount'] as num? ?? (recQty * _receiptUnitPrice)).toDouble();
 
@@ -2885,7 +2902,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
     if (adQty > 0) entryParts.add('$adQty Ad Cos');
     if (evQty > 0) entryParts.add('$evQty Ev Soft');
     if (setAmt > 0) entryParts.add('Settlement');
-    final entryTitle = entryParts.isNotEmpty ? 'Entry: ${entryParts.join(' + ')}' : 'Collection Entry';
+    final entryTitle = entryParts.isNotEmpty ? 'Invoice: ${entryParts.join(' + ')}' : 'Invoice';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -2907,8 +2924,8 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                   children: [
                     CircleAvatar(
                       radius: 14,
-                      backgroundColor: colorScheme.primaryContainer,
-                      foregroundColor: colorScheme.onPrimaryContainer,
+                      backgroundColor: isCurrentPeriod ? colorScheme.primaryContainer : colorScheme.surfaceContainerHighest,
+                      foregroundColor: isCurrentPeriod ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
                       child: Text('$index', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                     ),
                     const SizedBox(width: 8),
@@ -2919,9 +2936,39 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                           entryTitle,
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.onSurface),
                         ),
-                        Text(
-                          dateStr,
-                          style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            if (periodBadge.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: isCurrentPeriod
+                                      ? colorScheme.primaryContainer
+                                      : colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: isCurrentPeriod
+                                        ? colorScheme.primary.withValues(alpha: 0.4)
+                                        : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                child: Text(
+                                  periodBadge,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: isCurrentPeriod ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                            ],
+                            Text(
+                              dateStr,
+                              style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -3052,7 +3099,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 const Spacer(),
                 IconButton(
                   icon: Icon(Icons.delete_outline_rounded, color: colorScheme.outline, size: 18),
-                  tooltip: 'Delete Collection Entry',
+                  tooltip: 'Delete Invoice',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   onPressed: () => _deleteCollectionTransaction(
@@ -3065,6 +3112,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                     eventsAnalyticsAmount: evAmt,
                     settlementAmount: setAmt,
                     totalAmount: amount,
+                    transactionPeriodKey: itemPeriodKey,
                   ),
                 ),
               ],

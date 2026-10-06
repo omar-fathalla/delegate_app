@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
+import 'package:delegate_app/features/tasks/domain/usecases/delete_task.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_bloc.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_event.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_bloc.dart';
@@ -665,30 +665,231 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     }
   }
 
-  void _confirmDelete(BuildContext context) {
-    showM3Dialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.deleteTask),
-        content: Text(AppLocalizations.of(context)!.deleteTaskConfirmation),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(AppLocalizations.of(context)!.all),
-          ),
-          TextButton(
-            onPressed: () {
-              // Handle delete logic here or dispatch event
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            child: Text(
-              AppLocalizations.of(context)!.delete,
-              style: const TextStyle(color: Colors.red),
+  Future<void> _confirmDelete(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isMobile = MediaQuery.of(context).size.width <= 768;
+
+    Widget buildSheetContent(BuildContext modalContext, StateSetter setModalState, bool isDeleting) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (isMobile)
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4.5,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.deleteTask,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _task.title,
+                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
+            const SizedBox(height: 16),
+            Text(
+              l10n.deleteTaskConfirmation,
+              style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant, height: 1.4),
+            ),
+            const SizedBox(height: 24),
+
+            // Connected Dual Action Button Group
+            Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  width: 1.2,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Row(
+                children: [
+                  // Cancel Button (إلغاء)
+                  Expanded(
+                    flex: 2,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: isDeleting ? null : () => Navigator.pop(modalContext),
+                        child: Center(
+                          child: Text(
+                            l10n.cancel,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Divider
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  ),
+
+                  // Confirm Delete Button (حذف)
+                  Expanded(
+                    flex: 3,
+                    child: Material(
+                      color: colorScheme.error,
+                      child: InkWell(
+                        onTap: isDeleting
+                            ? null
+                            : () async {
+                                setModalState(() => isDeleting = true);
+                                try {
+                                  final deleteTaskUseCase = di.sl<DeleteTask>();
+                                  final result = await deleteTaskUseCase(
+                                    widget.organizationId,
+                                    _task.uid,
+                                  );
+
+                                  if (!modalContext.mounted) return;
+
+                                  result.fold(
+                                    (failure) {
+                                      setModalState(() => isDeleting = false);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(failure.message),
+                                          backgroundColor: colorScheme.error,
+                                        ),
+                                      );
+                                    },
+                                    (_) {
+                                      Navigator.pop(modalContext);
+                                      Navigator.pop(context, true);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Text('تم حذف المهمة بنجاح'),
+                                          backgroundColor: Colors.green.shade700,
+                                        ),
+                                      );
+                                    },
+                                  );
+                                } catch (e) {
+                                  if (modalContext.mounted) {
+                                    setModalState(() => isDeleting = false);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('حدث خطأ أثناء حذف المهمة: $e'),
+                                        backgroundColor: colorScheme.error,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        child: Center(
+                          child: isDeleting
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colorScheme.onError,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.delete_forever_rounded, size: 18, color: colorScheme.onError),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      l10n.delete,
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onError,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isMobile) {
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (modalCtx) {
+          bool isDeleting = false;
+          return StatefulBuilder(
+            builder: (ctx, setModalState) => buildSheetContent(modalCtx, setModalState, isDeleting),
+          );
+        },
+      );
+    } else {
+      await showDialog<void>(
+        context: context,
+        builder: (modalCtx) {
+          bool isDeleting = false;
+          return Dialog(
+            backgroundColor: colorScheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: StatefulBuilder(
+                builder: (ctx, setModalState) => buildSheetContent(modalCtx, setModalState, isDeleting),
+              ),
+            ),
+          );
+        },
+      );
+    }
   }
 }

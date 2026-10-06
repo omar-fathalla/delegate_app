@@ -21,6 +21,7 @@ class TashilConnectedButtonItem<T> {
   final IconData? icon;
   final Color? activeColor;
   final Color? activeForegroundColor;
+  final int? count;
 
   const TashilConnectedButtonItem({
     required this.value,
@@ -28,6 +29,7 @@ class TashilConnectedButtonItem<T> {
     this.icon,
     this.activeColor,
     this.activeForegroundColor,
+    this.count,
   });
 }
 
@@ -47,6 +49,7 @@ class TashilConnectedButtonGroup<T> extends StatelessWidget {
   final double height;
   final bool isScrollable;
   final double? width;
+  final EdgeInsetsGeometry? itemPadding;
 
   const TashilConnectedButtonGroup({
     super.key,
@@ -56,6 +59,7 @@ class TashilConnectedButtonGroup<T> extends StatelessWidget {
     this.height = 44.0,
     this.isScrollable = false,
     this.width,
+    this.itemPadding,
   });
 
   @override
@@ -63,13 +67,20 @@ class TashilConnectedButtonGroup<T> extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final defaultPadding = itemPadding ??
+        (isScrollable
+            ? const EdgeInsets.symmetric(horizontal: 14.0)
+            : const EdgeInsets.symmetric(horizontal: 4.0));
+
+    final innerHeight = (height - 8.0).clamp(20.0, 56.0);
+
     final content = Container(
       height: height,
       width: width,
       padding: const EdgeInsets.all(4.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: BorderRadius.circular(height / 2),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
           width: 1.0,
@@ -83,6 +94,8 @@ class TashilConnectedButtonGroup<T> extends StatelessWidget {
             item: item,
             isSelected: isSelected,
             onTap: () => onSelected(item.value),
+            padding: defaultPadding,
+            height: innerHeight,
           );
 
           if (isScrollable || width == null) {
@@ -109,11 +122,15 @@ class _TashilConnectedButtonSegment<T> extends StatefulWidget {
   final TashilConnectedButtonItem<T> item;
   final bool isSelected;
   final VoidCallback onTap;
+  final EdgeInsetsGeometry? padding;
+  final double height;
 
   const _TashilConnectedButtonSegment({
     required this.item,
     required this.isSelected,
     required this.onTap,
+    this.padding,
+    this.height = 35.0,
   });
 
   @override
@@ -151,8 +168,8 @@ class _TashilConnectedButtonSegmentState<T>
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeInOutCubic,
-          height: 35.0,
-          padding: const EdgeInsets.symmetric(horizontal: 14.0),
+          height: widget.height,
+          padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 14.0),
           decoration: BoxDecoration(
             color: isSelected
                 ? (_isHovered
@@ -163,7 +180,7 @@ class _TashilConnectedButtonSegmentState<T>
                 : (_isHovered
                     ? colorScheme.primaryHoverStateLayer
                     : Colors.transparent),
-            borderRadius: BorderRadius.circular(17.5),
+            borderRadius: BorderRadius.circular(widget.height / 2),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
@@ -174,29 +191,52 @@ class _TashilConnectedButtonSegmentState<T>
                   ]
                 : null,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (item.icon != null) ...[
-                Icon(
-                  item.icon,
-                  size: 15.0,
-                  color: isSelected ? activeFg : unselectedFg,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (item.icon != null) ...[
+                  Icon(
+                    item.icon,
+                    size: 15.0,
+                    color: isSelected ? activeFg : unselectedFg,
+                  ),
+                  const SizedBox(width: 5.0),
+                ],
+                Text(
+                  item.label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: isSelected ? activeFg : unselectedFg,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    fontSize: 12.0,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(width: 6.0),
+                if (item.count != null) ...[
+                  const SizedBox(width: 5.0),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? activeFg.withValues(alpha: 0.22)
+                          : colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${item.count}',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? activeFg : unselectedFg,
+                      ),
+                    ),
+                  ),
+                ],
               ],
-              Text(
-                item.label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: isSelected ? activeFg : unselectedFg,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  fontSize: 12.0,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+            ),
           ),
         ),
       ),

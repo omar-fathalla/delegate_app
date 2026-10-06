@@ -64,6 +64,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   Map<String, String> _companiesMap = {};
   final Map<String, List<_CompanyContact>> _companyContactsCache = {};
   bool _isExporting = false;
+  List<Map<String, dynamic>> _currentFilteredLogs = [];
 
   bool get _isCompanyScoped =>
       widget.delegate.companyUID.isNotEmpty &&
@@ -1603,6 +1604,8 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           return true;
         }).toList();
 
+        _currentFilteredLogs = filteredLogs;
+
           return RefreshIndicator(
             onRefresh: () async {
               setState(() {});
@@ -1610,6 +1613,53 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
+                if (!widget.showAppBar)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isArabic ? 'سجل الأمان وكشف التزييف' : 'Security & Anti-Fraud Logs',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                ),
+                                if (widget.delegate.companyName.isNotEmpty)
+                                  Text(
+                                    widget.delegate.companyName,
+                                    style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.refresh_rounded),
+                            tooltip: isArabic ? 'تحديث' : 'Refresh',
+                            onPressed: () => setState(() {}),
+                          ),
+                          IconButton(
+                            icon: _isExporting
+                                ? SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: colorScheme.primary,
+                                    ),
+                                  )
+                                : const Icon(Icons.file_download_outlined),
+                            tooltip: isArabic ? 'تصدير إكسيل' : 'Export Excel',
+                            onPressed: (_isExporting || _currentFilteredLogs.isEmpty)
+                                ? null
+                                : () => _exportToCSV(_currentFilteredLogs),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 if (_currentTab == 'devices') ...[
                   SliverToBoxAdapter(
                     child: _buildDeviceBindingSection(colorScheme, isArabic),
@@ -1859,10 +1909,47 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               width: 0.8,
             ),
           ),
-          title: Text(
-            isArabic ? 'سجل الأمان وكشف التزييف' : 'Security & Anti-Fraud Logs',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isArabic ? 'سجل الأمان وكشف التزييف' : 'Security & Anti-Fraud Logs',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              if (widget.delegate.companyName.isNotEmpty)
+                Text(
+                  widget.delegate.companyName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: isArabic ? 'تحديث' : 'Refresh',
+              onPressed: () => setState(() {}),
+            ),
+            IconButton(
+              icon: _isExporting
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colorScheme.primary,
+                      ),
+                    )
+                  : const Icon(Icons.file_download_outlined),
+              tooltip: isArabic ? 'تصدير إكسيل' : 'Export Excel',
+              onPressed: (_isExporting || _currentFilteredLogs.isEmpty)
+                  ? null
+                  : () => _exportToCSV(_currentFilteredLogs),
+            ),
+            const SizedBox(width: 8),
+          ],
         ),
         body: body,
       );
@@ -3476,7 +3563,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           ),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Icon(
               Icons.storefront_rounded,
@@ -3486,7 +3573,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                   : colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 8),
-            Flexible(
+            Expanded(
               child: Text(
                 _selectedBranchFilter == 'all'
                     ? (isArabic
@@ -3514,7 +3601,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
       ),
     );
 
-    // 4. Time Filters (الكل / اليوم) M3 Segmented Control
+    // 4. Time Filters (الكل / اليوم) M3 Segmented Control (Equal Width)
     final timeFilterSegment = Container(
       height: 44,
       padding: const EdgeInsets.all(3),
@@ -3526,82 +3613,25 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         ),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          _buildSegmentButton(
-            label: isArabic ? 'الكل (${allLogs.length})' : 'All (${allLogs.length})',
-            isSelected: _timeFilter == 'all',
-            colorScheme: colorScheme,
-            onTap: () => setState(() => _timeFilter = 'all'),
+          Expanded(
+            child: _buildSegmentButton(
+              label: isArabic ? 'الكل (${allLogs.length})' : 'All (${allLogs.length})',
+              isSelected: _timeFilter == 'all',
+              colorScheme: colorScheme,
+              onTap: () => setState(() => _timeFilter = 'all'),
+            ),
           ),
           const SizedBox(width: 3),
-          _buildSegmentButton(
-            label: isArabic ? 'اليوم ($todayAttempts)' : 'Today ($todayAttempts)',
-            isSelected: _timeFilter == 'today',
-            colorScheme: colorScheme,
-            onTap: () => setState(() => _timeFilter = 'today'),
+          Expanded(
+            child: _buildSegmentButton(
+              label: isArabic ? 'اليوم ($todayAttempts)' : 'Today ($todayAttempts)',
+              isSelected: _timeFilter == 'today',
+              colorScheme: colorScheme,
+              onTap: () => setState(() => _timeFilter = 'today'),
+            ),
           ),
         ],
-      ),
-    );
-
-    // 5. Excel Export Button
-    final exportButton = SizedBox(
-      height: 44,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: (_isExporting || filteredLogs.isEmpty)
-              ? null
-              : () => _exportToCSV(filteredLogs),
-          borderRadius: BorderRadius.circular(22),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: filteredLogs.isEmpty
-                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
-                  : colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-              ),
-            ),
-            alignment: Alignment.center,
-            child: _isExporting
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: colorScheme.primary,
-                    ),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.arrow_downward_rounded,
-                        size: 18,
-                        color: filteredLogs.isEmpty
-                            ? colorScheme.onSurfaceVariant.withValues(alpha: 0.35)
-                            : colorScheme.primary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Excel',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: filteredLogs.isEmpty
-                              ? colorScheme.onSurfaceVariant.withValues(alpha: 0.35)
-                              : colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        ),
       ),
     );
 
@@ -3616,13 +3646,14 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               searchButton,
               const SizedBox(width: 8),
               ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 180, maxWidth: 260),
+                constraints: const BoxConstraints(minWidth: 180, maxWidth: 280),
                 child: branchDropdown,
               ),
               const SizedBox(width: 8),
-              timeFilterSegment,
-              const SizedBox(width: 8),
-              exportButton,
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 180, maxWidth: 240),
+                child: timeFilterSegment,
+              ),
             ],
           );
         } else {
@@ -3638,11 +3669,15 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(child: branchDropdown),
+                  Expanded(
+                    flex: 11,
+                    child: branchDropdown,
+                  ),
                   const SizedBox(width: 8),
-                  timeFilterSegment,
-                  const SizedBox(width: 8),
-                  exportButton,
+                  Expanded(
+                    flex: 10,
+                    child: timeFilterSegment,
+                  ),
                 ],
               ),
             ],

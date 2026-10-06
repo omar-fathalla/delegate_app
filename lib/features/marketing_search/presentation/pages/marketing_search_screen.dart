@@ -39,6 +39,7 @@ class _MarketingSearchView extends StatefulWidget {
 
 class _MarketingSearchViewState extends State<_MarketingSearchView> {
   final TextEditingController _companyNameController = TextEditingController();
+  final TextEditingController _delegateNameController = TextEditingController();
   final TextEditingController _phoneNumberController = TextEditingController();
   String? _actualOrganizationUID;
 
@@ -72,6 +73,7 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
   @override
   void dispose() {
     _companyNameController.dispose();
+    _delegateNameController.dispose();
     _phoneNumberController.dispose();
     super.dispose();
   }
@@ -105,10 +107,11 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
 
   /// Handle delegate search
   void _onSearchDelegate() {
+    final name = _delegateNameController.text.trim();
     final phoneNumber = _phoneNumberController.text.trim();
 
-    if (phoneNumber.isEmpty) {
-      _showSnackBar('يرجى إدخال رقم الموبايل');
+    if (name.isEmpty && phoneNumber.isEmpty) {
+      _showSnackBar('يرجى إدخال اسم المندوب أو رقم الموبايل');
       return;
     }
 
@@ -117,12 +120,13 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
       return;
     }
 
-    developer.log('🔍 [Marketing Search] البحث عن مندوب: $phoneNumber');
+    developer.log('🔍 [Marketing Search] البحث عن مندوب: name="$name", phone="$phoneNumber"');
 
     context.read<MarketingSearchBloc>().add(
       SearchDelegateRequested(
         organizationUID: _actualOrganizationUID!,
-        phoneNumber: phoneNumber,
+        name: name.isNotEmpty ? name : null,
+        phoneNumber: phoneNumber.isNotEmpty ? phoneNumber : null,
       ),
     );
 
@@ -133,6 +137,7 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
   /// Handle clear search
   void _onClearSearch() {
     _companyNameController.clear();
+    _delegateNameController.clear();
     _phoneNumberController.clear();
     context.read<MarketingSearchBloc>().add(const ClearSearchRequested());
   }
@@ -253,7 +258,8 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
 
             // قسم البحث عن المندوبين
             DelegateSearchSection(
-              controller: _phoneNumberController,
+              nameController: _delegateNameController,
+              phoneController: _phoneNumberController,
               onSearch: _onSearchDelegate,
             ),
 

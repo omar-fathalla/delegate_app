@@ -80,4 +80,17 @@
     2. A compact status pill/chip (`Container` with 12px radius, icon, and text).
   - The card itself must always have `colorScheme.surface` background, `colorScheme.outlineVariant` border, and smooth hover state highlighting (`colorScheme.primary.withValues(alpha: 0.05)`).
 
+## Mobile-First Modal Bottom Sheets & Connected Action Button Groups Standard (حظر النوافذ المنبثقة العائمة على الموبايل - No Dialog Bubbles on Mobile)
+- **Strict Prohibition of Floating Dialog Bubbles on Mobile (حظر البابلز العائمة)**:
+  - All detail cards, action forms, and editing modals on mobile viewports (`maxWidth <= 768px`) MUST NEVER appear as floating center dialog bubbles (`AlertDialog` floating in the middle of the screen).
+  - Instead, they MUST ALWAYS be implemented as **Material 3 Modal Bottom Sheets** (`showModalBottomSheet`):
+    1. **Smooth Bottom Slide-Up Motion**: Slides up smoothly from the screen bottom, filling ~75% - 85% of screen height (`MediaQuery.size.height * 0.80`).
+    2. **Top Drag Handle Pill**: Width `38px`, height `4.5px`, rounded radius `3px`, centered at the top with `colorScheme.outlineVariant.withValues(alpha: 0.6)`.
+    3. **Top Rounded Corners**: `BorderRadius.vertical(top: Radius.circular(28))`.
+    4. **Keyboard Avoidance**: Always handle soft keyboard insets (`padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom)`).
+    5. **Connected Action Button Group**: Action buttons (e.g. Close / Save / Edit / Cancel) must NEVER be plain detached buttons. They must use a unified, connected dual-button group container (`height: 48`, `borderRadius: 24`, outline border, vertical divider).
+- **Responsive Multiplatform Adaptation**:
+  - On Desktop/Web viewports (`maxWidth > 768px`), the exact same component adapts into a centered Material 3 `Dialog` (max width `520px` - `560px`, `borderRadius: 24px`).
+
+
 

@@ -283,8 +283,8 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
     final accentColor = _getOrgAccentColor(orgName);
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 4,
+        horizontal: 6,
+        vertical: 5,
       ),
       decoration: BoxDecoration(
         color: accentColor.withValues(alpha: 0.25),
@@ -296,24 +296,67 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Icons.storefront_rounded,
             size: 13,
             color: accentColor.withValues(alpha: 0.95),
           ),
-          const SizedBox(width: 5),
-          Text(
-            orgName,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              letterSpacing: 0.2,
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              orgName,
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: 0.1,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSupervisorOrganizationsGrid(
+    List<String> organizations,
+    bool isArabic,
+  ) {
+    if (organizations.isEmpty) return const SizedBox.shrink();
+
+    // تقسيم السلاسل إلى مجموعات ثلاثية (3 عناصر في كل صف)
+    final chunks = <List<String>>[];
+    for (var i = 0; i < organizations.length; i += 3) {
+      final end = (i + 3 < organizations.length) ? i + 3 : organizations.length;
+      chunks.add(organizations.sublist(i, end));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (int r = 0; r < chunks.length; r++) ...[
+          if (r > 0) const SizedBox(height: 6),
+          Row(
+            children: [
+              for (int c = 0; c < chunks[r].length; c++) ...[
+                if (c > 0) const SizedBox(width: 6),
+                Expanded(
+                  child: _buildOrgBadgeChip(chunks[r][c], isArabic),
+                ),
+              ],
+              for (int empty = 0; empty < (3 - chunks[r].length); empty++) ...[
+                const SizedBox(width: 6),
+                const Expanded(child: SizedBox.shrink()),
+              ],
+            ],
+          ),
+        ],
+      ],
     );
   }
 
@@ -1019,21 +1062,10 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
                         ],
                       ),
                     ),
-                    // رُقاقات سلاسل المنظمات التابع لها مناديب المشرف (صف منفصل متصل يلتف معاً)
-                    if (_isCompanySupervisor && _supervisorOrganizations.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: _supervisorOrganizations.map(
-                          (org) => _buildOrgBadgeChip(org, isArabic),
-                        ).toList(),
-                      ),
-                    ],
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
               // صورة البروفايل بالأفاتار الدائري
               Builder(
                 builder: (context) {
@@ -1076,6 +1108,12 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
               ),
             ],
           ),
+
+          // رُقاقات سلاسل المنظمات التابع لها مناديب المشرف (صف يأخذ 3 عناصر دائماً)
+          if (_isCompanySupervisor && _supervisorOrganizations.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildSupervisorOrganizationsGrid(_supervisorOrganizations, isArabic),
+          ],
 
           const SizedBox(height: 16),
           Divider(color: Colors.white.withValues(alpha: 0.25), height: 1),

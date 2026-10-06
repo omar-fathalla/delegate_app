@@ -332,7 +332,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         color: isSelected
                             ? colorScheme.primaryContainer.withValues(alpha: 0.5)
                             : colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(12),
                         clipBehavior: Clip.antiAlias,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

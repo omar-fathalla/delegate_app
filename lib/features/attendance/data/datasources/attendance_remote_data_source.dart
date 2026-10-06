@@ -7,6 +7,7 @@ import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/core/models/pagination_response.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
 import 'package:delegate_app/features/tracking/data/services/delegate_tracking_engine.dart';
@@ -47,6 +48,12 @@ abstract class AttendanceRemoteDataSource {
   /// for the given [userId] in the specified [organizationId].
   /// Returns `null` if no active session exists.
   Future<AttendanceModel?> findActiveAttendance(
+    String userId,
+    String organizationId,
+  );
+
+  /// Emits real-time updates for active attendance of the delegate.
+  Stream<AttendanceModel?> streamActiveAttendance(
     String userId,
     String organizationId,
   );
@@ -366,8 +373,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
               .collectionGroup('delegates')
               .where('nationalityID', isEqualTo: cleanNat)
               .limit(10)
-              .get()
-              .timeout(const Duration(seconds: 4));
+              .getResilient(
+                timeout: const Duration(seconds: 4),
+                forceServer: true,
+              );
           for (final doc in natSnap.docs) {
             identifiers.add(doc.id);
           }
@@ -388,8 +397,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
               .collectionGroup('delegates')
               .where('phoneNumber', isEqualTo: normalizedPhone)
               .limit(10)
-              .get()
-              .timeout(const Duration(seconds: 4));
+              .getResilient(
+                timeout: const Duration(seconds: 4),
+                forceServer: true,
+              );
           for (final doc in phoneSnap.docs) {
             identifiers.add(doc.id);
           }
@@ -407,8 +418,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         query = query.startAfterDocument(startAfter);
       }
 
-      final querySnapshot = await query.get().timeout(
-        const Duration(seconds: 10),
+      final querySnapshot = await query.getResilient(
+        timeout: const Duration(seconds: 8),
+        forceServer: true,
       );
 
       if (querySnapshot.docs.isEmpty) {
@@ -539,8 +551,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           .where('delegateId', isEqualTo: userId)
           .orderBy('timestamp', descending: true)
           .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 15));
+          .getResilient(
+            timeout: const Duration(seconds: 5),
+            forceServer: true,
+          );
 
       if (querySnapshot.docs.isEmpty) return null;
 
@@ -629,6 +643,38 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   }
 
   @override
+  Stream<AttendanceModel?> streamActiveAttendance(
+    String userId,
+    String organizationId,
+  ) {
+    return _attendanceCollection(organizationId)
+        .where('delegateId', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .streamResilient(includeMetadataChanges: true)
+        .map((snapshot) {
+          if (snapshot.docs.isEmpty) return null;
+          final doc = snapshot.docs.first;
+          final data = doc.data();
+          if (data['type'] == 'check_in') {
+            return AttendanceModel(
+              id: doc.id,
+              userId: data['delegateId'] ?? data['userId'] ?? '',
+              organizationId: organizationId,
+              checkInTime: data['timestamp'] != null
+                  ? (data['timestamp'] as Timestamp).toDate()
+                  : DateTime.now(),
+              latitude: (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
+              longitude:
+                  (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
+              branchName: data['branchName'],
+            );
+          }
+          return null;
+        });
+  }
+
+  @override
   Future<void> syncOfflineQueue(List<Map<String, dynamic>> queue) async {
     try {
       final batch = firestore.batch();
@@ -675,16 +721,20 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           .collection('branches')
           .where('branchName', isEqualTo: branchName.trim())
           .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 15));
+          .getResilient(
+            timeout: const Duration(seconds: 5),
+            forceServer: true,
+          );
 
       if (querySnapshot.docs.isEmpty) {
         final groupSnap = await firestore
             .collectionGroup('branches')
             .where('branchName', isEqualTo: branchName.trim())
             .limit(1)
-            .get()
-            .timeout(const Duration(seconds: 15));
+            .getResilient(
+              timeout: const Duration(seconds: 5),
+              forceServer: true,
+            );
         if (groupSnap.docs.isNotEmpty) {
           return groupSnap.docs.first.data();
         }
@@ -713,8 +763,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           .collection('branches')
           .where('branchName', isEqualTo: branchName)
           .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 15));
+          .getResilient(
+            timeout: const Duration(seconds: 5),
+            forceServer: true,
+          );
 
       final Map<String, dynamic> data = {
         'branchName': branchName,

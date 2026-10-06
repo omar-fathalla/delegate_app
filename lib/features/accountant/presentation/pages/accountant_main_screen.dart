@@ -10,6 +10,7 @@ import 'package:delegate_app/features/wallet/data/models/user_wallet_model.dart'
 import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
+import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'accountant_beneficiary_wallets_tab.dart';
 
@@ -91,46 +92,7 @@ class _AccountantMainScreenState extends State<AccountantMainScreen> {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.logout_rounded, color: colorScheme.error, size: 24),
-            const SizedBox(width: 8),
-            Text(l10n.logout),
-          ],
-        ),
-        content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              'إلغاء',
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              foregroundColor: colorScheme.onError,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              context.go('/login');
-            },
-            child: Text(l10n.logout),
-          ),
-        ],
-      ),
-    );
+    AppLogoutModal.show(context, delegate: widget.delegate);
   }
 
   @override
