@@ -772,15 +772,20 @@ class _SuperAdminSessionControlScreenState
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'إدارة الجلسات والخروج الإجباري',
               style: GoogleFonts.cairo(
                 fontWeight: FontWeight.bold,
-                fontSize: 16.5,
+                fontSize: 14.5,
+                letterSpacing: -0.2,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               'تحكم إداري مباشر لإجبار المناديب على إعادة التحقق',

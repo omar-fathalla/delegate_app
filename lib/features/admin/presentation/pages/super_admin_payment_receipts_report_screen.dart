@@ -218,12 +218,17 @@ class _SuperAdminPaymentReceiptsReportScreenState
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerRight,
           child: Text(
             l10n.paymentReceiptsReport,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14.5,
+              letterSpacing: -0.2,
+            ),
           ),
         ),
         actions: [

@@ -3,6 +3,9 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
 import 'package:delegate_app/features/wallet/data/models/user_wallet_model.dart';
 import 'package:delegate_app/features/wallet/domain/entities/user_wallet_entity.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
+import 'package:delegate_app/injection_container.dart' as di;
 
 class UserWalletScreen extends StatelessWidget {
   final String targetUserId;
@@ -36,11 +39,18 @@ class UserWalletScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: colorScheme.surfaceContainerLowest,
         appBar: AppBar(
+          titleSpacing: 0,
           title: Text(
             targetUserName != null && targetUserName!.isNotEmpty
                 ? 'محفظة مستحقات: $targetUserName'
                 : 'محفظتي والمستحقات',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14.5,
+              letterSpacing: -0.2,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           actions: [
             IconButton(
@@ -67,20 +77,21 @@ class UserWalletScreen extends StatelessWidget {
             ),
           ],
         ),
-        body: StreamBuilder<UserWalletModel?>(
-          stream: dataSource.streamUserWallet(targetUserId),
-          builder: (context, walletSnapshot) {
-            if (walletSnapshot.connectionState == ConnectionState.waiting) {
+        body: FutureBuilder(
+          future: di.sl<AuthRepository>().getCachedDelegate(),
+          builder: (context, authSnapshot) {
+            if (authSnapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator.adaptive());
             }
 
-            final wallet = walletSnapshot.data;
-            final currentBalance = wallet?.currentBalance ?? 0.0;
-            final totalAllocated = wallet?.totalAllocated ?? 0.0;
-            final totalPaid = wallet?.totalPaid ?? 0.0;
-            final isEnabled = wallet?.isWalletEnabled ?? false;
+            final viewer = authSnapshot.data?.fold((l) => null, (r) => r);
+            final isSuperAdmin = viewer?.role == UserRole.superAdmin;
+            final isAccountant = viewer?.role == UserRole.accountant;
+            final isFayez = viewer?.phoneNumber == '01001989360' ||
+                (viewer?.fullName.toLowerCase().contains('fayez') ?? false);
+            final isAuthorized = isSuperAdmin || isAccountant || isFayez;
 
-            if (wallet == null || (!isEnabled && !isReadOnlyView)) {
+            if (!isAuthorized) {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(32.0),
@@ -88,17 +99,18 @@ class UserWalletScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.lock_outline_rounded,
-                          size: 64, color: colorScheme.outline),
+                          size: 64, color: colorScheme.error),
                       const SizedBox(height: 16),
                       Text(
-                        'المحفظة غير مفعلة حالياً',
+                        'غير مصرح بعرض المحفظة',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: colorScheme.error,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'لم يتم تفعيل رصيد محفظة لحسابك من قبل الإدارة بعد.',
+                        'بيانات المحافظ والمستحقات سرية ومخصصة للإدارة العامة والمحاسب فقط.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: colorScheme.onSurfaceVariant,
@@ -111,23 +123,65 @@ class UserWalletScreen extends StatelessWidget {
               );
             }
 
-            return CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                // 1. Hero Balance Card
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                    child: _buildHeroBalanceCard(
-                      currentBalance: currentBalance,
-                      totalAllocated: totalAllocated,
-                      totalPaid: totalPaid,
-                      companyName: wallet.companyName,
-                      theme: theme,
-                      colorScheme: colorScheme,
+            return StreamBuilder<UserWalletModel?>(
+              stream: dataSource.streamUserWallet(targetUserId),
+              builder: (context, walletSnapshot) {
+                if (walletSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator.adaptive());
+                }
+
+                final wallet = walletSnapshot.data;
+                final currentBalance = wallet?.currentBalance ?? 0.0;
+                final totalPaid = wallet?.totalPaid ?? 0.0;
+                final isEnabled = wallet?.isWalletEnabled ?? false;
+
+                if (wallet == null || (!isEnabled && !isReadOnlyView)) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.lock_outline_rounded,
+                              size: 64, color: colorScheme.outline),
+                          const SizedBox(height: 16),
+                          Text(
+                            'المحفظة غير مفعلة حالياً',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'لم يتم تفعيل رصيد محفظة لحسابك من قبل الإدارة بعد.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                }
+
+                return CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    // 1. Hero Balance Card
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                        child: _buildHeroBalanceCard(
+                          currentBalance: currentBalance,
+                          totalPaid: totalPaid,
+                          companyName: wallet.companyName,
+                          theme: theme,
+                          colorScheme: colorScheme,
+                        ),
+                      ),
+                    ),
 
                 // 2. Transactions Header
                 SliverToBoxAdapter(
@@ -218,7 +272,9 @@ class UserWalletScreen extends StatelessWidget {
                     );
                   },
                 ),
-              ],
+                  ],
+                );
+              },
             );
           },
         ),
@@ -228,7 +284,6 @@ class UserWalletScreen extends StatelessWidget {
 
   Widget _buildHeroBalanceCard({
     required double currentBalance,
-    required double totalAllocated,
     required double totalPaid,
     required String companyName,
     required ThemeData theme,
@@ -331,7 +386,7 @@ class UserWalletScreen extends StatelessWidget {
 
           // Main Balance Value
           Text(
-            'رصيد مستحقاتك الحالي',
+            'الرصيد المستحق',
             style: TextStyle(
               color: colorScheme.onPrimary.withValues(alpha: 0.8),
               fontSize: 12,
@@ -351,59 +406,26 @@ class UserWalletScreen extends StatelessWidget {
           Divider(color: colorScheme.onPrimary.withValues(alpha: 0.25), height: 1),
           const SizedBox(height: 14),
 
-          // Bottom Metric Indicators
+          // Bottom Metric: إجمالي المنصرف فقط
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'إجمالي المخصص لك',
-                      style: TextStyle(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.75),
-                        fontSize: 10.5,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _formatCurrency(totalAllocated),
-                      style: TextStyle(
-                        color: colorScheme.onPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+              Icon(Icons.payments_outlined,
+                  size: 16, color: colorScheme.onPrimary.withValues(alpha: 0.85)),
+              const SizedBox(width: 8),
+              Text(
+                'إجمالي المنصرف:',
+                style: TextStyle(
+                  color: colorScheme.onPrimary.withValues(alpha: 0.85),
+                  fontSize: 12,
                 ),
               ),
-              Container(
-                height: 28,
-                width: 1,
-                color: colorScheme.onPrimary.withValues(alpha: 0.25),
-                margin: const EdgeInsets.symmetric(horizontal: 12),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'إجمالي المنصرف والمسدد',
-                      style: TextStyle(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.75),
-                        fontSize: 10.5,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _formatCurrency(totalPaid),
-                      style: TextStyle(
-                        color: colorScheme.onPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+              const Spacer(),
+              Text(
+                _formatCurrency(totalPaid),
+                style: TextStyle(
+                  color: colorScheme.onPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],

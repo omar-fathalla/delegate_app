@@ -8,16 +8,15 @@ import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_p
 import 'package:delegate_app/features/photo_permission/presentation/pages/supervisor_permissions_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/marketing_permissions_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/super_admin_permissions_report_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/super_admin_photos_and_permissions_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_payment_receipts_report_screen.dart';
-import 'dart:async';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_collections_screen.dart';
-import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
 import 'package:delegate_app/features/wallet/presentation/pages/super_admin_wallets_screen.dart';
-import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_branch_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_branches_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/create_admin_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_dashboard_screen.dart';
+import 'package:delegate_app/features/admin/presentation/pages/super_admin_hr_system_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/manage_admins_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/manage_marketing_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/anti_fraud_audit_screen.dart';
@@ -63,26 +62,9 @@ class AdminMainScreen extends StatefulWidget {
 class _AdminMainScreenState extends State<AdminMainScreen> {
   int _currentIndex = 0;
   late final List<Widget> _screens;
-  StreamSubscription? _walletSubscription;
-  bool _isWalletEnabled = false;
-
   @override
   void initState() {
     super.initState();
-    _walletSubscription = WalletRemoteDataSourceImpl()
-        .streamUserWallet(widget.delegate.uid)
-        .listen(
-      (w) {
-        if (mounted) {
-          setState(() {
-            _isWalletEnabled = w?.isWalletEnabled ?? false;
-          });
-        }
-      },
-      onError: (e) {
-        debugPrint('Wallet stream error: $e');
-      },
-    );
     final delegate = widget.delegate;
     if (isSuperAdmin) {
       _screens = [
@@ -202,7 +184,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
 
   @override
   void dispose() {
-    _walletSubscription?.cancel();
     super.dispose();
   }
 
@@ -262,7 +243,35 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
         );
         break;
+      case 'super_admin_hr_system':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SuperAdminHRSystemScreen(
+              delegate: widget.delegate,
+            ),
+          ),
+        );
+        break;
       case 'hr_system':
+        if (isSuperAdmin) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SuperAdminHRSystemScreen(
+                delegate: widget.delegate,
+              ),
+            ),
+          );
+          break;
+        }
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => HRAttendanceScreen(
+              hrDelegate: widget.delegate,
+              showAppBar: true,
+            ),
+          ),
+        );
+        break;
       case 'hr_attendance':
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -312,7 +321,27 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
         );
         break;
+      case 'super_admin_photos_and_permissions':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SuperAdminPhotosAndPermissionsScreen(
+              delegate: widget.delegate,
+            ),
+          ),
+        );
+        break;
       case 'field_photos':
+        if (isSuperAdmin) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SuperAdminPhotosAndPermissionsScreen(
+                delegate: widget.delegate,
+                initialTabIndex: 1,
+              ),
+            ),
+          );
+          break;
+        }
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => HRFieldPhotosScreen(
@@ -383,6 +412,17 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         );
         break;
       case 'permissions_report':
+        if (isSuperAdmin) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SuperAdminPhotosAndPermissionsScreen(
+                delegate: widget.delegate,
+                initialTabIndex: 2,
+              ),
+            ),
+          );
+          break;
+        }
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => BlocProvider(
@@ -410,18 +450,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => SuperAdminWalletsScreen(adminDelegate: widget.delegate),
-          ),
-        );
-        break;
-      case 'user_wallet':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => UserWalletScreen(
-              targetUserId: widget.delegate.uid,
-              targetUserName: widget.delegate.fullName.isNotEmpty
-                  ? widget.delegate.fullName
-                  : widget.delegate.firstName,
-            ),
           ),
         );
         break;
@@ -662,26 +690,34 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               icon: Icons.how_to_reg_rounded,
               title: 'طلبات اشتراك واعتماد المناديب',
             ),
-            buildPopupItem(
-              value: 'hr_attendance',
-              icon: Icons.co_present_rounded,
-              title: isArabic ? 'سجل الحضور والانصراف' : 'Attendance & Departure',
-            ),
-            buildPopupItem(
-              value: 'delegate_tracking',
-              icon: Icons.radar_rounded,
-              title: 'Live Tracking',
-            ),
-            buildPopupItem(
-              value: 'leaves_and_excuses',
-              customIcon: buildBadgeIcon(Icons.event_note_rounded, 'leave_requests'),
-              title: 'طلبات الإجازات والأعذار',
-            ),
-            buildPopupItem(
-              value: 'monthly_payroll',
-              icon: Icons.account_balance_wallet_rounded,
-              title: 'مسير الرواتب والعمولات',
-            ),
+            if (isSuperAdmin) ...[
+              buildPopupItem(
+                value: 'super_admin_hr_system',
+                customIcon: buildBadgeIcon(Icons.badge_rounded, 'leave_requests'),
+                title: isArabic ? 'نظام HR (HR System)' : 'HR System',
+              ),
+            ] else ...[
+              buildPopupItem(
+                value: 'hr_attendance',
+                icon: Icons.co_present_rounded,
+                title: isArabic ? 'سجل الحضور والانصراف' : 'Attendance & Departure',
+              ),
+              buildPopupItem(
+                value: 'delegate_tracking',
+                icon: Icons.radar_rounded,
+                title: 'Live Tracking',
+              ),
+              buildPopupItem(
+                value: 'leaves_and_excuses',
+                customIcon: buildBadgeIcon(Icons.event_note_rounded, 'leave_requests'),
+                title: 'طلبات الإجازات والأعذار',
+              ),
+              buildPopupItem(
+                value: 'monthly_payroll',
+                icon: Icons.account_balance_wallet_rounded,
+                title: 'مسير الرواتب والعمولات',
+              ),
+            ],
             buildPopupItem(
               value: 'device_unbind_requests',
               customIcon: buildBadgeIcon(Icons.phonelink_lock_rounded, 'device_unbind_requests'),
@@ -692,16 +728,26 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               icon: Icons.security_rounded,
               title: 'تدقيق الأمان ومكافحة الاحتيال',
             ),
-            buildPopupItem(
-              value: 'field_photos',
-              icon: Icons.photo_library_rounded,
-              title: 'الصور والزيارات الميدانية',
-            ),
-            buildPopupItem(
-              value: 'attendance_adjustments',
-              icon: Icons.history_edu_rounded,
-              title: isArabic ? 'سجل تعديلات الحضور والانصراف' : 'Attendance Adjustments Log',
-            ),
+            if (isSuperAdmin) ...[
+              buildPopupItem(
+                value: 'super_admin_photos_and_permissions',
+                icon: Icons.photo_library_rounded,
+                title: 'الصور وأذونات التصوير',
+              ),
+            ] else ...[
+              buildPopupItem(
+                value: 'field_photos',
+                icon: Icons.photo_library_rounded,
+                title: 'الصور والزيارات الميدانية',
+              ),
+            ],
+            if (!isSuperAdmin) ...[
+              buildPopupItem(
+                value: 'attendance_adjustments',
+                icon: Icons.history_edu_rounded,
+                title: isArabic ? 'سجل تعديلات الحضور والانصراف' : 'Attendance Adjustments Log',
+              ),
+            ],
           ],
           if (isSuperAdmin || isTechnicalSupport) ...[
             buildPopupItem(
@@ -750,12 +796,14 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 title: 'إرسال إشعار جديد',
               ),
             ],
-            if (delegate.role != UserRole.technicalSupport) ...[
+            if (delegate.role != UserRole.technicalSupport && !isSuperAdmin) ...[
               buildPopupItem(
                 value: 'permissions_report',
                 icon: Icons.analytics_rounded,
                 title: 'تقرير أذونات التصوير',
               ),
+            ],
+            if (delegate.role != UserRole.technicalSupport) ...[
               buildPopupItem(
                 value: 'receipts_report',
                 icon: Icons.receipt_long_rounded,
@@ -787,15 +835,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             ),
           ],
 
-          // نظام الغرامات في القائمة للأدوار التي لا تملكه كتبويب سفلي مباشر
-          if (!isOrganizationAdmin && !isSuperAdmin && !isBranchesMarketingManager) ...[
-            buildPopupItem(
-              value: 'penalties_management',
-              icon: Icons.gavel_rounded,
-              title: 'نظام الغرامات والمخالفات',
-            ),
-          ],
-
           // لائحة الغرامات والجزاءات الرسمية
           buildPopupItem(
             value: 'penalty_rules_catalog',
@@ -803,11 +842,13 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             title: isArabic ? 'لائحة الغرامات والجزاءات' : 'Penalty Rules Catalog',
           ),
 
-          if (_isWalletEnabled) ...[
+          // نظام الغرامات في القائمة للأدوار التي لا تملكه كتبويب سفلي مباشر (في أسفل القائمة فوق الإعدادات)
+          if (!isOrganizationAdmin && !isSuperAdmin && !isBranchesMarketingManager) ...[
             buildPopupItem(
-              value: 'user_wallet',
-              icon: Icons.account_balance_wallet_rounded,
-              title: 'المحفظة والمستحقات',
+              value: 'penalties_management',
+              icon: Icons.gavel_rounded,
+              title: 'نظام الغرامات والمخالفات',
+              color: Theme.of(context).colorScheme.error,
             ),
           ],
 

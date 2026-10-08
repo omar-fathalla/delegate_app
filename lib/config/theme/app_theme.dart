@@ -85,6 +85,12 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 2,
         centerTitle: false,
+        titleTextStyle: baseTextTheme.titleMedium?.copyWith(
+          color: colorScheme.onSurface,
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+          letterSpacing: -0.2,
+        ),
         shape: Border(
           bottom: BorderSide(
             color: colorScheme.outlineVariant.withValues(alpha: 0.35),

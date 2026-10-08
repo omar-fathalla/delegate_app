@@ -13,7 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
@@ -564,6 +564,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     foregroundColor: colorScheme.onSurface,
                   ),
                   iconSize: 22,
+                  tooltip: isArabic ? 'الشهر السابق' : 'Previous month',
                   onPressed: () {
                     setState(() {
                       _selectedMonth = DateTime(
@@ -573,7 +574,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       _recomputeFilteredHistory();
                     });
                   },
-                  icon: const Icon(Icons.chevron_left_rounded),
+                  icon: const Icon(
+                    Icons.chevron_right_rounded,
+                    textDirection: TextDirection.ltr,
+                  ),
                 ),
                 Expanded(
                   child: Column(
@@ -628,6 +632,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     foregroundColor: colorScheme.onSurface,
                   ),
                   iconSize: 22,
+                  tooltip: isArabic ? 'الشهر التالي' : 'Next month',
                   onPressed: () {
                     setState(() {
                       _selectedMonth = DateTime(
@@ -637,7 +642,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       _recomputeFilteredHistory();
                     });
                   },
-                  icon: const Icon(Icons.chevron_right_rounded),
+                  icon: const Icon(
+                    Icons.chevron_left_rounded,
+                    textDirection: TextDirection.ltr,
+                  ),
                 ),
               ],
             ),

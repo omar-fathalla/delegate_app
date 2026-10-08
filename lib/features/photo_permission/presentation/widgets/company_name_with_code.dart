@@ -7,6 +7,8 @@ class CompanyNameWithCode extends StatelessWidget {
   final String companyName;
   final int? companyCode;
   final TextStyle? style;
+  final TextStyle? codeStyle;
+  final bool twoLines;
 
   const CompanyNameWithCode({
     super.key,
@@ -15,11 +17,46 @@ class CompanyNameWithCode extends StatelessWidget {
     required this.companyName,
     this.companyCode,
     this.style,
+    this.codeStyle,
+    this.twoLines = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final effectiveCodeStyle = codeStyle ??
+        TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
+        );
+
+    Widget buildTwoLines(String? code) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            companyName,
+            style: style ?? theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (code != null && code.isNotEmpty && code != '0') ...[
+            const SizedBox(height: 2),
+            Text(
+              'كود: $code',
+              style: effectiveCodeStyle,
+            ),
+          ],
+        ],
+      );
+    }
+
     if (companyCode != null && companyCode != 0) {
+      if (twoLines) {
+        return buildTwoLines(companyCode.toString());
+      }
       return Text(
         '$companyName - كود: $companyCode',
         style: style,
@@ -64,9 +101,13 @@ class CompanyNameWithCode extends StatelessWidget {
     return FutureBuilder<String?>(
       future: fetchCompanyCode(),
       builder: (context, snapshot) {
+        final code = snapshot.data;
+        if (twoLines) {
+          return buildTwoLines(code);
+        }
         String display = companyName;
-        if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty) {
-          display = '$companyName - كود: ${snapshot.data}';
+        if (code != null && code.isNotEmpty && code != '0') {
+          display = '$companyName - كود: $code';
         }
         return Text(
           display,

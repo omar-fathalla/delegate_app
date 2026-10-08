@@ -1502,9 +1502,14 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
       child: Scaffold(
         appBar: AppBar(
           centerTitle: false,
+          titleSpacing: 0,
           title: const Text(
             'Collections & Invoices',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14.5,
+              letterSpacing: -0.2,
+            ),
           ),
           actions: [
             IconButton(
@@ -2918,62 +2923,67 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: isCurrentPeriod ? colorScheme.primaryContainer : colorScheme.surfaceContainerHighest,
-                      foregroundColor: isCurrentPeriod ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
-                      child: Text('$index', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                    ),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          entryTitle,
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.onSurface),
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            if (periodBadge.isNotEmpty) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                decoration: BoxDecoration(
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: isCurrentPeriod ? colorScheme.primaryContainer : colorScheme.surfaceContainerHighest,
+                  foregroundColor: isCurrentPeriod ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+                  child: Text('$index', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entryTitle,
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.onSurface),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          if (periodBadge.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: isCurrentPeriod
+                                    ? colorScheme.primaryContainer
+                                    : colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
                                   color: isCurrentPeriod
-                                      ? colorScheme.primaryContainer
-                                      : colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: isCurrentPeriod
-                                        ? colorScheme.primary.withValues(alpha: 0.4)
-                                        : colorScheme.outlineVariant.withValues(alpha: 0.4),
-                                  ),
-                                ),
-                                child: Text(
-                                  periodBadge,
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: isCurrentPeriod ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                                  ),
+                                      ? colorScheme.primary.withValues(alpha: 0.4)
+                                      : colorScheme.outlineVariant.withValues(alpha: 0.4),
                                 ),
                               ),
-                              const SizedBox(width: 5),
-                            ],
-                            Text(
+                              child: Text(
+                                periodBadge,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: isCurrentPeriod ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                          ],
+                          Flexible(
+                            child: Text(
                               dateStr,
                               style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   _formatCurrency(amount),
                   style: TextStyle(
@@ -3088,12 +3098,18 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
                 ),
                 if (createdBy.isNotEmpty) ...[
                   const SizedBox(width: 6),
-                  Chip(
-                    label: Text(createdBy),
-                    avatar: const Icon(Icons.person_outline_rounded, size: 12),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    labelStyle: const TextStyle(fontSize: 10),
+                  Flexible(
+                    child: Chip(
+                      label: Text(
+                        createdBy,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      avatar: const Icon(Icons.person_outline_rounded, size: 12),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      labelStyle: const TextStyle(fontSize: 10),
+                    ),
                   ),
                 ],
                 const Spacer(),

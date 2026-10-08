@@ -4,6 +4,7 @@ enum SubscriptionPaymentMethod {
   companyDeduction,
   instaPay,
   branchReceipt,
+  freePromotion,
 }
 
 extension SubscriptionPaymentMethodX on SubscriptionPaymentMethod {
@@ -15,6 +16,8 @@ extension SubscriptionPaymentMethodX on SubscriptionPaymentMethod {
         return 'تحويل عبر انستاباي (InstaPay)';
       case SubscriptionPaymentMethod.branchReceipt:
         return 'إيصال إلكتروني من تسويق الفرع';
+      case SubscriptionPaymentMethod.freePromotion:
+        return 'عرض ترويجي مجاني (حتى 31/12)';
     }
   }
 
@@ -26,6 +29,8 @@ extension SubscriptionPaymentMethodX on SubscriptionPaymentMethod {
         return 'انستاباي';
       case SubscriptionPaymentMethod.branchReceipt:
         return 'إيصال إلكتروني';
+      case SubscriptionPaymentMethod.freePromotion:
+        return 'عرض مجاني';
     }
   }
 }
@@ -126,6 +131,7 @@ class DelegateSubscriptionRequest extends Equatable {
         SubscriptionPaymentMethod.companyDeduction => 'company_deduction',
         SubscriptionPaymentMethod.instaPay => 'instapay',
         SubscriptionPaymentMethod.branchReceipt => 'branch_receipt',
+        SubscriptionPaymentMethod.freePromotion => 'free_promotion',
       },
       'receiptCode': receiptCode,
       'receiptImageUrl': receiptImageUrl,
@@ -149,6 +155,7 @@ class DelegateSubscriptionRequest extends Equatable {
     SubscriptionPaymentMethod parsePaymentMethod(dynamic val) {
       if (val == 'company_deduction') return SubscriptionPaymentMethod.companyDeduction;
       if (val == 'instapay' || val == 'insta_pay') return SubscriptionPaymentMethod.instaPay;
+      if (val == 'free_promotion' || val == 'free') return SubscriptionPaymentMethod.freePromotion;
       return SubscriptionPaymentMethod.branchReceipt;
     }
 

@@ -134,7 +134,8 @@ class NotificationsPage extends StatelessWidget {
             AppLocalizations.of(context)!.notifications,
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 20,
+              fontSize: 15,
+              letterSpacing: -0.2,
               color: colorScheme.onSurface,
             ),
           ),

@@ -7,7 +7,6 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_subscription_financial_report_screen.dart';
 import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
 import 'package:delegate_app/features/wallet/data/models/user_wallet_model.dart';
-import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
@@ -26,8 +25,6 @@ class AccountantMainScreen extends StatefulWidget {
 class _AccountantMainScreenState extends State<AccountantMainScreen> {
   int _currentIndex = 0;
   final Set<int> _loadedTabs = {0};
-  StreamSubscription? _walletSubscription;
-  bool _isWalletEnabled = false;
 
   void _onTabSelected(int index) {
     setState(() {
@@ -39,20 +36,10 @@ class _AccountantMainScreenState extends State<AccountantMainScreen> {
   @override
   void initState() {
     super.initState();
-    _walletSubscription = WalletRemoteDataSourceImpl()
-        .streamUserWallet(widget.delegate.uid)
-        .listen((w) {
-      if (mounted) {
-        setState(() {
-          _isWalletEnabled = w?.isWalletEnabled ?? false;
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
-    _walletSubscription?.cancel();
     super.dispose();
   }
 
@@ -63,17 +50,6 @@ class _AccountantMainScreenState extends State<AccountantMainScreen> {
       case 'profile':
         context.push('/user-profile', extra: delegate);
         break;
-      case 'user_wallet':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => UserWalletScreen(
-              targetUserId: delegate.uid,
-              targetUserName: delegate.fullName.isNotEmpty
-                  ? delegate.fullName
-                  : delegate.firstName,
-            ),
-          ),
-        );
       case 'logout':
         _showLogoutDialog(context);
         break;
@@ -117,17 +93,6 @@ class _AccountantMainScreenState extends State<AccountantMainScreen> {
               ],
             ),
           ),
-          if (_isWalletEnabled)
-            PopupMenuItem(
-              value: 'user_wallet',
-              child: Row(
-                children: [
-                  Icon(Icons.wallet_rounded, color: colorScheme.primary, size: 20),
-                  const SizedBox(width: 12),
-                  const Text('محفظتي الشخصية'),
-                ],
-              ),
-            ),
           PopupMenuItem(
             value: 'logout',
             child: Row(

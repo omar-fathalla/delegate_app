@@ -1909,20 +1909,30 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               width: 0.8,
             ),
           ),
+          titleSpacing: 0,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 isArabic ? 'سجل الأمان وكشف التزييف' : 'Security & Anti-Fraud Logs',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14.5,
+                  letterSpacing: -0.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               if (widget.delegate.companyName.isNotEmpty)
                 Text(
                   widget.delegate.companyName,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: colorScheme.onSurfaceVariant,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
             ],
           ),

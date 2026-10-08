@@ -271,5 +271,34 @@ void main() {
         const PhotoPermissionError(message: 'Failed to update dates'),
       ],
     );
+
+    blocTest<PhotoPermissionBloc, PhotoPermissionState>(
+      'should emit [PhotoPermissionLoading, CapturedPhotosLoaded] when LoadCompanyCapturedPhotosRequested succeeds with branchName and limit',
+      build: () {
+        when(() => mockGetCompanyCapturedPhotos(any()))
+            .thenAnswer((_) async => const Right([]));
+        return bloc;
+      },
+      act: (bloc) => bloc.add(
+        const LoadCompanyCapturedPhotosRequested(
+          companyUID: 'comp123',
+          branchName: 'Gardenia',
+          limit: 20,
+        ),
+      ),
+      expect: () => [
+        PhotoPermissionLoading(),
+        const CapturedPhotosLoaded(photos: []),
+      ],
+      verify: (_) {
+        verify(() => mockGetCompanyCapturedPhotos(
+          const GetCompanyCapturedPhotosParams(
+            companyUID: 'comp123',
+            branchName: 'Gardenia',
+            limit: 20,
+          ),
+        )).called(1);
+      },
+    );
   });
 }

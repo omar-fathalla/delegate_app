@@ -1,7 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/private_label/domain/entities/private_label_permissions.dart';
+import 'package:delegate_app/features/private_label/data/datasources/private_label_permissions_remote_data_source.dart';
+import 'package:delegate_app/features/private_label/presentation/pages/private_label_screen.dart';
+import 'package:delegate_app/features/private_label/presentation/pages/private_label_review_screen.dart';
+import 'package:delegate_app/features/private_label/presentation/pages/private_label_report_screen.dart';
+import 'package:delegate_app/injection_container.dart';
 
 /// الشاشة الرئيسية الترحيبية لمسؤول تسويق العروض الترويجية (Marketing Promotion Home)
 /// تعرض الترحيب بالاسم، ودليل المهام والمسؤوليات، ولوحة المؤشرات المفلترة بالأقسام المثبتة، والإرشادات التشغيلية
@@ -21,11 +28,35 @@ class MarketingPromotionHomeScreen extends StatefulWidget {
 
 class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScreen> {
   Set<String> _pinnedDepartments = {};
+  StreamSubscription<PrivateLabelPermissions?>? _permissionsSubscription;
+  PrivateLabelPermissions? _permissions;
+
+  bool get _isSuperAdmin => widget.delegate.role == UserRole.superAdmin;
+  bool get _canCapture => _isSuperAdmin || (_permissions?.canCapture ?? false);
+  bool get _canViewReports => _isSuperAdmin || (_permissions?.canViewReports ?? false);
+  bool get _canReviewAudit => _isSuperAdmin || (_permissions?.canReviewAudit ?? false);
 
   @override
   void initState() {
     super.initState();
     _loadPinnedDepartments();
+    _listenToPermissions();
+  }
+
+  void _listenToPermissions() {
+    _permissionsSubscription = sl<PrivateLabelPermissionsRemoteDataSource>()
+        .streamUserPermissions(widget.delegate.uid)
+        .listen((p) {
+      if (mounted) {
+        setState(() => _permissions = p);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _permissionsSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadPinnedDepartments() async {
@@ -61,7 +92,25 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
             // 1. الكارت الترحيبي والتعريفي الرئيسي مع دليل المهام والمسؤوليات
             _buildWelcomeDutiesBanner(context, colorScheme, isArabic),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // 1.1 مدخل تدقيق البرايفت ليبل
+            if (_canReviewAudit) ...[
+              _buildPrivateLabelAuditEntry(context, colorScheme),
+              const SizedBox(height: 10),
+            ],
+
+            // 1.2 مدخل تقارير البرايفت ليبل (نسب الإنجاز الشهرية للفروع والمسوقين)
+            if (_canViewReports) ...[
+              _buildPrivateLabelReportEntry(context, colorScheme),
+              const SizedBox(height: 10),
+            ],
+
+            // 1.3 مدخل التوثيق الميداني للبرايفت ليبل (تصوير المنتجات وبطاقات الأسعار)
+            if (_canCapture) ...[
+              _buildPrivateLabelCaptureEntry(context, colorScheme),
+              const SizedBox(height: 10),
+            ],
 
             // 2. النبض اللحظي والمؤشرات (طلبات الانتظار والأذونات السارية)
             Row(
@@ -118,6 +167,183 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
             // 4. دليل الإرشادات والتعليمات وسير العمل الميداني
             _buildWorkGuidanceCard(context, colorScheme, isArabic),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// مدخل شاشة تدقيق البرايفت ليبل (صور المنتج + بطاقة السعر من الفروع)
+  Widget _buildPrivateLabelAuditEntry(BuildContext context, ColorScheme colorScheme) {
+    final theme = Theme.of(context);
+    return Material(
+      color: colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PrivateLabelReviewScreen(delegate: widget.delegate),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.fact_check_rounded, color: colorScheme.onPrimaryContainer),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Private Label Audit',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'مراجعة صور المنتجات وبطاقات الأسعار من الفروع وفلترة مخالفات الأسعار',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// مدخل شاشة تقارير البرايفت ليبل (نسب الإنجاز الشهرية وترتيب الفروع والمسوقين)
+  Widget _buildPrivateLabelReportEntry(BuildContext context, ColorScheme colorScheme) {
+    final theme = Theme.of(context);
+    return Material(
+      color: colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PrivateLabelReportScreen(delegate: widget.delegate),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.analytics_rounded, color: colorScheme.onSecondaryContainer),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Private Label Report',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'مؤشرات ونسب إنجاز الفروع والمسوقين وترتيب الأداء الشهري',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// مدخل شاشة التوثيق الميداني للبرايفت ليبل (تصوير المنتجات وبطاقات الأسعار)
+  Widget _buildPrivateLabelCaptureEntry(BuildContext context, ColorScheme colorScheme) {
+    final theme = Theme.of(context);
+    return Material(
+      color: colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PrivateLabelScreen(delegate: widget.delegate),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: colorScheme.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.camera_alt_rounded, color: colorScheme.onTertiaryContainer),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Private Label Capture',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'التوثيق الميداني اليومي للمنتجات وبطاقات الأسعار في الفروع',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );

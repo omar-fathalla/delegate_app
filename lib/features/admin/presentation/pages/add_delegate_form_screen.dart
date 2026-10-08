@@ -61,6 +61,9 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
   @override
   void initState() {
     super.initState();
+    if (SubscriptionCycleHelper.isFreePromotionActive()) {
+      _paymentMethod = SubscriptionPaymentMethod.freePromotion;
+    }
     _fetchOrganizations();
   }
 
@@ -282,7 +285,8 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
       receiptCode: _paymentMethod == SubscriptionPaymentMethod.branchReceipt
           ? _receiptCodeController.text.trim()
           : null,
-      receiptImage: _paymentMethod != SubscriptionPaymentMethod.companyDeduction
+      receiptImage: (_paymentMethod == SubscriptionPaymentMethod.branchReceipt ||
+              _paymentMethod == SubscriptionPaymentMethod.instaPay)
           ? _receiptImage
           : null,
     );
@@ -295,9 +299,12 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
         AppSnackBar.showError(context, failure.message);
       },
       (requestId) async {
+        final isFree = _paymentMethod == SubscriptionPaymentMethod.freePromotion;
         AppSnackBar.showSuccess(
           context,
-          'تم إرسال طلب تسجيل واشتراك المندوب بنجاح! بانتظار اعتماد الدعم الفني.',
+          isFree
+              ? 'تم إرسال طلب تسجيل المندوب بنجاح (مجاناً ضمن العرض الترويجي)! بانتظار اعتماد الإدارة.'
+              : 'تم إرسال طلب تسجيل واشتراك المندوب بنجاح! بانتظار اعتماد الدعم الفني.',
         );
 
         final goToApprovals = await showDialog<bool>(
@@ -354,9 +361,14 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: const Text(
           'إضافة مندوب لمنظمة جديدة',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14.5,
+            letterSpacing: -0.2,
+          ),
         ),
         centerTitle: true,
         elevation: 0,
@@ -393,11 +405,17 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
 
                       // 5. Payment Method & Subscription
                       _buildSectionHeader(
-                        'طريقة دفع الاشتراك (${SubscriptionCycleHelper.getRemainingMonthsInCycle()} أشهر - ${SubscriptionCycleHelper.getProratedSubscriptionFee().toInt()} ج.م)',
-                        Icons.payments_rounded,
+                        SubscriptionCycleHelper.isFreePromotionActive()
+                            ? 'الاشتراك والربط (مجاناً حتى 31/12)'
+                            : 'طريقة دفع الاشتراك (${SubscriptionCycleHelper.getRemainingMonthsInCycle()} أشهر - ${SubscriptionCycleHelper.getProratedSubscriptionFee().toInt()} ج.م)',
+                        SubscriptionCycleHelper.isFreePromotionActive()
+                            ? Icons.card_giftcard_rounded
+                            : Icons.payments_rounded,
                       ),
                       const SizedBox(height: 8),
-                      _buildPaymentCard(colorScheme),
+                      SubscriptionCycleHelper.isFreePromotionActive()
+                          ? _buildFreePromotionCard(colorScheme)
+                          : _buildPaymentCard(colorScheme),
                       const SizedBox(height: 24),
 
                       // 6. Submit Button
@@ -426,7 +444,9 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                           label: Text(
                             _isSubmitting
                                 ? 'جاري رفع البيانات وإرسال الطلب...'
-                                : 'إرسال طلب التسجيل',
+                                : (SubscriptionCycleHelper.isFreePromotionActive()
+                                    ? 'إرسال طلب التسجيل (مجاناً)'
+                                    : 'إرسال طلب التسجيل'),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -445,39 +465,60 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
   }
 
   Widget _buildCycleBanner(ColorScheme colorScheme) {
+    final isFree = SubscriptionCycleHelper.isFreePromotionActive();
     final cycleTitle = SubscriptionCycleHelper.getCycleTitleArabic();
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+        color: isFree
+            ? const Color(0xFFDCFCE7).withValues(alpha: 0.6)
+            : colorScheme.primaryContainer.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.25)),
+        border: Border.all(
+          color: isFree
+              ? const Color(0xFF86EFAC)
+              : colorScheme.primary.withValues(alpha: 0.25),
+        ),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: colorScheme.primary,
+              color: isFree ? const Color(0xFF16A34A) : colorScheme.primary,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.date_range_rounded, color: colorScheme.onPrimary, size: 20),
+            child: Icon(
+              isFree ? Icons.celebration_rounded : Icons.date_range_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'دورة الاشتراك النصف سنوية المطبقة',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                Text(
+                  isFree
+                      ? 'عرض ترويجي مجاني ممتد لنهاية العام 🎉'
+                      : 'دورة الاشتراك النصف سنوية المطبقة',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: isFree ? const Color(0xFF14532D) : colorScheme.onSurface,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  cycleTitle,
+                  isFree
+                      ? 'الخدمة مجانية بالكامل لجميع السلاسل والمنظمات حتى 31 ديسمبر 2026'
+                      : cycleTitle,
                   style: TextStyle(
                     fontSize: 11.5,
-                    color: colorScheme.onSurfaceVariant,
+                    color: isFree
+                        ? const Color(0xFF15803D)
+                        : colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -755,6 +796,287 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
             icon: const Icon(Icons.add_photo_alternate_rounded, size: 16),
             label: const Text('اختيار', style: TextStyle(fontSize: 12)),
           ),
+      ],
+    );
+  }
+
+  /// كارت العرض الترويجي المجاني (حتى 31/12) بمواصفات Material Design 3
+  Widget _buildFreePromotionCard(ColorScheme colorScheme) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark
+            ? colorScheme.surfaceContainerLow
+            : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark
+              ? const Color(0xFF16A34A).withValues(alpha: 0.4)
+              : const Color(0xFF86EFAC),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF16A34A).withValues(alpha: isDark ? 0.05 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Row: Badges
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF166534).withValues(alpha: 0.4)
+                      : const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF16A34A) : const Color(0xFF86EFAC),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.celebration_rounded,
+                      size: 15,
+                      color: Color(0xFF16A34A),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'عرض خاص حتى 31 ديسمبر 2026',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      'مجاناً 0 ج.م',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Main Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF166534).withValues(alpha: 0.4)
+                      : const Color(0xFFDCFCE7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.card_giftcard_rounded,
+                  color: Color(0xFF16A34A),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'اشتراك ومتابعة مجاناً بالكامل حتى 31/12',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? colorScheme.onSurface : const Color(0xFF14532D),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Clarifying Announcement Message Box (User exact words)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? colorScheme.surfaceContainer
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark
+                    ? colorScheme.outlineVariant
+                    : const Color(0xFFBBF7D0),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: Color(0xFF16A34A),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'يمكنك الآن إضافة المناديب للسلاسل والمنظمات الأخرى ومتابعة حضورهم وانصرافهم ورفع التصوير مجاناً بالكامل حتى 31/12 بدون أي رسوم اشتراك.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? colorScheme.onSurface : const Color(0xFF1F2937),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Benefit Checkpoints
+          _buildPromotionBenefitItem(
+            colorScheme,
+            icon: Icons.storefront_rounded,
+            title: 'إضافة غير محدودة لكافة السلاسل الشريكة',
+            subtitle: 'سجل مناديبك في زهران ماركت، جملة ماركت، كارفور، وبيت الجملة.',
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+          _buildPromotionBenefitItem(
+            colorScheme,
+            icon: Icons.access_time_filled_rounded,
+            title: 'متابعة لحظية للحضور والانصراف',
+            subtitle: 'تقارير ميدانية موحدة لضبط التواجد والالتزام بساعات العمل.',
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+          _buildPromotionBenefitItem(
+            colorScheme,
+            icon: Icons.camera_alt_rounded,
+            title: 'رفع تقارير وأذونات التصوير الميداني',
+            subtitle: 'إدارة وتفعيل أذونات التصوير الشهرية ومراجعة معروضات المندوب.',
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+          _buildPromotionBenefitItem(
+            colorScheme,
+            icon: Icons.money_off_rounded,
+            title: 'بدون أي إجراء مالي أو إيصالات',
+            subtitle: 'لا يلزم سداد أي مبالغ أو إرفاق إيصالات دفع خلال فترة العرض.',
+            isDark: isDark,
+          ),
+          const SizedBox(height: 12),
+
+          // Reassurance Note
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? colorScheme.surfaceContainerHigh
+                  : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.verified_user_rounded,
+                  size: 16,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'سيتم اعتماد وتفعيل حساب المندوب فور مراجعة المستندات من الدعم الفني.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPromotionBenefitItem(
+    ColorScheme colorScheme, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isDark,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF166534).withValues(alpha: 0.3)
+                : const Color(0xFFDCFCE7),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Icon(icon, size: 15, color: const Color(0xFF16A34A)),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? colorScheme.onSurface : const Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

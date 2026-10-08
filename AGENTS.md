@@ -11,7 +11,10 @@
 
 ## Header & App Bar Popup Menu Ordering (Across all 9 User Roles)
 - In all App Bars / Header Menus / `PopupMenuButton`s across all user roles (Delegate, Promoter, Supervisor, Admin, Super Admin, Organization Admin, Technical Support, Marketing, Branches Marketing Manager):
-  - The **Profile (`profile`)** and role-specific feature options (e.g. Search, Tasks, Penalties, Admin tools, Org Switch) must always appear at the top.
+  - The **Profile (`profile`)** and role-specific feature options (e.g. Search, Tasks, Private Label, Admin tools, Org Switch, Wallet) must always appear at the top.
+  - Whenever **المخالفات والغرامات (`penalties` / `penalties_management`)** is present:
+    - If **تسجيل الخروج (`logout`)** is present: **المخالفات والغرامات** MUST be placed directly and immediately above **تسجيل الخروج** (so the two red-accented operational items sit seamlessly together without any other options between them).
+    - If **تسجيل الخروج (`logout`)** is NOT present: **المخالفات والغرامات** MUST be placed as the last option right above the divider and Settings (`settings`).
   - The **Settings (`settings` / الإعدادات)** option **MUST ALWAYS BE THE LAST / BOTTOM-MOST item in the menu**, even when new items or options are added in the future.
 
 ## Firebase Storage & Security Rules (Feedback & Uploads Across All 9 User Roles)
@@ -91,6 +94,20 @@
     5. **Connected Action Button Group**: Action buttons (e.g. Close / Save / Edit / Cancel) must NEVER be plain detached buttons. They must use a unified, connected dual-button group container (`height: 48`, `borderRadius: 24`, outline border, vertical divider).
 - **Responsive Multiplatform Adaptation**:
   - On Desktop/Web viewports (`maxWidth > 768px`), the exact same component adapts into a centered Material 3 `Dialog` (max width `520px` - `560px`, `borderRadius: 24px`).
+
+## Enterprise Mobile & Web UI/UX Standards: Connected Groups, Card Contrast, & Input Refinements
+- **Connected Button Groups (Full-Width on Mobile)**:
+  - On mobile viewports (`maxWidth <= 768px`), view-mode switcher or toggle button groups (`TashilConnectedButtonGroup`) MUST span the entire screen width (`width: double.infinity`).
+  - Items must be equally distributed (`Expanded`), with height `46-48px`, and generous internal padding (`horizontal: 14-16px`) so icons and labels never crowd each other.
+- **Card Contrast & Curvature Consistency (حظر تطابق لون الكروت مع الخلفية وحظر بروز الحدود الحادة)**:
+  - Cards MUST NEVER share the exact identical background color as the scaffold (`cs.surface` on `cs.surface` is forbidden).
+  - Cards must use `colorScheme.surfaceContainerLow` (or soft mauve tint derived from `colorScheme.primaryContainer`) against `colorScheme.surface` scaffold background to establish clear visual depth and avoid eye fatigue ("تشوش وتضارب في العين").
+  - Any start status border line (e.g. 3.5px line) MUST be clipped via `clipBehavior: Clip.antiAlias` on the card container so it seamlessly conforms to the card's 16px corner curvature.
+  - Zero/uninitiated activity (`0%`) must use NEUTRAL styling (`colorScheme.outlineVariant` or `colorScheme.onSurfaceVariant`), NEVER harsh red. Red is strictly reserved for critical violations.
+- **Search Fields & Dropdown Trigger Specifications**:
+  - **Search Inputs**: Must have standard non-bold typography (`fontSize: 13-14sp`, `fontWeight: FontWeight.normal`), subtle opacity for placeholder text, height `44px`, and corner radius `14px`. Never use large bold placeholder text.
+  - **Dropdown Triggers**: Height `44px`, corner radius `14px`, background `colorScheme.surfaceContainerLow`, outline border `colorScheme.outlineVariant`. In RTL: leading Google icon on the right, label in the center (`Expanded`), and `Icons.expand_more_rounded` on the far left.
+  - **No Unicode Emojis or Non-Material Symbols**: Never embed unicode symbols like `⬇`, `⬆`, or custom glyphs in labels; use official Google Material rounded icons (`Icons.*_rounded`) exclusively.
 
 
 

@@ -224,16 +224,26 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
             width: 1,
           ),
         ),
+        titleSpacing: 0,
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'لائحة الغرامات المعتمدة',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14.5,
+                letterSpacing: -0.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               'دليل بنود المخالفات والجزاءات المالية الرسمية',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

@@ -103,6 +103,8 @@ abstract class PhotoPermissionRemoteDataSource {
   Future<List<CapturedPhotoModel>> getCompanyCapturedPhotos({
     required String companyUID,
     String? organizationUID,
+    String? branchName,
+    int? limit,
   });
 
   Future<void> deleteCapturedPhoto({
@@ -526,6 +528,8 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
   Future<List<CapturedPhotoModel>> getCompanyCapturedPhotos({
     required String companyUID,
     String? organizationUID,
+    String? branchName,
+    int? limit,
   }) async {
     try {
       await _ensureAuth();
@@ -533,6 +537,12 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         Query query = firestore.collectionGroup('captured_photos');
         if (companyUID.isNotEmpty) {
           query = query.where('companyUID', isEqualTo: companyUID);
+        }
+        if (branchName != null && branchName.trim().isNotEmpty && branchName != 'all') {
+          query = query.where('branchName', isEqualTo: branchName.trim());
+        }
+        if (limit != null && limit > 0) {
+          query = query.limit(limit);
         }
         final snapshot = await query.getResilient();
 
@@ -545,18 +555,25 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       } on FirebaseException catch (e) {
         if (e.code == 'failed-precondition') {
           debugPrint(
-            'Company captured photos index missing/building, fetching collectionGroup and filtering locally in Dart',
+            'Company captured photos index missing/building, fetching collectionGroup with limit and filtering locally in Dart',
           );
-          final snapshot =
-              await firestore.collectionGroup('captured_photos').get();
+          Query fallbackQuery = firestore.collectionGroup('captured_photos');
+          if (limit != null && limit > 0) {
+            fallbackQuery = fallbackQuery.limit(limit * 3);
+          }
+          final snapshot = await fallbackQuery.get();
           final docs = snapshot.docs
               .map((doc) => CapturedPhotoModel.fromFirestore(doc))
               .where(
                 (photo) =>
-                    companyUID.isEmpty || photo.companyUID == companyUID,
+                    (companyUID.isEmpty || photo.companyUID == companyUID) &&
+                    (branchName == null || branchName.isEmpty || branchName == 'all' || photo.branchName.trim() == branchName.trim()),
               )
               .toList();
           docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+          if (limit != null && limit > 0 && docs.length > limit) {
+            return docs.sublist(0, limit);
+          }
           return docs;
         }
         rethrow;

@@ -57,11 +57,16 @@ class _DelegateSubscriptionRequestsPageState
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
+        titleSpacing: 0,
         title: Text(
           widget.currentAdmin.role == UserRole.admin
               ? 'متابعة اعتمادات وطلبات المناديب'
               : 'طلبات تسجيل واشتراك المناديب',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14.5,
+            letterSpacing: -0.2,
+          ),
         ),
         centerTitle: true,
         elevation: 0,
@@ -903,7 +908,31 @@ class _SubscriptionRequestCard extends StatelessWidget {
                             spacing: 6,
                             runSpacing: 4,
                             children: [
-                              if (request.paymentMethod == SubscriptionPaymentMethod.companyDeduction)
+                              if (request.paymentMethod == SubscriptionPaymentMethod.freePromotion)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFF86EFAC)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.card_giftcard_rounded, size: 13, color: Color(0xFF16A34A)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'عرض مجاني (0 ج.م)',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF15803D),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else if (request.paymentMethod == SubscriptionPaymentMethod.companyDeduction)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(

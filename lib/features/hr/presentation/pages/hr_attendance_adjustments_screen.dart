@@ -324,21 +324,31 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: widget.showAppBar
           ? AppBar(
+              titleSpacing: 0,
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
                     'سجل تعديلات الحضور والانصراف',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.5,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     widget.hrDelegate.companyName.isNotEmpty
                         ? widget.hrDelegate.companyName
                         : 'إدارة الرقابة الإدارية والامتثال',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

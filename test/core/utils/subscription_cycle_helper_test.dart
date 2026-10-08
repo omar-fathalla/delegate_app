@@ -88,30 +88,31 @@ void main() {
       expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 12, 31)), equals(1));
     });
 
-    test('getProratedSubscriptionFee returns correct rounded fee per user tiers', () {
-      // 6 months -> 500 EGP
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 1, 1)), equals(500.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 7, 1)), equals(500.0));
+    test('isFreePromotionActive correctly identifies promotion window until 31/12/2026', () {
+      expect(SubscriptionCycleHelper.isFreePromotionActive(DateTime(2026, 10, 8)), isTrue);
+      expect(SubscriptionCycleHelper.isFreePromotionActive(DateTime(2026, 12, 31, 23, 59, 59)), isTrue);
+      expect(SubscriptionCycleHelper.isFreePromotionActive(DateTime(2027, 1, 1, 0, 0, 1)), isFalse);
+    });
 
-      // 5 months -> 450 EGP
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 2, 1)), equals(450.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 8, 1)), equals(450.0));
+    test('getFeeForMonths returns correct rounded fee per user tiers', () {
+      expect(SubscriptionCycleHelper.getFeeForMonths(6), equals(500.0));
+      expect(SubscriptionCycleHelper.getFeeForMonths(5), equals(450.0));
+      expect(SubscriptionCycleHelper.getFeeForMonths(4), equals(350.0));
+      expect(SubscriptionCycleHelper.getFeeForMonths(3), equals(250.0));
+      expect(SubscriptionCycleHelper.getFeeForMonths(2), equals(200.0));
+      expect(SubscriptionCycleHelper.getFeeForMonths(1), equals(100.0));
+    });
 
-      // 4 months -> 350 EGP (e.g. current month September)
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 3, 1)), equals(350.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 9, 1)), equals(350.0));
+    test('getProratedSubscriptionFee returns 0.0 during active free promotion in 2026', () {
+      // Free during active promotion in 2026
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 10, 8)), equals(0.0));
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 12, 1)), equals(0.0));
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 12, 31)), equals(0.0));
 
-      // 3 months -> 250 EGP
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 4, 1)), equals(250.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 10, 1)), equals(250.0));
-
-      // 2 months -> 200 EGP
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 5, 1)), equals(200.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 11, 1)), equals(200.0));
-
-      // 1 month -> 100 EGP
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 6, 1)), equals(100.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 12, 1)), equals(100.0));
+      // Post promotion in 2027 (standard tiers)
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 1, 1)), equals(500.0));
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 3, 1)), equals(350.0));
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 4, 1)), equals(250.0));
     });
   });
 }

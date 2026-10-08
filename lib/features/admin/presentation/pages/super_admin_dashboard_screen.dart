@@ -16,14 +16,14 @@ import 'delegate_subscription_requests_page.dart';
 import 'super_admin_payment_receipts_report_screen.dart';
 import 'super_admin_subscription_financial_report_screen.dart';
 import 'super_admin_session_control_screen.dart';
-import '../../../photo_permission/presentation/pages/super_admin_permissions_report_screen.dart';
-import '../../../photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import '../../../photo_permission/presentation/pages/super_admin_photos_and_permissions_screen.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_settings_page.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_penalties_list_page.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/wallet/presentation/pages/super_admin_wallets_screen.dart';
+import 'package:delegate_app/features/private_label/presentation/pages/super_admin_private_label_permissions_screen.dart';
 import 'manage_admins_screen.dart';
 
 class SuperAdminDashboardScreen extends StatefulWidget {
@@ -697,15 +697,12 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 },
               ),
               _buildActionButton(
-                label: 'تقرير أذونات التصوير',
-                icon: Icons.analytics_rounded,
+                label: 'الصور وأذونات التصوير',
+                icon: Icons.photo_library_rounded,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => BlocProvider(
-                        create: (_) => di.sl<PhotoPermissionBloc>(),
-                        child: SuperAdminPermissionsReportScreen(delegate: widget.delegate),
-                      ),
+                      builder: (_) => SuperAdminPhotosAndPermissionsScreen(delegate: widget.delegate),
                     ),
                   );
                 },
@@ -753,6 +750,19 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const ManageAdminsScreen(),
+                    ),
+                  );
+                },
+              ),
+              _buildActionButton(
+                label: 'صلاحيات Private Label',
+                icon: Icons.sell_rounded,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SuperAdminPrivateLabelPermissionsScreen(
+                        adminDelegate: widget.delegate,
+                      ),
                     ),
                   );
                 },

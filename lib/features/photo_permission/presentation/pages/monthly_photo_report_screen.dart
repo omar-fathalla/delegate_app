@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
 import 'package:delegate_app/core/widgets/app_photo_image.dart';
@@ -582,7 +582,11 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                 padding: const EdgeInsets.all(8),
                                 minimumSize: const Size(38, 38),
                               ),
-                              icon: const Icon(Icons.chevron_right_rounded, size: 22),
+                              icon: const Icon(
+                                Icons.chevron_right_rounded,
+                                size: 22,
+                                textDirection: TextDirection.ltr,
+                              ),
                               onPressed: _previousMonth,
                               tooltip: 'الشهر السابق (أرشيف)',
                             ),
@@ -644,13 +648,24 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                         borderRadius: BorderRadius.circular(6),
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                          child: Text(
-                                            'العودة للشهر الحالي ↩',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: colorScheme.secondary,
-                                            ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.restore_rounded,
+                                                size: 13,
+                                                color: colorScheme.secondary,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'العودة للشهر الحالي',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: colorScheme.secondary,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
@@ -668,7 +683,11 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                 padding: const EdgeInsets.all(8),
                                 minimumSize: const Size(38, 38),
                               ),
-                              icon: const Icon(Icons.chevron_left_rounded, size: 22),
+                              icon: const Icon(
+                                Icons.chevron_left_rounded,
+                                size: 22,
+                                textDirection: TextDirection.ltr,
+                              ),
                               onPressed: isCurrentMonth ? null : _nextMonth,
                               tooltip: 'الشهر التالي',
                             ),

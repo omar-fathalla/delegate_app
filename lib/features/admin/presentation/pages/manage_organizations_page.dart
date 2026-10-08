@@ -155,9 +155,14 @@ class _ManageOrganizationsPageState extends State<ManageOrganizationsPage> {
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: const Text(
           'إدارة المنظمات والسلاسل التجارية',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14.5,
+            letterSpacing: -0.2,
+          ),
         ),
         centerTitle: true,
         elevation: 0,

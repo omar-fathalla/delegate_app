@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/features/marketing/data/models/floor_verification_model.dart';
 
 /// Service responsible for local cache (0ms) and Firestore sync of floor verification checks
-class FloorVerificationService {
+class FloorVerificationService extends ChangeNotifier {
   final SharedPreferences _prefs;
   final FirebaseFirestore _firestore;
 
@@ -58,6 +59,7 @@ class FloorVerificationService {
         for (final entry in current.entries) entry.key: entry.value.toJson(),
       };
       await _prefs.setString(key, json.encode(encoded));
+      notifyListeners();
 
       if (syncToCloud) {
         _syncToCloudInBackground(item);
@@ -81,6 +83,7 @@ class FloorVerificationService {
         for (final entry in current.entries) entry.key: entry.value.toJson(),
       };
       await _prefs.setString(key, json.encode(encoded));
+      notifyListeners();
 
       if (syncToCloud) {
         _deleteFromCloudInBackground(dateStr, branchName, delegateId);
@@ -114,6 +117,7 @@ class FloorVerificationService {
         for (final entry in current.entries) entry.key: entry.value.toJson(),
       };
       await _prefs.setString(key, json.encode(encoded));
+      notifyListeners();
     } catch (_) {}
   }
 
@@ -161,6 +165,7 @@ class FloorVerificationService {
         for (final entry in localMap.entries) entry.key: entry.value.toJson(),
       };
       await _prefs.setString(key, json.encode(encoded));
+      notifyListeners();
 
       return localMap;
     } catch (_) {

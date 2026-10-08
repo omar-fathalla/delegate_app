@@ -167,11 +167,14 @@ class _CompanySearchViewState extends State<_CompanySearchView> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
+        titleSpacing: 0,
         title: Text(
           l10n.searchCompanies,
-          style: theme.textTheme.titleLarge?.copyWith(
+          style: TextStyle(
             color: colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.2,
           ),
         ),
         backgroundColor: colorScheme.surface,

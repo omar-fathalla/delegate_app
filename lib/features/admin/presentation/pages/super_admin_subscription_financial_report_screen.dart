@@ -130,9 +130,14 @@ class _SuperAdminSubscriptionFinancialReportScreenState
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: const Text(
           'التقرير المالي لاشتراكات المناديب',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14.5,
+            letterSpacing: -0.2,
+          ),
         ),
         centerTitle: true,
         actions: [
@@ -269,6 +274,8 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           branchReceiptCount++;
           branchReceiptAmount += req.fee;
           break;
+        case SubscriptionPaymentMethod.freePromotion:
+          break;
       }
     }
 
@@ -297,6 +304,8 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           case SubscriptionPaymentMethod.branchReceipt:
             branchCount++;
             branchAmt += r.fee;
+            break;
+          case SubscriptionPaymentMethod.freePromotion:
             break;
         }
       }
@@ -1300,6 +1309,12 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           colorScheme.tertiary,
           colorScheme.tertiaryContainer.withValues(alpha: 0.4),
         ),
+      SubscriptionPaymentMethod.freePromotion => (
+          'عرض مجاني',
+          Icons.card_giftcard_rounded,
+          const Color(0xFF16A34A),
+          const Color(0xFFDCFCE7),
+        ),
     };
 
     return Container(
@@ -1476,6 +1491,7 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           SubscriptionPaymentMethod.companyDeduction => 'خصم من حساب الشركة',
           SubscriptionPaymentMethod.instaPay => 'تحويل انستاباي',
           SubscriptionPaymentMethod.branchReceipt => 'إيصال إلكتروني من تسويق الفرع',
+          SubscriptionPaymentMethod.freePromotion => 'عرض ترويجي مجاني',
         };
 
         final statusText = switch (req.status) {

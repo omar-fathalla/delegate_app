@@ -161,6 +161,21 @@ class AllBranchesAttendanceLoaded extends MarketingState {
   }
 
   @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is AllBranchesAttendanceLoaded &&
+        const DeepCollectionEquality().equals(data, other.data) &&
+        const ListEquality().equals(favoriteBranches, other.favoriteBranches) &&
+        const SetEquality().equals(loadingBranches, other.loadingBranches);
+  }
+
+  @override
+  int get hashCode =>
+      const DeepCollectionEquality().hash(data) ^
+      const ListEquality().hash(favoriteBranches) ^
+      const SetEquality().hash(loadingBranches);
+
+  @override
   List<Object?> get props => [data, favoriteBranches, loadingBranches];
 }
 

@@ -37,6 +37,7 @@ void main() {
       remoteDataSource: mockRemoteDataSource,
       branchPreferenceService: mockBranchPreferenceService,
     );
+    MarketingBloc.clearCache();
   });
 
   tearDown(() {
@@ -79,4 +80,177 @@ void main() {
       const CompaniesError(message: 'Error'),
     ],
   );
+
+  group('LoadAllFavoriteBranchesAttendance (SWR & Zero-Drop Sync)', () {
+    final tBranches = ['Abo Yousif'];
+    final tDate = DateTime(2026, 10, 7);
+    final tAttendanceData = {
+      'Abo Yousif': [
+        {'delegateId': 'd1', 'delegateNameInLog': 'Ahmad', 'checkOutTime': null}
+      ]
+    };
+
+    blocTest<MarketingBloc, MarketingState>(
+      'should emit empty AllBranchesAttendanceLoaded when favoriteBranches is empty',
+      build: () => bloc,
+      act: (bloc) => bloc.add(LoadAllFavoriteBranchesAttendance(
+        favoriteBranches: const [],
+        organizationId: tOrganizationUID,
+      )),
+      expect: () => [
+        const AllBranchesAttendanceLoaded(
+          data: {},
+          favoriteBranches: [],
+          loadingBranches: {},
+        ),
+      ],
+    );
+
+    blocTest<MarketingBloc, MarketingState>(
+      'should emit [Loading, Loaded] when no cache exists and fetch succeeds',
+      build: () {
+        when(() => mockRemoteDataSource.getTodayAttendanceForBranches(
+          branchNames: any(named: 'branchNames'),
+          organizationId: any(named: 'organizationId'),
+          date: any(named: 'date'),
+        )).thenAnswer((_) async => tAttendanceData);
+        return bloc;
+      },
+      act: (bloc) => bloc.add(LoadAllFavoriteBranchesAttendance(
+        favoriteBranches: tBranches,
+        organizationId: tOrganizationUID,
+        date: tDate,
+      )),
+      expect: () => [
+        AllBranchesAttendanceLoading(),
+        AllBranchesAttendanceLoaded(
+          data: tAttendanceData,
+          favoriteBranches: tBranches,
+          loadingBranches: const {},
+        ),
+      ],
+    );
+
+    test('should emit cached state immediately (0ms) and revalidate from server in background (SWR)', () async {
+      when(() => mockRemoteDataSource.getTodayAttendanceForBranches(
+        branchNames: any(named: 'branchNames'),
+        organizationId: any(named: 'organizationId'),
+        date: any(named: 'date'),
+      )).thenAnswer((_) async => tAttendanceData);
+
+      // 1. Initial fetch populates cache
+      bloc.add(LoadAllFavoriteBranchesAttendance(
+        favoriteBranches: tBranches,
+        organizationId: tOrganizationUID,
+        date: tDate,
+      ));
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          AllBranchesAttendanceLoading(),
+          AllBranchesAttendanceLoaded(
+            data: tAttendanceData,
+            favoriteBranches: tBranches,
+            loadingBranches: const {},
+          ),
+        ]),
+      );
+
+      // 2. Updated data arrives from remote server
+      final tUpdatedAttendanceData = {
+        'Abo Yousif': [
+          {'delegateId': 'd1', 'delegateNameInLog': 'Ahmad', 'checkOutTime': null},
+          {'delegateId': 'd2', 'delegateNameInLog': 'Mohamed', 'checkOutTime': null},
+        ]
+      };
+      when(() => mockRemoteDataSource.getTodayAttendanceForBranches(
+        branchNames: any(named: 'branchNames'),
+        organizationId: any(named: 'organizationId'),
+        date: any(named: 'date'),
+      )).thenAnswer((_) async => tUpdatedAttendanceData);
+
+      // SWR: Triggering load when cache is present
+      bloc.add(LoadAllFavoriteBranchesAttendance(
+        favoriteBranches: tBranches,
+        organizationId: tOrganizationUID,
+        date: tDate,
+        forceRefresh: true,
+      ));
+
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          // Instant cache rendering (0ms)
+          AllBranchesAttendanceLoaded(
+            data: tAttendanceData,
+            favoriteBranches: tBranches,
+            loadingBranches: {'Abo Yousif'},
+          ),
+          // Followed by fresh server data
+          AllBranchesAttendanceLoaded(
+            data: tUpdatedAttendanceData,
+            favoriteBranches: tBranches,
+            loadingBranches: const {},
+          ),
+        ]),
+      );
+    });
+
+    test('should preserve cached data gracefully if background revalidation encounters server error', () async {
+      when(() => mockRemoteDataSource.getTodayAttendanceForBranches(
+        branchNames: any(named: 'branchNames'),
+        organizationId: any(named: 'organizationId'),
+        date: any(named: 'date'),
+      )).thenAnswer((_) async => tAttendanceData);
+
+      // Populate cache
+      bloc.add(LoadAllFavoriteBranchesAttendance(
+        favoriteBranches: tBranches,
+        organizationId: tOrganizationUID,
+        date: tDate,
+      ));
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          AllBranchesAttendanceLoading(),
+          AllBranchesAttendanceLoaded(
+            data: tAttendanceData,
+            favoriteBranches: tBranches,
+            loadingBranches: const {},
+          ),
+        ]),
+      );
+
+      // Now server fails
+      when(() => mockRemoteDataSource.getTodayAttendanceForBranches(
+        branchNames: any(named: 'branchNames'),
+        organizationId: any(named: 'organizationId'),
+        date: any(named: 'date'),
+      )).thenThrow(Exception('Network timeout'));
+
+      bloc.add(LoadAllFavoriteBranchesAttendance(
+        favoriteBranches: tBranches,
+        organizationId: tOrganizationUID,
+        date: tDate,
+        forceRefresh: true,
+      ));
+
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          AllBranchesAttendanceLoaded(
+            data: tAttendanceData,
+            favoriteBranches: tBranches,
+            loadingBranches: {'Abo Yousif'},
+          ),
+          // Seamlessly preserves cached data, NO error screen!
+          AllBranchesAttendanceLoaded(
+            data: tAttendanceData,
+            favoriteBranches: tBranches,
+            loadingBranches: const {},
+          ),
+        ]),
+      );
+    });
+  });
 }

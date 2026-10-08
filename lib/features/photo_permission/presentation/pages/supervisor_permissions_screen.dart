@@ -1243,6 +1243,8 @@ class ApproverNameText extends StatefulWidget {
   final String? companyUID;
   final String? currentUserUid;
   final String? currentUserName;
+  final TextOverflow? overflow;
+  final int? maxLines;
 
   const ApproverNameText({
     super.key,
@@ -1253,6 +1255,8 @@ class ApproverNameText extends StatefulWidget {
     this.companyUID,
     this.currentUserUid,
     this.currentUserName,
+    this.overflow,
+    this.maxLines,
   });
 
   static final Map<String, String> _userNameCache = {};
@@ -1473,6 +1477,8 @@ class _ApproverNameTextState extends State<ApproverNameText> {
       return Text(
         '${widget.prefix}...',
         style: widget.style,
+        overflow: widget.overflow,
+        maxLines: widget.maxLines,
       );
     }
 
@@ -1480,6 +1486,8 @@ class _ApproverNameTextState extends State<ApproverNameText> {
     return Text(
       '${widget.prefix}$displayName',
       style: widget.style,
+      overflow: widget.overflow,
+      maxLines: widget.maxLines,
     );
   }
 }

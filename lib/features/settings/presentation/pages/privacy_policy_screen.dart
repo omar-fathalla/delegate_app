@@ -17,15 +17,16 @@ class PrivacyPolicyScreen extends StatelessWidget {
         surfaceTintColor: theme.colorScheme.surfaceTint,
         centerTitle: true,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
           l10n.privacyPolicy,
           style: TextStyle(
             color: theme.colorScheme.onSurface,
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: FontWeight.bold,
+            letterSpacing: -0.2,
           ),
         ),
       ),

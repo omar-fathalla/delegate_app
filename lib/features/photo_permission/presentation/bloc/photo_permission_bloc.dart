@@ -471,7 +471,11 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
   ) async {
     emit(PhotoPermissionLoading());
     final result = await getCompanyCapturedPhotos(
-      GetCompanyCapturedPhotosParams(companyUID: event.companyUID),
+      GetCompanyCapturedPhotosParams(
+        companyUID: event.companyUID,
+        branchName: event.branchName,
+        limit: event.limit,
+      ),
     );
     result.fold(
       (failure) => emit(PhotoPermissionError(message: failure.message)),

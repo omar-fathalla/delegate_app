@@ -20,8 +20,6 @@ import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 import 'dart:async';
 import 'package:delegate_app/features/admin/presentation/pages/manage_organizations_page.dart';
-import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
-import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/delegate_leaves_and_requests_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
@@ -45,27 +43,14 @@ class _MainScreenState extends State<MainScreen> {
   final Set<int> _initializedTabs = {0}; // Tab 0 (Attendance) loads first
 
   List<Delegate> _allDelegates = [];
-  StreamSubscription? _walletSubscription;
-  bool _isWalletEnabled = false;
-
   @override
   void initState() {
     super.initState();
     _loadAllDelegates();
-    _walletSubscription = WalletRemoteDataSourceImpl()
-        .streamUserWallet(widget.delegate.uid)
-        .listen((w) {
-      if (mounted) {
-        setState(() {
-          _isWalletEnabled = w?.isWalletEnabled ?? false;
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
-    _walletSubscription?.cancel();
     super.dispose();
   }
 
@@ -151,17 +136,6 @@ class _MainScreenState extends State<MainScreen> {
         onMenuSelected: (value) {
           if (value == 'profile') {
             context.push('/user-profile', extra: delegate);
-          } else if (value == 'wallet') {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => UserWalletScreen(
-                  targetUserId: delegate.uid,
-                  targetUserName: delegate.fullName.isNotEmpty
-                      ? delegate.fullName
-                      : delegate.firstName,
-                ),
-              ),
-            );
           } else if (value == 'penalties') {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -240,28 +214,6 @@ class _MainScreenState extends State<MainScreen> {
               ],
             ),
           ),
-          if (_isWalletEnabled) ...[
-            PopupMenuItem<String>(
-              value: 'wallet',
-              child: Row(
-                children: [
-                  Icon(Icons.account_balance_wallet_rounded, color: colorScheme.primary),
-                  const SizedBox(width: 12),
-                  const Text('المحفظة والمستحقات'),
-                ],
-              ),
-            ),
-          ],
-          PopupMenuItem<String>(
-            value: 'penalties',
-            child: Row(
-              children: [
-                Icon(Icons.gavel_rounded, color: colorScheme.error),
-                const SizedBox(width: 12),
-                const Text('المخالفات والغرامات'),
-              ],
-            ),
-          ),
           PopupMenuItem<String>(
             value: 'penalty_rules_catalog',
             child: Row(
@@ -317,6 +269,20 @@ class _MainScreenState extends State<MainScreen> {
                 Icon(Icons.task_alt_rounded, color: colorScheme.primary),
                 const SizedBox(width: 12),
                 Text(l10n.tasks),
+              ],
+            ),
+          ),
+          // المخالفات والغرامات دائماً فوق تسجيل الخروج لتطابق اللون والتنسيق
+          PopupMenuItem<String>(
+            value: 'penalties',
+            child: Row(
+              children: [
+                Icon(Icons.gavel_rounded, color: colorScheme.error),
+                const SizedBox(width: 12),
+                Text(
+                  'المخالفات والغرامات',
+                  style: TextStyle(color: colorScheme.error),
+                ),
               ],
             ),
           ),

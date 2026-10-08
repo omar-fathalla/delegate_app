@@ -352,5 +352,20 @@ When building or updating enterprise screens (HR System, Backoffice, Management 
     ```
 - **Responsive Web/Desktop Fallback**: On desktop (`maxWidth > 768px`), the exact same component adapts into a centered `Dialog` (max width `520px` - `560px`, `borderRadius: 24px`).
 
+### 5. Enterprise Mobile & Web UI/UX Standards: Connected Groups, Card Contrast, & Input Refinements
+- **Connected Button Groups (Full-Width on Mobile)**:
+  - On mobile viewports (`maxWidth <= 768px`), view-mode switcher or toggle button groups (`TashilConnectedButtonGroup`) MUST span the entire screen width (`width: double.infinity`).
+  - Items must be equally distributed (`Expanded`), with height `46-48px`, and generous internal padding (`horizontal: 14-16px`) so icons and labels never crowd each other.
+- **Card Contrast & Curvature Consistency (حظر تطابق لون الكروت مع الخلفية وحظر بروز الحدود الحادة)**:
+  - Cards MUST NEVER share the exact identical background color as the scaffold (`cs.surface` on `cs.surface` is forbidden).
+  - Cards must use `colorScheme.surfaceContainerLow` (or soft mauve tint derived from `colorScheme.primaryContainer`) against `colorScheme.surface` scaffold background to establish clear visual depth and avoid eye fatigue ("تشوش وتضارب في العين").
+  - Any start status border line (e.g. 3.5px line) MUST be clipped via `clipBehavior: Clip.antiAlias` on the card container so it seamlessly conforms to the card's 16px corner curvature without sharp protruding corners.
+  - Zero/uninitiated activity (`0%`) must use NEUTRAL styling (`colorScheme.outlineVariant` or `colorScheme.onSurfaceVariant`), NEVER harsh red. Red is strictly reserved for critical violations.
+- **Search Fields & Dropdown Trigger Specifications**:
+  - **Search Inputs**: Must have standard non-bold typography (`fontSize: 13-14sp`, `fontWeight: FontWeight.normal`), subtle opacity for placeholder text, height `44px`, and corner radius `14px`. Never use large bold placeholder text.
+  - **Dropdown Triggers**: Height `44px`, corner radius `14px`, background `colorScheme.surfaceContainerLow`, outline border `colorScheme.outlineVariant`. In RTL: leading Google icon on the right, label in the center (`Expanded`), and `Icons.expand_more_rounded` on the far left.
+  - **No Unicode Emojis or Non-Material Symbols**: Never embed unicode symbols like `⬇`, `⬆`, or custom glyphs in labels; use official Google Material rounded icons (`Icons.*_rounded`) exclusively.
+
+
 
 

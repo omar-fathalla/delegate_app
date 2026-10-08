@@ -53,6 +53,17 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
 
   MarketingRemoteDataSourceImpl({required this.firestore});
 
+  /// التطبيع الموحد لأسماء الفروع لمنع أي فقدان في السجلات بسبب الهمزات والمسافات
+  static String normalizeBranchName(String name) {
+    return name
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[أإآ]'), 'ا')
+        .replaceAll('ة', 'ه')
+        .replaceAll('ى', 'ي')
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
+
   @override
   Future<List<Map<String, dynamic>>> getCompanies(
     String organizationUID,
@@ -293,14 +304,36 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       final todayStart = DateTime(targetDate.year, targetDate.month, targetDate.day);
       final todayEnd = todayStart.add(const Duration(days: 1));
 
-      // ── Step 1: جلب سجلات الحضور الخاصة بالفروع المطلوبة فقط بـ whereIn ──
-      // لتقسيم الفروع في مجموعات حتى 30 فرع لكل استعلام
+      // ── Step 1: جلب سجلات الحضور مع تطبيع أسماء الفروع والاستعلام الموثوق ──
+      final Set<String> queryBranchTerms = {};
+      final Map<String, String> normalizedToBranch = {};
+
+      for (final b in branchNames) {
+        final trimmed = b.trim();
+        if (trimmed.isEmpty) continue;
+        normalizedToBranch[normalizeBranchName(trimmed)] = b;
+        queryBranchTerms.add(trimmed);
+
+        // إضافة أشكال الحروف المختلفة (الهمزات، التاء المربوطة، الياء/الألف المقصورة) لضمان عدم سقوط أي سجل في whereIn
+        final withoutHamza = trimmed.replaceAll(RegExp(r'[أإآ]'), 'ا');
+        queryBranchTerms.add(withoutHamza);
+        final withAlifHamza = trimmed.replaceAll('ا', 'أ');
+        queryBranchTerms.add(withAlifHamza);
+        final withTa = trimmed.replaceAll('ه', 'ة');
+        queryBranchTerms.add(withTa);
+        final withHa = trimmed.replaceAll('ة', 'ه');
+        queryBranchTerms.add(withHa);
+        final withYa = trimmed.replaceAll('ى', 'ي');
+        queryBranchTerms.add(withYa);
+      }
+
+      final queryBranchList = queryBranchTerms.toList();
       final branchChunks = <List<String>>[];
-      for (var i = 0; i < branchNames.length; i += 30) {
+      for (var i = 0; i < queryBranchList.length; i += 30) {
         branchChunks.add(
-          branchNames.sublist(
+          queryBranchList.sublist(
             i,
-            (i + 30 > branchNames.length) ? branchNames.length : i + 30,
+            (i + 30 > queryBranchList.length) ? queryBranchList.length : i + 30,
           ),
         );
       }
@@ -310,18 +343,18 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         final snap = await firestore
             .collection(kAttendanceCollection)
             .where('branchName', whereIn: chunk)
-            .get();
+            .getResilient(forceServer: true);
         branchLogsDocs.addAll(snap.docs);
       }
 
-      // تصفية سجلات اليوم حسب النطاق الزمني
+      // تصفية سجلات اليوم حسب النطاق الزمني مع معالجة السجلات الفورية (hasPendingWrites)
       final todayDocs = branchLogsDocs.where((doc) {
         final data = doc.data();
         final ts = data['timestamp'] as Timestamp?;
-        if (ts == null) return false;
-        final d = ts.toDate();
-        return d.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
-            d.isBefore(todayEnd);
+        final effectiveDate = ts?.toDate() ?? (doc.metadata.hasPendingWrites ? DateTime.now() : null);
+        if (effectiveDate == null) return false;
+        return effectiveDate.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
+            effectiveDate.isBefore(todayEnd);
       }).toList();
 
       // خريطة فرز الحضور حسب الفرع
@@ -339,7 +372,8 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       for (final doc in todayDocs) {
         final data = doc.data();
         final type = data['type'] as String? ?? '';
-        final branch = data['branchName'] as String? ?? '';
+        final rawBranch = data['branchName'] as String? ?? '';
+        final branch = normalizedToBranch[normalizeBranchName(rawBranch)] ?? rawBranch;
         if (!checkInsByBranch.containsKey(branch)) continue;
 
         if (type == 'check_in') {
@@ -390,13 +424,14 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         }
       }
 
-      // معالجة الانصراف check_out من السجلات المجلوبة
+      // معالجة الانصراف check_out من السجلات المجلوبة مع التطبيع
       for (final doc in todayDocs) {
         final data = doc.data();
         final type = data['type'] as String? ?? '';
         if (type != 'check_out') continue;
 
-        final branch = data['branchName'] as String? ?? '';
+        final rawBranch = data['branchName'] as String? ?? '';
+        final branch = normalizedToBranch[normalizeBranchName(rawBranch)] ?? rawBranch;
         final delegateId = data['delegateId'] as String? ??
             data['userId'] as String? ??
             '';
@@ -438,7 +473,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
                 .collection(kAttendanceCollection)
                 .where('delegateId', whereIn: chunk)
                 .where('type', isEqualTo: 'check_out')
-                .get();
+                .getResilient(forceServer: true);
 
             for (final doc in outSnap.docs) {
               final data = doc.data();

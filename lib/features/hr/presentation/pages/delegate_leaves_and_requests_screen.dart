@@ -84,21 +84,31 @@ class _DelegateLeavesAndRequestsScreenState
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: widget.showAppBar
           ? AppBar(
+              titleSpacing: 0,
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
                     'طلباتي (الإجازات والأعذار)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.5,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     widget.delegate.companyName.isNotEmpty
                         ? widget.delegate.companyName
                         : widget.delegate.organizationName,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: colorScheme.onSurfaceVariant,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

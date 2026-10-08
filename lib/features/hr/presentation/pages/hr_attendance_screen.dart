@@ -41,6 +41,7 @@ class _HRAttendanceScreenState extends State<HRAttendanceScreen> {
                   width: 0.8,
                 ),
               ),
+              titleSpacing: 0,
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -49,16 +50,21 @@ class _HRAttendanceScreenState extends State<HRAttendanceScreen> {
                     isArabic ? 'سجل الحضور والانصراف' : 'Attendance & Departure',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: 14.5,
+                      letterSpacing: -0.2,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (widget.hrDelegate.companyName.isNotEmpty)
                     Text(
                       widget.hrDelegate.companyName,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         color: colorScheme.onSurfaceVariant,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),

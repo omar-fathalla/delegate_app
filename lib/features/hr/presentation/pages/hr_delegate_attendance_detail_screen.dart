@@ -916,22 +916,29 @@ class _HRDelegateAttendanceDetailScreenState
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
+        titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               isWide ? 'سجل الحضور والانصراف التفصيلي' : 'سجل حضور المندوب',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14.5,
+                letterSpacing: -0.2,
+              ),
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
               widget.delegate.fullName,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 11,
                 fontWeight: FontWeight.normal,
                 color: colorScheme.onSurfaceVariant,
               ),
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ],
@@ -1216,14 +1223,18 @@ class _HRDelegateAttendanceDetailScreenState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Previous Month Button (< الشهر السابق)
+          // Previous Month Button (> الشهر السابق)
           FilledButton.tonalIcon(
             onPressed: _goToPreviousMonth,
             style: FilledButton.styleFrom(
               padding: EdgeInsets.symmetric(horizontal: isWide ? 16 : 10, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+            icon: const Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              textDirection: TextDirection.ltr,
+            ),
             label: Text(isWide ? 'الشهر السابق' : 'السابق'),
           ),
 
@@ -1252,7 +1263,7 @@ class _HRDelegateAttendanceDetailScreenState
             ],
           ),
 
-          // Next Month Button (الشهر التالي >)
+          // Next Month Button (الشهر التالي <)
           FilledButton.tonalIcon(
             onPressed: _goToNextMonth,
             style: FilledButton.styleFrom(
@@ -1260,7 +1271,11 @@ class _HRDelegateAttendanceDetailScreenState
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             label: Text(isWide ? 'الشهر التالي' : 'التالي'),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
+            icon: const Icon(
+              Icons.chevron_left_rounded,
+              size: 18,
+              textDirection: TextDirection.ltr,
+            ),
           ),
         ],
       ),

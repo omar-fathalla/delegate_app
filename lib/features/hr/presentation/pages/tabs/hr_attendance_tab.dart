@@ -2497,6 +2497,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                 Icons.chevron_right_rounded,
                 size: 22,
                 color: colorScheme.onSurfaceVariant,
+                textDirection: TextDirection.ltr,
               ),
             ),
           ),
@@ -2595,6 +2596,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                 color: isToday
                     ? colorScheme.outlineVariant.withValues(alpha: 0.35)
                     : colorScheme.onSurfaceVariant,
+                textDirection: TextDirection.ltr,
               ),
             ),
           ),
@@ -2705,6 +2707,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     Icons.chevron_right_rounded,
                     size: isWide ? 20 : 18,
                     color: colorScheme.onSurfaceVariant,
+                    textDirection: TextDirection.ltr,
                   ),
                 ),
               ),
@@ -2766,6 +2769,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     color: isToday
                         ? colorScheme.outlineVariant.withValues(alpha: 0.4)
                         : colorScheme.onSurfaceVariant,
+                    textDirection: TextDirection.ltr,
                   ),
                 ),
               ),

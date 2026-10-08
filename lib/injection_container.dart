@@ -123,6 +123,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/features/feedback/feedback_injection.dart';
+import 'package:delegate_app/features/private_label/private_label_injection.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:get_it/get_it.dart';
 
@@ -455,6 +456,9 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   // ! Features - Feedback
   initFeedbackDependencies();
+
+  // ! Features - Private Label (توثيق يومي + KPI شهري)
+  initPrivateLabelDependencies();
 
   // ! Features - Marketing
   sl.registerLazySingleton(

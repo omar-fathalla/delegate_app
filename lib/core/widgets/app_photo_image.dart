@@ -110,10 +110,10 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
         width: widget.width,
         height: widget.height,
         fit: widget.fit,
-        memCacheWidth: widget.isThumbnail ? 200 : null,
-        memCacheHeight: widget.isThumbnail ? 200 : null,
-        maxHeightDiskCache: widget.isThumbnail ? 400 : 1800,
-        maxWidthDiskCache: widget.isThumbnail ? 400 : 1800,
+        memCacheWidth: widget.isThumbnail ? 350 : null,
+        memCacheHeight: widget.isThumbnail ? 350 : null,
+        maxHeightDiskCache: widget.isThumbnail ? 600 : 1800,
+        maxWidthDiskCache: widget.isThumbnail ? 600 : 1800,
         placeholder: (context, url) => Center(
           child: AppLoadingIndicator(
             size: widget.isThumbnail ? 16 : 28,

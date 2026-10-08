@@ -1,9 +1,19 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:delegate_app/features/private_label/presentation/widgets/private_label_home_card.dart';
+import 'package:delegate_app/features/private_label/domain/entities/private_label_permissions.dart';
+import 'package:delegate_app/features/private_label/data/datasources/private_label_permissions_remote_data_source.dart';
+import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
+import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
+import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
+import 'package:delegate_app/features/marketing/data/models/floor_verification_model.dart';
+import 'package:delegate_app/injection_container.dart' as di;
 
 /// الشاشة الرئيسية لمسؤول تسويق الفروع (Branch Marketing Dashboard)
 /// تعرض الترحيب بالاسم، وتفاصيل المهام الثلاث اليومية، وكروت الوصول السريع، والملخص الميداني
@@ -22,6 +32,121 @@ class MarketingHomeScreen extends StatefulWidget {
 }
 
 class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
+  late final FloorVerificationService _floorService;
+  late final BranchPreferenceService _prefService;
+  List<String> _favoriteBranches = [];
+  List<Map<String, dynamic>> _todayRecords = [];
+  Map<String, FloorVerificationItem> _floorVerifications = {};
+  bool _isLoadingAttendance = true;
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      _floorService = di.sl<FloorVerificationService>();
+      _prefService = di.sl<BranchPreferenceService>();
+      _floorService.addListener(_onFloorServiceChanged);
+      _loadFloorData();
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    try {
+      _floorService.removeListener(_onFloorServiceChanged);
+    } catch (_) {}
+    super.dispose();
+  }
+
+  void _onFloorServiceChanged() {
+    if (!mounted) return;
+    setState(() {
+      _floorVerifications = _floorService.getLocalVerifications(DateTime.now());
+    });
+  }
+
+  Future<void> _loadFloorData({bool forceRefresh = false}) async {
+    try {
+      final favs = _prefService.getFavoriteBranches(widget.delegate.uid);
+      if (favs.isNotEmpty) {
+        _favoriteBranches = favs;
+      } else {
+        final active = _prefService.getActiveBranch(widget.delegate.uid);
+        _favoriteBranches = (active != null && active.isNotEmpty) ? [active] : [];
+      }
+
+      final today = DateTime.now();
+      final todayStr = DateFormat('yyyy-MM-dd').format(today);
+
+      // Instant 0ms local read
+      _floorVerifications = _floorService.getLocalVerifications(today);
+
+      final prefs = di.sl<SharedPreferences>();
+      final cacheKey = 'mkt_today_records_${widget.delegate.uid}_$todayStr';
+      if (!forceRefresh) {
+        final cached = prefs.getString(cacheKey);
+        if (cached != null && cached.isNotEmpty) {
+          final decoded = json.decode(cached) as List<dynamic>;
+          _todayRecords = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _isLoadingAttendance = false;
+          if (mounted) setState(() {});
+        }
+      }
+
+      if (_favoriteBranches.isEmpty) {
+        if (mounted) setState(() => _isLoadingAttendance = false);
+        return;
+      }
+
+      // Background remote fetch
+      final remoteDataSource = di.sl<MarketingRemoteDataSource>();
+      final orgId = widget.delegate.organizationUID.isNotEmpty
+          ? widget.delegate.organizationUID
+          : 'PiioBFgxaHAeuRdjlDgj';
+
+      final res = await remoteDataSource.getTodayAttendanceForBranches(
+        branchNames: _favoriteBranches,
+        organizationId: orgId,
+        date: today,
+      );
+
+      final allRecs = <Map<String, dynamic>>[];
+      for (final list in res.values) {
+        allRecs.addAll(list);
+      }
+
+      if (mounted) {
+        setState(() {
+          _todayRecords = allRecs;
+          _isLoadingAttendance = false;
+        });
+      }
+
+      // Cache minimal records for 0ms next load
+      final minimal = allRecs
+          .map((r) => {
+                'delegateId': r['delegateId'] ?? '',
+                'fullName': r['fullName'] ?? '',
+                'branchName': r['branchName'] ?? '',
+              })
+          .toList();
+      await prefs.setString(cacheKey, json.encode(minimal));
+
+      // Cloud sync verifications
+      final cloudVerifications = await _floorService.fetchCloudVerifications(
+        date: today,
+        branchNames: _favoriteBranches,
+      );
+      if (mounted) {
+        setState(() {
+          _floorVerifications = cloudVerifications;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAttendance = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -30,7 +155,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        setState(() {});
+        await _loadFloorData(forceRefresh: true);
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -41,7 +166,25 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
             // 1. الكارت الترحيبي والتعريفي الرئيسي مع دليل المهام
             _buildWelcomeDutiesBanner(context, colorScheme, isArabic),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // 1.1 مهام البرايفت ليبل (KPI الشهري + حالة توثيق اليوم)
+            StreamBuilder<PrivateLabelPermissions?>(
+              stream: di.sl<PrivateLabelPermissionsRemoteDataSource>()
+                  .streamUserPermissions(widget.delegate.uid),
+              builder: (context, snapshot) {
+                final isAllowed = widget.delegate.role == UserRole.superAdmin ||
+                    (snapshot.data?.canCapture ?? false);
+                if (!isAllowed) return const SizedBox.shrink();
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PrivateLabelHomeCard(delegate: widget.delegate),
+                    const SizedBox(height: 20),
+                  ],
+                );
+              },
+            ),
 
             // 2. عنوان لوحة العمليات والوصول السريع
             Row(
@@ -69,8 +212,29 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
 
             const SizedBox(height: 20),
 
-            // 4. ملخص العمل الميداني والنبض اللحظي
-            _buildLiveOperationalOverview(context, colorScheme, isArabic),
+            // 4. عنوان ملخص الميداني اليومي
+            Row(
+              children: [
+                Icon(
+                  Icons.assignment_turned_in_rounded,
+                  color: colorScheme.primary,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isArabic ? 'ملخص الميداني اليومي' : 'Daily Field Summary',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // كارت التحقق الميداني بالصالة (اليومي)
+            _buildDailyFloorInspectionOverview(context, colorScheme, isArabic),
 
             const SizedBox(height: 16),
 
@@ -497,123 +661,223 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
     );
   }
 
-  /// 3. ملخص العمل الميداني والنبض اللحظي
-  Widget _buildLiveOperationalOverview(
+  /// 3. ملخص الميداني اليومي (التحقق الميداني بالصالة)
+  Widget _buildDailyFloorInspectionOverview(
     BuildContext context,
     ColorScheme colorScheme,
     bool isArabic,
   ) {
-    final orgId = widget.delegate.organizationUID;
+    final theme = Theme.of(context);
+    final totalCount = _todayRecords.length;
+    final verifiedCount = _todayRecords
+        .where((r) => _floorVerifications[r['delegateId']]?.isVerified == true)
+        .length;
+    final missingCount = _todayRecords
+        .where((r) => _floorVerifications[r['delegateId']]?.isMissing == true)
+        .length;
+    final remainingCount = (totalCount - verifiedCount - missingCount).clamp(0, totalCount);
+    final percent = totalCount > 0 ? (verifiedCount / totalCount) : 0.0;
+    final percentInt = (percent * 100).toInt();
+    final isComplete = totalCount > 0 && verifiedCount == totalCount;
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: orgId.isNotEmpty
-          ? FirebaseFirestore.instance
-              .collectionGroup('photo_permissions')
-              .where('status', isEqualTo: 'pending')
-              .limit(10)
-              .snapshots()
-          : const Stream.empty(),
-      builder: (context, snapshot) {
-        final pendingCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
-
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.insights_rounded,
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isArabic ? 'ملخص النبض الميداني اليومي' : 'Live Field Overview',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  // عداد أذونات التصوير المعلقة
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => widget.onNavigateTab(1),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // رأس الكارت: الأيقونة + العنوان + النسبة
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
                       decoration: BoxDecoration(
-                        color: pendingCount > 0
-                            ? colorScheme.tertiaryContainer.withValues(alpha: 0.5)
-                            : colorScheme.surface,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: pendingCount > 0
-                              ? colorScheme.tertiary.withValues(alpha: 0.35)
-                              : colorScheme.outlineVariant,
-                        ),
+                        color: isComplete
+                            ? const Color(0xFF2E7D32).withValues(alpha: 0.14)
+                            : colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(
+                      child: Icon(
+                        isComplete
+                            ? Icons.verified_rounded
+                            : Icons.fact_check_rounded,
+                        size: 20,
+                        color: isComplete
+                            ? const Color(0xFF2E7D32)
+                            : colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.pending_actions_rounded,
-                            color: pendingCount > 0
-                                ? colorScheme.tertiary
-                                : colorScheme.onSurfaceVariant,
-                            size: 22,
+                          Text(
+                            isArabic ? 'التحقق الميداني بالصالة' : 'Floor Verification',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '$pendingCount',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: pendingCount > 0
-                                        ? colorScheme.onTertiaryContainer
-                                        : colorScheme.onSurface,
-                                  ),
-                                ),
-                                Text(
-                                  isArabic
-                                      ? 'أذونات بانتظار الاعتماد'
-                                      : 'Pending Permissions',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
+                          Text(
+                            _favoriteBranches.isNotEmpty
+                                ? (_favoriteBranches.length == 1
+                                    ? (isArabic
+                                        ? 'فرع ${_favoriteBranches.first}'
+                                        : 'Branch ${_favoriteBranches.first}')
+                                    : (isArabic
+                                        ? 'عبر ${_favoriteBranches.length} فروع مفضلة'
+                                        : 'Across ${_favoriteBranches.length} favorite branches'))
+                                : (isArabic
+                                    ? 'معدل المرور اليومي على المناديب'
+                                    : 'Daily floor check progress'),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
                       ),
                     ),
+                    // نسبة التحقق الميداني
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isComplete
+                            ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                            : colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$percentInt%',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: isComplete
+                              ? const Color(0xFF2E7D32)
+                              : colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // شريط التقدم المرئي
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: percent,
+                    minHeight: 7,
+                    backgroundColor: colorScheme.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      isComplete
+                          ? const Color(0xFF2E7D32)
+                          : colorScheme.primary,
+                    ),
                   ),
-                ],
-              ),
-            ],
+                ),
+
+                const SizedBox(height: 10),
+
+                // سطر الإحصائيات والتفاصيل
+                Row(
+                  children: [
+                    Text(
+                      totalCount > 0
+                          ? (isArabic
+                              ? 'تم المرور على $verifiedCount من $totalCount مندوب'
+                              : '$verifiedCount of $totalCount delegates checked')
+                          : (_isLoadingAttendance
+                              ? (isArabic ? 'جاري تحميل الحضور...' : 'Loading attendance...')
+                              : (isArabic ? 'لا يوجد حضور مسجل اليوم' : 'No attendance recorded today')),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (totalCount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: remainingCount > 0
+                              ? colorScheme.secondaryContainer.withValues(alpha: 0.6)
+                              : const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          remainingCount > 0
+                              ? (isArabic ? 'المتبقي: $remainingCount' : '$remainingCount remaining')
+                              : (isArabic ? 'اكتمل المرور' : 'All checked'),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: remainingCount > 0
+                                ? colorScheme.onSecondaryContainer
+                                : const Color(0xFF2E7D32),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // زر الانتقال لصفحة الفروع لبدء/استكمال المرور
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: FilledButton.tonal(
+                    onPressed: () => widget.onNavigateTab(1),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 38),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          isArabic ? 'متابعة المرور اليومي للمناديب' : 'Daily Delegates Tour',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 16,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 

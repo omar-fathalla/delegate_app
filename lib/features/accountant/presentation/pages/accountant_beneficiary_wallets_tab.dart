@@ -60,7 +60,7 @@ class _AccountantBeneficiaryWalletsTabState
         appBar: AppBar(
           title: const Text(
             'المحفظة',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: -0.2),
           ),
           actions: [
             IconButton(
@@ -880,32 +880,32 @@ class _AccountantBeneficiaryWalletsTabState
               children: [
                 // 1. الرصيد القائم للصرف
                 Expanded(
-                  flex: 5,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: hasBalance
                           ? colorScheme.primaryContainer.withValues(alpha: 0.4)
                           : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isFayezAtter ? 'الرصيد المتبقي (الإجمالي)' : 'الرصيد المتبقي للصرف',
+                          isFayezAtter ? 'الرصيد المتبقي (الإجمالي)' : 'الرصيد المستحق للصرف',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 11,
                             color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
                             _formatCurrency(isFayezAtter ? totalDueCombined : wallet.currentBalance),
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: hasBalance
                                   ? colorScheme.primary
@@ -917,53 +917,15 @@ class _AccountantBeneficiaryWalletsTabState
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
 
-                // 2. إجمالي المستحق
+                // 2. المنصرف
                 Expanded(
-                  flex: 4,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'إجمالي المستحق',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            _formatCurrency(wallet.totalAllocated),
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // 3. المنصرف
-                Expanded(
-                  flex: 4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -971,17 +933,18 @@ class _AccountantBeneficiaryWalletsTabState
                         Text(
                           'إجمالي المنصرف',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 11,
                             color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
                             _formatCurrency(wallet.totalPaid),
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: colorScheme.secondary,
                             ),

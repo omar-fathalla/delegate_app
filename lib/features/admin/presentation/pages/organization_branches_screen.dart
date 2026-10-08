@@ -42,22 +42,29 @@ class _OrganizationBranchesScreenState
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               widget.organizationName,
               style: GoogleFonts.cairo(
-                fontSize: 18,
+                fontSize: 14.5,
                 fontWeight: FontWeight.bold,
+                letterSpacing: -0.2,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               'فروع المنظمة',
               style: GoogleFonts.cairo(
-                fontSize: 12,
+                fontSize: 11,
                 color: colorScheme.onSurfaceVariant,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

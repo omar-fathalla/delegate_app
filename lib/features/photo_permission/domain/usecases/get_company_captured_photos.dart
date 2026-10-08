@@ -15,6 +15,8 @@ class GetCompanyCapturedPhotos implements UseCase<List<CapturedPhoto>, GetCompan
     return repository.getCompanyCapturedPhotos(
       companyUID: params.companyUID,
       organizationUID: params.organizationUID,
+      branchName: params.branchName,
+      limit: params.limit,
     );
   }
 }
@@ -22,9 +24,16 @@ class GetCompanyCapturedPhotos implements UseCase<List<CapturedPhoto>, GetCompan
 class GetCompanyCapturedPhotosParams extends Equatable {
   final String companyUID;
   final String? organizationUID;
+  final String? branchName;
+  final int? limit;
 
-  const GetCompanyCapturedPhotosParams({required this.companyUID, this.organizationUID});
+  const GetCompanyCapturedPhotosParams({
+    required this.companyUID,
+    this.organizationUID,
+    this.branchName,
+    this.limit,
+  });
 
   @override
-  List<Object?> get props => [companyUID, organizationUID];
+  List<Object?> get props => [companyUID, organizationUID, branchName, limit];
 }

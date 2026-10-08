@@ -44,25 +44,32 @@ class AdminHeader extends StatelessWidget implements PreferredSizeWidget {
               onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
             )
           : null,
+      titleSpacing: showBackButton ? 0 : null,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             title ?? l10n.admin,
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 14.5,
               fontWeight: FontWeight.bold,
               color: colorScheme.onSurface,
+              letterSpacing: -0.2,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           if (subtitle != null)
             Text(
               subtitle!,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 11,
                 color: colorScheme.onSurfaceVariant,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
         ],
       ),

@@ -83,8 +83,21 @@ class SubscriptionCycleHelper {
     }
   }
 
+  /// End date of the free registration promotion (end of year: 31/12/2026).
+  static final DateTime freePromotionEndDate = DateTime(2026, 12, 31, 23, 59, 59);
+
+  /// Checks if the free promotion period is currently active (up to 31/12/2026).
+  static bool isFreePromotionActive([DateTime? date]) {
+    final d = date ?? DateTime.now();
+    return !d.isAfter(freePromotionEndDate);
+  }
+
   /// Calculates the prorated subscription fee for the given date (defaults to now).
+  /// If the free promotion is active, the fee is 0.0 EGP.
   static double getProratedSubscriptionFee([DateTime? date]) {
+    if (isFreePromotionActive(date)) {
+      return 0.0;
+    }
     final months = getRemainingMonthsInCycle(date);
     return getFeeForMonths(months);
   }

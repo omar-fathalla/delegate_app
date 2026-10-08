@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -94,6 +95,15 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   /// Filter state per branch: 'all' | 'remaining' | 'verified' | 'missing'
   final Map<String, String> _branchFilter = {};
 
+  /// Periodic timer for auto-refresh heartbeat (every 30s)
+  Timer? _autoRefreshTimer;
+
+  /// App lifecycle listener to sync immediately upon app resume
+  AppLifecycleListener? _lifecycleListener;
+
+  /// Timestamp of the last successful sync with server
+  DateTime? _lastSyncTime;
+
   @override
   void initState() {
     super.initState();
@@ -105,11 +115,31 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       _prefsLoaded = true;
       _floorVerifications = _floorService.getLocalVerifications(_selectedDate);
       _syncFloorVerificationsFromCloud();
+
+      // Auto-refresh heartbeat every 30 seconds for live zero-drop data delivery
+      _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted && _favoriteBranches.isNotEmpty) {
+          _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+          _syncFloorVerificationsFromCloud();
+        }
+      });
+
+      // Revalidate immediately when app resumes from background
+      _lifecycleListener = AppLifecycleListener(
+        onResume: () {
+          if (mounted && _favoriteBranches.isNotEmpty) {
+            _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+            _syncFloorVerificationsFromCloud();
+          }
+        },
+      );
     } catch (_) {}
   }
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
+    _lifecycleListener?.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -438,7 +468,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         _selectedDate = picked;
         _floorVerifications = _floorService.getLocalVerifications(picked);
       });
-      _loadAllBranches(context, _favoriteBranches);
+      _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
       _syncFloorVerificationsFromCloud();
     }
   }
@@ -454,6 +484,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           curr is AllBranchesAttendanceError ||
           curr is AllBranchesAttendanceLoading,
       listener: (context, state) {
+        if (state is AllBranchesAttendanceLoaded) {
+          _lastSyncTime = DateTime.now();
+        }
         if (state is BranchPreferencesLoaded) {
           final favorites = state.favoriteBranches;
           setState(() {
@@ -674,7 +707,10 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     ColorScheme colorScheme,
   ) {
     return RefreshIndicator(
-      onRefresh: () async => _loadAllBranches(context, _favoriteBranches),
+      onRefresh: () async {
+        _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+        await _syncFloorVerificationsFromCloud();
+      },
       child: CustomScrollView(
         slivers: [
           // ─── تاريخ اليوم ──────────────────────────────────────────────
@@ -720,13 +756,51 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                           color: colorScheme.primary,
                         ),
                         const Spacer(),
+                        if (_lastSyncTime != null)
+                          Tooltip(
+                            message: 'آخر مزامنة ناجحة مع السيرفر: ${DateFormat('h:mm:ss a', 'ar').format(_lastSyncTime!)}',
+                            child: Container(
+                              margin: const EdgeInsetsDirectional.only(end: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.green.withValues(alpha: 0.35),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF2E7D32),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'مُتصل (${DateFormat('h:mm a', 'ar').format(_lastSyncTime!)})',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         if (!DateUtils.isSameDay(_selectedDate, DateTime.now()))
                           TextButton(
                             onPressed: () {
                               setState(() {
                                 _selectedDate = DateTime.now();
                               });
-                              _loadAllBranches(context, _favoriteBranches);
+                              _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
                             },
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
@@ -982,133 +1056,139 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                 onTap: () => _toggleBranchExpansion(branchName),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surface.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.location_on_rounded,
-                          color: colorScheme.primary,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surface.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.location_on_rounded,
+                              color: colorScheme.primary,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
                               branchName,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
                                 color: colorScheme.onPrimaryContainer,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            if (totalCount > 0) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                '$presentCount حاضر • $checkedOutCount منصرف • تم فحص $verifiedCount من $totalCount',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-                                ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (isBranchLoading) ...[
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: colorScheme.primary,
                               ),
-                            ],
+                            ),
+                            const SizedBox(width: 8),
                           ],
-                        ),
+                          // Badge عدد المندوبين
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              query.isEmpty
+                                  ? (currentFilter == 'all'
+                                      ? '$totalCount مندوب'
+                                      : '${displayRecords.length} من $totalCount')
+                                  : '${displayRecords.length} من $totalCount',
+                              style: TextStyle(
+                                color: colorScheme.onPrimary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          // زر تصدير Excel للفرع
+                          IconButton(
+                            icon: const Icon(
+                              Icons.table_chart_rounded,
+                              color: Color(0xFF2E7D32),
+                              size: 20,
+                            ),
+                            tooltip: 'تصدير كشف الفرع إلى Excel',
+                            style: IconButton.styleFrom(
+                              backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
+                              padding: const EdgeInsets.all(6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => _showExportExcelModal(
+                              context,
+                              preselectedBranch: branchName,
+                              branchRecords: {branchName: records},
+                              initialOnlyNotCheckedOut: currentFilter == 'not_checked_out',
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          // زر حذف الفرع المباشر
+                          IconButton(
+                            icon: Icon(
+                              Icons.delete_outline_rounded,
+                              color: colorScheme.error,
+                              size: 20,
+                            ),
+                            tooltip: 'إزالة الفرع من القائمة',
+                            style: IconButton.styleFrom(
+                              backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
+                              padding: const EdgeInsets.all(6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => _confirmRemoveBranch(context, branchName),
+                          ),
+                          const SizedBox(width: 4),
+                          // سهم الطي والانكماش Animated Chevron
+                          AnimatedRotation(
+                            turns: isExpanded ? 0.5 : 0.0,
+                            duration: AppMotionDurations.short4,
+                            curve: AppMotionCurves.emphasized,
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: colorScheme.onPrimaryContainer,
+                              size: 22,
+                            ),
+                          ),
+                        ],
                       ),
-                      if (isBranchLoading) ...[
-                        SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: colorScheme.primary,
+                      if (totalCount > 0) ...[
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(start: 44),
+                          child: Text(
+                            '$presentCount حاضر • $checkedOutCount منصرف • تم فحص $verifiedCount من $totalCount',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
                       ],
-                      // Badge عدد المندوبين
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          query.isEmpty
-                              ? (currentFilter == 'all'
-                                  ? '$totalCount مندوب'
-                                  : '${displayRecords.length} من $totalCount')
-                              : '${displayRecords.length} من $totalCount',
-                          style: TextStyle(
-                            color: colorScheme.onPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      // زر تصدير Excel للفرع
-                      IconButton(
-                        icon: const Icon(
-                          Icons.table_chart_rounded,
-                          color: Color(0xFF2E7D32),
-                          size: 20,
-                        ),
-                        tooltip: 'تصدير كشف الفرع إلى Excel',
-                        style: IconButton.styleFrom(
-                          backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
-                          padding: const EdgeInsets.all(6),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => _showExportExcelModal(
-                          context,
-                          preselectedBranch: branchName,
-                          branchRecords: {branchName: records},
-                          initialOnlyNotCheckedOut: currentFilter == 'not_checked_out',
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      // زر حذف الفرع المباشر
-                      IconButton(
-                        icon: Icon(
-                          Icons.delete_outline_rounded,
-                          color: colorScheme.error,
-                          size: 20,
-                        ),
-                        tooltip: 'إزالة الفرع من القائمة',
-                        style: IconButton.styleFrom(
-                          backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
-                          padding: const EdgeInsets.all(6),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => _confirmRemoveBranch(context, branchName),
-                      ),
-                      const SizedBox(width: 4),
-                      // سهم الطي والانكماش Animated Chevron
-                      AnimatedRotation(
-                        turns: isExpanded ? 0.5 : 0.0,
-                        duration: AppMotionDurations.short4,
-                        curve: AppMotionCurves.emphasized,
-                        child: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: colorScheme.onPrimaryContainer,
-                          size: 22,
-                        ),
-                      ),
                     ],
                   ),
                 ),

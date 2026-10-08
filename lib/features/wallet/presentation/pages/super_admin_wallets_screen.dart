@@ -70,9 +70,16 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          titleSpacing: 0,
           title: const Text(
             'إدارة المحافظ والمستحقات',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14.5,
+              letterSpacing: -0.2,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           actions: [
             IconButton(
@@ -681,19 +688,18 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
             const Divider(height: 1),
             const SizedBox(height: 10),
 
-            // 2. Financial Metrics: Due Balance + Monthly Allocation + Total Paid
+            // 2. Financial Metrics: Due Balance + Total Paid
             Row(
               children: [
                 // الرصيد المستحق
                 Expanded(
-                  flex: 5,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: hasBalance
                           ? colorScheme.primaryContainer.withValues(alpha: 0.4)
                           : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -701,17 +707,18 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                         Text(
                           'الرصيد المستحق',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 11,
                             color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
                             _formatCurrency(wallet.currentBalance),
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: hasBalance
                                   ? colorScheme.primary
@@ -723,53 +730,15 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-
-                // إجمالي المستحق
-                Expanded(
-                  flex: 4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'إجمالي المستحق',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            _formatCurrency(wallet.totalAllocated),
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
 
                 // إجمالي المنصرف
                 Expanded(
-                  flex: 4,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -777,17 +746,18 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                         Text(
                           'إجمالي المنصرف',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 11,
                             color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
                             _formatCurrency(wallet.totalPaid),
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: colorScheme.secondary,
                             ),
@@ -903,7 +873,7 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
     Map<String, String>? selectedUser;
     final userSearchController = TextEditingController();
     bool isLoadingUsers = false;
-    bool isInternalOnly = false;
+    bool isInternalOnly = true;
     bool isSubmitting = false;
     bool hasSearched = false;
     List<Map<String, String>> searchResults = [];
@@ -1192,9 +1162,8 @@ class _SuperAdminWalletsScreenState extends State<SuperAdminWalletsScreen> {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      '• الرصيد القائم حالياً: ${_formatCurrency(existingWallet.currentBalance)}\n'
-                                      '• إجمالي المستحق: ${_formatCurrency(existingWallet.totalAllocated)}\n'
-                                      '• إجمالي المسدد: ${_formatCurrency(existingWallet.totalPaid)}',
+                                      '• الرصيد المستحق حالياً: ${_formatCurrency(existingWallet.currentBalance)}\n'
+                                      '• إجمالي المنصرف: ${_formatCurrency(existingWallet.totalPaid)}',
                                       style: TextStyle(
                                         fontSize: 11.5,
                                         color: colorScheme.onSurfaceVariant,

@@ -24,8 +24,11 @@ import 'package:delegate_app/features/penalties/presentation/pages/company_penal
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'dart:async';
-import 'package:delegate_app/features/wallet/data/datasources/wallet_remote_data_source.dart';
-import 'package:delegate_app/features/wallet/presentation/pages/user_wallet_screen.dart';
+import 'package:delegate_app/features/private_label/presentation/pages/private_label_screen.dart';
+import 'package:delegate_app/features/private_label/presentation/pages/private_label_report_screen.dart';
+import 'package:delegate_app/features/private_label/presentation/pages/private_label_review_screen.dart';
+import 'package:delegate_app/features/private_label/domain/entities/private_label_permissions.dart';
+import 'package:delegate_app/features/private_label/data/datasources/private_label_permissions_remote_data_source.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 class MarketingMainScreen extends StatefulWidget {
@@ -39,18 +42,20 @@ class MarketingMainScreen extends StatefulWidget {
 
 class _MarketingMainScreenState extends State<MarketingMainScreen> {
   int _currentIndex = 0;
-  StreamSubscription? _walletSubscription;
-  bool _isWalletEnabled = false;
+  StreamSubscription<PrivateLabelPermissions?>? _plSubscription;
+  PrivateLabelPermissions? _plPermissions;
+
+  bool get _isSuperAdmin => widget.delegate.role == UserRole.superAdmin;
 
   @override
   void initState() {
     super.initState();
-    _walletSubscription = WalletRemoteDataSourceImpl()
-        .streamUserWallet(widget.delegate.uid)
-        .listen((w) {
+    _plSubscription = di.sl<PrivateLabelPermissionsRemoteDataSource>()
+        .streamUserPermissions(widget.delegate.uid)
+        .listen((p) {
       if (mounted) {
         setState(() {
-          _isWalletEnabled = w?.isWalletEnabled ?? false;
+          _plPermissions = p;
         });
       }
     });
@@ -58,7 +63,7 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
 
   @override
   void dispose() {
-    _walletSubscription?.cancel();
+    _plSubscription?.cancel();
     super.dispose();
   }
 
@@ -67,18 +72,6 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
     final isPromotionOnly = delegate.role == UserRole.marketingPromotion;
 
     switch (value) {
-      case 'wallet':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => UserWalletScreen(
-              targetUserId: delegate.uid,
-              targetUserName: delegate.fullName.isNotEmpty
-                  ? delegate.fullName
-                  : delegate.firstName,
-            ),
-          ),
-        );
-        break;
       case 'profile':
         context.push('/user-profile', extra: delegate);
         break;
@@ -130,6 +123,27 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                 showAppBar: true,
               ),
             ),
+          ),
+        );
+        break;
+      case 'private_label':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PrivateLabelScreen(delegate: delegate),
+          ),
+        );
+        break;
+      case 'private_label_report':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PrivateLabelReportScreen(delegate: delegate),
+          ),
+        );
+        break;
+      case 'private_label_audit':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PrivateLabelReviewScreen(delegate: delegate),
           ),
         );
         break;
@@ -285,19 +299,31 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
               icon: Icons.task_alt_rounded,
               title: l10n.tasks,
             ),
+          if (_isSuperAdmin || (_plPermissions?.canCapture ?? false))
+            buildPopupItem(
+              value: 'private_label',
+              icon: Icons.sell_rounded,
+              title: 'Private Label (التوثيق)',
+            ),
+          if (_isSuperAdmin || (_plPermissions?.canViewReports ?? false))
+            buildPopupItem(
+              value: 'private_label_report',
+              icon: Icons.analytics_rounded,
+              title: 'تقارير Private Label',
+            ),
+          if (_isSuperAdmin || (_plPermissions?.canReviewAudit ?? false))
+            buildPopupItem(
+              value: 'private_label_audit',
+              icon: Icons.fact_check_rounded,
+              title: 'اعتمادات Private Label',
+            ),
+          // المخالفات والغرامات دائماً فوق تسجيل الخروج لتطابق اللون الأحمر والتنسيق الموحد
           if (!isPromotionOnly)
             buildPopupItem(
               value: 'penalties',
               icon: Icons.gavel_rounded,
               title: 'المخالفات والغرامات',
               color: colorScheme.error,
-            ),
-          if (_isWalletEnabled)
-            buildPopupItem(
-              value: 'wallet',
-              icon: Icons.account_balance_wallet_rounded,
-              title: 'المحفظة والمستحقات',
-              color: colorScheme.primary,
             ),
           buildPopupItem(
             value: 'logout',

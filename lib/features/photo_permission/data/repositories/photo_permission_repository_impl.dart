@@ -253,11 +253,15 @@ class PhotoPermissionRepositoryImpl implements PhotoPermissionRepository {
   Future<Either<Failure, List<CapturedPhoto>>> getCompanyCapturedPhotos({
     required String companyUID,
     String? organizationUID,
+    String? branchName,
+    int? limit,
   }) async {
     try {
       final result = await remoteDataSource.getCompanyCapturedPhotos(
         companyUID: companyUID,
         organizationUID: organizationUID,
+        branchName: branchName,
+        limit: limit,
       );
       return Right(result);
     } on Failure catch (f) {

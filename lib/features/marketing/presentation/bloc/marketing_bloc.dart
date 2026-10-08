@@ -1,5 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_companies.dart';
@@ -329,7 +330,7 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
       branchesToFetch.addAll(event.favoriteBranches);
     }
 
-    // If we have some data ready right now (e.g. Agmy Star is already loaded):
+    // If we have some data ready right now (e.g. cached branches):
     if (branchData.isNotEmpty) {
       // 0ms instant render of cached branches!
       emit(AllBranchesAttendanceLoaded(
@@ -342,15 +343,16 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
       emit(AllBranchesAttendanceLoading());
     }
 
-    // If nothing needs to be fetched (all branches cached and no force refresh)
-    if (branchesToFetch.isEmpty) {
-      return;
-    }
+    // Stale-While-Revalidate (SWR):
+    // Even if all branches were present in local cache, we revalidate from the live server
+    // in the background to ensure any newly added attendance/check-outs are delivered with 100% integrity.
+    final branchesToQuery = branchesToFetch.isNotEmpty
+        ? branchesToFetch
+        : event.favoriteBranches;
 
     try {
-      // Only fetch the branches that actually need fetching (e.g. newly added branch only!)
       final fetchedData = await remoteDataSource.getTodayAttendanceForBranches(
-        branchNames: branchesToFetch,
+        branchNames: branchesToQuery,
         organizationId: event.organizationId,
         date: date,
       );

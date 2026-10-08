@@ -387,6 +387,36 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isAuthenticated();
       }
+
+      // ==================== PRIVATE LABEL (Fathalla) ====================
+      // Daily product + price-tag documentation by branch marketing and its review
+      // by marketing promotion. Mobile app uses anonymous auth, so access is
+      // enforced by app logic (org + delegateUid scoping), like tasks above.
+      match /private_label_audits/{auditId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() &&
+                         request.resource.data.organizationUID == orgId &&
+                         request.resource.data.delegateUid is string &&
+                         request.resource.data.productPhotoUrl is string &&
+                         request.resource.data.pricePhotoUrl is string;
+        allow update: if isAuthenticated();
+        // Allowed for authorized marketing promotion and admins
+        allow delete: if isAuthenticated();
+      }
+
+      // One summary doc per marketer per day ({uid}_{yyyy-MM-dd}): worked / rest.
+      match /private_label_days/{dayId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated();
+        allow delete: if isAuthenticated();
+      }
+
+      // Product catalog (reference prices) managed by marketing promotion.
+      match /private_label_products/{productId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated();
+        allow delete: if isAuthenticated();
+      }
     }
 
     // ==================== MAIL COLLECTION ====================
@@ -550,6 +580,14 @@ service cloud.firestore {
       }
     }
     match /{path=**}/user_wallets/{userId} {
+      allow read, write: if true;
+    }
+
+    // ==================== PRIVATE LABEL PERMISSIONS ====================
+    match /private_label_permissions/{userId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/private_label_permissions/{userId} {
       allow read, write: if true;
     }
 

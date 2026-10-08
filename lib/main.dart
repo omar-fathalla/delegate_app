@@ -122,6 +122,10 @@ void main() async {
   // Note: FCM initialization is now done post-login in SplashScreen/LoginScreen
   // so we have the delegate UID for token storage.
 
+  // ضبط سعة ذاكرة التخزين المؤقت للصور (ImageCache) للحد من استهلاك الذاكرة العشوائية RAM وتفادي ضغط GC
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 40 * 1024 * 1024; // 40 MB max heap for decoded bitmaps
+  PaintingBinding.instance.imageCache.maximumSize = 100; // max 100 cached images
+
   runApp(const MyApp());
 
   // Schedule background tasks non-blockingly after UI has launched

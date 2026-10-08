@@ -682,36 +682,58 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: widget.showAppBar
           ? AppBar(
+              titleSpacing: 0,
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
                     'مسيرات الرواتب الشهرية',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.5,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     widget.hrDelegate.companyName,
-                    style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
               actions: [
                 IconButton(
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  padding: const EdgeInsets.all(6),
                   icon: const Icon(Icons.tune_rounded),
                   tooltip: 'قواعد وسياسة الرواتب للشركة',
                   onPressed: _openCompanyPayrollPolicyDialog,
                 ),
                 IconButton(
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  padding: const EdgeInsets.all(6),
                   icon: const Icon(Icons.file_download_outlined),
                   tooltip: 'تصدير مسير الرواتب إلى Excel',
                   onPressed: _exportPayrollToExcel,
                 ),
                 IconButton(
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  padding: const EdgeInsets.all(6),
                   icon: const Icon(Icons.refresh_rounded),
                   tooltip: 'إعادة الاحتساب والتحديث',
                   onPressed: _loadPayrollData,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
               ],
             )
           : null,
@@ -738,11 +760,22 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                                 children: [
                                   const Text(
                                     'مسيرات الرواتب الشهرية',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14.5,
+                                      letterSpacing: -0.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
                                     widget.hrDelegate.companyName,
-                                    style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -1236,6 +1269,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                     Icons.chevron_right_rounded,
                     size: 20,
                     color: colorScheme.onSurfaceVariant,
+                    textDirection: TextDirection.ltr,
                   ),
                 ),
               ),
@@ -1299,6 +1333,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                     Icons.chevron_left_rounded,
                     size: 20,
                     color: colorScheme.onSurfaceVariant,
+                    textDirection: TextDirection.ltr,
                   ),
                 ),
               ),

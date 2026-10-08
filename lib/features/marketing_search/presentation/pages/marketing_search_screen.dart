@@ -201,11 +201,13 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
-        title: Text(
+        titleSpacing: 0,
+        title: const Text(
           'البحث',
-          style: theme.textTheme.titleLarge?.copyWith(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            letterSpacing: -0.2,
           ),
         ),
         backgroundColor: colorScheme.surfaceContainer,
