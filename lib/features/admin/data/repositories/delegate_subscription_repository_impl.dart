@@ -6,6 +6,7 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionRepository {
@@ -504,6 +505,96 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
   }
 
   @override
+  Future<Either<Failure, String>> submitDeleteDelegateRequest({
+    required String supervisorUid,
+    required String supervisorName,
+    required String supervisorPhone,
+    required Delegate delegate,
+    required String reason,
+  }) async {
+    try {
+      final now = DateTime.now();
+
+      // 1. Check if a pending delete request already exists for this delegate
+      final existingPending = await _firestore
+          .collection('delegate_requests')
+          .where('existingDelegateUid', isEqualTo: delegate.uid)
+          .where('requestType', isEqualTo: 'delete_delegate')
+          .where('status', isEqualTo: 'pending')
+          .limit(1)
+          .get();
+
+      if (existingPending.docs.isNotEmpty) {
+        return Left(ServerFailure(
+          'يوجد طلب حذف معلق بالفعل لهذا المندوب وبانتظار موافقة الإدارة العليا.',
+        ));
+      }
+
+      // 2. Create the delete request document in delegate_requests
+      final docRef = _firestore.collection('delegate_requests').doc();
+      final requestId = docRef.id;
+
+      final requestData = {
+        'id': requestId,
+        'supervisorUid': supervisorUid,
+        'supervisorName': supervisorName,
+        'supervisorPhone': supervisorPhone,
+        'companyUID': delegate.companyUID,
+        'companyName': delegate.companyName,
+        'organizationUID': delegate.organizationUID,
+        'organizationName': delegate.organizationName,
+        'firstName': delegate.firstName,
+        'secondName': delegate.middleName,
+        'thirdName': delegate.lastName,
+        'fullName': delegate.fullName,
+        'phoneNumber': delegate.phoneNumber,
+        'nationalId': delegate.nationalityID,
+        'profileImageUrl': delegate.personalPhotoUrl,
+        'nationalIdFrontUrl': '',
+        'nationalIdBackUrl': '',
+        'paymentMethod': 'free_promotion',
+        'subscriptionCycle': '',
+        'cycleStartDate': now.toIso8601String(),
+        'cycleEndDate': now.toIso8601String(),
+        'fee': 0.0,
+        'remainingMonths': 0,
+        'status': 'pending',
+        'requestType': 'delete_delegate',
+        'existingDelegateUid': delegate.uid,
+        'currentOrganizationName': delegate.organizationName,
+        'rejectionReason': reason.trim(),
+        'createdAt': now.toIso8601String(),
+      };
+
+      await docRef.set(requestData);
+
+      // 3. Send notifications to Super Admin & Tech Support
+      final notifTitle = 'طلب حذف مندوب جديد';
+      final notifBody =
+          'طلب المشرف $supervisorName حذف المندوب ${delegate.fullName} (${delegate.companyName})${reason.trim().isNotEmpty ? " - السبب: ${reason.trim()}" : ""}';
+
+      for (final roleKey in ['super-admin', 'technicalSupport', 'role_super_admin', 'role_technical_support']) {
+        await _firestore.collection('notifications').add({
+          'delegateUid': roleKey,
+          'title': notifTitle,
+          'body': notifBody,
+          'type': 'delegate_delete_request',
+          'requestId': requestId,
+          'senderName': supervisorName,
+          'senderRole': 'supervisor',
+          'createdAt': FieldValue.serverTimestamp(),
+          'isRead': false,
+          'targetRoles': ['superAdmin', 'technicalSupport'],
+        });
+      }
+
+      return Right(requestId);
+    } catch (e) {
+      return Left(ServerFailure('فشل تقديم طلب حذف المندوب: $e'));
+    }
+  }
+
+  @override
   Future<Either<Failure, bool>> isReceiptCodeUsed(String receiptCode) async {
     try {
       final cleanCode = receiptCode.trim();
@@ -607,6 +698,84 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
               request.existingDelegateUid!.trim().isNotEmpty)
           ? request.existingDelegateUid!.trim()
           : request.id;
+
+      // Special handling for delete_delegate request
+      if (request.requestType == 'delete_delegate') {
+        // A. Delete from organizations subcollections
+        if (request.companyUID.isNotEmpty) {
+          final orgsSnap = await _firestore.collection('organizations').get();
+          for (final orgDoc in orgsSnap.docs) {
+            final delRef = _firestore
+                .collection('organizations')
+                .doc(orgDoc.id)
+                .collection('companies')
+                .doc(request.companyUID)
+                .collection('delegates')
+                .doc(targetDelegateUid);
+            final check = await delRef.get();
+            if (check.exists) {
+              await delRef.delete();
+            }
+          }
+        }
+
+        // B. CollectionGroup query deletion to ensure no orphan doc exists
+        try {
+          final groupQuery = await _firestore
+              .collectionGroup('delegates')
+              .where('uid', isEqualTo: targetDelegateUid)
+              .get();
+          for (final doc in groupQuery.docs) {
+            await doc.reference.delete();
+          }
+        } catch (_) {}
+
+        // C. Delete from users collection if role is delegate/promoter
+        try {
+          final userDoc = _firestore.collection('users').doc(targetDelegateUid);
+          final uSnap = await userDoc.get();
+          if (uSnap.exists) {
+            final role = uSnap.data()?['role']?.toString().toLowerCase();
+            if (role == 'delegate' || role == 'promoter' || role == null) {
+              await userDoc.delete();
+            }
+          }
+        } catch (_) {}
+
+        // D. Delete active tracking session if any
+        try {
+          final trackingDoc =
+              _firestore.collection('delegate_tracking').doc(targetDelegateUid);
+          final tSnap = await trackingDoc.get();
+          if (tSnap.exists) {
+            final crumbs = await trackingDoc.collection('breadcrumbs').get();
+            for (final c in crumbs.docs) {
+              await c.reference.delete();
+            }
+            await trackingDoc.delete();
+          }
+        } catch (_) {}
+
+        // E. Send notification to supervisor that the delete request was approved
+        try {
+          await _firestore.collection('notifications').add({
+            'delegateUid': request.supervisorUid,
+            'title': 'تمت الموافقة على حذف المندوب',
+            'body':
+                'تمت الموافقة على طلب حذف المندوب ${request.fullName} وحذفه نهائياً من المنظومة.',
+            'type': 'delegate_deleted',
+            'senderName': reviewerName,
+            'senderRole': 'superAdmin',
+            'createdAt': FieldValue.serverTimestamp(),
+            'isRead': false,
+          });
+        } catch (_) {}
+
+        // F. Clear delegates cache
+        AdminDelegatesBloc.clearCache();
+
+        return const Right(null);
+      }
 
       // 2. Update delegate record to active in company branch
       final delegateData = {
@@ -714,6 +883,18 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       }
 
       // 2c. Provision delegate record to active in company branch (target organization)
+      final allKnownOrgs = <String>{
+        request.organizationName.trim(),
+        if (request.currentOrganizationName != null &&
+            request.currentOrganizationName!.trim().isNotEmpty)
+          request.currentOrganizationName!.trim(),
+      }.where((s) => s.isNotEmpty).toList();
+
+      final targetDelegateData = Map<String, dynamic>.from(delegateData);
+      if (allKnownOrgs.length > 1) {
+        targetDelegateData['allOrganizationNames'] = allKnownOrgs;
+      }
+
       await _firestore
           .collection('organizations')
           .doc(request.organizationUID)
@@ -721,25 +902,52 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           .doc(request.companyUID)
           .collection('delegates')
           .doc(targetDelegateUid)
-          .set(delegateData, SetOptions(merge: true));
+          .set(targetDelegateData, SetOptions(merge: true));
 
-      // 2d. If supervisor belongs to a different primary organization, also provision in supervisor's branch
-      try {
-        final supDoc = await _firestore.collection('users').doc(request.supervisorUid).get();
-        final supOrg = supDoc.data()?['organizationUID'] as String?;
-        if (supOrg != null && supOrg.isNotEmpty && supOrg != request.organizationUID) {
-          await _firestore
-              .collection('organizations')
-              .doc(supOrg)
-              .collection('companies')
-              .doc(request.companyUID)
-              .collection('delegates')
-              .doc(targetDelegateUid)
-              .set(delegateData, SetOptions(merge: true));
-        }
-      } catch (_) {}
+      // 2d. If add_organization: ensure original organization document maintains its own organizationUID/Name and updates allOrganizationNames
+      if (request.requestType == 'add_organization') {
+        try {
+          final supDoc = await _firestore.collection('users').doc(request.supervisorUid).get();
+          final supOrg = supDoc.data()?['organizationUID'] as String?;
+          if (supOrg != null && supOrg.isNotEmpty && supOrg != request.organizationUID) {
+            await _firestore
+                .collection('organizations')
+                .doc(supOrg)
+                .collection('companies')
+                .doc(request.companyUID)
+                .collection('delegates')
+                .doc(targetDelegateUid)
+                .update({
+              'allOrganizationNames': FieldValue.arrayUnion([request.organizationName]),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        } catch (_) {}
+      } else {
+        // 2e. For new_delegate requests: if supervisor belongs to a different primary organization, provision in supervisor's branch using supervisor's own organizationUID
+        try {
+          final supDoc = await _firestore.collection('users').doc(request.supervisorUid).get();
+          final supOrg = supDoc.data()?['organizationUID'] as String?;
+          final supOrgName = supDoc.data()?['organizationName'] as String? ?? '';
+          if (supOrg != null && supOrg.isNotEmpty && supOrg != request.organizationUID) {
+            final supDelegateData = Map<String, dynamic>.from(delegateData);
+            supDelegateData['organizationUID'] = supOrg;
+            if (supOrgName.isNotEmpty) {
+              supDelegateData['organizationName'] = supOrgName;
+            }
+            await _firestore
+                .collection('organizations')
+                .doc(supOrg)
+                .collection('companies')
+                .doc(request.companyUID)
+                .collection('delegates')
+                .doc(targetDelegateUid)
+                .set(supDelegateData, SetOptions(merge: true));
+          }
+        } catch (_) {}
+      }
 
-      // 3. Also ensure user record exists for mobile login
+      // 3. Also ensure user record exists for mobile login with all organization names
       await _firestore.collection('users').doc(targetDelegateUid).set({
         'uid': targetDelegateUid,
         'fullName': request.fullName,
@@ -748,6 +956,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'role': 'delegate',
         'organizationUID': request.organizationUID,
         'companyUID': request.companyUID,
+        'organizationNames': FieldValue.arrayUnion(allKnownOrgs),
         'status': 'active',
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -823,27 +1032,36 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'reviewedAt': now.toIso8601String(),
       });
 
-      // 2. Update delegate doc status if exists
-      try {
-        await _firestore
-            .collection('organizations')
-            .doc(request.organizationUID)
-            .collection('companies')
-            .doc(request.companyUID)
-            .collection('delegates')
-            .doc(request.id)
-            .set({
-          'status': 'rejected',
-          'statusReason': reason,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      } catch (_) {}
+      // 2. Update delegate doc status if exists (only for new delegate requests)
+      if (request.requestType != 'delete_delegate') {
+        try {
+          await _firestore
+              .collection('organizations')
+              .doc(request.organizationUID)
+              .collection('companies')
+              .doc(request.companyUID)
+              .collection('delegates')
+              .doc(request.id)
+              .set({
+            'status': 'rejected',
+            'statusReason': reason,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } catch (_) {}
+      }
 
       // 3. Send notification to supervisor
+      final notifTitle = request.requestType == 'delete_delegate'
+          ? 'تم رفض طلب حذف المندوب'
+          : 'تم رفض طلب اشتراك المندوب';
+      final notifBody = request.requestType == 'delete_delegate'
+          ? 'تم رفض طلب حذف المندوب ${request.fullName}. السبب: $reason'
+          : 'تم رفض طلب المندوب ${request.fullName}. السبب: $reason';
+
       await _firestore.collection('notifications').add({
         'delegateUid': request.supervisorUid,
-        'title': 'تم رفض طلب اشتراك المندوب',
-        'body': 'تم رفض طلب المندوب ${request.fullName}. السبب: $reason',
+        'title': notifTitle,
+        'body': notifBody,
         'type': 'subscription_rejected',
         'senderName': reviewerName,
         'senderRole': 'superAdmin',

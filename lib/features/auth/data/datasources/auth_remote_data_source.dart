@@ -145,7 +145,25 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (querySnapshot != null) {
         for (final doc in querySnapshot.docs) {
           final data = doc.data();
-          final model = DelegateModel.fromJson(data, doc.id);
+          var model = DelegateModel.fromJson(data, doc.id);
+
+          // Extract true organizationUID and companyUID from the Firestore document path
+          // Path: organizations/{orgUID}/companies/{compUID}/delegates/{delegateUID}
+          final pathSegments = doc.reference.path.split('/');
+          final pathOrgUID = (pathSegments.length >= 2 && pathSegments[0] == 'organizations')
+              ? pathSegments[1]
+              : '';
+          final pathCompUID = (pathSegments.length >= 4 && pathSegments[2] == 'companies')
+              ? pathSegments[3]
+              : '';
+
+          if (pathOrgUID.isNotEmpty && model.organizationUID != pathOrgUID) {
+            model = model.copyWith(organizationUID: pathOrgUID);
+          }
+          if (pathCompUID.isNotEmpty && model.companyUID != pathCompUID) {
+            model = model.copyWith(companyUID: pathCompUID);
+          }
+
           // Key based on uid, organizationUID, and companyUID to prevent identical duplicate records
           final key = '${model.uid}_${model.organizationUID}_${model.companyUID}';
           if (delegatesMap.containsKey(key)) {
@@ -158,6 +176,32 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           } else {
             delegatesMap[key] = model;
           }
+        }
+
+        // Cross-populate allOrganizationNames and synchronize earliest createdAt across all profiles
+        final allOrgNames = delegatesMap.values
+            .map((d) => d.organizationName.trim())
+            .where((name) => name.isNotEmpty)
+            .toSet()
+            .toList();
+
+        DateTime? earliestCreatedAt;
+        for (final d in delegatesMap.values) {
+          if (earliestCreatedAt == null || d.createdAt.isBefore(earliestCreatedAt)) {
+            earliestCreatedAt = d.createdAt;
+          }
+        }
+
+        for (final key in delegatesMap.keys.toList()) {
+          var current = delegatesMap[key]!;
+          if (allOrgNames.length > 1) {
+            final mergedNames = {...current.allOrganizationNames, ...allOrgNames}.toList();
+            current = current.copyWith(allOrganizationNames: mergedNames);
+          }
+          if (earliestCreatedAt != null && current.createdAt != earliestCreatedAt) {
+            current = current.copyWith(createdAt: earliestCreatedAt);
+          }
+          delegatesMap[key] = current;
         }
       }
 

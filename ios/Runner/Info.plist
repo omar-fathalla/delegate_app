@@ -79,7 +79,13 @@
 			<string>UIInterfaceOrientationLandscapeRight</string>
 		</array>
 		<key>GMSApiKey</key>
-		<string>AIzaSyDQkxCw7YSM1-qUxcjT9oWA9DNZyp3fsOk</string>
+		<string>AIzaSyAi6ryBU40avvR0X6xwk7DAeyvNlrYhpgc</string>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>location</string>
+			<string>fetch</string>
+			<string>remote-notification</string>
+		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
 		<key>ITSAppUsesNonExemptEncryption</key>

@@ -983,8 +983,8 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 },
               ),
               _buildActionButton(
-                label: 'إرسال إشعار جديد',
-                icon: Icons.send_time_extension_rounded,
+                label: 'بث الإشعارات السحابية',
+                icon: Icons.campaign_rounded,
                 onTap: widget.onNavigateToSendNotification ?? () {
                   Navigator.of(context).push(
                     MaterialPageRoute(

@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_event.dart';
-import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_state.dart';
@@ -12,10 +11,10 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:delegate_app/core/services/session_management_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/link_delegate_to_org_sheet.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/delete_delegate_request_sheet.dart';
 
 class AdminDelegatesScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -912,42 +911,6 @@ class _CompactDelegateTile extends StatelessWidget {
     }
   }
 
-  Future<void> _makePhoneCall(BuildContext context, String rawPhone) async {
-    final cleanPhone = rawPhone.replaceAll(RegExp(r'\s+'), '').trim();
-    if (cleanPhone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('رقم الهاتف غير متوفر'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-    final uri = Uri.parse('tel:$cleanPhone');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('تعذر إجراء المكالمة بالرقم $cleanPhone'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('حدث خطأ أثناء محاولة الاتصال: $e'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    }
-  }
 
   Widget _buildOrgBadge(
     BuildContext context,
@@ -1253,33 +1216,76 @@ class _CompactDelegateTile extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButton({
+  bool _isFathallaDelegate(Delegate delegate) {
+    final orgName = delegate.organizationName.toLowerCase().trim();
+    final orgUid = delegate.organizationUID.toLowerCase().trim();
+    final allOrgs = delegate.allOrganizationNames.map((e) => e.toLowerCase().trim());
+    return orgName.contains('fathalla') ||
+        orgName.contains('فتح الله') ||
+        orgName.contains('فتح_الله') ||
+        orgUid.contains('fathalla') ||
+        orgUid.contains('فتح الله') ||
+        orgUid.contains('فتح_الله') ||
+        orgUid == 'piiobfgxahaeurdjldgj' ||
+        allOrgs.any((name) =>
+            name.contains('fathalla') ||
+            name.contains('فتح الله') ||
+            name.contains('فتح_الله'));
+  }
+
+  Widget _buildActionPill({
     required BuildContext context,
     required Widget icon,
+    required String label,
     required VoidCallback? onPressed,
     required String tooltip,
     required Color backgroundColor,
+    required Color borderColor,
     required Color foregroundColor,
+    double height = 30,
+    double? width,
+    double fontSize = 11,
   }) {
     return Tooltip(
       message: tooltip,
       child: Material(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onPressed,
-          child: SizedBox(
-            width: 32,
-            height: 32,
-            child: Center(
-              child: IconTheme(
-                data: IconThemeData(
-                  color: foregroundColor,
-                  size: 16,
+          child: Container(
+            height: height,
+            width: width,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: borderColor, width: 1),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                IconTheme(
+                  data: IconThemeData(
+                    color: foregroundColor,
+                    size: height > 34 ? 17 : 14.5,
+                  ),
+                  child: icon,
                 ),
-                child: icon,
-              ),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: foregroundColor,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
         ),
@@ -1293,22 +1299,57 @@ class _CompactDelegateTile extends StatelessWidget {
     AppLocalizations l10n,
   ) {
     final isSuperAdmin = adminDelegate?.role == UserRole.superAdmin;
-    final hasSupervisorActions = adminDelegate != null;
+    final isSupervisor = adminDelegate?.role == UserRole.admin ||
+        adminDelegate?.position == DelegatePosition.supervisor;
+    final isFathalla = _isFathallaDelegate(delegate);
+    final canRequestDelete = isSupervisor && !isFathalla;
+
+    final isDark = theme.brightness == Brightness.dark;
+    final goldBg = const Color(0xFFB8860B).withValues(alpha: isDark ? 0.28 : 0.12);
+    final goldBorder = const Color(0xFFD4AF37).withValues(alpha: isDark ? 0.6 : 0.45);
+    final goldFg = isDark ? const Color(0xFFFFE082) : const Color(0xFF8D6200);
 
     // 1. Link Org Button
-    final linkOrgBtn = hasSupervisorActions
-        ? _buildActionButton(
-            context: context,
-            icon: const Icon(Icons.add_business_rounded),
-            backgroundColor: const Color(0xFFB8860B).withValues(
-              alpha: theme.brightness == Brightness.dark ? 0.3 : 0.15,
-            ),
-            foregroundColor: theme.brightness == Brightness.dark
-                ? const Color(0xFFFFE082)
-                : const Color(0xFF8D6200),
-            tooltip: 'ربط بسلسلة إضافية وسداد الاشتراك',
-            onPressed: () async {
+    final linkOrgBtn = _buildActionPill(
+      context: context,
+      icon: const Icon(Icons.add_business_rounded),
+      label: canRequestDelete ? 'ربط بسلسلة' : 'ربط بسلاسل إضافية',
+      backgroundColor: goldBg,
+      borderColor: goldBorder,
+      foregroundColor: goldFg,
+      tooltip: 'ربط بسلسلة إضافية وسداد الاشتراك',
+      height: canRequestDelete ? 30 : 40,
+      width: canRequestDelete ? 104 : null,
+      fontSize: canRequestDelete ? 10.5 : 11.5,
+      onPressed: adminDelegate != null
+          ? () async {
               final result = await LinkDelegateToOrgSheet.show(
+                context,
+                delegate: delegate,
+                supervisor: adminDelegate!,
+              );
+              if (result == true) {
+                onRefresh?.call();
+              }
+            }
+          : null,
+    );
+
+    // 2. Delete Request Button (Supervisor only, non-Fathalla delegates)
+    final deleteRequestBtn = canRequestDelete
+        ? _buildActionPill(
+            context: context,
+            icon: const Icon(Icons.person_remove_rounded),
+            label: 'طلب حذف',
+            backgroundColor: Colors.red.withValues(alpha: isDark ? 0.22 : 0.10),
+            borderColor: Colors.red.withValues(alpha: 0.4),
+            foregroundColor: isDark ? Colors.red.shade300 : Colors.red.shade700,
+            tooltip: 'إرسال طلب للإدارة العليا لحذف المندوب نهائياً',
+            height: 30,
+            width: 104,
+            fontSize: 10.5,
+            onPressed: () async {
+              final result = await DeleteDelegateRequestSheet.show(
                 context,
                 delegate: delegate,
                 supervisor: adminDelegate!,
@@ -1320,109 +1361,50 @@ class _CompactDelegateTile extends StatelessWidget {
           )
         : null;
 
-    // 2. Call Button
-    final callBtn = _buildActionButton(
-      context: context,
-      icon: const Icon(Icons.phone_in_talk_rounded),
-      backgroundColor: theme.colorScheme.primary.withValues(
-        alpha: theme.brightness == Brightness.dark ? 0.25 : 0.15,
-      ),
-      foregroundColor: theme.colorScheme.primary,
-      tooltip: delegate.phoneNumber.trim().isNotEmpty
-          ? 'اتصال بالمندوب (${delegate.phoneNumber})'
-          : 'رقم الهاتف غير متوفر',
-      onPressed: delegate.phoneNumber.trim().isNotEmpty
-          ? () => _makePhoneCall(context, delegate.phoneNumber)
-          : null,
-    );
-
-    // 3. Attendance Button
-    final attendanceBtn = _buildActionButton(
-      context: context,
-      icon: const Icon(Icons.history_rounded),
-      backgroundColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
-      foregroundColor: theme.colorScheme.onPrimaryContainer,
-      tooltip: l10n.viewAttendance,
-      onPressed: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => AttendanceScreen(
-              delegate: delegate,
-              viewOnly: true,
-            ),
-          ),
-        );
-      },
-    );
-
-    // 4. Profile Button
-    final profileBtn = _buildActionButton(
-      context: context,
-      icon: const Icon(Icons.person_search_rounded),
-      backgroundColor: theme.colorScheme.surfaceContainerHighest,
-      foregroundColor: theme.colorScheme.onSurfaceVariant,
-      tooltip: l10n.viewProfileData,
-      onPressed: () async {
-        final result = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (_) => BlocProvider(
-              create: (_) => sl<ProfileBloc>(),
-              child: ProfileScreen(
-                delegate: delegate,
-                showBackButton: true,
-              ),
-            ),
-          ),
-        );
-        if (result == true) {
-          onRefresh?.call();
-        }
-      },
-    );
-
-    // 5. Force Logout Button (SuperAdmin only)
+    // 3. Force Logout Button (SuperAdmin only)
     final logoutBtn = isSuperAdmin
-        ? _buildActionButton(
+        ? _buildActionPill(
             context: context,
             icon: const Icon(Icons.logout_rounded),
+            label: 'خروج إجباري',
             backgroundColor: theme.colorScheme.error.withValues(
-              alpha: theme.brightness == Brightness.dark ? 0.25 : 0.15,
+              alpha: isDark ? 0.25 : 0.12,
             ),
+            borderColor: theme.colorScheme.error.withValues(alpha: 0.4),
             foregroundColor: theme.colorScheme.error,
             tooltip: 'تسجيل خروج إجباري للتحقق من الشركة',
+            height: 30,
+            width: 104,
+            fontSize: 10.5,
             onPressed: () => _confirmForceLogout(context),
           )
         : null;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (linkOrgBtn != null) ...[
-              linkOrgBtn,
-              const SizedBox(width: 5),
-            ],
-            callBtn,
-            if (logoutBtn != null) ...[
-              const SizedBox(width: 5),
-              logoutBtn,
-            ],
-          ],
-        ),
-        const SizedBox(height: 5),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            attendanceBtn,
-            const SizedBox(width: 5),
-            profileBtn,
-          ],
-        ),
-      ],
-    );
+    if (canRequestDelete && deleteRequestBtn != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          linkOrgBtn,
+          const SizedBox(height: 5),
+          deleteRequestBtn,
+        ],
+      );
+    }
+
+    if (isSuperAdmin && logoutBtn != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          linkOrgBtn,
+          const SizedBox(height: 5),
+          logoutBtn,
+        ],
+      );
+    }
+
+    return linkOrgBtn;
   }
 
   Color _getStatusColor(BuildContext context, DelegateStatus status) {

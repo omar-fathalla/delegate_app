@@ -477,23 +477,35 @@ class _DelegateSubscriptionRequestsPageState
   }
 
   Future<void> _handleApprove(DelegateSubscriptionRequest request) async {
+    final isDelete = request.requestType == 'delete_delegate';
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.check_circle_rounded, color: Colors.green),
-            SizedBox(width: 8),
-            Text('تأكيد الاعتماد', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Icon(
+              isDelete ? Icons.delete_forever_rounded : Icons.check_circle_rounded,
+              color: isDelete ? Colors.red : Colors.green,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isDelete ? 'تأكيد حذف المندوب نهائياً' : 'تأكيد الاعتماد',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ],
         ),
         content: Text(
-          request.requestType == 'add_organization'
-              ? 'هل أنت متأكد من الموافقة على ربط المندوب "${request.fullName}" بسلسلة "${request.organizationName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر)؟\n\n'
-                  'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}'
-              : 'هل أنت متأكد من اعتماد المندوب "${request.fullName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر) حتى نهاية دورة ${request.subscriptionCycle}؟\n\n'
-                  'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}',
+          isDelete
+              ? 'هل أنت متأكد من الموافقة على طلب الحذف للمندوب "${request.fullName}" المقدم من المشرف ${request.supervisorName}؟\n\n'
+                  '⚠️ تحذير: سيتم حذف المندوب وكافة بياناته وسجلاته نهائياً من قاعدة البيانات والمنظومة، ولا يمكن التراجع عن هذا الإجراء.\n\n'
+                  '${request.rejectionReason?.isNotEmpty == true ? "سبب طلب الحذف: ${request.rejectionReason}" : ""}'
+              : request.requestType == 'add_organization'
+                  ? 'هل أنت متأكد من الموافقة على ربط المندوب "${request.fullName}" بسلسلة "${request.organizationName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر)؟\n\n'
+                      'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}'
+                  : 'هل أنت متأكد من اعتماد المندوب "${request.fullName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر) حتى نهاية دورة ${request.subscriptionCycle}؟\n\n'
+                      'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}',
         ),
         actions: [
           TextButton(
@@ -501,9 +513,11 @@ class _DelegateSubscriptionRequestsPageState
             child: const Text('إلغاء'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
+            style: FilledButton.styleFrom(
+              backgroundColor: isDelete ? Colors.red.shade700 : Colors.green,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('اعتماد وتفعيل'),
+            child: Text(isDelete ? 'تأكيد الحذف النهائي' : 'اعتماد وتفعيل'),
           ),
         ],
       ),
@@ -524,35 +538,45 @@ class _DelegateSubscriptionRequestsPageState
       (failure) => AppSnackBar.showError(context, failure.message),
       (_) => AppSnackBar.showSuccess(
         context,
-        'تم اعتماد المندوب ${request.fullName} بنجاح وتفعيل حسابه!',
+        isDelete
+            ? 'تم حذف المندوب ${request.fullName} نهائياً من المنظومة بنجاح.'
+            : 'تم اعتماد المندوب ${request.fullName} بنجاح وتفعيل حسابه!',
       ),
     );
   }
 
   Future<void> _handleReject(DelegateSubscriptionRequest request) async {
+    final isDelete = request.requestType == 'delete_delegate';
     final reasonController = TextEditingController();
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.cancel_rounded, color: Colors.red),
-            SizedBox(width: 8),
-            Text('رفض طلب المندوب', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const Icon(Icons.cancel_rounded, color: Colors.red),
+            const SizedBox(width: 8),
+            Text(
+              isDelete ? 'رفض طلب حذف المندوب' : 'رفض طلب المندوب',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('يرجى توضيح سبب رفض طلب المندوب "${request.fullName}":'),
+            Text(
+              isDelete
+                  ? 'يرجى توضيح سبب رفض طلب حذف المندوب "${request.fullName}":'
+                  : 'يرجى توضيح سبب رفض طلب المندوب "${request.fullName}":',
+            ),
             const SizedBox(height: 10),
             TextField(
               controller: reasonController,
               maxLines: 3,
               decoration: const InputDecoration(
-                hintText: 'اكتب سبب الرفض هنا (مثلاً: صورة البطاقة غير واضحة)...',
+                hintText: 'اكتب سبب الرفض هنا...',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -592,7 +616,12 @@ class _DelegateSubscriptionRequestsPageState
 
     result.fold(
       (failure) => AppSnackBar.showError(context, failure.message),
-      (_) => AppSnackBar.showSuccess(context, 'تم رفض الطلب وإشعار المشرف بالسبب.'),
+      (_) => AppSnackBar.showSuccess(
+        context,
+        isDelete
+            ? 'تم رفض طلب حذف المندوب ${request.fullName}.'
+            : 'تم رفض الطلب وإشعار المشرف بالسبب.',
+      ),
     );
   }
 }
@@ -705,16 +734,30 @@ class _SubscriptionRequestCard extends StatelessWidget {
     final dateStr = DateFormat('yyyy/MM/dd • hh:mm a').format(request.createdAt);
 
     final Color statusColor;
-    switch (request.status) {
-      case SubscriptionRequestStatus.pending:
-        statusColor = colorScheme.primary;
-        break;
-      case SubscriptionRequestStatus.approved:
-        statusColor = const Color(0xFF16A34A);
-        break;
-      case SubscriptionRequestStatus.rejected:
-        statusColor = colorScheme.error;
-        break;
+    if (request.requestType == 'delete_delegate') {
+      switch (request.status) {
+        case SubscriptionRequestStatus.pending:
+          statusColor = Colors.red.shade700;
+          break;
+        case SubscriptionRequestStatus.approved:
+          statusColor = Colors.grey.shade600;
+          break;
+        case SubscriptionRequestStatus.rejected:
+          statusColor = colorScheme.error;
+          break;
+      }
+    } else {
+      switch (request.status) {
+        case SubscriptionRequestStatus.pending:
+          statusColor = colorScheme.primary;
+          break;
+        case SubscriptionRequestStatus.approved:
+          statusColor = const Color(0xFF16A34A);
+          break;
+        case SubscriptionRequestStatus.rejected:
+          statusColor = colorScheme.error;
+          break;
+      }
     }
 
     return Card(
@@ -743,7 +786,39 @@ class _SubscriptionRequestCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (request.requestType == 'add_organization') ...[
+                    if (request.requestType == 'delete_delegate') ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.red.shade300,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.delete_forever_rounded,
+                              size: 16,
+                              color: Colors.red.shade800,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'طلب حذف مندوب نهائياً من المنظومة',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (request.requestType == 'add_organization') ...[
                       Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -820,7 +895,11 @@ class _SubscriptionRequestCard extends StatelessWidget {
                           ),
                         ),
                         const Spacer(),
-                        _buildStatusBadge(request.status, colorScheme),
+                        _buildStatusBadge(
+                          request.status,
+                          colorScheme,
+                          isDeleteRequest: request.requestType == 'delete_delegate',
+                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -898,113 +977,210 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     ),
                     const Divider(height: 16),
 
-                    // Row 3: Payment & Cycle info + Document Icon Buttons (Responsive & Icon-First)
-                    Row(
-                      children: [
-                        // Payment Method & Fee
-                        Expanded(
-                          child: Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: [
-                              if (request.paymentMethod == SubscriptionPaymentMethod.freePromotion)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFDCFCE7),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFF86EFAC)),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.card_giftcard_rounded, size: 13, color: Color(0xFF16A34A)),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'عرض مجاني (0 ج.م)',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF15803D),
-                                        ),
+                    // Row 3: Payment & Cycle info + Document Icon Buttons or Deletion Details
+                    if (request.requestType == 'delete_delegate')
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.red.shade200),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.info_outline_rounded, size: 16, color: Colors.red.shade700),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      request.rejectionReason != null && request.rejectionReason!.trim().isNotEmpty
+                                          ? 'سبب طلب الحذف: ${request.rejectionReason}'
+                                          : 'طلب حذف مقدم من المشرف بدون سبب إضافي',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.red.shade900,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                    ],
-                                  ),
-                                )
-                              else if (request.paymentMethod == SubscriptionPaymentMethod.companyDeduction)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'خصم شركة',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onSecondaryContainer,
                                     ),
                                   ),
-                                )
-                              else if (request.paymentMethod == SubscriptionPaymentMethod.instaPay) ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF6B21A8).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFF9333EA).withValues(alpha: 0.3)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Image.asset(
-                                        'assets/images/instapay_logo.png',
-                                        width: 14,
-                                        height: 14,
-                                        fit: BoxFit.contain,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      const Text(
-                                        'انستاباي',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF9333EA),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (request.receiptImageUrl != null)
-                                  IconButton.filledTonal(
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (request.nationalIdFrontUrl.isNotEmpty || request.nationalIdBackUrl.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (request.nationalIdFrontUrl.isNotEmpty)
+                                  IconButton.outlined(
                                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                     padding: EdgeInsets.zero,
-                                    tooltip: 'عرض إشعار تحويل انستاباي',
-                                    icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                                    tooltip: 'وجه البطاقة',
+                                    icon: const Icon(Icons.badge_outlined, size: 16),
                                     onPressed: () => _showImageDialog(
                                       context,
-                                      'إشعار تحويل انستاباي - ${request.fullName}',
-                                      request.receiptImageUrl!,
+                                      'بطاقة الرقم القومي (الوجه) - ${request.fullName}',
+                                      request.nationalIdFrontUrl,
                                     ),
                                   ),
-                              ] else ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'إيصال إلكتروني',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onPrimaryContainer,
+                                if (request.nationalIdBackUrl.isNotEmpty) ...[
+                                  const SizedBox(width: 4),
+                                  IconButton.outlined(
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    padding: EdgeInsets.zero,
+                                    tooltip: 'ظهر البطاقة',
+                                    icon: const Icon(Icons.flip_rounded, size: 16),
+                                    onPressed: () => _showImageDialog(
+                                      context,
+                                      'بطاقة الرقم القومي (الظهر) - ${request.fullName}',
+                                      request.nationalIdBackUrl,
                                     ),
                                   ),
-                                ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ],
+                      )
+                    else
+                      Row(
+                        children: [
+                          // Payment Method & Fee
+                          Expanded(
+                            child: Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                if (request.paymentMethod == SubscriptionPaymentMethod.freePromotion)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDCFCE7),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFF86EFAC)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.card_giftcard_rounded, size: 13, color: Color(0xFF16A34A)),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'عرض مجاني (0 ج.م)',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF15803D),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else if (request.paymentMethod == SubscriptionPaymentMethod.companyDeduction)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'خصم شركة',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSecondaryContainer,
+                                      ),
+                                    ),
+                                  )
+                                else if (request.paymentMethod == SubscriptionPaymentMethod.instaPay) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF6B21A8).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFF9333EA).withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Image.asset(
+                                          'assets/images/instapay_logo.png',
+                                          width: 14,
+                                          height: 14,
+                                          fit: BoxFit.contain,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Text(
+                                          'انستاباي',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF9333EA),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (request.receiptImageUrl != null)
+                                    IconButton.filledTonal(
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                      padding: EdgeInsets.zero,
+                                      tooltip: 'عرض إشعار تحويل انستاباي',
+                                      icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                                      onPressed: () => _showImageDialog(
+                                        context,
+                                        'إشعار تحويل انستاباي - ${request.fullName}',
+                                        request.receiptImageUrl!,
+                                      ),
+                                    ),
+                                ] else ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'إيصال إلكتروني',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'كود: ${request.receiptCode ?? "-"}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                  if (request.receiptImageUrl != null)
+                                    IconButton.filledTonal(
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                      padding: EdgeInsets.zero,
+                                      tooltip: 'عرض الإيصال الإلكتروني',
+                                      icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                                      onPressed: () => _showImageDialog(
+                                        context,
+                                        'إيصال إلكتروني - كود ${request.receiptCode}',
+                                        request.receiptImageUrl!,
+                                      ),
+                                    ),
+                                ],
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
@@ -1012,7 +1188,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    'كود: ${request.receiptCode ?? "-"}',
+                                    '${request.fee.toInt()} ج.م (${request.remainingMonths} ش)',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
@@ -1020,69 +1196,41 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                                if (request.receiptImageUrl != null)
-                                  IconButton.filledTonal(
-                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                    padding: EdgeInsets.zero,
-                                    tooltip: 'عرض الإيصال الإلكتروني',
-                                    icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                                    onPressed: () => _showImageDialog(
-                                      context,
-                                      'إيصال إلكتروني - كود ${request.receiptCode}',
-                                      request.receiptImageUrl!,
-                                    ),
-                                  ),
                               ],
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+
+                          // Documents viewer buttons (Icon-Only with tooltips)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton.outlined(
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                padding: EdgeInsets.zero,
+                                tooltip: 'وجه البطاقة',
+                                icon: const Icon(Icons.badge_outlined, size: 16),
+                                onPressed: () => _showImageDialog(
+                                  context,
+                                  'بطاقة الرقم القومي (الوجه) - ${request.fullName}',
+                                  request.nationalIdFrontUrl,
                                 ),
-                                child: Text(
-                                  '${request.fee.toInt()} ج.م (${request.remainingMonths} ش)',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton.outlined(
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                padding: EdgeInsets.zero,
+                                tooltip: 'ظهر البطاقة',
+                                icon: const Icon(Icons.flip_rounded, size: 16),
+                                onPressed: () => _showImageDialog(
+                                  context,
+                                  'بطاقة الرقم القومي (الظهر) - ${request.fullName}',
+                                  request.nationalIdBackUrl,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-
-                        // Documents viewer buttons (Icon-Only with tooltips)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton.outlined(
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                              padding: EdgeInsets.zero,
-                              tooltip: 'وجه البطاقة',
-                              icon: const Icon(Icons.badge_outlined, size: 16),
-                              onPressed: () => _showImageDialog(
-                                context,
-                                'بطاقة الرقم القومي (الوجه) - ${request.fullName}',
-                                request.nationalIdFrontUrl,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton.outlined(
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                              padding: EdgeInsets.zero,
-                              tooltip: 'ظهر البطاقة',
-                              icon: const Icon(Icons.flip_rounded, size: 16),
-                              onPressed: () => _showImageDialog(
-                                context,
-                                'بطاقة الرقم القومي (الظهر) - ${request.fullName}',
-                                request.nationalIdBackUrl,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
 
                     // Row 4: Action Buttons or Status Message
                     if (request.status == SubscriptionRequestStatus.pending) ...[
@@ -1094,16 +1242,25 @@ class _SubscriptionRequestCard extends StatelessWidget {
                             Expanded(
                               child: FilledButton.icon(
                                 style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF16A34A),
+                                  backgroundColor: request.requestType == 'delete_delegate'
+                                      ? Colors.red.shade700
+                                      : const Color(0xFF16A34A),
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(vertical: 9),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
                                 onPressed: onApprove,
-                                icon: const Icon(Icons.verified_rounded, size: 17),
-                                label: const Text(
-                                  'اعتماد وتفعيل',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                icon: Icon(
+                                  request.requestType == 'delete_delegate'
+                                      ? Icons.delete_forever_rounded
+                                      : Icons.verified_rounded,
+                                  size: 17,
+                                ),
+                                label: Text(
+                                  request.requestType == 'delete_delegate'
+                                      ? 'اعتماد الحذف النهائي'
+                                      : 'اعتماد وتفعيل',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                 ),
                               ),
                             ),
@@ -1118,9 +1275,11 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                 ),
                                 onPressed: onReject,
                                 icon: const Icon(Icons.cancel_rounded, size: 17),
-                                label: const Text(
-                                  'رفض الطلب',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                label: Text(
+                                  request.requestType == 'delete_delegate'
+                                      ? 'رفض طلب الحذف'
+                                      : 'رفض الطلب',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                 ),
                               ),
                             ),
@@ -1156,20 +1315,38 @@ class _SubscriptionRequestCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                          color: request.requestType == 'delete_delegate'
+                              ? Colors.grey.shade100
+                              : const Color(0xFF16A34A).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.25)),
+                          border: Border.all(
+                            color: request.requestType == 'delete_delegate'
+                                ? Colors.grey.shade300
+                                : const Color(0xFF16A34A).withValues(alpha: 0.25),
+                          ),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF16A34A)),
+                            Icon(
+                              request.requestType == 'delete_delegate'
+                                  ? Icons.delete_outline_rounded
+                                  : Icons.check_circle_rounded,
+                              size: 16,
+                              color: request.requestType == 'delete_delegate'
+                                  ? Colors.grey.shade700
+                                  : const Color(0xFF16A34A),
+                            ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'تم اعتماد وتفعيل المندوب بنجاح${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}!',
-                                style: const TextStyle(
+                                request.requestType == 'delete_delegate'
+                                    ? 'تم تنفيذ الحذف النهائي للمندوب بنجاح${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}!'
+                                    : 'تم اعتماد وتفعيل المندوب بنجاح${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}!',
+                                style: TextStyle(
                                   fontSize: 11.5,
-                                  color: Color(0xFF16A34A),
+                                  color: request.requestType == 'delete_delegate'
+                                      ? Colors.grey.shade800
+                                      : const Color(0xFF16A34A),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1193,7 +1370,9 @@ class _SubscriptionRequestCard extends StatelessWidget {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'تم رفض الطلب: ${request.rejectionReason ?? "بدون سبب"}${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}',
+                                request.requestType == 'delete_delegate'
+                                    ? 'تم رفض طلب الحذف: ${request.rejectionReason ?? "بدون سبب"}${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}'
+                                    : 'تم رفض الطلب: ${request.rejectionReason ?? "بدون سبب"}${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: colorScheme.onErrorContainer,
@@ -1215,31 +1394,58 @@ class _SubscriptionRequestCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge(SubscriptionRequestStatus status, ColorScheme colorScheme) {
+  Widget _buildStatusBadge(
+    SubscriptionRequestStatus status,
+    ColorScheme colorScheme, {
+    bool isDeleteRequest = false,
+  }) {
     Color bg;
     Color fg;
     String label;
     IconData icon;
 
-    switch (status) {
-      case SubscriptionRequestStatus.pending:
-        bg = colorScheme.primary.withValues(alpha: 0.12);
-        fg = colorScheme.primary;
-        label = 'قيد الانتظار';
-        icon = Icons.hourglass_top_rounded;
-        break;
-      case SubscriptionRequestStatus.approved:
-        bg = const Color(0xFF16A34A).withValues(alpha: 0.14);
-        fg = const Color(0xFF16A34A);
-        label = 'معتمد';
-        icon = Icons.verified_rounded;
-        break;
-      case SubscriptionRequestStatus.rejected:
-        bg = colorScheme.error.withValues(alpha: 0.12);
-        fg = colorScheme.error;
-        label = 'مرفوض';
-        icon = Icons.cancel_rounded;
-        break;
+    if (isDeleteRequest) {
+      switch (status) {
+        case SubscriptionRequestStatus.pending:
+          bg = Colors.red.withValues(alpha: 0.12);
+          fg = Colors.red.shade700;
+          label = 'معلق للحذف';
+          icon = Icons.delete_sweep_rounded;
+          break;
+        case SubscriptionRequestStatus.approved:
+          bg = Colors.grey.withValues(alpha: 0.14);
+          fg = Colors.grey.shade700;
+          label = 'تم الحذف';
+          icon = Icons.check_circle_rounded;
+          break;
+        case SubscriptionRequestStatus.rejected:
+          bg = colorScheme.error.withValues(alpha: 0.12);
+          fg = colorScheme.error;
+          label = 'مرفوض';
+          icon = Icons.cancel_rounded;
+          break;
+      }
+    } else {
+      switch (status) {
+        case SubscriptionRequestStatus.pending:
+          bg = colorScheme.primary.withValues(alpha: 0.12);
+          fg = colorScheme.primary;
+          label = 'قيد الانتظار';
+          icon = Icons.hourglass_top_rounded;
+          break;
+        case SubscriptionRequestStatus.approved:
+          bg = const Color(0xFF16A34A).withValues(alpha: 0.14);
+          fg = const Color(0xFF16A34A);
+          label = 'معتمد';
+          icon = Icons.verified_rounded;
+          break;
+        case SubscriptionRequestStatus.rejected:
+          bg = colorScheme.error.withValues(alpha: 0.12);
+          fg = colorScheme.error;
+          label = 'مرفوض';
+          icon = Icons.cancel_rounded;
+          break;
+      }
     }
 
     return Container(

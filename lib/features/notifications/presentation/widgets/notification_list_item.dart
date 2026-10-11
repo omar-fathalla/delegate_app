@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/core/services/review_service.dart';
 
 class NotificationListItem extends StatefulWidget {
   final NotificationEntity notification;
@@ -351,6 +353,31 @@ class _NotificationListItemState extends State<NotificationListItem> {
                               style: FilledButton.styleFrom(
                                 visualDensity: VisualDensity.compact,
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
+                              ),
+                            ),
+                          if (widget.notification.type == 'update' ||
+                              widget.notification.title.contains('تحديث') ||
+                              widget.notification.body.contains('تحديث التطبيق'))
+                            FilledButton.icon(
+                              onPressed: () async {
+                                _markAsRead();
+                                try {
+                                  final prefs = await SharedPreferences.getInstance();
+                                  await ReviewService(prefs: prefs).openStoreListing();
+                                } catch (e) {
+                                  debugPrint('Error opening store listing: $e');
+                                }
+                              },
+                              icon: const Icon(Icons.system_update_rounded, size: 16),
+                              label: const Text(
+                                'تحديث التطبيق الآن',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              style: FilledButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: colorScheme.onPrimary,
                               ),
                             ),
                         ],

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart';
 import 'package:delegate_app/features/auth/presentation/pages/splash_screen.dart';
 import 'package:delegate_app/features/home/presentation/pages/main_screen.dart';
@@ -77,7 +78,10 @@ final appRouter = GoRouter(
         }
         return AppMotionPage.fadeThrough(
           state: state,
-          child: MainScreen(delegate: delegate),
+          child: MainScreen(
+            key: ValueKey('${delegate.uid}_${delegate.organizationUID}_${delegate.companyUID}'),
+            delegate: delegate,
+          ),
         );
       },
     ),

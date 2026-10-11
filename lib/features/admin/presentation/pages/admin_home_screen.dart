@@ -1338,7 +1338,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.celebration_rounded,
+                          Icons.local_offer_rounded,
                           size: 14,
                           color: Color(0xFF16A34A),
                         ),

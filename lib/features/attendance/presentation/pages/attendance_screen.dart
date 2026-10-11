@@ -10,6 +10,8 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
+import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
@@ -22,6 +24,7 @@ import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/core/services/security_audit_service.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:delegate_app/features/tracking/data/services/delegate_tracking_engine.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final Delegate delegate;
@@ -50,6 +53,70 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   List<Attendance> _filteredHistory = [];
   Map<String, List<Attendance>> _groupedByDay = {};
   List<String> _dayKeys = [];
+  String _chainFilter = 'all'; // 'all' or 'active'
+  int _allAttendedDaysCount = 0;
+  int _activeOrgDaysCount = 0;
+  int _approvedLeavesThisMonth = 0;
+
+  static final Map<String, String> _orgNamesCache = {
+    'PiioBFgxaHAeuRdjlDgj': 'fathalla market',
+    '5DE6702w6hFwycJfZyqM': 'جملة ماركت',
+    'gOaRsmPocj2xV018m0hY': 'جملة ماركت',
+  };
+
+  String _resolveOrgName(String orgId) {
+    if (orgId.isEmpty) return widget.delegate.organizationName;
+    if (_orgNamesCache.containsKey(orgId)) {
+      return _orgNamesCache[orgId]!;
+    }
+    if (orgId == widget.delegate.organizationUID) {
+      return widget.delegate.organizationName;
+    }
+    FirebaseFirestore.instance
+        .collection('organizations')
+        .doc(orgId)
+        .getResilient(forceServer: false)
+        .then((doc) {
+      if (doc.exists && mounted) {
+        final name = (doc.data()?['name'] as String?)?.trim() ?? '';
+        if (name.isNotEmpty) {
+          setState(() {
+            _orgNamesCache[orgId] = name;
+          });
+        }
+      }
+    }).ignore();
+    return widget.delegate.organizationName;
+  }
+
+  Future<void> _loadApprovedLeaves() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('leave_requests')
+          .where('delegateUid', isEqualTo: widget.delegate.uid)
+          .where('status', isEqualTo: 'approved')
+          .getResilient(forceServer: false);
+
+      int count = 0;
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (data['isHourly'] == true) continue;
+        final start = data['startDate'];
+        if (start is Timestamp) {
+          final date = start.toDate();
+          if (date.year == _selectedMonth.year && date.month == _selectedMonth.month) {
+            final days = (data['daysCount'] as num?)?.toInt() ?? 1;
+            count += days;
+          }
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _approvedLeavesThisMonth = count;
+        });
+      }
+    } catch (_) {}
+  }
 
   final ScrollController _scrollController = ScrollController();
 
@@ -85,11 +152,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   @override
   void initState() {
     super.initState();
+    try {
+      _selectedMonth = sl.isRegistered<TrustedTimeService>()
+          ? sl<TrustedTimeService>().now
+          : DateTime.now();
+    } catch (_) {
+      _selectedMonth = DateTime.now();
+    }
+
+    _loadApprovedLeaves();
     _attendanceBloc = sl<AttendanceBloc>();
     _attendanceBloc.add(
       HistoryRequested(
         userId: widget.delegate.uid,
-        organizationId: widget.delegate.organizationUID,
+        organizationId: '', // Cross-org query for unified monthly attendance
         nationalityID: widget.delegate.nationalityID,
         phoneNumber: widget.delegate.phoneNumber,
       ),
@@ -100,14 +176,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _attendanceBloc.add(const SyncRequested());
       }
     }).ignore();
-
-    try {
-      _selectedMonth = sl.isRegistered<TrustedTimeService>()
-          ? sl<TrustedTimeService>().now
-          : DateTime.now();
-    } catch (_) {
-      _selectedMonth = DateTime.now();
-    }
 
     // Subscribe to connectivity changes once
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
@@ -186,25 +254,23 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.delegate.organizationUID != widget.delegate.organizationUID) {
       setState(() {
-        _rawHistory.clear();
-        _filteredHistory.clear();
-        _groupedByDay.clear();
-        _dayKeys.clear();
         _orgBranches.clear();
         _matchedBranch = null;
         _nearestBranch = null;
         _distanceToNearest = null;
         _isInsideGeofence = false;
+        _recomputeFilteredHistory();
       });
       _fetchOrganizationSettings().then((_) {
         if (mounted && _isGeofenceMode) {
           _loadBranches();
         }
       });
+      _loadApprovedLeaves();
       _attendanceBloc.add(
         HistoryRequested(
           userId: widget.delegate.uid,
-          organizationId: widget.delegate.organizationUID,
+          organizationId: '', // Cross-org query
           nationalityID: widget.delegate.nationalityID,
           phoneNumber: widget.delegate.phoneNumber,
         ),
@@ -214,9 +280,34 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   /// Recomputes filtered/grouped data only when source data or month changes.
   void _recomputeFilteredHistory() {
+    final currentOrg = widget.delegate.organizationUID.trim();
+
+    final allDaysSet = <String>{};
+    final activeDaysSet = <String>{};
+
+    for (final item in _rawHistory) {
+      if (item.checkInTime.month == _selectedMonth.month &&
+          item.checkInTime.year == _selectedMonth.year) {
+        final dayKey = DateFormat('yyyy-MM-dd').format(item.checkInTime);
+        allDaysSet.add(dayKey);
+        if (currentOrg.isEmpty || item.organizationId.isEmpty || item.organizationId == currentOrg) {
+          activeDaysSet.add(dayKey);
+        }
+      }
+    }
+
+    _allAttendedDaysCount = allDaysSet.length;
+    _activeOrgDaysCount = activeDaysSet.length;
+
     _filteredHistory = _rawHistory.where((attendance) {
-      return attendance.checkInTime.month == _selectedMonth.month &&
+      final inMonth = attendance.checkInTime.month == _selectedMonth.month &&
           attendance.checkInTime.year == _selectedMonth.year;
+      if (!inMonth) return false;
+
+      if (_chainFilter == 'active' && currentOrg.isNotEmpty) {
+        return attendance.organizationId.isEmpty || attendance.organizationId == currentOrg;
+      }
+      return true; // 'all'
     }).toList();
 
     _filteredHistory.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
@@ -238,6 +329,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
+            DelegateTrackingEngine().startTrackingSession(delegateId: widget.delegate.uid);
             if (state.attendance.isSynced) {
               AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
             } else {
@@ -249,12 +341,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             context.read<AttendanceBloc>().add(
               HistoryRequested(
                 userId: widget.delegate.uid,
-                organizationId: widget.delegate.organizationUID,
+                organizationId: '',
                 nationalityID: widget.delegate.nationalityID,
                 phoneNumber: widget.delegate.phoneNumber,
               ),
             );
           } else if (state is AttendanceCheckedOut) {
+            DelegateTrackingEngine().stopTrackingSession();
             if (state.attendance.isSynced) {
               AppSnackBar.showSuccess(context, l10n.checkedOutSuccessfully);
             } else {
@@ -266,7 +359,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             context.read<AttendanceBloc>().add(
               HistoryRequested(
                 userId: widget.delegate.uid,
-                organizationId: widget.delegate.organizationUID,
+                organizationId: '',
                 nationalityID: widget.delegate.nationalityID,
                 phoneNumber: widget.delegate.phoneNumber,
               ),
@@ -274,7 +367,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           } else if (state is AttendanceError) {
             AppSnackBar.showError(context, state.message);
           } else if (state is AttendanceHistoryLoaded) {
-            // --- Performance: cache + compute only when data changes ---
             _rawHistory = state.history;
             _recomputeFilteredHistory();
 
@@ -329,6 +421,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               orElse: () => null,
             );
             isCheckedIn = activeAttendance != null;
+          }
+
+          if (isCheckedIn && !DelegateTrackingEngine().isTracking) {
+            DelegateTrackingEngine()
+                .startTrackingSession(delegateId: widget.delegate.uid);
           }
 
           return Scaffold(
@@ -445,21 +542,35 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       DateTime(trustedNow.year, trustedNow.month, 1),
     );
 
-    final attendedDays = _dayKeys.length;
+    final attendedDays = _allAttendedDaysCount;
 
     if (isPastMonth) {
-      return (26 - attendedDays).clamp(0, 26);
+      return (26 - attendedDays - _approvedLeavesThisMonth).clamp(0, 26);
     } else if (isCurrentMonth) {
       final currentDay = trustedNow.day;
+
+      // Active days for new delegates (using earliest registration date across all chains)
+      DateTime earliestCreatedAt = widget.delegate.createdAt;
+      try {
+        if (sl.isRegistered<AuthLocalDataSource>()) {
+          final all = sl<AuthLocalDataSource>().getCachedAllDelegatesData();
+          for (final d in all) {
+            if (d.createdAt.isBefore(earliestCreatedAt)) {
+              earliestCreatedAt = d.createdAt;
+            }
+          }
+        }
+      } catch (_) {}
+
       int activeDays = currentDay;
-      if (widget.delegate.createdAt.year == _selectedMonth.year &&
-          widget.delegate.createdAt.month == _selectedMonth.month &&
-          widget.delegate.createdAt.day > 1) {
-        activeDays = (currentDay - widget.delegate.createdAt.day + 1)
+      if (earliestCreatedAt.year == _selectedMonth.year &&
+          earliestCreatedAt.month == _selectedMonth.month &&
+          earliestCreatedAt.day > 1) {
+        activeDays = (currentDay - earliestCreatedAt.day + 1)
             .clamp(1, totalDaysInMonth);
       }
       final offDaysSoFar = (activeDays / 7).floor().clamp(0, 4);
-      final elapsedWorkDays = (activeDays - offDaysSoFar).clamp(0, 26);
+      final elapsedWorkDays = (activeDays - offDaysSoFar - _approvedLeavesThisMonth).clamp(0, 26);
       return (elapsedWorkDays - attendedDays).clamp(0, 26);
     } else if (isFutureMonth) {
       return 0;
@@ -482,7 +593,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final isCurrentMonth = _selectedMonth.year == trustedNow.year &&
         _selectedMonth.month == trustedNow.month;
 
-    final attendedDays = _dayKeys.length;
+    final attendedDays = _allAttendedDaysCount;
     final absentDays = _calculateAbsentDays();
     final isBusy = _isCheckingLocation || _isLoadingBranches;
 
@@ -572,6 +683,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         _selectedMonth.month - 1,
                       );
                       _recomputeFilteredHistory();
+                      _loadApprovedLeaves();
                     });
                   },
                   icon: const Icon(
@@ -601,6 +713,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             setState(() {
                               _selectedMonth = trustedNow;
                               _recomputeFilteredHistory();
+                              _loadApprovedLeaves();
                             });
                           },
                           borderRadius: BorderRadius.circular(12),
@@ -640,6 +753,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         _selectedMonth.month + 1,
                       );
                       _recomputeFilteredHistory();
+                      _loadApprovedLeaves();
                     });
                   },
                   icon: const Icon(
@@ -1034,7 +1148,198 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
   }
 
+  Widget _buildChainFilterBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isArabic = Localizations.localeOf(context).languageCode.startsWith('ar');
+    final activeOrgName = widget.delegate.organizationName.isNotEmpty
+        ? widget.delegate.organizationName
+        : (isArabic ? 'السلسلة الحالية' : 'Active Chain');
 
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          // 1. All Chains Tab
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (_chainFilter != 'all') {
+                  setState(() {
+                    _chainFilter = 'all';
+                    _recomputeFilteredHistory();
+                  });
+                }
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: _chainFilter == 'all'
+                      ? colorScheme.surface
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: _chainFilter == 'all'
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.hub_rounded,
+                      size: 15,
+                      color: _chainFilter == 'all'
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        isArabic ? 'جميع السلاسل' : 'All Chains',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: _chainFilter == 'all'
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                          color: _chainFilter == 'all'
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: _chainFilter == 'all'
+                            ? colorScheme.primaryContainer
+                            : colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$_allAttendedDaysCount',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: _chainFilter == 'all'
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+
+          // 2. Active Chain Tab
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (_chainFilter != 'active') {
+                  setState(() {
+                    _chainFilter = 'active';
+                    _recomputeFilteredHistory();
+                  });
+                }
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: _chainFilter == 'active'
+                      ? colorScheme.surface
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: _chainFilter == 'active'
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.storefront_rounded,
+                      size: 15,
+                      color: _chainFilter == 'active'
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        activeOrgName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: _chainFilter == 'active'
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                          color: _chainFilter == 'active'
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: _chainFilter == 'active'
+                            ? colorScheme.primaryContainer
+                            : colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$_activeOrgDaysCount',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: _chainFilter == 'active'
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildBody(BuildContext context, AttendanceState state) {
     final l10n = AppLocalizations.of(context)!;
@@ -1064,7 +1369,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 _attendanceBloc.add(
                   HistoryRequested(
                     userId: widget.delegate.uid,
-                    organizationId: widget.delegate.organizationUID,
+                    organizationId: '',
                     nationalityID: widget.delegate.nationalityID,
                     phoneNumber: widget.delegate.phoneNumber,
                   ),
@@ -1076,9 +1381,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         ),
       );
     } else if (state is AttendanceHistoryLoaded) {
-      // --- Performance: Use pre-computed cached data ---
-      if (_filteredHistory.isEmpty && state.hasReachedMax) {
-        final colorScheme = Theme.of(context).colorScheme;
+      final colorScheme = Theme.of(context).colorScheme;
+      final isArabic = locale.startsWith('ar');
+      final activeOrgName = widget.delegate.organizationName.isNotEmpty
+          ? widget.delegate.organizationName
+          : (isArabic ? 'السلسلة الحالية' : 'Active Chain');
+
+      if (_dayKeys.isEmpty) {
         return RefreshIndicator(
           onRefresh: () async {
             if (_isGeofenceMode) {
@@ -1088,11 +1397,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             _attendanceBloc.add(
               HistoryRequested(
                 userId: widget.delegate.uid,
-                organizationId: widget.delegate.organizationUID,
+                organizationId: '',
                 nationalityID: widget.delegate.nationalityID,
                 phoneNumber: widget.delegate.phoneNumber,
               ),
             );
+            _loadApprovedLeaves();
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -1100,28 +1410,89 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             child: Column(
               children: [
                 _buildUnifiedAttendanceCard(context),
-                const SizedBox(height: 32),
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    shape: BoxShape.circle,
+                _buildChainFilterBar(context),
+                const SizedBox(height: 24),
+                if (_chainFilter == 'active' && _allAttendedDaysCount > 0) ...[
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.storefront_rounded,
+                          size: 44,
+                          color: colorScheme.outline,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          isArabic
+                              ? 'لا توجد جلسات حضور مسجلة في $activeOrgName خلال هذا الشهر'
+                              : 'No sessions recorded for $activeOrgName this month',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          isArabic
+                              ? 'لديك $_allAttendedDaysCount يوم حضور مسجل في السلاسل الأخرى.'
+                              : 'You have $_allAttendedDaysCount attended days in other chains.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.tonalIcon(
+                          onPressed: () {
+                            setState(() {
+                              _chainFilter = 'all';
+                              _recomputeFilteredHistory();
+                            });
+                          },
+                          icon: const Icon(Icons.hub_rounded, size: 18),
+                          label: Text(
+                            isArabic ? 'عرض جميع السلاسل' : 'Show All Chains',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Icon(
-                    Icons.verified_user_rounded,
-                    size: 56,
-                    color: colorScheme.primary,
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.verified_user_rounded,
+                      size: 56,
+                      color: colorScheme.primary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  l10n.noHistoryAvailable,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
+                  const SizedBox(height: 20),
+                  Text(
+                    l10n.noHistoryAvailable,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 12),
                 if (!_isGeofenceMode)
                   Container(
@@ -1173,21 +1544,25 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           _attendanceBloc.add(
             HistoryRequested(
               userId: widget.delegate.uid,
-              organizationId: widget.delegate.organizationUID,
+              organizationId: '',
               nationalityID: widget.delegate.nationalityID,
               phoneNumber: widget.delegate.phoneNumber,
             ),
           );
+          _loadApprovedLeaves();
         },
         child: ListView.builder(
           controller: _scrollController,
           padding: const EdgeInsetsDirectional.only(top: 12, bottom: 80),
-          itemCount: _dayKeys.length + (state.hasReachedMax ? 1 : 2),
+          itemCount: _dayKeys.length + 2 + (state.hasReachedMax ? 0 : 1),
           itemBuilder: (context, index) {
             if (index == 0) {
               return _buildUnifiedAttendanceCard(context);
             }
-            final dayIndex = index - 1;
+            if (index == 1) {
+              return _buildChainFilterBar(context);
+            }
+            final dayIndex = index - 2;
             if (dayIndex >= _dayKeys.length) {
               return state.isLoadingMore
                   ? const Padding(
@@ -1298,11 +1673,47 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                       color: colorScheme.outline,
                                     ),
                                     const SizedBox(width: 4),
-                                    Text(
-                                      branchName,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: colorScheme.outline,
+                                    Expanded(
+                                      child: Text(
+                                        branchName,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: colorScheme.outline,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: colorScheme.primary.withValues(alpha: 0.25),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.storefront_rounded,
+                                            size: 11,
+                                            color: colorScheme.primary,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _resolveOrgName(item.organizationId),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: colorScheme.primary,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],

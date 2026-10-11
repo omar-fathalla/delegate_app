@@ -46,6 +46,15 @@ abstract class DelegateSubscriptionRepository {
     int? remainingMonths,
   });
 
+  /// Submits a request by a company supervisor to delete a non-Fathalla delegate
+  Future<Either<Failure, String>> submitDeleteDelegateRequest({
+    required String supervisorUid,
+    required String supervisorName,
+    required String supervisorPhone,
+    required Delegate delegate,
+    required String reason,
+  });
+
   /// Checks whether a 5-digit receipt code is already used across the system
   Future<Either<Failure, bool>> isReceiptCodeUsed(String receiptCode);
 

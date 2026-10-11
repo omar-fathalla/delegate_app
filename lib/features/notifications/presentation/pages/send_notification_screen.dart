@@ -4,6 +4,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
+/// مركز بث وإرسال الإشعارات السحابية الشامل
+/// يتيح للسوبر أدمن والدعم الفني إرسال إشعارات فورية لجميع الأجهزة (Android & iOS)
+/// مع محاكي حي لشكل الإشعار وقوالب جاهزة للتحديثات والصيانة.
 class SendNotificationScreen extends StatefulWidget {
   final Delegate senderDelegate;
   final bool showAppBar;
@@ -26,22 +29,33 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
   final _bodyController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  String _targetAudience = 'all'; // 'all', 'org', 'user'
+  String _targetAudience = 'all'; // 'all', 'org', 'role', 'user'
+  String _selectedType = 'update'; // 'update', 'announcement', 'support_alert'
+  String _selectedRole = 'delegate'; // 'delegate', 'supervisor', 'marketing'
   String? _selectedOrgUID;
   List<Map<String, dynamic>> _organizations = [];
   bool _isLoadingOrgs = true;
   bool _isSending = false;
+  bool _isPreviewAndroid = true; // true for Android, false for iOS
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _titleController.addListener(_onTextChanged);
+    _bodyController.addListener(_onTextChanged);
     _fetchOrganizations();
+  }
+
+  void _onTextChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _titleController.removeListener(_onTextChanged);
+    _bodyController.removeListener(_onTextChanged);
     _titleController.dispose();
     _bodyController.dispose();
     _phoneController.dispose();
@@ -72,6 +86,27 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     } catch (_) {
       if (mounted) setState(() => _isLoadingOrgs = false);
     }
+  }
+
+  void _applyPreset({
+    required String title,
+    required String body,
+    required String type,
+    String audience = 'all',
+  }) {
+    setState(() {
+      _titleController.text = title;
+      _bodyController.text = body;
+      _selectedType = type;
+      _targetAudience = audience;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('تم تطبيق قالب: $title'),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   String _formatUserNameAndRole(Map<String, dynamic> data) {
@@ -107,7 +142,6 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     return 'مستخدم';
   }
 
-  /// Helper to search for a user by various phone number formats
   Future<Map<String, dynamic>?> _findUserByPhone(String rawPhone) async {
     final cleanPhone = rawPhone.replaceAll(RegExp(r'\s+'), '').trim();
     if (cleanPhone.isEmpty) return null;
@@ -123,7 +157,6 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
     final firestore = FirebaseFirestore.instance;
 
-    // 1. Search in users collection
     for (final phoneVar in variations) {
       for (final field in ['phoneNumber', 'phone', 'mobile', 'mobileNumber']) {
         final query =
@@ -147,7 +180,6 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
       }
     }
 
-    // 2. Search in delegates collectionGroup
     for (final phoneVar in variations) {
       for (final field in ['phoneNumber', 'phone', 'mobile', 'mobileNumber']) {
         final query =
@@ -188,22 +220,22 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
       String targetDetails = '';
       String? targetUid;
 
-      // 1. Create a tracking doc in sent_notifications collection
       final sentLogRef = firestore.collection('sent_notifications').doc();
       final String broadcastId = sentLogRef.id;
 
       if (_targetAudience == 'all') {
-        targetName = 'جميع مستخدمي التطبيق (الكل)';
-        targetDetails = 'إرسال لجميع الفروع والمناديب والمدراء';
+        targetName = 'جميع مستخدمي التطبيق (بث عام)';
+        targetDetails = 'بث مباشر عبر FCM Topic (app_updates) لجميع هواتف Android و iOS';
 
-        // Add global broadcast notification
+        // 1. Write single global broadcast document
+        // This triggers Cloud Function `onNotificationCreated` which broadcasts to topic 'app_updates'
         await firestore.collection('notifications').add({
           'delegateUid': 'all',
           'organizationId': '',
           'companyId': '',
           'title': title,
           'body': body,
-          'type': 'technical_support_broadcast',
+          'type': _selectedType,
           'isRead': false,
           'createdAt': FieldValue.serverTimestamp(),
           'senderName': widget.senderDelegate.fullName,
@@ -212,39 +244,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           'broadcastId': broadcastId,
         });
 
-        // Add individual user notifications
-        final snap = await firestore.collectionGroup('delegates').get();
-        final batch = firestore.batch();
-        int count = 0;
-        for (final doc in snap.docs) {
-          final data = doc.data();
-          final uid = data['uid'] ?? doc.id;
-          final orgId = data['organizationUID'] ?? '';
-          final compId = data['companyUID'] ?? '';
-          if (uid != null && uid.toString().isNotEmpty) {
-            final newRef = firestore.collection('notifications').doc();
-            batch.set(newRef, {
-              'delegateUid': uid,
-              'organizationId': orgId,
-              'companyId': compId,
-              'title': title,
-              'body': body,
-              'type': 'support_alert',
-              'isRead': false,
-              'createdAt': FieldValue.serverTimestamp(),
-              'senderName': widget.senderDelegate.fullName,
-              'senderRole': widget.senderDelegate.role.name,
-              'senderUid': widget.senderDelegate.uid,
-              'broadcastId': broadcastId,
-            });
-            count++;
-            if (count % 450 == 0) {
-              await batch.commit();
-            }
-          }
-        }
-        await batch.commit();
-        sentCount = count > 0 ? count : 1;
+        sentCount = 1;
       } else if (_targetAudience == 'org' && _selectedOrgUID != null) {
         final org = _organizations.firstWhere(
           (o) => o['uid'] == _selectedOrgUID,
@@ -274,7 +274,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
               'companyId': compId,
               'title': title,
               'body': body,
-              'type': 'support_alert',
+              'type': _selectedType,
               'isRead': false,
               'createdAt': FieldValue.serverTimestamp(),
               'senderName': widget.senderDelegate.fullName,
@@ -286,6 +286,43 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             if (count % 450 == 0) {
               await batch.commit();
             }
+          }
+        }
+        await batch.commit();
+        sentCount = count;
+      } else if (_targetAudience == 'role') {
+        final roleLabel = _getRoleLabel(_selectedRole);
+        targetName = 'فئة: $roleLabel';
+        targetDetails = 'جميع المستخدمين الحاملين لرتبة $roleLabel';
+
+        final usersSnap = await firestore
+            .collection('users')
+            .where('role', isEqualTo: _selectedRole)
+            .get();
+        final batch = firestore.batch();
+        int count = 0;
+
+        for (final doc in usersSnap.docs) {
+          final data = doc.data();
+          final uid = data['uid'] ?? doc.id;
+          final newRef = firestore.collection('notifications').doc();
+          batch.set(newRef, {
+            'delegateUid': uid,
+            'organizationId': data['organizationUID'] ?? '',
+            'companyId': data['companyUID'] ?? '',
+            'title': title,
+            'body': body,
+            'type': _selectedType,
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
+            'senderName': widget.senderDelegate.fullName,
+            'senderRole': widget.senderDelegate.role.name,
+            'senderUid': widget.senderDelegate.uid,
+            'broadcastId': broadcastId,
+          });
+          count++;
+          if (count % 450 == 0) {
+            await batch.commit();
           }
         }
         await batch.commit();
@@ -308,7 +345,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             'companyId': matchedUser['companyUID'] ?? '',
             'title': title,
             'body': body,
-            'type': 'support_direct',
+            'type': _selectedType,
             'isRead': false,
             'createdAt': FieldValue.serverTimestamp(),
             'senderName': widget.senderDelegate.fullName,
@@ -318,10 +355,9 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           });
           sentCount = 1;
         } else {
-          // Send to phone identifier fallback
           targetUid = 'phone_$phoneInput';
           targetName = 'رقم الهاتف: $phoneInput';
-          targetDetails = 'مستخدم غير مسجل بالاسم • رقم الهاتف: $phoneInput';
+          targetDetails = 'مستخدم برقم الهاتف: $phoneInput';
 
           await firestore.collection('notifications').add({
             'delegateUid': targetUid,
@@ -330,7 +366,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             'companyId': '',
             'title': title,
             'body': body,
-            'type': 'support_direct',
+            'type': _selectedType,
             'isRead': false,
             'createdAt': FieldValue.serverTimestamp(),
             'senderName': widget.senderDelegate.fullName,
@@ -347,6 +383,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
         'broadcastId': broadcastId,
         'title': title,
         'body': body,
+        'type': _selectedType,
         'senderUid': widget.senderDelegate.uid,
         'senderName': widget.senderDelegate.fullName,
         'senderRole': widget.senderDelegate.role.name,
@@ -354,35 +391,30 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
         'targetName': targetName,
         'targetDetails': targetDetails,
         'targetUid': targetUid,
+        'targetRole': _targetAudience == 'role' ? _selectedRole : null,
         'targetPhone': _targetAudience == 'user' ? _phoneController.text.trim() : null,
         'targetOrgId': _targetAudience == 'org' ? _selectedOrgUID : null,
         'sentCount': sentCount,
-        'sentAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Trigger local test notification on device
+      // Optional local test chime on sender device
       try {
-        final flutterLocalNotificationsPlugin =
-            FlutterLocalNotificationsPlugin();
+        final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
         const androidDetails = AndroidNotificationDetails(
-          'support_channel',
-          'إشعارات الدعم الفني',
-          channelDescription: 'إشعارات وبلاغات الدعم الفني',
+          'task_notifications',
+          'إشعارات المهام والتحديثات',
           importance: Importance.high,
           priority: Priority.high,
         );
-        const notificationDetails = NotificationDetails(
-          android: androidDetails,
-        );
+        const notificationDetails = NotificationDetails(android: androidDetails);
         await flutterLocalNotificationsPlugin.show(
           DateTime.now().millisecondsSinceEpoch ~/ 1000,
           title,
           body,
           notificationDetails,
         );
-      } catch (e) {
-        debugPrint('Local notification test trigger error: $e');
-      }
+      } catch (_) {}
 
       if (mounted) {
         _titleController.clear();
@@ -391,13 +423,21 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('تم إرسال الإشعار بنجاح إلى $targetName'),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('تم إرسال الإشعار السحابي بنجاح إلى $targetName 🚀'),
+                ),
+              ],
+            ),
             backgroundColor: Theme.of(context).colorScheme.primary,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
 
-        // Switch to Sent History tab
         _tabController.animateTo(1);
       }
     } catch (e) {
@@ -415,6 +455,25 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     }
   }
 
+  String _getRoleLabel(String role) {
+    switch (role) {
+      case 'delegate':
+        return 'المناديب';
+      case 'supervisor':
+        return 'المشرفين';
+      case 'marketing':
+        return 'مسؤولي تسويق الفروع';
+      case 'marketing_promotion':
+        return 'مسؤولي العروض الترويجية';
+      case 'admin':
+        return 'مشرفي الشركات';
+      case 'organizationAdmin':
+        return 'مدراء المنظمات';
+      default:
+        return role;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -428,10 +487,10 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
       unselectedLabelColor: colorScheme.onSurfaceVariant,
       labelStyle: const TextStyle(fontWeight: FontWeight.bold),
       tabs: const [
-        Tab(icon: Icon(Icons.edit_note_rounded), text: 'إرسال إشعار جديد'),
+        Tab(icon: Icon(Icons.send_rounded), text: 'إنشاء وبث إشعار جديد'),
         Tab(
           icon: Icon(Icons.outbox_rounded),
-          text: 'صندوق الصادر والمقروء',
+          text: 'سجل الحملات الصادرة',
         ),
       ],
     );
@@ -454,7 +513,10 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [_buildComposeTab(theme, colorScheme), _buildSentHistoryTab()],
+              children: [
+                _buildComposeTab(theme, colorScheme),
+                _buildSentHistoryTab(),
+              ],
             ),
           ),
         ],
@@ -463,302 +525,552 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'نظام إشعارات الدعم الفني',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Column(
+          children: [
+            const Text(
+              'مركز بث الإشعارات السحابية',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            Text(
+              'بث فوري لجميع الأجهزة (Android & iOS)',
+              style: TextStyle(
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ],
         ),
         centerTitle: true,
         bottom: tabBar,
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [_buildComposeTab(theme, colorScheme), _buildSentHistoryTab()],
+        children: [
+          _buildComposeTab(theme, colorScheme),
+          _buildSentHistoryTab(),
+        ],
       ),
     );
   }
 
   Widget _buildComposeTab(ThemeData theme, ColorScheme colorScheme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 920;
+
+        if (isDesktop) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left Column (in RTL: inputs column)
+              Expanded(
+                flex: 6,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: _buildComposerForm(theme, colorScheme),
+                ),
+              ),
+              // Vertical Divider
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+              ),
+              // Right Column (in RTL: Device Live Mockup Preview)
+              Expanded(
+                flex: 4,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: _buildDevicePreviewColumn(theme, colorScheme),
+                ),
+              ),
+            ],
+          );
+        }
+
+        // Mobile Layout: Stacked with Collapsible Mockup
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildPresetsBar(colorScheme),
+              const SizedBox(height: 16),
+              // Mobile Mockup Preview Card
+              _buildDevicePreviewCardMobile(theme, colorScheme),
+              const SizedBox(height: 16),
+              _buildComposerForm(theme, colorScheme, showPresets: false),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPresetsBar(ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            // Header Info Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: colorScheme.primary.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.campaign_rounded,
-                    color: colorScheme.primary,
-                    size: 32,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'إرسال إشعار مباشر أو جماعي',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'يصل التنبيه لجميع الأجهزة وتظهر حالة الاستلام والقراءة في صندوق الصادر.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onPrimaryContainer.withValues(
-                              alpha: 0.8,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Title Field
+            Icon(Icons.bolt_rounded, size: 18, color: colorScheme.primary),
+            const SizedBox(width: 6),
             Text(
-              'عنوان الإشعار',
+              'قوالب إشعارات سريعة (بضغطة زر واحدة)',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
+                fontSize: 13,
                 color: colorScheme.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                hintText: 'مثال: تنبيه هام من الدعم الفني',
-                prefixIcon: const Icon(Icons.title_rounded),
-                filled: true,
-                fillColor: colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.5,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: colorScheme.outlineVariant),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: colorScheme.primary, width: 2),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildPresetChip(
+                label: '🚀 تحديث إلزامي فوري',
+                colorScheme: colorScheme,
+                onTap: () => _applyPreset(
+                  title: 'تحديث إلزامي جديد متوفر للتطبيق 🚀',
+                  body:
+                      'يرجى تحديث التطبيق الآن فوراً من المتجر (Google Play أو App Store) لضمان استمرار الخدمة وتجنب أي انقطاع.',
+                  type: 'update',
                 ),
               ),
-              validator:
-                  (v) =>
-                      v == null || v.trim().isEmpty
-                          ? 'يرجى إدخال عنوان الإشعار'
-                          : null,
-            ),
-            const SizedBox(height: 18),
+              const SizedBox(width: 8),
+              _buildPresetChip(
+                label: '✨ إصدار جديد ومميزات',
+                colorScheme: colorScheme,
+                onTap: () => _applyPreset(
+                  title: 'إصدار جديد متاح الآن ✨',
+                  body:
+                      'تم إطلاق إصدار جديد يضم ميزات وتحسينات جديدة للأداء. حدّث تطبيقك الآن لتجربة أسرع وأسهل.',
+                  type: 'update',
+                ),
+              ),
+              const SizedBox(width: 8),
+              _buildPresetChip(
+                label: '⚙️ صيانة مجدولة',
+                colorScheme: colorScheme,
+                onTap: () => _applyPreset(
+                  title: 'تنبيه: صيانة دورية مجدولة ⚙️',
+                  body:
+                      'نود إحاطتكم علماً بوجود أعمال صيانة دورية لتحسين كفاءة الخوادم، قد يحدث بطء طفيف لعدة دقائق.',
+                  type: 'announcement',
+                ),
+              ),
+              const SizedBox(width: 8),
+              _buildPresetChip(
+                label: '📢 تعميم إداري عام',
+                colorScheme: colorScheme,
+                onTap: () => _applyPreset(
+                  title: 'تعميم إداري هام 📋',
+                  body:
+                      'تنبيه لجميع منسوبي العمل، يرجى الالتزام بالتعليمات والمهام الموكلة إليكم والتحقق من الحضور اليومي بدقة.',
+                  type: 'announcement',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
-            // Body Field
-            Text(
-              'نص ومحتوى الإشعار',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _bodyController,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: 'اكتب نص الإشعار هنا بالتفصيل...',
-                prefixIcon: const Padding(
-                  padding: EdgeInsets.only(bottom: 50),
-                  child: Icon(Icons.notes_rounded),
-                ),
-                filled: true,
-                fillColor: colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.5,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: colorScheme.outlineVariant),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: colorScheme.primary, width: 2),
-                ),
-              ),
-              validator:
-                  (v) =>
-                      v == null || v.trim().isEmpty
-                          ? 'يرجى إدخال محتوى الإشعار'
-                          : null,
-            ),
+  Widget _buildPresetChip({
+    required String label,
+    required ColorScheme colorScheme,
+    required VoidCallback onTap,
+  }) {
+    return ActionChip(
+      onPressed: onTap,
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: colorScheme.onSurface,
+        ),
+      ),
+      backgroundColor: colorScheme.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComposerForm(ThemeData theme, ColorScheme colorScheme, {bool showPresets = true}) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showPresets) ...[
+            _buildPresetsBar(colorScheme),
             const SizedBox(height: 20),
+          ],
 
-            // Target Audience Selection
+          // Notification Type Selector Chips
+          Text(
+            'نوع الإشعار',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13.5,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTypeSelectTile(
+                  title: 'تحديث تطبيق',
+                  subtitle: 'مع زر للمتجر',
+                  value: 'update',
+                  icon: Icons.system_update_rounded,
+                  colorScheme: colorScheme,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildTypeSelectTile(
+                  title: 'إعلان عام',
+                  subtitle: 'تعميم إداري',
+                  value: 'announcement',
+                  icon: Icons.campaign_rounded,
+                  colorScheme: colorScheme,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildTypeSelectTile(
+                  title: 'تنبيه نظام',
+                  subtitle: 'دعم فني',
+                  value: 'support_alert',
+                  icon: Icons.notifications_active_rounded,
+                  colorScheme: colorScheme,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Title Field
+          Text(
+            'عنوان الإشعار',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _titleController,
+            decoration: InputDecoration(
+              hintText: 'مثال: تحديث إلزامي جديد متوفر للتطبيق 🚀',
+              prefixIcon: const Icon(Icons.title_rounded),
+              filled: true,
+              fillColor: colorScheme.surfaceContainerLow,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: colorScheme.primary, width: 2),
+              ),
+            ),
+            validator: (v) =>
+                v == null || v.trim().isEmpty ? 'يرجى إدخال عنوان الإشعار' : null,
+          ),
+          const SizedBox(height: 18),
+
+          // Body Field
+          Text(
+            'نص ومحتوى الإشعار',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _bodyController,
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: 'اكتب نص الإشعار هنا بالتفصيل ليظهر على شاشات المستخدمين...',
+              prefixIcon: const Padding(
+                padding: EdgeInsets.only(bottom: 55),
+                child: Icon(Icons.notes_rounded),
+              ),
+              filled: true,
+              fillColor: colorScheme.surfaceContainerLow,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: colorScheme.primary, width: 2),
+              ),
+            ),
+            validator: (v) =>
+                v == null || v.trim().isEmpty ? 'يرجى إدخال نص الإشعار' : null,
+          ),
+          const SizedBox(height: 20),
+
+          // Target Audience Selection
+          Text(
+            'الجمهور المستهدف بالإشعار',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Column(
+              children: [
+                _buildAudienceOptionTile(
+                  title: 'جميع مستخدمي التطبيق (بث شامل)',
+                  subtitle: 'يصل فورياً لجميع هواتف Android و iOS عبر موضوع app_updates',
+                  value: 'all',
+                  icon: Icons.public_rounded,
+                  badge: 'الأشمل',
+                ),
+                const Divider(height: 1),
+                _buildAudienceOptionTile(
+                  title: 'حسب الدور الوظيفي (فئة محددة)',
+                  subtitle: 'مناديب فقط، مشرفين، أو مسؤولي تسويق',
+                  value: 'role',
+                  icon: Icons.groups_rounded,
+                ),
+                const Divider(height: 1),
+                _buildAudienceOptionTile(
+                  title: 'قطاع / منظمة محددة',
+                  subtitle: 'تخصيص الإشعار لمنظمة معينة',
+                  value: 'org',
+                  icon: Icons.corporate_fare_rounded,
+                ),
+                const Divider(height: 1),
+                _buildAudienceOptionTile(
+                  title: 'مستخدم فردي (برقم الهاتف)',
+                  subtitle: 'إرسال الإشعار لشخص واحد بالهاتف',
+                  value: 'user',
+                  icon: Icons.person_rounded,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Conditional Target Sub-forms
+          if (_targetAudience == 'role') ...[
             Text(
-              'الجمهور المستهدف بالإشعار',
+              'اختر الفئة الوظيفية المستهدفة',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.3,
+            DropdownButtonFormField<String>(
+              initialValue: _selectedRole,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: colorScheme.surfaceContainerLow,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: colorScheme.outlineVariant),
                 ),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: colorScheme.outlineVariant),
               ),
-              child: Column(
-                children: [
-                  _buildAudienceOptionTile(
-                    title: 'جميع مستخدمي التطبيق (الكل)',
-                    subtitle: 'إرسال لجميع المناديب والمدراء في النظام',
-                    value: 'all',
-                    icon: Icons.public_rounded,
-                  ),
-                  const Divider(height: 1),
-                  _buildAudienceOptionTile(
-                    title: 'قطاع / منظمة محددة',
-                    subtitle: 'تخصيص الإشعار لمنظمة معينة فقط',
-                    value: 'org',
-                    icon: Icons.corporate_fare_rounded,
-                  ),
-                  const Divider(height: 1),
-                  _buildAudienceOptionTile(
-                    title: 'مستخدم / مندوب محدد (رقم الهاتف)',
-                    subtitle: 'إرسال الإشعار لمستخدم واحد برقم الهاتف',
-                    value: 'user',
-                    icon: Icons.person_rounded,
-                  ),
-                ],
-              ),
+              items: const [
+                DropdownMenuItem(value: 'delegate', child: Text('جميع المناديب والمروجين')),
+                DropdownMenuItem(value: 'supervisor', child: Text('جميع المشرفين')),
+                DropdownMenuItem(value: 'marketing', child: Text('مسؤولو تسويق الفروع')),
+                DropdownMenuItem(value: 'admin', child: Text('مشرفو ومسؤولو الشركات')),
+              ],
+              onChanged: (val) {
+                if (val != null) setState(() => _selectedRole = val);
+              },
             ),
             const SizedBox(height: 18),
+          ],
 
-            // Sub-selection depending on Target Audience
-            if (_targetAudience == 'org') ...[
-              Text(
-                'اختر المنظمة المستهدفة',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
+          if (_targetAudience == 'org') ...[
+            Text(
+              'اختر المنظمة المستهدفة',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
               ),
-              const SizedBox(height: 8),
-              _isLoadingOrgs
-                  ? const CircularProgressIndicator()
-                  : DropdownButtonFormField<String>(
+            ),
+            const SizedBox(height: 8),
+            _isLoadingOrgs
+                ? const Center(child: CircularProgressIndicator())
+                : DropdownButtonFormField<String>(
                     initialValue: _selectedOrgUID,
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.5,
-                      ),
+                      fillColor: colorScheme.surfaceContainerLow,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: colorScheme.outlineVariant),
                       ),
                     ),
-                    items:
-                        _organizations.map((org) {
-                          return DropdownMenuItem<String>(
-                            value: org['uid'] as String,
-                            child: Text(org['name'] as String),
-                          );
-                        }).toList(),
+                    items: _organizations.map((org) {
+                      return DropdownMenuItem<String>(
+                        value: org['uid'] as String,
+                        child: Text(org['name'] as String),
+                      );
+                    }).toList(),
                     onChanged: (val) => setState(() => _selectedOrgUID = val),
                   ),
-              const SizedBox(height: 18),
-            ],
+            const SizedBox(height: 18),
+          ],
 
-            if (_targetAudience == 'user') ...[
-              Text(
-                'رقم هاتف المستخدم المستهدف',
-                style: TextStyle(
+          if (_targetAudience == 'user') ...[
+            Text(
+              'رقم هاتف المستخدم المستهدف',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                hintText: 'مثال: 01012345678',
+                prefixIcon: const Icon(Icons.phone_rounded),
+                filled: true,
+                fillColor: colorScheme.surfaceContainerLow,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: colorScheme.outlineVariant),
+                ),
+              ),
+              validator: (v) =>
+                  _targetAudience == 'user' && (v == null || v.trim().isEmpty)
+                      ? 'يرجى إدخال رقم هاتف المستخدم'
+                      : null,
+            ),
+            const SizedBox(height: 18),
+          ],
+
+          const SizedBox(height: 12),
+
+          // Broadcast Action Button
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: FilledButton.icon(
+              onPressed: _isSending ? null : _sendNotification,
+              icon: _isSending
+                  ? SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: colorScheme.onPrimary,
+                        strokeWidth: 2.2,
+                      ),
+                    )
+                  : const Icon(Icons.campaign_rounded, size: 22),
+              label: Text(
+                _isSending
+                    ? 'جاري البث والإرسال لجميع الأجهزة...'
+                    : 'بث وإرسال الإشعار الآن 🚀',
+                style: const TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
                 ),
               ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  hintText: 'مثال: 01012345678',
-                  prefixIcon: const Icon(Icons.phone_rounded),
-                  filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.5,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                validator:
-                    (v) =>
-                        _targetAudience == 'user' &&
-                                (v == null || v.trim().isEmpty)
-                            ? 'يرجى إدخال رقم هاتف المستخدم'
-                            : null,
-              ),
-              const SizedBox(height: 18),
-            ],
-
-            const SizedBox(height: 16),
-
-            // Submit Button
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: FilledButton.icon(
-                onPressed: _isSending ? null : _sendNotification,
-                icon:
-                    _isSending
-                        ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: colorScheme.onPrimary,
-                            strokeWidth: 2,
-                          ),
-                        )
-                        : const Icon(Icons.send_rounded),
-                label: Text(
-                  _isSending ? 'جاري إرسال الإشعار...' : 'إرسال الإشعار الآن',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+              style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypeSelectTile({
+    required String title,
+    required String subtitle,
+    required String value,
+    required IconData icon,
+    required ColorScheme colorScheme,
+  }) {
+    final isSelected = _selectedType == value;
+    return InkWell(
+      onTap: () => setState(() => _selectedType = value),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primaryContainer.withValues(alpha: 0.6)
+              : colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outlineVariant.withValues(alpha: 0.6),
+            width: isSelected ? 1.8 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+              size: 24,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 10,
+                color: isSelected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -770,6 +1082,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     required String subtitle,
     required String value,
     required IconData icon,
+    String? badge,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final isSelected = _targetAudience == value;
@@ -783,18 +1096,12 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           children: [
             Icon(
               isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color:
-                  isSelected
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
+              color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 12),
             Icon(
               icon,
-              color:
-                  isSelected
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
+              color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
               size: 22,
             ),
             const SizedBox(width: 12),
@@ -802,21 +1109,40 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color:
-                          isSelected
-                              ? colorScheme.primary
-                              : colorScheme.onSurface,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                        ),
+                      ),
+                      if (badge != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            badge,
+                            style: TextStyle(
+                              color: colorScheme.onPrimary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
@@ -830,15 +1156,381 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
   }
 
   // ----------------------------------------------------
+  // Live Device Mockup Preview Column (Desktop/Web)
+  // ----------------------------------------------------
+  Widget _buildDevicePreviewColumn(ThemeData theme, ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Preview Header + Toggle between Android and iOS
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.remove_red_eye_rounded, size: 18, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'معاينة حية للموبايل',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ],
+              ),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment<bool>(
+                    value: true,
+                    label: Text('Android', style: TextStyle(fontSize: 11)),
+                    icon: Icon(Icons.android_rounded, size: 14),
+                  ),
+                  ButtonSegment<bool>(
+                    value: false,
+                    label: Text('iOS', style: TextStyle(fontSize: 11)),
+                    icon: Icon(Icons.apple_rounded, size: 14),
+                  ),
+                ],
+                selected: {_isPreviewAndroid},
+                onSelectionChanged: (set) {
+                  setState(() => _isPreviewAndroid = set.first);
+                },
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Realistic Phone Mockup Frame
+        _buildPhoneFrame(colorScheme),
+      ],
+    );
+  }
+
+  Widget _buildDevicePreviewCardMobile(ThemeData theme, ColorScheme colorScheme) {
+    return ExpansionTile(
+      initiallyExpanded: false,
+      collapsedBackgroundColor: colorScheme.surfaceContainerLow,
+      backgroundColor: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      collapsedShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      leading: Icon(Icons.phone_android_rounded, color: colorScheme.primary),
+      title: const Text(
+        'معاينة شكل الإشعار على الهاتف',
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+      ),
+      subtitle: Text(
+        'اضغط لمشاهدة كيف سيظهر التنبيه للمستخدمين',
+        style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+      ),
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: _buildDevicePreviewColumn(theme, colorScheme),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhoneFrame(ColorScheme colorScheme) {
+    final title = _titleController.text.trim().isEmpty
+        ? 'عنوان الإشعار سيظهر هنا...'
+        : _titleController.text.trim();
+    final body = _bodyController.text.trim().isEmpty
+        ? 'نص ومحتوى الرسالة سيظهر هنا بشكل واضح على شاشة قفل هاتف المستخدم...'
+        : _bodyController.text.trim();
+
+    return Container(
+      width: 320,
+      decoration: BoxDecoration(
+        color: const Color(0xFF121316),
+        borderRadius: BorderRadius.circular(36),
+        border: Border.all(color: const Color(0xFF2C2D32), width: 5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Top Speaker / Dynamic Island or Notch
+          Container(
+            width: _isPreviewAndroid ? 50 : 80,
+            height: _isPreviewAndroid ? 4 : 14,
+            decoration: BoxDecoration(
+              color: const Color(0xFF28292E),
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Status Bar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                DateFormat('hh:mm').format(DateTime.now()),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Row(
+                children: [
+                  Icon(Icons.wifi_rounded, color: Colors.white, size: 14),
+                  SizedBox(width: 4),
+                  Icon(Icons.signal_cellular_alt_rounded, color: Colors.white, size: 14),
+                  SizedBox(width: 4),
+                  Icon(Icons.battery_full_rounded, color: Colors.white, size: 14),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Notification Banner on Phone Screen
+          if (_isPreviewAndroid)
+            _buildAndroidNotificationCard(title, body, colorScheme)
+          else
+            _buildIosNotificationCard(title, body, colorScheme),
+
+          const SizedBox(height: 50),
+
+          // Bottom Home Indicator Bar
+          Container(
+            width: 100,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAndroidNotificationCard(String title, String body, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E2024),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // App Header Row
+          Row(
+            children: [
+              Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: const Icon(Icons.send_rounded, color: Colors.white, size: 11),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'تساهيل',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                '• الآن',
+                style: TextStyle(color: Colors.white38, fontSize: 10),
+              ),
+              const Spacer(),
+              const Icon(Icons.expand_more_rounded, color: Colors.white38, size: 16),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Title
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 3),
+
+          // Body
+          Text(
+            body,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11.5,
+              height: 1.3,
+            ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+
+          // If Type is Update -> Action Button
+          if (_selectedType == 'update') ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: colorScheme.primary.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.system_update_rounded, size: 13, color: colorScheme.primary),
+                  const SizedBox(width: 5),
+                  Text(
+                    'تحديث التطبيق الآن',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIosNotificationCard(String title, String body, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF24262B).withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.send_rounded, color: Colors.white, size: 12),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'تساهيل',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              const Text(
+                'الآن',
+                style: TextStyle(color: Colors.white38, fontSize: 10),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            body,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11.5,
+              height: 1.3,
+            ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (_selectedType == 'update') ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'فتح المتجر للتحديث',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ----------------------------------------------------
   // Sent History / Outbox Tab with Realtime Read Status
   // ----------------------------------------------------
   Widget _buildSentHistoryTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('sent_notifications')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('sent_notifications')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
       builder: (context, snapshot) {
         final colorScheme = Theme.of(context).colorScheme;
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -872,7 +1564,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'أي إشعار ستقوم بإرساله سيظهر هنا مع إحصائيات القراءة والتسليم.',
+                  'أي إشعار ستقوم ببثه سيظهر هنا في السجل مع إمكانية إعادة إرساله بنقرة واحدة.',
                   style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
@@ -882,7 +1574,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final doc = docs[index];
@@ -890,9 +1582,10 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             return _SentNotificationCard(
               docId: doc.id,
               data: data,
-              onResend: (t, b, aud, ph) {
+              onResend: (t, b, type, aud, ph) {
                 _titleController.text = t;
                 _bodyController.text = b;
+                _selectedType = type;
                 _targetAudience = aud;
                 _phoneController.text = ph;
                 _tabController.animateTo(0);
@@ -912,10 +1605,10 @@ class _SentNotificationCard extends StatelessWidget {
   final void Function(
     String title,
     String body,
+    String type,
     String audience,
     String phone,
-  )
-  onResend;
+  ) onResend;
 
   const _SentNotificationCard({
     required this.docId,
@@ -930,381 +1623,223 @@ class _SentNotificationCard extends StatelessWidget {
 
     final title = data['title'] as String? ?? 'بدون عنوان';
     final body = data['body'] as String? ?? '';
+    final type = data['type'] as String? ?? 'update';
     final rawTargetName = data['targetName'] as String? ?? 'الجميع';
     final targetName = rawTargetName.replaceAll(RegExp(r'\s*\(\+?\d+\)\s*'), '').trim();
-    final targetAudience = data['targetAudience'] as String? ?? 'all';
     final senderName = data['senderName'] as String? ?? 'الدعم الفني';
-    final totalSent = (data['sentCount'] as num?)?.toInt() ?? 1;
     final timestamp = data['createdAt'] as Timestamp?;
-    final dateStr =
-        timestamp != null
-            ? DateFormat('dd/MM/yyyy • hh:mm a').format(timestamp.toDate())
-            : 'الآن';
+    final dateStr = timestamp != null
+        ? DateFormat('dd/MM/yyyy • hh:mm a').format(timestamp.toDate())
+        : 'الآن';
 
-    return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('notifications')
-              .where('broadcastId', isEqualTo: docId)
-              .snapshots(),
-      builder: (context, notifSnap) {
-        int readCount = 0;
-        int actualCount = totalSent;
-        DateTime? latestReadTime;
-
-        if (notifSnap.hasData && notifSnap.data!.docs.isNotEmpty) {
-          final docs = notifSnap.data!.docs;
-          actualCount = docs.length;
-          for (final d in docs) {
-            final m = d.data() as Map<String, dynamic>;
-            if (m['isRead'] == true) {
-              readCount++;
-              final rTime = (m['readAt'] as Timestamp?)?.toDate();
-              if (rTime != null &&
-                  (latestReadTime == null || rTime.isAfter(latestReadTime))) {
-                latestReadTime = rTime;
-              }
-            }
-          }
-        }
-
-        final bool isAllRead = actualCount > 0 && readCount == actualCount;
-        final bool isSingleUser = targetAudience == 'user';
-        final bool isUserRead = isSingleUser && readCount > 0;
-
-        return Card(
-          elevation: 0.5,
-          margin: const EdgeInsets.only(bottom: 8),
-          color: colorScheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(
-              color: isUserRead || isAllRead
-                  ? colorScheme.primary.withValues(alpha: 0.3)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.4),
-            ),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () => _showNotificationDetails(
-              context,
-              dateStr,
-              readCount: readCount,
-              actualCount: actualCount,
-              latestReadTime: latestReadTime,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  // 1. Audience / User Avatar
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: isUserRead || isAllRead
-                          ? colorScheme.primaryContainer
-                          : colorScheme.primaryContainer.withValues(alpha: 0.6),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Icon(
-                        _getAudienceIcon(targetAudience),
-                        color: isUserRead || isAllRead
-                            ? colorScheme.primary
-                            : colorScheme.primary,
-                        size: 20,
-                      ),
-                    ),
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _showNotificationDetails(context, dateStr),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              // 1. Icon Avatar
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _getTypeBackgroundColor(type, colorScheme),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Icon(
+                    _getTypeIcon(type),
+                    color: _getTypeColor(type, colorScheme),
+                    size: 22,
                   ),
-                  const SizedBox(width: 10),
+                ),
+              ),
+              const SizedBox(width: 12),
 
-                  // 2. Middle Details
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              // 2. Middle Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        // Row 1: Target Name + Compact Read Status Chip
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                targetName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13.5,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                        Flexible(
+                          child: Text(
+                            targetName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
                             ),
-                            const SizedBox(width: 6),
-                            _buildCompactReadBadge(
-                              colorScheme: colorScheme,
-                              isSingleUser: isSingleUser,
-                              isUserRead: isUserRead,
-                              readCount: readCount,
-                              actualCount: actualCount,
-                              isAllRead: isAllRead,
-                              latestReadTime: latestReadTime,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-
-                        // Row 2: Title and preview of message
-                        Text(
-                          body.isNotEmpty ? '$title: $body' : title,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 3),
-
-                        // Row 3: Timestamp & Sender
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.schedule_rounded,
-                              size: 11,
-                              color: colorScheme.outline,
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _getTypeColor(type, colorScheme).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            _getTypeLabel(type),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: _getTypeColor(type, colorScheme),
                             ),
-                            const SizedBox(width: 3),
-                            Text(
-                              dateStr,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                color: colorScheme.outline,
-                              ),
-                            ),
-                            if (senderName.isNotEmpty) ...[
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  '• $senderName',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    color: colorScheme.outline,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 6),
+                    const SizedBox(height: 4),
 
-                  // 3. Trailing Action Icons Only
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Resend Icon Button
-                      IconButton(
-                        constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                        style: IconButton.styleFrom(
-                          backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.35),
-                          foregroundColor: colorScheme.primary,
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(6),
-                        ),
-                        icon: const Icon(Icons.repeat_rounded, size: 17),
-                        tooltip: 'إعادة إرسال',
-                        onPressed: () {
-                          final targetAudience =
-                              data['targetAudience'] as String? ?? 'all';
-                          final targetName = data['targetName'] as String? ?? '';
-                          String phone = '';
-                          if (targetAudience == 'user') {
-                            final match = RegExp(
-                              r'(\+?\d{10,14})',
-                            ).firstMatch(targetName);
-                            if (match != null) phone = match.group(0) ?? '';
-                          }
-                          onResend(title, body, targetAudience, phone);
-                        },
+                    Text(
+                      body.isNotEmpty ? '$title: $body' : title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
                       ),
-                      const SizedBox(width: 4),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
 
-                      // Details Icon Button
-                      IconButton(
-                        constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                        style: IconButton.styleFrom(
-                          backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-                          foregroundColor: colorScheme.onSurfaceVariant,
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(6),
-                        ),
-                        icon: const Icon(Icons.visibility_rounded, size: 17),
-                        tooltip: 'عرض التفاصيل',
-                        onPressed: () => _showNotificationDetails(
-                          context,
+                    Row(
+                      children: [
+                        Icon(Icons.schedule_rounded, size: 12, color: colorScheme.outline),
+                        const SizedBox(width: 4),
+                        Text(
                           dateStr,
-                          readCount: readCount,
-                          actualCount: actualCount,
-                          latestReadTime: latestReadTime,
+                          style: TextStyle(fontSize: 11, color: colorScheme.outline),
                         ),
-                      ),
-                    ],
+                        if (senderName.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              '• $senderName',
+                              style: TextStyle(fontSize: 11, color: colorScheme.outline),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // 3. Actions: Resend Button & Details Button
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton.filledTonal(
+                    style: IconButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.all(8),
+                    ),
+                    icon: const Icon(Icons.repeat_rounded, size: 18),
+                    tooltip: 'إعادة إرسال نفس الإشعار',
+                    onPressed: () {
+                      final targetAudience = data['targetAudience'] as String? ?? 'all';
+                      final targetName = data['targetName'] as String? ?? '';
+                      String phone = '';
+                      if (targetAudience == 'user') {
+                        final match = RegExp(r'(\+?\d{10,14})').firstMatch(targetName);
+                        if (match != null) phone = match.group(0) ?? '';
+                      }
+                      onResend(title, body, type, targetAudience, phone);
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    style: IconButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.all(8),
+                    ),
+                    icon: const Icon(Icons.visibility_rounded, size: 18),
+                    tooltip: 'عرض التفاصيل',
+                    onPressed: () => _showNotificationDetails(context, dateStr),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  Widget _buildCompactReadBadge({
-    required ColorScheme colorScheme,
-    required bool isSingleUser,
-    required bool isUserRead,
-    required int readCount,
-    required int actualCount,
-    required bool isAllRead,
-    required DateTime? latestReadTime,
-  }) {
-    if (isSingleUser) {
-      if (isUserRead) {
-        final timeStr =
-            latestReadTime != null
-                ? DateFormat('hh:mm a').format(latestReadTime)
-                : '';
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3), width: 0.7),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.done_all_rounded, size: 12, color: colorScheme.primary),
-              if (timeStr.isNotEmpty) ...[
-                const SizedBox(width: 2),
-                Text(
-                  timeStr,
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        );
-      } else {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-          decoration: BoxDecoration(
-            color: colorScheme.secondaryContainer.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.3), width: 0.7),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.hourglass_empty_rounded, size: 11, color: colorScheme.secondary),
-              const SizedBox(width: 2),
-              Text(
-                'في الانتظار',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.secondary,
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-    } else {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-        decoration: BoxDecoration(
-          color: isAllRead
-              ? colorScheme.primaryContainer.withValues(alpha: 0.6)
-              : colorScheme.secondaryContainer.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: isAllRead
-                ? colorScheme.primary.withValues(alpha: 0.3)
-                : colorScheme.secondary.withValues(alpha: 0.3),
-            width: 0.7,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isAllRead ? Icons.done_all_rounded : Icons.people_rounded,
-              size: 11,
-              color: isAllRead ? colorScheme.primary : colorScheme.secondary,
-            ),
-            const SizedBox(width: 2),
-            Text(
-              '$readCount / $actualCount',
-              style: TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.bold,
-                color: isAllRead ? colorScheme.primary : colorScheme.secondary,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  IconData _getAudienceIcon(String audience) {
-    switch (audience) {
-      case 'org':
-        return Icons.corporate_fare_rounded;
-      case 'user':
-        return Icons.person_rounded;
+  IconData _getTypeIcon(String type) {
+    switch (type) {
+      case 'update':
+        return Icons.system_update_rounded;
+      case 'announcement':
+        return Icons.campaign_rounded;
       default:
-        return Icons.public_rounded;
+        return Icons.notifications_active_rounded;
     }
   }
 
-  void _showNotificationDetails(
-    BuildContext context,
-    String dateStr, {
-    int readCount = 0,
-    int actualCount = 1,
-    DateTime? latestReadTime,
-  }) {
-    final targetAudience = data['targetAudience'] as String? ?? 'all';
-    final isSingleUser = targetAudience == 'user';
-    final readStatusText =
-        isSingleUser
-            ? (readCount > 0
-                ? 'تمت القراءة بنجاح ${latestReadTime != null ? "(${DateFormat('hh:mm a').format(latestReadTime)})" : ""}'
-                : 'لم تتم القراءة بعد (في الانتظار)')
-            : '$readCount من أصل $actualCount مستخدم قاموا بالقراءة';
+  Color _getTypeColor(String type, ColorScheme colorScheme) {
+    switch (type) {
+      case 'update':
+        return colorScheme.primary;
+      case 'announcement':
+        return colorScheme.tertiary;
+      default:
+        return colorScheme.secondary;
+    }
+  }
+
+  Color _getTypeBackgroundColor(String type, ColorScheme colorScheme) {
+    switch (type) {
+      case 'update':
+        return colorScheme.primaryContainer;
+      case 'announcement':
+        return colorScheme.tertiaryContainer;
+      default:
+        return colorScheme.secondaryContainer;
+    }
+  }
+
+  String _getTypeLabel(String type) {
+    switch (type) {
+      case 'update':
+        return 'تحديث تطبيق';
+      case 'announcement':
+        return 'إعلان عام';
+      default:
+        return 'تنبيه نظام';
+    }
+  }
+
+  void _showNotificationDetails(BuildContext context, String dateStr) {
+    final title = data['title'] as String? ?? '';
+    final body = data['body'] as String? ?? '';
+    final targetDetails = data['targetDetails'] as String? ?? data['targetName'] as String? ?? '';
 
     showDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
-              Icon(
-                Icons.mark_email_read_rounded,
-                color: Theme.of(ctx).colorScheme.primary,
-              ),
+              Icon(Icons.mark_email_read_rounded, color: Theme.of(ctx).colorScheme.primary),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -1319,32 +1854,15 @@ class _SentNotificationCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildDetailRow(ctx, 'العنوان', data['title'] ?? ''),
+                _buildDetailRow(ctx, 'العنوان', title),
                 const Divider(),
-                _buildDetailRow(ctx, 'المحتوى', data['body'] ?? ''),
+                _buildDetailRow(ctx, 'المحتوى', body),
                 const Divider(),
-                _buildDetailRow(
-                  ctx,
-                  'المستهدف',
-                  (data['targetDetails'] as String? ??
-                          data['targetName'] as String? ??
-                          '')
-                      .replaceAll(RegExp(r'\s*•?\s*رقم الهاتف:?\s*\+?\d+'), '')
-                      .replaceAll(RegExp(r'\s*\(\+?\d+\)\s*'), '')
-                      .trim(),
-                ),
-                const Divider(),
-                _buildDetailRow(ctx, 'حالة القراءة', readStatusText),
+                _buildDetailRow(ctx, 'المستهدف', targetDetails),
                 const Divider(),
                 _buildDetailRow(ctx, 'المرسل', data['senderName'] ?? ''),
                 const Divider(),
                 _buildDetailRow(ctx, 'تاريخ الإرسال', dateStr),
-                const Divider(),
-                _buildDetailRow(
-                  ctx,
-                  'إجمالي المستلمين',
-                  '${data['sentCount'] ?? 1} مستخدم',
-                ),
               ],
             ),
           ),
@@ -1383,4 +1901,3 @@ class _SentNotificationCard extends StatelessWidget {
     );
   }
 }
-

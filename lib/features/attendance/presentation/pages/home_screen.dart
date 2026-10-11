@@ -17,6 +17,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/services/security_audit_service.dart';
 import 'package:delegate_app/features/tasks/data/models/task_model.dart';
+import 'package:delegate_app/features/tracking/data/services/delegate_tracking_engine.dart';
 
 class HomeScreen extends StatefulWidget {
   final Delegate delegate;
@@ -49,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
               AppSnackBar.showError(context, state.message);
             } else if (state is AttendanceCheckedIn) {
               AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
+              DelegateTrackingEngine().startTrackingSession(delegateId: widget.delegate.uid);
               context.read<AttendanceBloc>().add(
                 HistoryRequested(
                   userId: widget.delegate.uid,
@@ -57,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             } else if (state is AttendanceCheckedOut) {
               AppSnackBar.showSuccess(context, l10n.checkedOutSuccessfully);
+              DelegateTrackingEngine().stopTrackingSession();
               context.read<AttendanceBloc>().add(
                 HistoryRequested(
                   userId: widget.delegate.uid,
@@ -72,6 +75,11 @@ class _HomeScreenState extends State<HomeScreen> {
             if (state is AttendanceHistoryLoaded) {
               isCheckedIn = state.activeAttendance != null;
               activeAttendance = state.activeAttendance;
+
+              if (isCheckedIn && !DelegateTrackingEngine().isTracking) {
+                DelegateTrackingEngine()
+                    .startTrackingSession(delegateId: widget.delegate.uid);
+              }
             }
 
             return Padding(

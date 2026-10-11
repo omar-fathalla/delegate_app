@@ -1,20 +1,27 @@
 import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'delegate_tracking_service.dart';
 
 /// محرك البث الميداني الحقيقي بهاتف المندوب (Real-time Field Telemetry & Tracking Engine)
-/// يعمل بشكل تكيفي ذكي (Smart Adaptive Interval) بين فترتي الحضور والانصراف
+/// يعمل بنظام البث المستمر في الخلفية (Background Location Stream + Foreground Service)
+/// مع المزامنة اللحظية لأوامر المشرف والمؤقت الدوري الذكي
 class DelegateTrackingEngine {
   final DelegateTrackingService _trackingService;
   final Battery _battery;
 
+  StreamSubscription<Position>? _positionStreamSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _remoteConfigSubscription;
   Timer? _periodicTimer;
+
   String? _activeDelegateId;
   Position? _lastRecordedPosition;
   DateTime? _lastPingTime;
   bool _isTracking = false;
+  bool _remoteTrackingEnabled = true;
 
   // نمط المفرد (Singleton) للوصول الموحد عبر التطبيق
   static final DelegateTrackingEngine _instance =
@@ -43,10 +50,11 @@ class DelegateTrackingEngine {
         _battery = battery ?? Battery();
 
   bool get isTracking => _isTracking;
+  bool get remoteTrackingEnabled => _remoteTrackingEnabled;
   String? get activeDelegateId => _activeDelegateId;
   Position? get lastPosition => _lastRecordedPosition;
 
-  /// 1. بدء جلسة التتبع الميداني في هاتف المندوب عند تسجيل الحضور
+  /// 1. بدء جلسة التتبع الميداني في هاتف المندوب
   Future<void> startTrackingSession({
     required String delegateId,
     Duration interval = const Duration(minutes: 5),
@@ -55,26 +63,65 @@ class DelegateTrackingEngine {
 
     _activeDelegateId = delegateId;
     _isTracking = true;
+    _remoteTrackingEnabled = true;
 
-    debugPrint('🚀 [DelegateTrackingEngine] Starting tracking session for $delegateId');
+    debugPrint(
+        '🚀 [DelegateTrackingEngine] Starting background tracking session for $delegateId');
 
-    // إرسال أول نبضة قياس فوري
+    // أ. الاستماع اللحظي لتغييرات إعدادات التتبع من المشرف (Remote Toggle)
+    _listenToRemoteConfig(delegateId);
+
+    // ب. بدء خدمة البث المستمر في الخلفية عبر Geolocator مع الإشعار الدائم
+    await _startBackgroundPositionStream();
+
+    // ج. إرسال أول نبضة قياس فوري
     await triggerTelemetryPing();
 
-    // تشغيل المؤقت الدوري التكيفي الذكي
+    // د. تشغيل المؤقت الدوري للحفاظ على تحديث حالة البطارية والاتصال أثناء التوقف
     _periodicTimer?.cancel();
     _periodicTimer = Timer.periodic(interval, (_) async {
+      if (!_isTracking || !_remoteTrackingEnabled) return;
       await triggerTelemetryPing();
     });
   }
 
-  /// 2. إرسال نبضة قياس حي (GPS + Battery + Speed + Motion)
-  Future<void> triggerTelemetryPing() async {
-    final delegateId = _activeDelegateId;
-    if (delegateId == null || !_isTracking) return;
-
+  /// الاستماع لتعديل حالة التتبع من المشرف (isTrackingEnabled)
+  void _listenToRemoteConfig(String delegateId) {
+    _remoteConfigSubscription?.cancel();
     try {
-      // أ. فحص إذن خدمات الموقع
+      _remoteConfigSubscription = FirebaseFirestore.instance
+          .collection('delegate_tracking')
+          .doc(delegateId)
+          .snapshots()
+          .listen((snap) {
+        if (!snap.exists) return;
+        final data = snap.data();
+        if (data == null) return;
+
+        final bool isEnabled = data['isTrackingEnabled'] ?? true;
+        if (isEnabled != _remoteTrackingEnabled) {
+          _remoteTrackingEnabled = isEnabled;
+          debugPrint(
+              '📡 [DelegateTrackingEngine] Remote tracking status changed to: $isEnabled');
+          if (!isEnabled) {
+            _positionStreamSubscription?.pause();
+          } else {
+            _positionStreamSubscription?.resume();
+            unawaited(triggerTelemetryPing());
+          }
+        }
+      }, onError: (err) {
+        debugPrint(
+            '⚠️ [DelegateTrackingEngine] Remote config subscription error: $err');
+      });
+    } catch (e) {
+      debugPrint('⚠️ [DelegateTrackingEngine] Failed to listen to remote config: $e');
+    }
+  }
+
+  /// إعداد وبدء تيار الموقع في الخلفية عبر Foreground Service
+  Future<void> _startBackgroundPositionStream() async {
+    try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -85,15 +132,59 @@ class DelegateTrackingEngine {
         }
       }
 
-      // ب. قراءة الموقع الحالي بدقة عالية
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
+      LocationSettings locationSettings;
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        locationSettings = AndroidSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
+          distanceFilter: 15, // إرسال تحديث عند التحرك 15 متراً
+          intervalDuration: const Duration(seconds: 25),
+          foregroundNotificationConfig: const ForegroundNotificationConfig(
+            notificationTitle: 'تسهيل - التتبع الميداني نشط',
+            notificationText:
+                'يتم الآن تتبع وتوثيق خط السير الميداني أثناء فترة الدوام',
+            enableWakeLock: true,
+          ),
+        );
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        locationSettings = AppleSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 15,
+          activityType: ActivityType.other,
+          pauseLocationUpdatesAutomatically: false,
+          showBackgroundLocationIndicator: true,
+          allowBackgroundLocationUpdates: true,
+        );
+      } else {
+        locationSettings = const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 15,
+        );
+      }
 
-      // ج. قراءة نسبة البطارية الحقيقية
+      _positionStreamSubscription?.cancel();
+      _positionStreamSubscription = Geolocator.getPositionStream(
+        locationSettings: locationSettings,
+      ).listen(
+        (position) async {
+          if (!_isTracking || !_remoteTrackingEnabled) return;
+          await _handleIncomingPosition(position);
+        },
+        onError: (err) {
+          debugPrint('⚠️ [DelegateTrackingEngine] Position stream error: $err');
+        },
+      );
+    } catch (e) {
+      debugPrint('⚠️ [DelegateTrackingEngine] Failed to start background stream: $e');
+    }
+  }
+
+  /// معالجة نقطة الموقع الواردة من تيار الـ GPS
+  Future<void> _handleIncomingPosition(Position position) async {
+    final delegateId = _activeDelegateId;
+    if (delegateId == null || !_isTracking || !_remoteTrackingEnabled) return;
+
+    try {
+      // قراءة نسبة البطارية
       int? batteryLevel;
       try {
         batteryLevel = await _battery.batteryLevel;
@@ -101,30 +192,29 @@ class DelegateTrackingEngine {
         debugPrint('⚠️ [DelegateTrackingEngine] Battery read error: $err');
       }
 
-      // د. احتساب السرعة وحالة الحركة
+      // احتساب السرعة وحالة الحركة
       double speedKmh = 0.0;
       if (position.speed > 0) {
-        speedKmh = position.speed * 3.6; // تحويل من م/ث إلى كم/س
+        speedKmh = position.speed * 3.6;
       } else if (_lastRecordedPosition != null && _lastPingTime != null) {
-        final elapsedHours =
-            DateTime.now().difference(_lastPingTime!).inSeconds / 3600.0;
-        if (elapsedHours > 0) {
+        final elapsedSeconds =
+            DateTime.now().difference(_lastPingTime!).inSeconds;
+        if (elapsedSeconds > 0) {
           final distanceMeters = Geolocator.distanceBetween(
             _lastRecordedPosition!.latitude,
             _lastRecordedPosition!.longitude,
             position.latitude,
             position.longitude,
           );
-          speedKmh = (distanceMeters / 1000.0) / elapsedHours;
+          speedKmh = (distanceMeters / 1000.0) / (elapsedSeconds / 3600.0);
         }
       }
 
       final isMoving = speedKmh >= 2.0;
-
       _lastRecordedPosition = position;
       _lastPingTime = DateTime.now();
 
-      // هـ. بث التحديث لقاعدة البيانات وتوثيق نقطة المسار (Breadcrumb)
+      // بث التحديث لقاعدة البيانات وتوثيق نقطة المسار
       await _trackingService.updateLocationAndCheckGeofence(
         delegateId: delegateId,
         currentLat: position.latitude,
@@ -135,19 +225,17 @@ class DelegateTrackingEngine {
         isMocked: position.isMocked,
       );
 
-      // و. مزامنة أي نقاط مسار سابقة تم حفظها أوفلاين أثناء انقطاع الاتصال
+      // مزامنة أي نقاط مسار سابقة محفوظة محلياً
       await _trackingService.syncOfflineBreadcrumbsOnReconnect(
         delegateId: delegateId,
       );
 
       debugPrint(
-        '📍 [DelegateTrackingEngine] Ping sent: Lat ${position.latitude.toStringAsFixed(4)}, '
+        '📍 [DelegateTrackingEngine] Stream ping: Lat ${position.latitude.toStringAsFixed(4)}, '
         'Battery: $batteryLevel%, Speed: ${speedKmh.toStringAsFixed(1)} km/h, Moving: $isMoving',
       );
     } catch (e) {
-      debugPrint('⚠️ [DelegateTrackingEngine] Telemetry ping error: $e');
-
-      // عند انقطاع الإنترنت، تخزين إحداثيات المسار محلياً لحمايتها من الضياع
+      debugPrint('⚠️ [DelegateTrackingEngine] Handle position error: $e');
       if (_lastRecordedPosition != null) {
         await _trackingService.recordOfflineBreadcrumbLocally(
           delegateId: delegateId,
@@ -158,12 +246,46 @@ class DelegateTrackingEngine {
     }
   }
 
+  /// 2. إرسال نبضة قياس حي عند الطلب أو دورياً
+  Future<void> triggerTelemetryPing() async {
+    final delegateId = _activeDelegateId;
+    if (delegateId == null || !_isTracking || !_remoteTrackingEnabled) return;
+
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          debugPrint('⚠️ [DelegateTrackingEngine] Location permission denied.');
+          return;
+        }
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+
+      await _handleIncomingPosition(position);
+    } catch (e) {
+      debugPrint('⚠️ [DelegateTrackingEngine] Telemetry ping error: $e');
+    }
+  }
+
   /// 3. إيقاف جلسة التتبع عند تسجيل الانصراف (Check-Out)
   void stopTrackingSession() {
     debugPrint('🛑 [DelegateTrackingEngine] Stopping tracking session');
+    _positionStreamSubscription?.cancel();
+    _positionStreamSubscription = null;
+    _remoteConfigSubscription?.cancel();
+    _remoteConfigSubscription = null;
     _periodicTimer?.cancel();
     _periodicTimer = null;
     _isTracking = false;
+    _remoteTrackingEnabled = true;
     _activeDelegateId = null;
     _lastRecordedPosition = null;
     _lastPingTime = null;

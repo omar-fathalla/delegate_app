@@ -44,6 +44,14 @@ abstract class AttendanceRemoteDataSource {
     DocumentSnapshot? startAfter,
   });
 
+  /// Fetches recent attendance sessions across all affiliated organizations (for the home brief).
+  Future<List<AttendanceModel>> getRecentSessionsAcrossOrgs(
+    String userId, {
+    String? nationalityID,
+    String? phoneNumber,
+    int limit = 6,
+  });
+
   /// Finds the active attendance record (where checkOutTime is null)
   /// for the given [userId] in the specified [organizationId].
   /// Returns `null` if no active session exists.
@@ -408,8 +416,15 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       }
 
       final queryList = identifiers.where((id) => id.isNotEmpty).take(30).toList();
+      final cleanOrgId = organizationId.trim();
 
-      Query<Map<String, dynamic>> query = _attendanceCollection(organizationId)
+      Query<Map<String, dynamic>> query = _attendanceCollection(organizationId);
+
+      if (cleanOrgId.isNotEmpty) {
+        query = query.where('organizationId', isEqualTo: cleanOrgId);
+      }
+
+      query = query
           .where('delegateId', whereIn: queryList)
           .orderBy('timestamp', descending: true)
           .limit(limit * 2);
@@ -418,10 +433,26 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         query = query.startAfterDocument(startAfter);
       }
 
-      final querySnapshot = await query.getResilient(
-        timeout: const Duration(seconds: 8),
-        forceServer: true,
-      );
+      QuerySnapshot<Map<String, dynamic>> querySnapshot;
+      try {
+        querySnapshot = await query.getResilient(
+          timeout: const Duration(seconds: 8),
+          forceServer: true,
+        );
+      } catch (err) {
+        debugPrint('Query with organizationId fallback to in-memory filter: $err');
+        Query<Map<String, dynamic>> fallbackQuery = _attendanceCollection(organizationId)
+            .where('delegateId', whereIn: queryList)
+            .orderBy('timestamp', descending: true)
+            .limit(limit * 2);
+        if (startAfter != null) {
+          fallbackQuery = fallbackQuery.startAfterDocument(startAfter);
+        }
+        querySnapshot = await fallbackQuery.getResilient(
+          timeout: const Duration(seconds: 8),
+          forceServer: true,
+        );
+      }
 
       if (querySnapshot.docs.isEmpty) {
         return PaginationResponse(
@@ -434,7 +465,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final history = _pairAttendanceDocs(
         querySnapshot.docs,
         userId,
-        organizationId,
+        cleanOrgId,
       );
 
       return PaginationResponse(
@@ -445,6 +476,46 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     } catch (e, stack) {
       debugPrint('Error in getHistoryPaginated: $e\n$stack');
       return PaginationResponse(items: [], lastDoc: null, hasReachedMax: true);
+    }
+  }
+
+  @override
+  Future<List<AttendanceModel>> getRecentSessionsAcrossOrgs(
+    String userId, {
+    String? nationalityID,
+    String? phoneNumber,
+    int limit = 6,
+  }) async {
+    try {
+      final Set<String> identifiers = {userId};
+      if (nationalityID != null && nationalityID.trim().isNotEmpty) {
+        identifiers.add(nationalityID.trim());
+      }
+      if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+        final cleanPhone = phoneNumber.trim();
+        identifiers.add(cleanPhone);
+        final normalized = _normalizePhone(cleanPhone);
+        if (normalized.isNotEmpty) identifiers.add(normalized);
+      }
+      final queryList = identifiers.where((id) => id.isNotEmpty).take(30).toList();
+
+      final querySnapshot = await firestore
+          .collection(kAttendanceCollection)
+          .where('delegateId', whereIn: queryList)
+          .orderBy('timestamp', descending: true)
+          .limit(limit * 3)
+          .getResilient(
+            timeout: const Duration(seconds: 6),
+            forceServer: false,
+          );
+
+      if (querySnapshot.docs.isEmpty) return [];
+
+      final allSessions = _pairAttendanceDocs(querySnapshot.docs, userId, '');
+      return allSessions.take(limit).toList();
+    } catch (e) {
+      debugPrint('Error in getRecentSessionsAcrossOrgs: $e');
+      return [];
     }
   }
 
@@ -476,12 +547,24 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     for (var doc in checkIns) {
       final checkInId = doc.id;
       final data = doc.data();
+      final docOrg = (data['organizationId'] as String?)?.trim() ??
+          (data['organizationUID'] as String?)?.trim() ??
+          '';
+
+      // Dual-layer strict multi-tenant isolation:
+      if (organizationId.trim().isNotEmpty &&
+          docOrg.isNotEmpty &&
+          docOrg != organizationId.trim()) {
+        continue;
+      }
+
       final checkInTime = data['timestamp'] != null
           ? (data['timestamp'] as Timestamp).toDate()
           : DateTime.now();
       final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0;
       final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0;
       final branchName = data['branchName'];
+      final targetOrgId = docOrg.isNotEmpty ? docOrg : organizationId;
 
       if (checkOuts.containsKey(checkInId)) {
         final outData = checkOuts[checkInId]!;
@@ -491,7 +574,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           AttendanceModel(
             id: checkInId,
             userId: userId,
-            organizationId: organizationId,
+            organizationId: targetOrgId,
             checkInTime: checkInTime,
             checkOutTime: outData['timestamp'] != null
                 ? (outData['timestamp'] as Timestamp).toDate()
@@ -511,7 +594,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             AttendanceModel(
               id: checkInId,
               userId: userId,
-              organizationId: organizationId,
+              organizationId: targetOrgId,
               checkInTime: checkInTime,
               checkOutTime: checkInTime.add(const Duration(hours: 9)),
               latitude: lat,

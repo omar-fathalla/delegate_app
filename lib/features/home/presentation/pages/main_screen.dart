@@ -50,6 +50,21 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   @override
+  void didUpdateWidget(MainScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.delegate.organizationUID != widget.delegate.organizationUID ||
+        oldWidget.delegate.companyUID != widget.delegate.companyUID ||
+        oldWidget.delegate.uid != widget.delegate.uid) {
+      setState(() {
+        _currentIndex = 0;
+        _initializedTabs.clear();
+        _initializedTabs.add(0);
+      });
+      _loadAllDelegates();
+    }
+  }
+
+  @override
   void dispose() {
     super.dispose();
   }

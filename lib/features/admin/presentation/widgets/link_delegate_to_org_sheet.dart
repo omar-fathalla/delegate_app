@@ -897,7 +897,7 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(
-                      Icons.celebration_rounded,
+                      Icons.local_offer_rounded,
                       size: 14,
                       color: Color(0xFF16A34A),
                     ),

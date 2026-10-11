@@ -287,6 +287,10 @@ class DelegateSubscriptionRequest extends Equatable {
     );
   }
 
+  bool get isDeleteRequest => requestType == 'delete_delegate';
+  bool get isAddOrganizationRequest => requestType == 'add_organization';
+  bool get isNewDelegateRequest => requestType == 'new_delegate';
+
   @override
   List<Object?> get props => [
         id,

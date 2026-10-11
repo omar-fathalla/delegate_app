@@ -7,7 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
+import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
@@ -42,7 +44,14 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
   int _attendedDays = 0;
   int _absentDays = 0;
-  int _offDaysSoFar = 0;
+  int _approvedLeavesThisMonth = 0;
+
+  List<Attendance> _recentSessions = [];
+  static final Map<String, String> _orgNamesCache = {
+    'PiioBFgxaHAeuRdjlDgj': 'fathalla market',
+    '5DE6702w6hFwycJfZyqM': 'جملة ماركت',
+    'gOaRsmPocj2xV018m0hY': 'جملة ماركت',
+  };
 
   @override
   bool get wantKeepAlive => true;
@@ -56,6 +65,24 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     }
     _fetchSupervisors();
     _loadAttendanceData();
+    _loadRecentActivity();
+  }
+
+  @override
+  void didUpdateWidget(covariant DelegateHomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.delegate.organizationUID != widget.delegate.organizationUID ||
+        oldWidget.delegate.companyUID != widget.delegate.companyUID) {
+      final cacheKey = '${widget.delegate.organizationUID}_${widget.delegate.companyUID}';
+      if (_supervisorsCache.containsKey(cacheKey)) {
+        setState(() {
+          _supervisorsData = List.from(_supervisorsCache[cacheKey]!);
+        });
+      }
+      _fetchSupervisors();
+      _loadAttendanceData();
+      _loadRecentActivity();
+    }
   }
 
   Future<void> _fetchSupervisors({bool forceRefresh = false}) async {
@@ -408,6 +435,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           await Future.wait([
             _fetchSupervisors(forceRefresh: true),
             _loadAttendanceData(forceRefresh: true),
+            _loadRecentActivity(forceRefresh: true),
           ]);
         },
         child: SingleChildScrollView(
@@ -420,6 +448,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               _buildWelcomeHeroCard(context),
               const SizedBox(height: 16),
               _buildMonthlyAttendanceSummaryCard(context),
+              const SizedBox(height: 14),
+              _buildRecentActivityBriefCard(context),
               const SizedBox(height: 14),
               _buildLeavesAndRequestsCard(context),
               const SizedBox(height: 16),
@@ -478,79 +508,88 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        // Position Chip
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(widget.delegate.uid)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final userData = snapshot.data?.data();
+                        final positionLabel = widget.delegate.position ==
+                                    DelegatePosition.promoter ||
+                                widget.delegate.role ==
+                                    UserRole.marketingPromotion
+                            ? (isArabic ? 'مروج ميداني' : 'Field Promoter')
+                            : widget.delegate.position ==
+                                    DelegatePosition.supervisor
+                                ? (isArabic ? 'مشرف ميداني' : 'Field Supervisor')
+                                : (isArabic ? 'مندوب ميداني' : 'Field Delegate');
+
+                        final activeOrg = widget.delegate.organizationName.trim();
+                        final affiliatedOrgs = <String>{};
+
+                        if (activeOrg.isNotEmpty) {
+                          affiliatedOrgs.add(activeOrg);
+                        }
+
+                        if (userData != null) {
+                          final rawList = userData['organizationNames'] ??
+                              userData['organizations'];
+                          if (rawList is List) {
+                            for (final item in rawList) {
+                              if (item is String && item.trim().isNotEmpty) {
+                                affiliatedOrgs.add(item.trim());
+                              }
+                            }
+                          }
+                        }
+
+                        for (final name in widget.delegate.allOrganizationNames) {
+                          if (name.trim().isNotEmpty) {
+                            affiliatedOrgs.add(name.trim());
+                          }
+                        }
+
+                        final orgsList = affiliatedOrgs.toList();
+
+                        if (orgsList.length <= 1) {
+                          return Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.badge_rounded,
-                                size: 14,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                isArabic ? 'مندوب ميداني' : 'Field Delegate',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                              _buildPositionChip(positionLabel),
+                              if (orgsList.isNotEmpty)
+                                _buildWelcomeOrgChip(
+                                  orgName: orgsList.first,
+                                  isActive: true,
+                                  isArabic: isArabic,
                                 ),
-                              ),
                             ],
-                          ),
-                        ),
-                        // Organization Chip (Distinct Accent)
-                        if (widget.delegate.organizationName.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFBBF24).withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFFDE68A).withValues(alpha: 0.6),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                          );
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildPositionChip(positionLabel),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                const Icon(
-                                  Icons.domain_rounded,
-                                  size: 14,
-                                  color: Color(0xFFFEF3C7),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  widget.delegate.organizationName,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFFFEF3C7),
+                                for (final org in orgsList)
+                                  _buildWelcomeOrgChip(
+                                    orgName: org,
+                                    isActive: org == activeOrg,
+                                    isArabic: isArabic,
                                   ),
-                                ),
                               ],
                             ),
-                          ),
-                      ],
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -654,6 +693,126 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPositionChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.badge_rounded,
+            size: 14,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWelcomeOrgChip({
+    required String orgName,
+    required bool isActive,
+    required bool isArabic,
+  }) {
+    if (isActive) {
+      return Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 3,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFBBF24).withValues(alpha: 0.22),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFFDE68A).withValues(alpha: 0.7),
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.domain_rounded,
+              size: 14,
+              color: Color(0xFFFEF3C7),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              orgName,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFFEF3C7),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              width: 5.5,
+              height: 5.5,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF10B981),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.35),
+          width: 1.0,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.storefront_outlined,
+            size: 14,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            orgName,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.95),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1002,14 +1161,40 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       }
     } catch (_) {}
 
-    // 2. Remote fetch in background
+    // 2. Load approved leaves this month from leave_requests
+    int approvedLeaves = _approvedLeavesThisMonth;
+    try {
+      final leavesSnap = await FirebaseFirestore.instance
+          .collection('leave_requests')
+          .where('delegateUid', isEqualTo: widget.delegate.uid)
+          .where('status', isEqualTo: 'approved')
+          .getResilient(forceServer: forceRefresh);
+
+      final now = _getTrustedNow();
+      int count = 0;
+      for (final doc in leavesSnap.docs) {
+        final data = doc.data();
+        if (data['isHourly'] == true) continue;
+        final start = data['startDate'];
+        if (start is Timestamp) {
+          final date = start.toDate();
+          if (date.year == now.year && date.month == now.month) {
+            final days = (data['daysCount'] as num?)?.toInt() ?? 1;
+            count += days;
+          }
+        }
+      }
+      approvedLeaves = count;
+    } catch (_) {}
+
+    // 3. Remote fetch cross-organization attendance for unified monthly stats
     try {
       if (sl.isRegistered<GetHistory>()) {
         final getHistory = sl<GetHistory>();
         final result = await getHistory(
           GetHistoryParams(
             userId: widget.delegate.uid,
-            organizationId: widget.delegate.organizationUID,
+            organizationId: '', // Empty means all affiliated organizations
             nationalityID: widget.delegate.nationalityID,
             phoneNumber: widget.delegate.phoneNumber,
           ),
@@ -1017,21 +1202,21 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         result.fold(
           (_) {},
           (history) {
-            _computeStats(history);
+            _computeStats(history, approvedLeavesCount: approvedLeaves);
           },
         );
       }
     } catch (_) {}
   }
 
-  void _computeStats(List<Attendance> history) {
+  void _computeStats(List<Attendance> history, {int? approvedLeavesCount}) {
     final trustedNow = _getTrustedNow();
     final currentMonth = trustedNow.month;
     final currentYear = trustedNow.year;
     final currentDay = trustedNow.day;
     final totalDaysInMonth = DateUtils.getDaysInMonth(currentYear, currentMonth);
 
-    // Filter unique days attended in current month
+    // Filter unique days attended in current month across ALL affiliated organizations
     final daySet = <String>{};
     for (final item in history) {
       if (item.checkInTime.month == currentMonth &&
@@ -1044,25 +1229,39 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     }
     final attended = daySet.length;
 
-    // Active days for new delegates (if joined this month)
+    // Active days for new delegates (using earliest registration date across all chains)
+    DateTime earliestCreatedAt = widget.delegate.createdAt;
+    try {
+      if (sl.isRegistered<AuthLocalDataSource>()) {
+        final all = sl<AuthLocalDataSource>().getCachedAllDelegatesData();
+        for (final d in all) {
+          if (d.createdAt.isBefore(earliestCreatedAt)) {
+            earliestCreatedAt = d.createdAt;
+          }
+        }
+      }
+    } catch (_) {}
+
     int activeDays = currentDay;
-    if (widget.delegate.createdAt.year == currentYear &&
-        widget.delegate.createdAt.month == currentMonth &&
-        widget.delegate.createdAt.day > 1) {
-      activeDays = (currentDay - widget.delegate.createdAt.day + 1)
+    if (earliestCreatedAt.year == currentYear &&
+        earliestCreatedAt.month == currentMonth &&
+        earliestCreatedAt.day > 1) {
+      activeDays = (currentDay - earliestCreatedAt.day + 1)
           .clamp(1, totalDaysInMonth);
     }
 
+    final leavesThisMonth = approvedLeavesCount ?? _approvedLeavesThisMonth;
     // 4 off days per month (~1 every 7 days)
     final offSoFar = (activeDays / 7).floor().clamp(0, 4);
-    final elapsedWorkDays = (activeDays - offSoFar).clamp(0, 26);
+    // Working days elapsed excludes regular off days and approved leave days
+    final elapsedWorkDays = (activeDays - offSoFar - leavesThisMonth).clamp(0, 26);
     final absent = (elapsedWorkDays - attended).clamp(0, 26);
 
     if (mounted) {
       setState(() {
         _attendedDays = attended;
         _absentDays = absent;
-        _offDaysSoFar = offSoFar;
+        _approvedLeavesThisMonth = leavesThisMonth;
       });
     }
   }
@@ -1176,8 +1375,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   child: _buildAttendanceStatPill(
                     context,
                     title: isArabic ? 'أيام الإجازة' : 'Days Off',
-                    value: isArabic ? '$_offDaysSoFar من 4 أيام' : '$_offDaysSoFar of 4 days',
-                    icon: Icons.weekend_rounded,
+                    value: isArabic
+                        ? '$_approvedLeavesThisMonth من 4 أيام'
+                        : '$_approvedLeavesThisMonth of 4 days',
+                    icon: Icons.event_available_rounded,
                     containerColor: colorScheme.tertiaryContainer,
                     iconColor: colorScheme.onTertiaryContainer,
                     textColor: colorScheme.onSurface,
@@ -1220,6 +1421,319 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _loadRecentActivity({bool forceRefresh = false}) async {
+    try {
+      if (sl.isRegistered<AttendanceRemoteDataSource>()) {
+        final remoteDS = sl<AttendanceRemoteDataSource>();
+        final sessions = await remoteDS.getRecentSessionsAcrossOrgs(
+          widget.delegate.uid,
+          nationalityID: widget.delegate.nationalityID,
+          phoneNumber: widget.delegate.phoneNumber,
+          limit: 4,
+        );
+        if (mounted) {
+          setState(() {
+            _recentSessions = sessions;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading recent activity: $e');
+    }
+  }
+
+  String _resolveOrgLabel(String orgId) {
+    final clean = orgId.trim();
+    if (clean.isEmpty) return widget.delegate.organizationName;
+    if (_orgNamesCache.containsKey(clean)) {
+      return _orgNamesCache[clean]!;
+    }
+    if (clean == widget.delegate.organizationUID) {
+      _orgNamesCache[clean] = widget.delegate.organizationName;
+      return widget.delegate.organizationName;
+    }
+    return widget.delegate.organizationName;
+  }
+
+  Widget _buildRecentActivityBriefCard(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    if (_recentSessions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.history_toggle_off_rounded,
+                    size: 20,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isArabic
+                        ? 'آخر الفروع والنشاط الميداني'
+                        : 'Recent Branch Activity',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              if (widget.onNavigateToAttendance != null)
+                InkWell(
+                  onTap: widget.onNavigateToAttendance,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          isArabic ? 'عرض السجل' : 'View Log',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Icon(
+                          isArabic
+                              ? Icons.chevron_left_rounded
+                              : Icons.chevron_right_rounded,
+                          size: 16,
+                          color: colorScheme.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Session Items (latest 2-3 sessions)
+          ..._recentSessions.take(3).map((session) {
+            final branchName = session.branchName ??
+                (isArabic ? 'فرع غير محدد' : 'Unknown Branch');
+            final orgName = _resolveOrgLabel(session.organizationId);
+            final checkInStr =
+                DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkInTime);
+            final checkOutStr = session.checkOutTime != null
+                ? DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkOutTime!)
+                : (isArabic ? 'قيد العمل' : 'Active');
+
+            // Format date relative (اليوم، أمس، أو التاريخ)
+            final now = _getTrustedNow();
+            final isToday = session.checkInTime.year == now.year &&
+                session.checkInTime.month == now.month &&
+                session.checkInTime.day == now.day;
+            final isYesterday = session.checkInTime.year == now.year &&
+                session.checkInTime.month == now.month &&
+                session.checkInTime.day == now.day - 1;
+
+            final dateLabel = isToday
+                ? (isArabic ? 'اليوم' : 'Today')
+                : isYesterday
+                    ? (isArabic ? 'أمس' : 'Yesterday')
+                    : DateFormat('EEE، d MMM', isArabic ? 'ar' : 'en').format(session.checkInTime);
+
+            // Compute Duration
+            String durationLabel = '';
+            if (session.checkOutTime != null) {
+              final diff = session.checkOutTime!.difference(session.checkInTime);
+              final hours = diff.inHours;
+              final minutes = diff.inMinutes % 60;
+              durationLabel = isArabic
+                  ? '$hours س $minutes د'
+                  : '${hours}h ${minutes}m';
+            }
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Row 1: Branch Name + Org Chip
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_rounded,
+                        size: 15,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          branchName,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // Organization Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: colorScheme.primary.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.storefront_rounded,
+                              size: 11,
+                              color: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              orgName,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Row 2: Date + In/Out Times + Duration
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      // Date pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          dateLabel,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      // Check-in
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.login_rounded,
+                            size: 12,
+                            color: Color(0xFF10B981),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            checkInStr,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Check-out
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.logout_rounded,
+                            size: 12,
+                            color: session.checkOutTime != null
+                                ? colorScheme.error
+                                : const Color(0xFF10B981),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            checkOutStr,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: session.checkOutTime == null
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: session.checkOutTime != null
+                                  ? colorScheme.onSurfaceVariant
+                                  : const Color(0xFF10B981),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Duration
+                      if (durationLabel.isNotEmpty)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.timelapse_rounded,
+                              size: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              durationLabel,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }

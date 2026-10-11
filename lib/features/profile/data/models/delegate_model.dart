@@ -276,7 +276,19 @@ class DelegateModel extends Delegate {
       allReceiptCodes: (json['allReceiptCodes'] as List? ?? [])
           .map((e) => e.toString())
           .toList(),
-      createdAt: DateTimeUtils.parseDate(json['createdAt']),
+      createdAt: () {
+        final raw = json['createdAt'] ??
+            json['hiredAt'] ??
+            json['startDate'] ??
+            (json['subscription'] is Map ? json['subscription']['startDate'] : null) ??
+            (json['documents'] is List && (json['documents'] as List).isNotEmpty
+                ? (json['documents'][0] is Map ? json['documents'][0]['uploadedAt'] : null)
+                : null);
+        if (raw != null) {
+          return DateTimeUtils.parseDate(raw);
+        }
+        return DateTime(2026, 1, 1);
+      }(),
       createdBy: json['createdBy'] ?? '',
       hasPendingUpdate: parseBool(json['hasPendingUpdate']),
       isDeductedFromCompany: parseBool(json['isDeductedFromCompany']),
@@ -387,11 +399,23 @@ class DelegateModel extends Delegate {
       supervisorName: (json['supervisorName'] as String?)?.trim() ?? (json['supervisor_name'] as String?)?.trim(),
       supervisorPhone: (json['supervisorPhone'] as String?)?.trim() ?? (json['supervisor_phone'] as String?)?.trim(),
       supervisorUid: (json['supervisorUid'] as String?)?.trim() ?? (json['supervisor_uid'] as String?)?.trim(),
-      allOrganizationNames: (json['allOrganizationNames'] is List)
-          ? (json['allOrganizationNames'] as List)
-              .map((e) => e.toString())
-              .toList()
-          : const <String>[],
+      allOrganizationNames: () {
+        final list = (json['allOrganizationNames'] is List)
+            ? (json['allOrganizationNames'] as List)
+            : (json['organizationNames'] is List)
+                ? (json['organizationNames'] as List)
+                : null;
+        if (list != null) {
+          final names = list
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
+          if (names.isNotEmpty) return names;
+        }
+        final single = (json['organizationName'] as String?)?.trim();
+        if (single != null && single.isNotEmpty) return [single];
+        return const <String>[];
+      }(),
       isAnnualLeaveEnabled: parseBool(json['isAnnualLeaveEnabled'], false),
       annualLeaveQuota: (json['annualLeaveQuota'] is num)
           ? (json['annualLeaveQuota'] as num).toInt()

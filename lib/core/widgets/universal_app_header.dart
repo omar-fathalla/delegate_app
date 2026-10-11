@@ -74,51 +74,25 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
     }
   }
 
-  String _getOrganizationsLabel(Delegate del, Map<String, dynamic>? userData) {
-    final orgNames = <String>[];
-
+  String _getActiveOrganizationLabel(Delegate del, Map<String, dynamic>? userData) {
+    // إظهار المنظمة النشطة الحالية فقط في الهيدر العلوي
+    if (del.organizationName.trim().isNotEmpty) {
+      return del.organizationName.trim();
+    }
     if (userData != null) {
-      final rawList = userData['organizationNames'] ??
-          userData['organizations'] ??
-          userData['assignedOrganizations'];
-      if (rawList is List) {
-        for (final item in rawList) {
-          if (item is String && item.trim().isNotEmpty) {
-            orgNames.add(item.trim());
-          } else if (item is Map &&
-              item['name'] is String &&
-              (item['name'] as String).trim().isNotEmpty) {
-            orgNames.add((item['name'] as String).trim());
-          }
-        }
-      }
-    }
-
-    if (orgNames.isEmpty && del.organizationName.isNotEmpty) {
-      final parts = del.organizationName
-          .split(RegExp(r'[,،•]'))
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-      orgNames.addAll(parts);
-    }
-
-    if (orgNames.isEmpty && userData != null) {
       final singleOrg = (userData['organizationName'] as String?)?.trim();
       if (singleOrg != null && singleOrg.isNotEmpty) {
-        orgNames.add(singleOrg);
+        return singleOrg;
       }
     }
-
-    if (orgNames.isEmpty) {
-      final comp = (userData?['companyName'] as String?)?.trim() ?? del.companyName.trim();
-      if (comp.isNotEmpty) {
-        orgNames.add(comp);
-      }
+    if (del.companyName.trim().isNotEmpty) {
+      return del.companyName.trim();
     }
-
-    if (orgNames.isEmpty) return '';
-    return orgNames.toSet().join(' • ');
+    final comp = (userData?['companyName'] as String?)?.trim();
+    if (comp != null && comp.isNotEmpty) {
+      return comp;
+    }
+    return '';
   }
 
   String? _resolvePhotoUrl(Delegate del, Map<String, dynamic>? userData) {
@@ -257,7 +231,7 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
 
           // حل الدور والمنظمة
           final roleLabel = _getRoleLabel(context, delegate);
-          final orgsLabel = _getOrganizationsLabel(delegate, userData);
+          final activeOrgName = _getActiveOrganizationLabel(delegate, userData);
 
           return Row(
             children: [
@@ -307,17 +281,11 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
                               ),
                             ),
                           ),
-                          if (orgsLabel.isNotEmpty) ...[
+                          if (activeOrgName.isNotEmpty) ...[
                             const SizedBox(width: 6),
                             Flexible(
-                              child: Text(
-                                orgsLabel,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: _PulsingActiveOrgChip(
+                                organizationName: activeOrgName,
                               ),
                             ),
                           ],
@@ -344,6 +312,121 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
         ),
         const SizedBox(width: 4),
       ],
+    );
+  }
+}
+
+/// شريحة المنظمة النشطة المضيئة مع أنيميشن إضاءة متوهجة ناعمة تظهر وتختفي (Pulsing Glow)
+class _PulsingActiveOrgChip extends StatefulWidget {
+  final String organizationName;
+
+  const _PulsingActiveOrgChip({required this.organizationName});
+
+  @override
+  State<_PulsingActiveOrgChip> createState() => _PulsingActiveOrgChipState();
+}
+
+class _PulsingActiveOrgChipState extends State<_PulsingActiveOrgChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
+    _glowAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return AnimatedBuilder(
+      animation: _glowAnimation,
+      builder: (context, child) {
+        final progress = _glowAnimation.value;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHigh.withValues(
+              alpha: 0.75 + 0.25 * progress,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: colorScheme.primary.withValues(
+                alpha: 0.35 + 0.45 * progress,
+              ),
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.primary.withValues(
+                  alpha: 0.12 + 0.22 * progress,
+                ),
+                blurRadius: 4.0 + 4.0 * progress,
+                spreadRadius: 0.5 * progress,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // نقطة إضاءة خضراء حية نابضة
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF10B981).withValues(
+                    alpha: 0.6 + 0.4 * progress,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF10B981).withValues(
+                        alpha: 0.5 * progress,
+                      ),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4.5),
+              Icon(
+                Icons.storefront_rounded,
+                size: 12,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  widget.organizationName,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

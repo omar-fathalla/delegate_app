@@ -115,6 +115,14 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
   }
 
   @override
+  Future<List<AttendanceModel>> getRecentSessionsAcrossOrgs(
+    String userId, {
+    String? nationalityID,
+    String? phoneNumber,
+    int limit = 6,
+  }) async => [];
+
+  @override
   Future<AttendanceModel?> findActiveAttendance(
     String userId,
     String organizationId,
@@ -172,24 +180,24 @@ class MockAttendanceLocalDataSource implements AttendanceLocalDataSource {
   int overwriteCallCount = 0;
 
   @override
-  Future<void> cacheAttendance(AttendanceModel attendanceToCache) async {
+  Future<void> cacheAttendance(AttendanceModel attendanceToCache, [String? organizationId]) async {
     cacheCallCount++;
     history.add(attendanceToCache);
   }
 
   @override
-  Future<List<AttendanceModel>> getLastAttendanceHistory() async {
+  Future<List<AttendanceModel>> getLastAttendanceHistory([String? organizationId]) async {
     return history;
   }
 
   @override
-  Future<void> updateAttendance(AttendanceModel attendanceToUpdate) async {
+  Future<void> updateAttendance(AttendanceModel attendanceToUpdate, [String? organizationId]) async {
     final index = history.indexWhere((e) => e.id == attendanceToUpdate.id);
     if (index != -1) history[index] = attendanceToUpdate;
   }
 
   @override
-  Future<void> overwriteHistory(List<AttendanceModel> newHistory) async {
+  Future<void> overwriteHistory(List<AttendanceModel> newHistory, [String? organizationId]) async {
     overwriteCallCount++;
     history = List.from(newHistory);
   }

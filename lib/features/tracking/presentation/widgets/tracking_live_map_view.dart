@@ -550,19 +550,6 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
               ),
               const SizedBox(width: 2),
               IconButton(
-                icon: const Icon(Icons.play_circle_filled_rounded, size: 20),
-                color: colorScheme.primary,
-                tooltip: 'محاكاة وبث حركة وتيليمتري حية للتجربة',
-                visualDensity: VisualDensity.compact,
-                style: IconButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(28, 28),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => _simulateMovementForSession(session),
-              ),
-              const SizedBox(width: 2),
-              IconButton(
                 icon: const Icon(Icons.close_rounded, size: 18),
                 color: colorScheme.onSurfaceVariant,
                 tooltip: 'إغلاق المسار',
@@ -581,25 +568,19 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
     );
   }
 
-  Future<void> _simulateMovementForSession(DelegateTrackingSession session) async {
-    final baseLat = session.lastLatitude ?? session.branchLat;
-    final baseLng = session.lastLongitude ?? session.branchLng;
-    if (baseLat == 0 && baseLng == 0) return;
-
+  void _refreshTrackingData(DelegateTrackingSession session) {
+    widget.onRefresh?.call();
+    if (_selectedSession != null) {
+      _selectSession(_selectedSession);
+    }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('جارٍ بث تيليميتري ومسار تحرك حي للمندوب ${session.delegateName}...'),
-          duration: const Duration(seconds: 2),
+        const SnackBar(
+          content: Text('تم تحديث بيانات التتبع الحية'),
+          duration: Duration(seconds: 1),
         ),
       );
     }
-
-    await _trackingService.simulateDelegateMovement(
-      delegateId: session.delegateId,
-      baseLat: baseLat,
-      baseLng: baseLng,
-    );
   }
 
   String _formatTime(DateTime time) {
@@ -1031,7 +1012,7 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
                   _focusOnDelegate(activeSession!);
                 }
               },
-              onRefreshPing: () => _simulateMovementForSession(activeSession!),
+              onRefreshPing: () => _refreshTrackingData(activeSession!),
               onToggleTracking: (val) {
                 widget.onToggleTracking(activeSession!);
               },

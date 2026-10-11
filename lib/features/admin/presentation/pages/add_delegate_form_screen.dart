@@ -489,7 +489,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isFree ? Icons.celebration_rounded : Icons.date_range_rounded,
+              isFree ? Icons.local_offer_rounded : Icons.date_range_rounded,
               color: Colors.white,
               size: 20,
             ),
@@ -501,7 +501,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
               children: [
                 Text(
                   isFree
-                      ? 'عرض ترويجي مجاني ممتد لنهاية العام 🎉'
+                      ? 'عرض ترويجي مجاني ممتد لنهاية العام'
                       : 'دورة الاشتراك النصف سنوية المطبقة',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -554,11 +554,34 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: _selectedOrgUID,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
-                fillColor: colorScheme.surface,
+                fillColor: colorScheme.surfaceContainerLowest,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: colorScheme.primary,
+                    width: 1.5,
+                  ),
+                ),
               ),
               items: _organizations.map((org) {
                 return DropdownMenuItem<String>(
@@ -598,6 +621,82 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
     );
   }
 
+  InputDecoration _buildM3InputDecoration({
+    required BuildContext context,
+    required String labelText,
+    String? hintText,
+    String? helperText,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+    EdgeInsetsGeometry? contentPadding,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InputDecoration(
+      labelText: labelText,
+      hintText: hintText,
+      helperText: helperText,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: colorScheme.surfaceContainerLowest,
+      labelStyle: TextStyle(
+        fontSize: 11.5,
+        fontWeight: FontWeight.normal,
+        color: colorScheme.onSurfaceVariant,
+      ),
+      floatingLabelStyle: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: colorScheme.primary,
+      ),
+      hintStyle: TextStyle(
+        fontSize: 11.5,
+        color: colorScheme.outline.withValues(alpha: 0.6),
+      ),
+      helperStyle: TextStyle(
+        fontSize: 10.5,
+        color: colorScheme.outline,
+      ),
+      errorStyle: const TextStyle(
+        fontSize: 10,
+        height: 1.1,
+      ),
+      contentPadding: contentPadding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: colorScheme.primary,
+          width: 1.5,
+        ),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: colorScheme.error,
+        ),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: colorScheme.error,
+          width: 1.5,
+        ),
+      ),
+    );
+  }
+
   Widget _buildPersonalInfoCard(ColorScheme colorScheme) {
     return Card(
       elevation: 0,
@@ -614,9 +713,11 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _firstNameController,
-                    decoration: const InputDecoration(
+                    style: const TextStyle(fontSize: 12.5),
+                    decoration: _buildM3InputDecoration(
+                      context: context,
                       labelText: 'الاسم الأول *',
-                      border: OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
                     ),
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
                   ),
@@ -625,9 +726,11 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _secondNameController,
-                    decoration: const InputDecoration(
+                    style: const TextStyle(fontSize: 12.5),
+                    decoration: _buildM3InputDecoration(
+                      context: context,
                       labelText: 'اسم الأب *',
-                      border: OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
                     ),
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
                   ),
@@ -636,9 +739,11 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _thirdNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'اللقب / العائلة *',
-                      border: OutlineInputBorder(),
+                    style: const TextStyle(fontSize: 12.5),
+                    decoration: _buildM3InputDecoration(
+                      context: context,
+                      labelText: 'اللقب *',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
                     ),
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
                   ),
@@ -650,11 +755,12 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
               controller: _phoneController,
               keyboardType: TextInputType.phone,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
+              style: const TextStyle(fontSize: 13),
+              decoration: _buildM3InputDecoration(
+                context: context,
                 labelText: 'رقم الهاتف (لتسجيل الدخول) *',
                 hintText: '01xxxxxxxxx',
-                prefixIcon: Icon(Icons.phone_android_rounded),
-                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.phone_android_rounded, size: 20, color: colorScheme.primary),
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'يرجى إدخال رقم الهاتف';
@@ -672,10 +778,12 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(14),
               ],
-              decoration: const InputDecoration(
-                labelText: 'الرقم القومي (14 رقم) *',
-                prefixIcon: Icon(Icons.credit_card_rounded),
-                border: OutlineInputBorder(),
+              style: const TextStyle(fontSize: 13),
+              decoration: _buildM3InputDecoration(
+                context: context,
+                labelText: 'الرقم القومي (14 رقم) للباسورد *',
+                helperText: 'يُعتمد الرقم القومي ككلمة مرور افتراضية لتسجيل دخول المندوب',
+                prefixIcon: Icon(Icons.credit_card_rounded, size: 20, color: colorScheme.primary),
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'يرجى إدخال الرقم القومي';
@@ -848,7 +956,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(
-                      Icons.celebration_rounded,
+                      Icons.local_offer_rounded,
                       size: 15,
                       color: Color(0xFF16A34A),
                     ),
@@ -1623,7 +1731,8 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                                           onChanged: (val) {
                                             _checkReceiptCode(val);
                                           },
-                                          decoration: InputDecoration(
+                                          decoration: _buildM3InputDecoration(
+                                            context: context,
                                             labelText: 'كود الإيصال / العملية (5 أرقام) *',
                                             hintText: 'مثال: 54821',
                                             prefixIcon: const Icon(Icons.tag_rounded),
@@ -1641,8 +1750,8 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                                                     : _isReceiptCodeValid == false
                                                         ? const Icon(Icons.error_rounded, color: Colors.red)
                                                         : null,
-                                            border: const OutlineInputBorder(),
                                             helperText: _receiptCodeStatusText,
+                                          ).copyWith(
                                             helperStyle: TextStyle(
                                               color: _isReceiptCodeValid == true
                                                   ? Colors.green

@@ -23,6 +23,19 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   static final Map<String, AttendanceHistoryLoaded> _cachedHistoryState = {};
   static void clearCache() => _cachedHistoryState.clear();
 
+  static String _cacheKey(String userId, String organizationId) {
+    if (organizationId.trim().isNotEmpty) {
+      return '${userId}_${organizationId.trim()}';
+    }
+    return userId;
+  }
+
+  static void _invalidateUserCache(String userId) {
+    _cachedHistoryState.removeWhere(
+      (k, _) => k == userId || k.startsWith('${userId}_'),
+    );
+  }
+
   AttendanceBloc({
     required this.checkIn,
     required this.checkOut,
@@ -44,9 +57,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     CheckInRequested event,
     Emitter<AttendanceState> emit,
   ) async {
+    final cacheKey = _cacheKey(event.userId, event.organizationId);
     final previousLoadedState = state is AttendanceHistoryLoaded
         ? (state as AttendanceHistoryLoaded)
-        : _cachedHistoryState[event.userId];
+        : _cachedHistoryState[cacheKey];
     final currentHistory = previousLoadedState?.history;
 
     // Fast memory check: guard against duplicate check-in if there's already an active session
@@ -80,7 +94,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       }
     }
 
-    _cachedHistoryState.remove(event.userId);
+    _invalidateUserCache(event.userId);
     emit(AttendanceLoading());
     final result = await checkIn(
       CheckInParams(
@@ -110,7 +124,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     CheckOutRequested event,
     Emitter<AttendanceState> emit,
   ) async {
-    _cachedHistoryState.remove(event.userId);
+    _invalidateUserCache(event.userId);
     emit(AttendanceLoading());
     final result = await checkOut(
       CheckOutParams(
@@ -134,7 +148,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     HistoryRequested event,
     Emitter<AttendanceState> emit,
   ) async {
-    final cached = _cachedHistoryState[event.userId];
+    final cacheKey = _cacheKey(event.userId, event.organizationId);
+    final cached = _cachedHistoryState[cacheKey];
     if (cached != null) {
       emit(cached);
     } else {
@@ -175,7 +190,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
           hasReachedMax: result.hasReachedMax,
         );
 
-        _cachedHistoryState[event.userId] = loadedState;
+        _cachedHistoryState[cacheKey] = loadedState;
         emit(loadedState);
       },
     );
@@ -258,9 +273,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     CheckOutAndCheckInRequested event,
     Emitter<AttendanceState> emit,
   ) async {
+    final cacheKey = _cacheKey(event.userId, event.organizationId);
     final previousLoadedState = state is AttendanceHistoryLoaded
         ? (state as AttendanceHistoryLoaded)
-        : _cachedHistoryState[event.userId];
+        : _cachedHistoryState[cacheKey];
     final currentHistory = previousLoadedState?.history;
 
     emit(AttendanceLoading());
