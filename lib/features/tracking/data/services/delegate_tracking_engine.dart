@@ -138,12 +138,6 @@ class DelegateTrackingEngine {
           accuracy: LocationAccuracy.high,
           distanceFilter: 15, // إرسال تحديث عند التحرك 15 متراً
           intervalDuration: const Duration(seconds: 25),
-          foregroundNotificationConfig: const ForegroundNotificationConfig(
-            notificationTitle: 'تسهيل - التتبع الميداني نشط',
-            notificationText:
-                'يتم الآن تتبع وتوثيق خط السير الميداني أثناء فترة الدوام',
-            enableWakeLock: true,
-          ),
         );
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         locationSettings = AppleSettings(

@@ -3,8 +3,6 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -53,13 +51,6 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyDQkxCw7YSM1-qUxcjT9oWA9DNZyp3fsOk" />
-
-        <!-- Foreground location service for continuous live tracking -->
-        <service
-            android:name="com.baseflow.geolocator.GeolocatorLocationService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="location" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
