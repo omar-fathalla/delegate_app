@@ -97,3 +97,22 @@ final class PrivateLabelReviewBranchSelected extends PrivateLabelReviewEvent {
   @override
   List<Object?> get props => [branch];
 }
+
+final class PrivateLabelReviewProductSelected extends PrivateLabelReviewEvent {
+  final String? productName;
+
+  const PrivateLabelReviewProductSelected(this.productName);
+
+  @override
+  List<Object?> get props => [productName];
+}
+
+final class PrivateLabelReviewMarketerSelected extends PrivateLabelReviewEvent {
+  final String? marketerName;
+
+  const PrivateLabelReviewMarketerSelected(this.marketerName);
+
+  @override
+  List<Object?> get props => [marketerName];
+}
+

@@ -33,9 +33,11 @@ class PrivateLabelReviewState extends Equatable {
   final String? errorMessage;
   final PrivateLabelReviewFeedback? feedback;
 
-  // Branch filtering for audit review:
+  // Branch, Product, and Marketer filtering for audit review:
   final List<String> branches;
   final String? selectedBranch;
+  final String? selectedProduct;
+  final String? selectedMarketer;
 
   const PrivateLabelReviewState({
     this.status = PrivateLabelReviewStatusView.initial,
@@ -49,6 +51,8 @@ class PrivateLabelReviewState extends Equatable {
     this.feedback,
     this.branches = const [],
     this.selectedBranch,
+    this.selectedProduct,
+    this.selectedMarketer,
   });
 
   static bool isPriceIssue(PrivateLabelAudit a) =>
@@ -83,6 +87,16 @@ class PrivateLabelReviewState extends Equatable {
       list = list.where((a) => a.branchName.trim() == b).toList();
     }
 
+    if (selectedProduct != null && selectedProduct!.trim().isNotEmpty) {
+      final p = selectedProduct!.trim().toLowerCase();
+      list = list.where((a) => a.productName.trim().toLowerCase() == p).toList();
+    }
+
+    if (selectedMarketer != null && selectedMarketer!.trim().isNotEmpty) {
+      final m = selectedMarketer!.trim();
+      list = list.where((a) => a.delegateName.trim() == m).toList();
+    }
+
     return list;
   }
 
@@ -91,6 +105,52 @@ class PrivateLabelReviewState extends Equatable {
     final set = <String>{...branches};
     for (final a in audits) {
       if (a.branchName.isNotEmpty) set.add(a.branchName);
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
+
+  /// All unique product names (from Catalog products + any audits).
+  List<String> get allAvailableProducts {
+    final map = <String, String>{};
+    for (final p in products) {
+      final trimmed = p.name.trim();
+      if (trimmed.isNotEmpty) {
+        map.putIfAbsent(trimmed.toLowerCase(), () => trimmed);
+      }
+    }
+    for (final a in audits) {
+      final trimmed = a.productName.trim();
+      if (trimmed.isNotEmpty) {
+        map.putIfAbsent(trimmed.toLowerCase(), () => trimmed);
+      }
+    }
+    final list = map.values.toList()..sort();
+    return list;
+  }
+
+  /// Finds the Catalog product metadata matching [productName] if present.
+  PrivateLabelProduct? productForName(String productName) {
+    final lower = productName.trim().toLowerCase();
+    for (final p in products) {
+      if (p.name.trim().toLowerCase() == lower) return p;
+    }
+    return null;
+  }
+
+  /// Audits count for a given product name (or total audits if null).
+  int countForProduct(String? productName) {
+    if (productName == null || productName.trim().isEmpty) return audits.length;
+    final lower = productName.trim().toLowerCase();
+    return audits.where((a) => a.productName.trim().toLowerCase() == lower).length;
+  }
+
+  /// All unique marketer names from loaded audits.
+  List<String> get allAvailableMarketers {
+    final set = <String>{};
+    for (final a in audits) {
+      final name = a.delegateName.trim();
+      if (name.isNotEmpty) set.add(name);
     }
     final list = set.toList()..sort();
     return list;
@@ -123,6 +183,10 @@ class PrivateLabelReviewState extends Equatable {
     List<String>? branches,
     String? selectedBranch,
     bool clearSelectedBranch = false,
+    String? selectedProduct,
+    bool clearSelectedProduct = false,
+    String? selectedMarketer,
+    bool clearSelectedMarketer = false,
   }) {
     return PrivateLabelReviewState(
       status: status ?? this.status,
@@ -136,6 +200,8 @@ class PrivateLabelReviewState extends Equatable {
       feedback: feedback ?? this.feedback,
       branches: branches ?? this.branches,
       selectedBranch: clearSelectedBranch ? null : (selectedBranch ?? this.selectedBranch),
+      selectedProduct: clearSelectedProduct ? null : (selectedProduct ?? this.selectedProduct),
+      selectedMarketer: clearSelectedMarketer ? null : (selectedMarketer ?? this.selectedMarketer),
     );
   }
 
@@ -152,5 +218,8 @@ class PrivateLabelReviewState extends Equatable {
         feedback,
         branches,
         selectedBranch,
+        selectedProduct,
+        selectedMarketer,
       ];
 }
+

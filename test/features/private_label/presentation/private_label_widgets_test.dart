@@ -1,13 +1,17 @@
 import 'package:delegate_app/features/private_label/domain/entities/private_label_audit.dart';
+import 'package:delegate_app/features/private_label/domain/entities/private_label_audit_draft.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_dates.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_day.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_kpi.dart';
+import 'package:delegate_app/features/private_label/domain/entities/private_label_product.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_audit_edit_sheet.dart';
+import 'package:delegate_app/features/private_label/presentation/widgets/private_label_capture_sheet.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_kpi_card.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_month_calendar.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_rest_day_sheet.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_review_sheet.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_audit_tile.dart';
+import 'package:delegate_app/features/private_label/presentation/widgets/private_label_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -70,6 +74,58 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(tester.takeException(), isNull);
     expect(find.byType(PrivateLabelKpiCard), findsNWidgets(3));
+  });
+
+  testWidgets('PrivateLabelKpiCard renders onOpenCatalog button in full mode even when kpi is null', (tester) async {
+    var tappedFull = false;
+    var tappedCompact = false;
+
+    await tester.pumpWidget(_host(Column(
+      children: [
+        PrivateLabelKpiCard(
+          kpi: null,
+          compact: false,
+          isLoading: true,
+          onOpenCatalog: () => tappedFull = true,
+          catalogButtonLabel: 'تصفح الكتالوج (للنظر فقط)',
+        ),
+        const SizedBox(height: 16),
+        PrivateLabelKpiCard(
+          kpi: null,
+          compact: true,
+          isLoading: true,
+          onOpenCatalog: () => tappedCompact = true,
+          catalogButtonLabel: 'الكتالوج (للنظر فقط)',
+        ),
+      ],
+    )));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('تصفح الكتالوج (للنظر فقط)'), findsOneWidget);
+    expect(find.text('الكتالوج (للنظر فقط)'), findsOneWidget);
+
+    await tester.tap(find.text('تصفح الكتالوج (للنظر فقط)'));
+    await tester.tap(find.text('الكتالوج (للنظر فقط)'));
+    expect(tappedFull, isTrue);
+    expect(tappedCompact, isTrue);
+  });
+
+  testWidgets('PrivateLabelKpiCard renders English "Catalog" button label in compact mode', (tester) async {
+    var tapped = false;
+    await tester.pumpWidget(_host(
+      PrivateLabelKpiCard(
+        kpi: _kpi(),
+        compact: true,
+        isLoading: false,
+        onOpenCatalog: () => tapped = true,
+        catalogButtonLabel: 'Catalog',
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Catalog'), findsOneWidget);
+    await tester.tap(find.text('Catalog'));
+    expect(tapped, isTrue);
   });
 
   testWidgets('month calendar renders and reports taps', (tester) async {
@@ -246,7 +302,7 @@ void main() {
     expect(result, isTrue);
   });
 
-  testWidgets('edit sheet allows editing product name and price', (tester) async {
+  testWidgets('edit sheet selects product from dropdown menu, updates barcode on switch, and edits price', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -258,8 +314,11 @@ void main() {
       delegateUid: 'u1',
       delegateName: 'Omar',
       branchName: 'فرع المعادي',
-      productName: 'أرز 1 كجم',
-      shelfPrice: 30,
+      productId: 'default_wixmax',
+      productName: 'wixmax',
+      barcode: '62245165342547',
+      referencePrice: 58,
+      shelfPrice: 58,
       stockStatus: PrivateLabelStockStatus.available,
       productPhotoUrl: '',
       pricePhotoUrl: '',
@@ -293,17 +352,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('تعديل بيانات التوثيق'), findsOneWidget);
 
-    final textFields = find.byType(TextField);
-    expect(textFields, findsWidgets);
+    // Ensure there is NO manual product name TextField
+    expect(find.text('اسم المنتج *'), findsNothing);
+    expect(find.byType(PrivateLabelProductDropdownMenu), findsOneWidget);
 
-    // Edit price field
-    await tester.enterText(textFields.at(1), '35.5');
+    // Switch product via dropdown from wixmax to أرز فتح الله 1 كيلو
+    await tester.tap(find.byType(PrivateLabelProductDropdownMenu));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('أرز فتح الله 1 كيلو').last);
+    await tester.pumpAndSettle();
+
+    final textFields = find.byType(TextField);
+    expect(textFields, findsNWidgets(3)); // Price, Barcode, Notes
+
+    // Edit price field (now first TextField)
+    await tester.enterText(textFields.at(0), '35.5');
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('حفظ التعديلات'));
     await tester.pumpAndSettle();
 
     expect(updatedAudit, isNotNull);
+    expect(updatedAudit?.productName, 'أرز فتح الله 1 كيلو');
+    expect(updatedAudit?.productId, 'default_fathalla_rice_1kg');
+    expect(updatedAudit?.referencePrice, 35.0);
+    expect(updatedAudit?.barcode, '6224001001015');
     expect(updatedAudit?.shelfPrice, 35.5);
   });
 
@@ -338,6 +411,96 @@ void main() {
     expect(find.textContaining('صبحى قاسم سليم'), findsOneWidget);
     expect(find.text('في انتظار المراجعة'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
+  });
+
+  test('PrivateLabelProduct.defaultCatalog returns 4 products with images, prices, and barcodes', () {
+    final catalog = PrivateLabelProduct.defaultCatalog('org1');
+    expect(catalog.length, 4);
+    expect(catalog.map((p) => p.name), containsAll([
+      'wixmax',
+      'أرز فتح الله 1 كيلو',
+      'سكر فتح الله 1 كيلو',
+      'زيت خليط فتح الله 1 لتر',
+    ]));
+    for (final p in catalog) {
+      expect(p.referencePrice, isNotNull);
+      expect(p.referencePrice! > 0, isTrue);
+      expect(p.barcode, isNotNull);
+      expect(p.barcode!.isNotEmpty, isTrue);
+      expect(p.imageUrl, isNotNull);
+      expect(p.imageUrl!.startsWith('assets/images/private_label/'), isTrue);
+    }
+  });
+
+  testWidgets('PrivateLabelCaptureSheet selects product from dropdown menu instead of manual typing', (tester) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    PrivateLabelAuditDraft? savedDraft;
+    final catalog = PrivateLabelProduct.defaultCatalog('org1');
+
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(useMaterial3: true),
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: TextButton(
+                onPressed: () async {
+                  savedDraft = await showPrivateLabelSheet<PrivateLabelAuditDraft>(
+                    context: context,
+                    heightFactor: 0.9,
+                    builder: (_, layout) => PrivateLabelCaptureSheet(
+                      layout: layout,
+                      initialProductPath: 'assets/images/private_label/wixmax.jpg',
+                      initialPricePath: 'assets/images/private_label/wixmax.jpg',
+                      branches: const ['فرع سموحة'],
+                      initialBranch: 'فرع سموحة',
+                      products: catalog,
+                      organizationUID: 'org1',
+                      companyUID: 'comp1',
+                      delegateUid: 'u1',
+                      delegateName: 'Omar',
+                      clock: () => _today,
+                    ),
+                  );
+                },
+                child: const Text('open_capture'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('open_capture'));
+    await tester.pumpAndSettle();
+
+    // Open product dropdown menu
+    expect(find.text('اختار المنتج من الكتالوج'), findsOneWidget);
+    await tester.tap(find.text('اختار المنتج من الكتالوج'));
+    await tester.pumpAndSettle();
+
+    // Select 'أرز فتح الله 1 كيلو' from dropdown menu
+    await tester.tap(find.text('أرز فتح الله 1 كيلو').last);
+    await tester.pumpAndSettle();
+
+    // Enter shelf price
+    await tester.enterText(find.byType(TextField).first, '35');
+    await tester.pumpAndSettle();
+
+    // Save draft
+    await tester.tap(find.text('حفظ التوثيق'));
+    await tester.pumpAndSettle();
+
+    expect(savedDraft, isNotNull);
+    expect(savedDraft?.productName, 'أرز فتح الله 1 كيلو');
+    expect(savedDraft?.productId, 'default_fathalla_rice_1kg');
+    expect(savedDraft?.referencePrice, 35.0);
+    expect(savedDraft?.shelfPrice, 35.0);
+    expect(savedDraft?.barcode, '6224001001015');
   });
 }
 

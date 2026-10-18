@@ -4,7 +4,9 @@ import 'package:delegate_app/features/marketing/data/services/branch_preference_
 import 'package:delegate_app/features/private_label/domain/entities/private_label_audit.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_audit_draft.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_kpi.dart';
+import 'package:delegate_app/features/private_label/domain/entities/private_label_product.dart';
 import 'package:delegate_app/features/private_label/presentation/bloc/private_label_bloc.dart';
+import 'package:delegate_app/features/private_label/presentation/pages/private_label_catalog_screen.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_audit_tile.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_capture_sheet.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_kpi_card.dart';
@@ -110,6 +112,11 @@ class _PrivateLabelView extends StatelessWidget {
       ...state.selectedDateAudits.map((a) => a.productName),
     }.take(8).toList();
 
+    final activeProducts = state.products.where((p) => p.isActive).toList();
+    final catalogProducts = activeProducts.isNotEmpty
+        ? activeProducts
+        : PrivateLabelProduct.defaultCatalog(delegate.organizationUID);
+
     final draft = await showPrivateLabelSheet<PrivateLabelAuditDraft>(
       context: context,
       heightFactor: 0.9,
@@ -119,7 +126,7 @@ class _PrivateLabelView extends StatelessWidget {
         initialPricePath: pricePath,
         branches: branches,
         initialBranch: lastBranch ?? (active != null && branches.contains(active) ? active : null),
-        products: state.products.where((p) => p.isActive).toList(),
+        products: catalogProducts,
         recentProductNames: recent,
         organizationUID: delegate.organizationUID,
         companyUID: delegate.companyUID,
@@ -213,6 +220,23 @@ class _PrivateLabelView extends StatelessWidget {
               },
             ),
             IconButton(
+              tooltip: PrivateLabelCatalogScreen.canEditCatalog(delegate)
+                  ? 'الكتالوج (منتجات البرايفت ليبل)'
+                  : 'Catalog',
+              icon: const Icon(Icons.inventory_2_rounded),
+              onPressed: () async {
+                final bloc = context.read<PrivateLabelBloc>();
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PrivateLabelCatalogScreen(delegate: delegate),
+                  ),
+                );
+                if (context.mounted) {
+                  bloc.add(const PrivateLabelRefreshRequested());
+                }
+              },
+            ),
+            IconButton(
               tooltip: 'تحديث',
               icon: const Icon(Icons.refresh_rounded),
               onPressed: () => context.read<PrivateLabelBloc>().add(const PrivateLabelRefreshRequested()),
@@ -303,11 +327,26 @@ class _PrivateLabelView extends StatelessWidget {
     final today = context.read<PrivateLabelBloc>().todayKey;
     final kpi = state.kpi;
     final isCurrentMonth = kpi != null && kpi.todayStatus != PrivateLabelTodayStatus.outsideMonth;
+    final isReadOnlyCatalog = !PrivateLabelCatalogScreen.canEditCatalog(delegate);
     return PrivateLabelKpiCard(
       kpi: kpi,
       isLoading: kpi == null,
       isSyncing: state.isSyncing,
       pendingCount: state.pendingDrafts.length,
+      onOpenCatalog: () async {
+        final bloc = context.read<PrivateLabelBloc>();
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PrivateLabelCatalogScreen(delegate: delegate),
+          ),
+        );
+        if (context.mounted) {
+          bloc.add(const PrivateLabelRefreshRequested());
+        }
+      },
+      catalogButtonLabel: isReadOnlyCatalog
+          ? 'Catalog'
+          : 'الكتالوج (منتجات البرايفت ليبل)',
       onRegisterRestToday: isCurrentMonth && !state.isUpdatingRest ? () => _registerRest(context, today) : null,
       onCancelRestToday: isCurrentMonth && !state.isUpdatingRest ? () => _cancelRest(context, today) : null,
     );

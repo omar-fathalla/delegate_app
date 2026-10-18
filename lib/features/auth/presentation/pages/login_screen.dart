@@ -166,46 +166,97 @@ class _LoginScreenState extends State<LoginScreen>
                         children: [
                           const SizedBox(height: 16),
 
-                          // ---- Language Toggle ----
+                          // ---- Top Bar: Tashil Title (Left) & Language Toggle (Right) ----
                           FadeTransition(
                             opacity: _fadeAnimation,
-                            child: Align(
-                              alignment: AlignmentDirectional.centerEnd,
-                              child: Material(
-                                color: colorScheme.surface.withValues(alpha: 0),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(20),
-                                  onTap: () {
-                                    localeProvider.toggleLocale();
-                                  },
-                                  child: Container(
-                                    padding:
-                                        const EdgeInsetsDirectional.symmetric(
-                                          horizontal: 16,
-                                          vertical: 8,
-                                        ),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primaryContainer,
-                                      borderRadius: BorderRadius.circular(20),
+                            child: Directionality(
+                              textDirection: TextDirection.ltr,
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    l10n.appTitle,
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w900,
+                                      color: colorScheme.primary,
+                                      letterSpacing: 0.6,
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.language_rounded,
-                                          size: 18,
-                                          color: colorScheme.onSurface,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          isArabic ? 'English' : 'العربية',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
+                                  ),
+                                  Material(
+                                    color: colorScheme.surface.withValues(
+                                      alpha: 0,
+                                    ),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTap: () {
+                                        localeProvider.toggleLocale();
+                                      },
+                                      child: Container(
+                                        padding:
+                                            const EdgeInsetsDirectional.symmetric(
+                                              horizontal: 16,
+                                              vertical: 8,
+                                            ),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.primaryContainer,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
                                           ),
                                         ),
-                                      ],
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.language_rounded,
+                                              size: 18,
+                                              color: colorScheme.onSurface,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              isArabic ? 'English' : 'العربية',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: colorScheme.onSurface,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 32),
+
+                          // ---- Center Hero Logo (E) ----
+                          FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: Material(
+                              color: colorScheme.primary,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: SizedBox(
+                                width: 120,
+                                height: 120,
+                                child: Center(
+                                  child: Text(
+                                    'E',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 68,
+                                      fontWeight: FontWeight.w900,
+                                      height: 1.0,
+                                      color: colorScheme.onPrimary,
                                     ),
                                   ),
                                 ),
@@ -213,23 +264,7 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
 
-                          const SizedBox(height: 24),
-
-                          // ---- App Title (Logo) ----
-                          FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: Text(
-                              l10n.appTitle,
-                              style: TextStyle(
-                                fontSize: 48,
-                                fontWeight: FontWeight.w900,
-                                color: colorScheme.primary,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 14),
 
                           // ---- Subtitle ----
                           FadeTransition(
@@ -238,13 +273,13 @@ class _LoginScreenState extends State<LoginScreen>
                               l10n.delegateApp,
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w400,
+                                fontWeight: FontWeight.w500,
                                 color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
 
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 52),
 
                           // ---- Login Text ----
                           SlideTransition(

@@ -12,6 +12,7 @@ import '../../domain/entities/photo_permission_departments.dart';
 import 'captured_photos_view_screen.dart';
 import 'monthly_photo_report_screen.dart';
 import 'delegate_camera_capture_screen.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 class SupervisorPermissionsScreen extends StatefulWidget {
@@ -563,6 +564,7 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      color: colorScheme.surfaceContainerLow,
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -577,106 +579,132 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CompanyNameWithCode(
-                      organizationUID: permission.organizationUID.isNotEmpty
-                          ? permission.organizationUID
-                          : widget.supervisorDelegate.organizationUID,
-                      companyUID: permission.companyUID,
-                      companyName: permission.companyName,
-                      companyCode: permission.companyCode,
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                Expanded(
+                  child: CompanyNameWithCode(
+                    organizationUID: permission.organizationUID.isNotEmpty
+                        ? permission.organizationUID
+                        : widget.supervisorDelegate.organizationUID,
+                    companyUID: permission.companyUID,
+                    companyName: permission.companyName,
+                    companyCode: permission.companyCode,
+                    twoLines: true,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.5,
                     ),
-                  ],
+                    codeStyle: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+                    ),
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        statusText,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            statusText,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (isApproved && widget.supervisorDelegate.role == UserRole.marketingPromotion) ...[
+                          const SizedBox(width: 6),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                permission.isSupervisorEnabled ? 'مفعّل' : 'معطّل',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: permission.isSupervisorEnabled
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              Transform.scale(
+                                scale: 0.75,
+                                child: Switch(
+                                  value: permission.isSupervisorEnabled,
+                                  onChanged: (val) {
+                                    context.read<PhotoPermissionBloc>().add(
+                                          TogglePermissionRequested(
+                                            organizationUID: permission.organizationUID,
+                                            companyUID: permission.companyUID,
+                                            permissionId: permission.uid,
+                                            isEnabled: val,
+                                          ),
+                                        );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                     if (permission.approvedBy != null &&
                         permission.approvedBy!.trim().isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            permission.status == 'approved'
-                                ? Icons.verified_user_rounded
-                                : Icons.person_outline_rounded,
-                            size: 13,
-                            color: permission.status == 'approved'
-                                ? Colors.green.shade700
-                                : colorScheme.error,
-                          ),
-                          const SizedBox(width: 4),
-                          ApproverNameText(
-                            approvedBy: permission.approvedBy!,
-                            organizationUID: widget.supervisorDelegate.organizationUID,
-                            companyUID: permission.companyUID,
-                            currentUserUid: widget.supervisorDelegate.uid,
-                            currentUserName: widget.supervisorDelegate.fullName,
-                            prefix: permission.status == 'approved'
-                                ? 'تم الاعتماد بواسطة: '
-                                : 'مرفوض بواسطة: ',
-                            style: TextStyle(
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width * 0.42,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              permission.status == 'approved'
+                                  ? Icons.verified_user_rounded
+                                  : Icons.person_outline_rounded,
+                              size: 13,
                               color: permission.status == 'approved'
                                   ? Colors.green.shade700
-                                  : Colors.red.shade700,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                                  : colorScheme.error,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: ApproverNameText(
+                                approvedBy: permission.approvedBy!,
+                                organizationUID: widget.supervisorDelegate.organizationUID,
+                                companyUID: permission.companyUID,
+                                currentUserUid: widget.supervisorDelegate.uid,
+                                currentUserName: widget.supervisorDelegate.fullName,
+                                prefix: '',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  color: permission.status == 'approved'
+                                      ? Colors.green.shade700
+                                      : Colors.red.shade700,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ],
                 ),
-                if (isApproved && widget.supervisorDelegate.role == UserRole.marketingPromotion)
-                  Row(
-                    children: [
-                      Text(
-                        permission.isSupervisorEnabled ? 'مفعّل للمناديب' : 'معطّل مؤقتاً',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: permission.isSupervisorEnabled
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Switch(
-                        value: permission.isSupervisorEnabled,
-                        onChanged: (val) {
-                          context.read<PhotoPermissionBloc>().add(
-                                TogglePermissionRequested(
-                                  organizationUID: permission.organizationUID,
-                                  companyUID: permission.companyUID,
-                                  permissionId: permission.uid,
-                                  isEnabled: val,
-                                ),
-                              );
-                        },
-                      ),
-                    ],
-                  ),
               ],
             ),
             const SizedBox(height: 12),
@@ -725,14 +753,7 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
                 ),
               ),
             ],
-            const SizedBox(height: 12),
-            Text(
-              'الفروع المعتمدة (${permission.branchNames.length}):',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 10),
             ExpandableBranchText(branchNames: permission.branchNames),
             if (isApproved || _isSuperAdmin) ...[
               const Divider(height: 24),
@@ -1202,35 +1223,103 @@ class _ExpandableBranchTextState extends State<ExpandableBranchText> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final text = widget.branchNames.join('، ');
 
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _isExpanded = !_isExpanded;
-        });
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            text,
-            style: theme.textTheme.bodyMedium,
-            maxLines: _isExpanded ? null : 3,
-            overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-          ),
-          if (text.length > 70 || widget.branchNames.length > 2) ...[
-            const SizedBox(height: 4),
-            Text(
-              _isExpanded ? 'عرض أقل ▲' : 'عرض المزيد... ▼',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
+    final hasBranches = widget.branchNames.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: hasBranches
+              ? () {
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                }
+              : null,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
             ),
-          ],
-        ],
-      ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.store_rounded,
+                  size: 15,
+                  color: hasBranches ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  hasBranches
+                      ? 'الفروع المعتمدة (${widget.branchNames.length})'
+                      : 'لا توجد فروع معتمدة',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: hasBranches ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                if (hasBranches) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    _isExpanded ? 'عرض أقل' : 'عرض المزيد',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  AnimatedRotation(
+                    turns: _isExpanded ? 0.5 : 0.0,
+                    duration: AppMotionDurations.short4,
+                    curve: AppMotionCurves.emphasized,
+                    child: Icon(
+                      Icons.expand_more_rounded,
+                      size: 16,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: _isExpanded ? AppMotionDurations.medium1 : AppMotionDurations.short4,
+          curve: _isExpanded
+              ? AppMotionCurves.emphasizedDecelerate
+              : AppMotionCurves.emphasizedAccelerate,
+          alignment: Alignment.topCenter,
+          child: _isExpanded && hasBranches
+              ? Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 6),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                  ),
+                  child: Text(
+                    text,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
     );
   }
 }

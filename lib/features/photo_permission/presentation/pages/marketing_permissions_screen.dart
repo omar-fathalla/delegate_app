@@ -34,6 +34,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
   bool get _isPromotionUser =>
       widget.marketingDelegate.role == UserRole.marketingPromotion ||
+      widget.marketingDelegate.role == UserRole.branchesMarketingManager ||
       widget.marketingDelegate.role == UserRole.superAdmin;
 
   bool get _isSuperAdmin => widget.marketingDelegate.role == UserRole.superAdmin;
@@ -42,11 +43,13 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
   bool get _canApproveOrReject =>
       widget.marketingDelegate.role == UserRole.marketingPromotion ||
+      widget.marketingDelegate.role == UserRole.branchesMarketingManager ||
       widget.marketingDelegate.role == UserRole.technicalSupport ||
       widget.marketingDelegate.role == UserRole.superAdmin;
 
   bool get _canEditDates =>
       widget.marketingDelegate.role == UserRole.marketingPromotion ||
+      widget.marketingDelegate.role == UserRole.branchesMarketingManager ||
       widget.marketingDelegate.role == UserRole.technicalSupport ||
       widget.marketingDelegate.role == UserRole.superAdmin;
 
@@ -145,407 +148,561 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     }
   }
 
-  void _showBranchesDialog(BuildContext context, String companyName, List<String> branchNames) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-        final colorScheme = theme.colorScheme;
-
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.store_rounded, color: colorScheme.primary, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'الفروع المعتمدة (${branchNames.length})',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    Text(
-                      companyName,
-                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: branchNames.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Center(child: Text('لا توجد فروع مسجلة')),
-                  )
-                : ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(dialogContext).size.height * 0.45,
-                    ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: branchNames.length,
-                      separatorBuilder: (context, index) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        return ListTile(
-                          dense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                          leading: CircleAvatar(
-                            radius: 12,
-                            backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                            child: Text(
-                              '${index + 1}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            branchNames[index],
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إغلاق', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
+  Widget _buildDragHandlePill(ColorScheme colorScheme) {
+    return Center(
+      child: Container(
+        width: 38,
+        height: 4.5,
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(3),
+        ),
+      ),
     );
   }
 
+  Widget _buildConnectedActionGroup({
+    required ColorScheme colorScheme,
+    required String cancelLabel,
+    required VoidCallback onCancel,
+    String? primaryLabel,
+    IconData? primaryIcon,
+    VoidCallback? onPrimary,
+    Color? primaryColor,
+  }) {
+    final activePrimaryColor = primaryColor ?? colorScheme.primary;
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: onCancel,
+              child: Center(
+                child: Text(
+                  cancelLabel,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (primaryLabel != null) ...[
+            VerticalDivider(width: 1, thickness: 1, color: colorScheme.outlineVariant),
+            Expanded(
+              child: InkWell(
+                onTap: onPrimary,
+                child: Container(
+                  color: onPrimary != null
+                      ? activePrimaryColor.withValues(alpha: 0.12)
+                      : Colors.transparent,
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (primaryIcon != null) ...[
+                        Icon(
+                          primaryIcon,
+                          size: 18,
+                          color: onPrimary != null
+                              ? activePrimaryColor
+                              : colorScheme.onSurface.withValues(alpha: 0.38),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Flexible(
+                        child: Text(
+                          primaryLabel,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: onPrimary != null
+                                ? activePrimaryColor
+                                : colorScheme.onSurface.withValues(alpha: 0.38),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showBranchesDialog(BuildContext context, String companyName, List<String> branchNames) {
+    final isDesktop = MediaQuery.sizeOf(context).width > 768;
+
+    Widget buildContent(BuildContext modalContext) {
+      final theme = Theme.of(modalContext);
+      final colorScheme = theme.colorScheme;
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          isDesktop ? 20 : 12,
+          20,
+          20 + MediaQuery.viewInsetsOf(modalContext).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!isDesktop) _buildDragHandlePill(colorScheme),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.store_rounded, color: colorScheme.primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'الفروع المعتمدة (${branchNames.length})',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        companyName,
+                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (branchNames.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(child: Text('لا توجد فروع مسجلة')),
+              )
+            else
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(modalContext).height * 0.45,
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: branchNames.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    return ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                      leading: CircleAvatar(
+                        radius: 12,
+                        backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                        child: Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        branchNames[index],
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 16),
+            _buildConnectedActionGroup(
+              colorScheme: colorScheme,
+              cancelLabel: 'إغلاق',
+              onCancel: () => Navigator.pop(modalContext),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isDesktop) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: buildContent(dialogContext),
+          ),
+        ),
+      );
+    } else {
+      showM3ModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (sheetContext) => buildContent(sheetContext),
+      );
+    }
+  }
+
   void _showSupervisorDialog(BuildContext context, PhotoPermission permission) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-        final colorScheme = theme.colorScheme;
+    final isDesktop = MediaQuery.sizeOf(context).width > 768;
 
-        Future<Map<String, dynamic>?> fetchSupervisorInfo() async {
-          final firestore = FirebaseFirestore.instance;
+    Future<Map<String, dynamic>?> fetchSupervisorInfo() async {
+      final firestore = FirebaseFirestore.instance;
 
-          Map<String, dynamic>? extractInfo(Map<String, dynamic>? data) {
-            if (data == null) return null;
-            final name = (data['fullName'] ??
-                '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}').toString().trim();
-            final phone = (data['phoneNumber'] ?? data['phone'] ?? '').toString().trim();
-            if (name.isNotEmpty || phone.isNotEmpty) {
+      Map<String, dynamic>? extractInfo(Map<String, dynamic>? data) {
+        if (data == null) return null;
+        final name = (data['fullName'] ??
+            '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}').toString().trim();
+        final phone = (data['phoneNumber'] ?? data['phone'] ?? '').toString().trim();
+        if (name.isNotEmpty || phone.isNotEmpty) {
+          return {
+            'name': name.isNotEmpty ? name : 'مشرف الشركة',
+            'phone': phone,
+            'companyName': data['companyName'] ?? permission.companyName,
+          };
+        }
+        return null;
+      }
+
+      try {
+        // Strategy 1: Look in users/{requestedBy}
+        if (permission.requestedBy.isNotEmpty) {
+          final userDoc = await firestore.collection('users').doc(permission.requestedBy).get();
+          if (userDoc.exists) {
+            final res = extractInfo(userDoc.data());
+            if (res != null) return res;
+          }
+        }
+
+        // Strategy 2: Look in organizations/{orgId}/companies/{compId}/delegates/{requestedBy}
+        if (permission.organizationUID.isNotEmpty && permission.companyUID.isNotEmpty && permission.requestedBy.isNotEmpty) {
+          final delegateDoc = await firestore
+              .collection('organizations')
+              .doc(permission.organizationUID)
+              .collection('companies')
+              .doc(permission.companyUID)
+              .collection('delegates')
+              .doc(permission.requestedBy)
+              .get();
+          if (delegateDoc.exists) {
+            final res = extractInfo(delegateDoc.data());
+            if (res != null) return res;
+          }
+        }
+
+        // Strategy 3: Query any delegate with role 'companySupervisor' in this company
+        if (permission.organizationUID.isNotEmpty && permission.companyUID.isNotEmpty) {
+          final supDocs = await firestore
+              .collection('organizations')
+              .doc(permission.organizationUID)
+              .collection('companies')
+              .doc(permission.companyUID)
+              .collection('delegates')
+              .where('role', isEqualTo: 'companySupervisor')
+              .limit(1)
+              .get();
+          if (supDocs.docs.isNotEmpty) {
+            final res = extractInfo(supDocs.docs.first.data());
+            if (res != null) return res;
+          }
+        }
+
+        // Strategy 4: Fallback search in company document
+        if (permission.organizationUID.isNotEmpty && permission.companyUID.isNotEmpty) {
+          final compDoc = await firestore
+              .collection('organizations')
+              .doc(permission.organizationUID)
+              .collection('companies')
+              .doc(permission.companyUID)
+              .get();
+          if (compDoc.exists) {
+            final data = compDoc.data();
+            final phone = (data?['supervisorPhone'] ?? data?['phone'] ?? '').toString().trim();
+            final name = (data?['supervisorName'] ?? data?['contactPerson'] ?? '').toString().trim();
+            if (phone.isNotEmpty || name.isNotEmpty) {
               return {
                 'name': name.isNotEmpty ? name : 'مشرف الشركة',
                 'phone': phone,
-                'companyName': data['companyName'] ?? permission.companyName,
+                'companyName': permission.companyName,
               };
             }
-            return null;
           }
-
-          try {
-            // Strategy 1: Look in users/{requestedBy}
-            if (permission.requestedBy.isNotEmpty) {
-              final userDoc = await firestore.collection('users').doc(permission.requestedBy).get();
-              if (userDoc.exists) {
-                final res = extractInfo(userDoc.data());
-                if (res != null) return res;
-              }
-            }
-
-            // Strategy 2: Look in organizations/{orgId}/companies/{compId}/delegates/{requestedBy}
-            if (permission.organizationUID.isNotEmpty && permission.companyUID.isNotEmpty && permission.requestedBy.isNotEmpty) {
-              final delegateDoc = await firestore
-                  .collection('organizations')
-                  .doc(permission.organizationUID)
-                  .collection('companies')
-                  .doc(permission.companyUID)
-                  .collection('delegates')
-                  .doc(permission.requestedBy)
-                  .get();
-              if (delegateDoc.exists) {
-                final res = extractInfo(delegateDoc.data());
-                if (res != null) return res;
-              }
-            }
-
-            // Strategy 3: Query any delegate with role 'companySupervisor' in this company
-            if (permission.organizationUID.isNotEmpty && permission.companyUID.isNotEmpty) {
-              final supDocs = await firestore
-                  .collection('organizations')
-                  .doc(permission.organizationUID)
-                  .collection('companies')
-                  .doc(permission.companyUID)
-                  .collection('delegates')
-                  .where('role', isEqualTo: 'companySupervisor')
-                  .limit(1)
-                  .get();
-              if (supDocs.docs.isNotEmpty) {
-                final res = extractInfo(supDocs.docs.first.data());
-                if (res != null) return res;
-              }
-            }
-
-            // Strategy 4: Fallback search in company document
-            if (permission.organizationUID.isNotEmpty && permission.companyUID.isNotEmpty) {
-              final compDoc = await firestore
-                  .collection('organizations')
-                  .doc(permission.organizationUID)
-                  .collection('companies')
-                  .doc(permission.companyUID)
-                  .get();
-              if (compDoc.exists) {
-                final data = compDoc.data();
-                final phone = (data?['supervisorPhone'] ?? data?['phone'] ?? '').toString().trim();
-                final name = (data?['supervisorName'] ?? data?['contactPerson'] ?? '').toString().trim();
-                if (phone.isNotEmpty || name.isNotEmpty) {
-                  return {
-                    'name': name.isNotEmpty ? name : 'مشرف الشركة',
-                    'phone': phone,
-                    'companyName': permission.companyName,
-                  };
-                }
-              }
-            }
-          } catch (e) {
-            debugPrint('Error fetching supervisor: $e');
-          }
-          return null;
         }
+      } catch (e) {
+        debugPrint('Error fetching supervisor: $e');
+      }
+      return null;
+    }
 
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-          contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.person_rounded, color: colorScheme.primary, size: 28),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'بيانات مشرف الشركة',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      permission.companyName,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          content: FutureBuilder<Map<String, dynamic>?>(
-            future: fetchSupervisorInfo(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('جاري البحث عن بيانات المشرف...'),
-                      ],
-                    ),
+    final supervisorFuture = fetchSupervisorInfo();
+
+    Widget buildContent(BuildContext modalContext) {
+      final theme = Theme.of(modalContext);
+      final colorScheme = theme.colorScheme;
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          isDesktop ? 20 : 12,
+          20,
+          20 + MediaQuery.viewInsetsOf(modalContext).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!isDesktop) _buildDragHandlePill(colorScheme),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    shape: BoxShape.circle,
                   ),
-                );
-              }
-
-              final supervisor = snapshot.data;
-              final name = supervisor?['name'] ?? 'مشرف الشركة';
-              final phone = (supervisor?['phone'] ?? '').toString().trim();
-
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Divider(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  child: Icon(Icons.person_rounded, color: colorScheme.primary, size: 28),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'بيانات مشرف الشركة',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        permission.companyName,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            FutureBuilder<Map<String, dynamic>?>(
+              future: supervisorFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text('جاري البحث عن بيانات المشرف...'),
+                        ],
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.badge_rounded, size: 18, color: colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(
-                              'اسم المشرف:',
-                              style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                name,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Icon(Icons.phone_rounded, size: 18, color: colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(
-                              'رقم الهاتف:',
-                              style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                phone.isNotEmpty ? phone : 'غير مسجل بالمنظومة',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: phone.isNotEmpty ? null : Colors.red,
-                                ),
-                                textDirection: TextDirection.ltr,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (permission.department != null && permission.department!.isNotEmpty) ...[
-                          const SizedBox(height: 12),
+                  );
+                }
+
+                final supervisor = snapshot.data;
+                final name = supervisor?['name'] ?? 'مشرف الشركة';
+                final phone = (supervisor?['phone'] ?? '').toString().trim();
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Divider(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: colorScheme.outlineVariant),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Row(
                             children: [
-                              Icon(Icons.category_rounded, size: 18, color: colorScheme.primary),
+                              Icon(Icons.badge_rounded, size: 18, color: colorScheme.primary),
                               const SizedBox(width: 8),
                               Text(
-                                'القسم المصرح:',
+                                'اسم المشرف:',
                                 style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                               ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  permission.department!,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: colorScheme.primary,
-                                  ),
+                                  name,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(Icons.phone_rounded, size: 18, color: colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Text(
+                                'رقم الهاتف:',
+                                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  phone.isNotEmpty ? phone : 'غير مسجل بالمنظومة',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: phone.isNotEmpty ? null : colorScheme.error,
+                                  ),
+                                  textDirection: TextDirection.ltr,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (permission.department != null && permission.department!.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Icon(Icons.category_rounded, size: 18, color: colorScheme.primary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'القسم المصرح:',
+                                  style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    permission.department!,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  if (phone.isNotEmpty) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            onPressed: () {
-                              Navigator.pop(dialogContext);
-                              _openPhone(phone);
-                            },
-                            icon: const Icon(Icons.call_rounded, size: 20),
-                            label: const Text('اتصال هاتف', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF25D366),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            onPressed: () {
-                              Navigator.pop(dialogContext);
-                              _openWhatsApp(phone);
-                            },
-                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
-                            label: const Text('واتساب', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ] else ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.orange.shade300),
                       ),
-                      child: const Row(
+                    ),
+                    const SizedBox(height: 16),
+                    if (phone.isNotEmpty) ...[
+                      Row(
                         children: [
-                          Icon(Icons.info_outline_rounded, color: Colors.orange, size: 20),
-                          SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              'لا يتوفر رقم هاتف مسجل لهذا المشرف في الوقت الحالي.',
-                              style: TextStyle(fontSize: 12, color: Colors.orange),
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(modalContext);
+                                _openPhone(phone);
+                              },
+                              icon: const Icon(Icons.call_rounded, size: 20),
+                              label: const Text('اتصال هاتف', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF25D366),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(modalContext);
+                                _openWhatsApp(phone);
+                              },
+                              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
+                              label: const Text('واتساب', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
                       ),
-                    ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.orange.shade300),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded, color: Colors.orange, size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'لا يتوفر رقم هاتف مسجل لهذا المشرف في الوقت الحالي.',
+                                style: TextStyle(fontSize: 12, color: Colors.orange),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              ),
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إغلاق', style: TextStyle(fontWeight: FontWeight.bold)),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildConnectedActionGroup(
+              colorScheme: colorScheme,
+              cancelLabel: 'إغلاق',
+              onCancel: () => Navigator.pop(modalContext),
             ),
           ],
-        );
-      },
-    );
+        ),
+      );
+    }
+
+    if (isDesktop) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: buildContent(dialogContext),
+          ),
+        ),
+      );
+    } else {
+      showM3ModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (sheetContext) => buildContent(sheetContext),
+      );
+    }
   }
 
   Widget _buildPresetChip(
@@ -583,18 +740,26 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     final theme = Theme.of(parentContext);
     final colorScheme = theme.colorScheme;
     final dateFormat = DateFormat('yyyy-MM-dd');
+    final isDesktop = MediaQuery.sizeOf(parentContext).width > 768;
 
-    showDialog(
-      context: parentContext,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final diffDays = tempEnd.difference(tempStart).inDays;
-            final isInvalid = tempEnd.isBefore(tempStart);
+    Widget buildContent(BuildContext modalContext, StateSetter setModalState) {
+      final diffDays = tempEnd.difference(tempStart).inDays;
+      final isInvalid = tempEnd.isBefore(tempStart);
 
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          isDesktop ? 20 : 12,
+          20,
+          20 + MediaQuery.viewInsetsOf(modalContext).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!isDesktop) _buildDragHandlePill(colorScheme),
+              Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -613,218 +778,230 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   ),
                 ],
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'الشركة: ${permission.companyName}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if (permission.department != null && permission.department!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'القسم: ${permission.department}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    // كرت اختيار تاريخ البداية
-                    InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: tempStart,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2035),
-                          locale: const Locale('ar'),
-                        );
-                        if (picked != null) {
-                          setModalState(() {
-                            tempStart = picked;
-                            if (tempEnd.isBefore(tempStart)) {
-                              tempEnd = tempStart.add(const Duration(days: 30));
-                            }
-                          });
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: colorScheme.outlineVariant),
-                          borderRadius: BorderRadius.circular(12),
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'تاريخ البداية:',
-                                  style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  dateFormat.format(tempStart),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                ),
-                              ],
-                            ),
-                            Icon(Icons.calendar_today_rounded, size: 20, color: colorScheme.primary),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // كرت اختيار تاريخ النهاية
-                    InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: tempEnd.isBefore(tempStart) ? tempStart : tempEnd,
-                          firstDate: tempStart,
-                          lastDate: DateTime(2035),
-                          locale: const Locale('ar'),
-                        );
-                        if (picked != null) {
-                          setModalState(() {
-                            tempEnd = picked;
-                          });
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: colorScheme.outlineVariant),
-                          borderRadius: BorderRadius.circular(12),
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'تاريخ النهاية:',
-                                  style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  dateFormat.format(tempEnd),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                ),
-                              ],
-                            ),
-                            Icon(Icons.event_available_rounded, size: 20, color: colorScheme.primary),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    // اختصارات المدد الشائعة
-                    Text(
-                      'مدد سريعة محددة:',
-                      style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 6),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildPresetChip(setModalState, '30 يوم', 30, tempStart, tempEnd, (d) => tempEnd = d),
-                          const SizedBox(width: 6),
-                          _buildPresetChip(setModalState, '60 يوم', 60, tempStart, tempEnd, (d) => tempEnd = d),
-                          const SizedBox(width: 6),
-                          _buildPresetChip(setModalState, '90 يوم', 90, tempStart, tempEnd, (d) => tempEnd = d),
-                          const SizedBox(width: 6),
-                          _buildPresetChip(setModalState, '6 شهور', 180, tempStart, tempEnd, (d) => tempEnd = d),
-                          const SizedBox(width: 6),
-                          _buildPresetChip(setModalState, 'سنة', 365, tempStart, tempEnd, (d) => tempEnd = d),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    // كرت عرض ملخص المدة المحتسبة
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isInvalid
-                            ? colorScheme.errorContainer.withValues(alpha: 0.4)
-                            : colorScheme.primaryContainer.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              const SizedBox(height: 12),
+              Text(
+                'الشركة: ${permission.companyName}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (permission.department != null && permission.department!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'القسم: ${permission.department}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              // كرت اختيار تاريخ البداية
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: modalContext,
+                    initialDate: tempStart,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2035),
+                    locale: const Locale('ar'),
+                  );
+                  if (picked != null) {
+                    setModalState(() {
+                      tempStart = picked;
+                      if (tempEnd.isBefore(tempStart)) {
+                        tempEnd = tempStart.add(const Duration(days: 30));
+                      }
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: colorScheme.outlineVariant),
+                    borderRadius: BorderRadius.circular(12),
+                    color: colorScheme.surfaceContainerLow,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isInvalid ? 'تاريخ النهاية يسبق البداية!' : 'إجمالي عدد الأيام:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: isInvalid ? colorScheme.error : colorScheme.primary,
-                            ),
+                            'تاريخ البداية:',
+                            style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
                           ),
-                          if (!isInvalid)
-                            Text(
-                              '$diffDays يوم',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: colorScheme.primary,
-                              ),
-                            ),
+                          const SizedBox(height: 4),
+                          Text(
+                            dateFormat.format(tempStart),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
                         ],
                       ),
-                    ),
+                      Icon(Icons.calendar_today_rounded, size: 20, color: colorScheme.primary),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // كرت اختيار تاريخ النهاية
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: modalContext,
+                    initialDate: tempEnd.isBefore(tempStart) ? tempStart : tempEnd,
+                    firstDate: tempStart,
+                    lastDate: DateTime(2035),
+                    locale: const Locale('ar'),
+                  );
+                  if (picked != null) {
+                    setModalState(() {
+                      tempEnd = picked;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: colorScheme.outlineVariant),
+                    borderRadius: BorderRadius.circular(12),
+                    color: colorScheme.surfaceContainerLow,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'تاريخ النهاية:',
+                            style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            dateFormat.format(tempEnd),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                        ],
+                      ),
+                      Icon(Icons.event_available_rounded, size: 20, color: colorScheme.primary),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              // اختصارات المدد الشائعة
+              Text(
+                'مدد سريعة محددة:',
+                style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildPresetChip(setModalState, '30 يوم', 30, tempStart, tempEnd, (d) => tempEnd = d),
+                    const SizedBox(width: 6),
+                    _buildPresetChip(setModalState, '60 يوم', 60, tempStart, tempEnd, (d) => tempEnd = d),
+                    const SizedBox(width: 6),
+                    _buildPresetChip(setModalState, '90 يوم', 90, tempStart, tempEnd, (d) => tempEnd = d),
+                    const SizedBox(width: 6),
+                    _buildPresetChip(setModalState, '6 شهور', 180, tempStart, tempEnd, (d) => tempEnd = d),
+                    const SizedBox(width: 6),
+                    _buildPresetChip(setModalState, 'سنة', 365, tempStart, tempEnd, (d) => tempEnd = d),
                   ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('إلغاء'),
+              const SizedBox(height: 14),
+              // كرت عرض ملخص المدة المحتسبة
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isInvalid
+                      ? colorScheme.errorContainer.withValues(alpha: 0.4)
+                      : colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: isInvalid
-                      ? null
-                      : () {
-                          Navigator.pop(dialogContext);
-                          bloc.add(
-                            UpdatePhotoPermissionDatesRequested(
-                              organizationUID: permission.organizationUID,
-                              companyUID: permission.companyUID,
-                              permissionId: permission.uid,
-                              startDate: tempStart,
-                              endDate: tempEnd,
-                            ),
-                          );
-                        },
-                  icon: const Icon(Icons.check_rounded, size: 18),
-                  label: const Text('حفظ المدة الجديدة'),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isInvalid ? 'تاريخ النهاية يسبق البداية!' : 'إجمالي عدد الأيام:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: isInvalid ? colorScheme.error : colorScheme.primary,
+                      ),
+                    ),
+                    if (!isInvalid)
+                      Text(
+                        '$diffDays يوم',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            );
-          },
-        );
-      },
-    );
+              ),
+              const SizedBox(height: 18),
+              _buildConnectedActionGroup(
+                colorScheme: colorScheme,
+                cancelLabel: 'إلغاء',
+                onCancel: () => Navigator.pop(modalContext),
+                primaryLabel: 'حفظ المدة الجديدة',
+                primaryIcon: Icons.check_rounded,
+                onPrimary: isInvalid
+                    ? null
+                    : () {
+                        Navigator.pop(modalContext);
+                        bloc.add(
+                          UpdatePhotoPermissionDatesRequested(
+                            organizationUID: permission.organizationUID,
+                            companyUID: permission.companyUID,
+                            permissionId: permission.uid,
+                            startDate: tempStart,
+                            endDate: tempEnd,
+                          ),
+                        );
+                      },
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (isDesktop) {
+      showDialog(
+        context: parentContext,
+        builder: (dialogContext) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: StatefulBuilder(
+              builder: (context, setModalState) => buildContent(dialogContext, setModalState),
+            ),
+          ),
+        ),
+      );
+    } else {
+      showM3ModalBottomSheet(
+        context: parentContext,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (sheetContext) => StatefulBuilder(
+          builder: (context, setModalState) => buildContent(sheetContext, setModalState),
+        ),
+      );
+    }
   }
 
   @override
@@ -863,26 +1040,35 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
   }
 
   Future<void> _confirmDeletePermission(BuildContext context, PhotoPermission permission) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'تأكيد حذف إذن التصوير',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-            ),
-          ],
+    final isDesktop = MediaQuery.sizeOf(context).width > 768;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    Widget buildContent(BuildContext modalContext) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          isDesktop ? 20 : 12,
+          20,
+          20 + MediaQuery.viewInsetsOf(modalContext).bottom,
         ),
-        content: Column(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (!isDesktop) _buildDragHandlePill(colorScheme),
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: colorScheme.error, size: 28),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'تأكيد حذف إذن التصوير',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             Text(
               'هل أنت متأكد من رغبتك في حذف إذن التصوير لشركة "${permission.companyName}" نهائياً؟',
               style: const TextStyle(fontSize: 14),
@@ -891,43 +1077,60 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
+                color: colorScheme.errorContainer.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.error.withValues(alpha: 0.4)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
+                  Icon(Icons.info_outline_rounded, size: 18, color: colorScheme.error),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'سيتم حذف هذا الإذن وجميع الصور الميدانية المرفوعة داخله بشكل نهائي لا يمكن التراجع عنه.',
-                      style: TextStyle(fontSize: 12, color: Colors.red),
+                      style: TextStyle(fontSize: 12, color: colorScheme.error),
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 18),
+            _buildConnectedActionGroup(
+              colorScheme: colorScheme,
+              cancelLabel: 'إلغاء',
+              onCancel: () => Navigator.pop(modalContext, false),
+              primaryLabel: 'حذف نهائي',
+              primaryIcon: Icons.delete_forever_rounded,
+              primaryColor: colorScheme.error,
+              onPrimary: () => Navigator.pop(modalContext, true),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('إلغاء'),
+      );
+    }
+
+    final bool? confirmed;
+    if (isDesktop) {
+      confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: buildContent(dialogContext),
           ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_forever_rounded, size: 18),
-            label: const Text('حذف نهائي'),
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+    } else {
+      confirmed = await showM3ModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (sheetContext) => buildContent(sheetContext),
+      );
+    }
 
     if (confirmed == true && context.mounted) {
       context.read<PhotoPermissionBloc>().add(
@@ -989,6 +1192,12 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             : null,
       ),
       body: BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
+        buildWhen: (previous, current) =>
+            current is PhotoPermissionsLoaded ||
+            current is OngoingPermissionsLoaded ||
+            (current is PhotoPermissionLoading &&
+                previous is! PhotoPermissionsLoaded &&
+                previous is! OngoingPermissionsLoaded),
         listener: (context, state) {
           if (state is PermissionActionSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1036,241 +1245,219 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
   Future<void> _showDepartmentFilterPicker(BuildContext context, ThemeData theme) async {
     final colorScheme = theme.colorScheme;
-    final isDesktop = MediaQuery.of(context).size.width > 768;
+    final isDesktop = MediaQuery.sizeOf(context).width > 768;
 
     Set<String> tempSelected = Set<String>.from(_selectedDepartments);
     bool tempPinned = _isPinned;
 
-    Widget buildPickerContent(StateSetter setSheetState) {
+    Widget buildPickerContent(BuildContext modalContext, StateSetter setSheetState) {
       final isAll = tempSelected.isEmpty;
       return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Drag Handle Pill
-            Center(
-              child: Container(
-                width: 38,
-                height: 4.5,
-                decoration: BoxDecoration(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Header Row
-            Row(
-              children: [
-                Icon(Icons.tune_rounded, color: colorScheme.primary, size: 22),
-                const SizedBox(width: 8),
-                Text(
-                  'تصفية وتثبيت الأقسام',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                if (tempSelected.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () {
-                      setSheetState(() => tempSelected.clear());
-                    },
-                    icon: const Icon(Icons.clear_all_rounded, size: 16),
-                    label: const Text('كل الأقسام', style: TextStyle(fontSize: 12)),
-                  ),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          isDesktop ? 20 : 12,
+          20,
+          24 + MediaQuery.viewInsetsOf(modalContext).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!isDesktop) ...[
+                _buildDragHandlePill(colorScheme),
+                const SizedBox(height: 14),
               ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'يمكنك اختيار أكثر من قسم معاً لعرضها وتثبيتها كفلتر افتراضي:',
-              style: TextStyle(
-                fontSize: 12,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
 
-            // Wrap of FilterChips for all 10 departments
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilterChip(
-                  label: const Text('كل الأقسام'),
-                  avatar: isAll
-                      ? const Icon(Icons.check_circle_rounded, size: 16)
-                      : const Icon(Icons.apps_rounded, size: 16),
-                  selected: isAll,
-                  selectedColor: colorScheme.primaryContainer,
-                  checkmarkColor: colorScheme.primary,
-                  labelStyle: TextStyle(
-                    color: isAll ? colorScheme.primary : colorScheme.onSurface,
-                    fontWeight: isAll ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  onSelected: (val) {
-                    setSheetState(() => tempSelected.clear());
-                  },
-                ),
-                ...kPhotoPermissionDepartments.map((dept) {
-                  final isSelected = tempSelected.contains(dept);
-                  return FilterChip(
-                    label: Text(dept),
-                    selected: isSelected,
-                    selectedColor: colorScheme.primary,
-                    checkmarkColor: Colors.white,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : colorScheme.onSurface,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    ),
-                    onSelected: (val) {
-                      setSheetState(() {
-                        if (val) {
-                          tempSelected.add(dept);
-                        } else {
-                          tempSelected.remove(dept);
-                        }
-                      });
-                    },
-                  );
-                }),
-              ],
-            ),
-            const SizedBox(height: 18),
-
-            // Pin toggle card inside the selector
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: tempPinned
-                    ? Colors.amber.withValues(alpha: 0.15)
-                    : colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: tempPinned
-                      ? Colors.amber.shade700
-                      : colorScheme.outlineVariant.withValues(alpha: 0.5),
-                ),
-              ),
-              child: Row(
+              // Header Row
+              Row(
                 children: [
-                  Icon(
-                    Icons.push_pin_rounded,
-                    size: 20,
-                    color: tempPinned ? Colors.amber.shade900 : colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tempPinned ? 'تثبيت الفلتر مفعل' : 'تثبيت الفلتر كافتراضي',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: tempPinned ? Colors.amber.shade900 : colorScheme.onSurface,
-                          ),
-                        ),
-                        Text(
-                          tempSelected.isEmpty
-                              ? 'سيتم فتح الشاشة دائماً على كل الأقسام'
-                              : 'سيتم حفظ (${tempSelected.length}) أقسام كافتراضي عند فتح التطبيق',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                  Icon(Icons.tune_rounded, color: colorScheme.primary, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    'تصفية وتثبيت الأقسام',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Switch(
-                    value: tempPinned,
-                    activeTrackColor: Colors.amber.shade700,
-                    thumbColor: WidgetStateProperty.resolveWith((states) {
-                      if (states.contains(WidgetState.selected)) {
-                        return Colors.white;
-                      }
-                      return null;
-                    }),
-                    onChanged: (val) {
-                      setSheetState(() => tempPinned = val);
-                    },
-                  ),
+                  const Spacer(),
+                  if (tempSelected.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () {
+                        setSheetState(() => tempSelected.clear());
+                      },
+                      icon: const Icon(Icons.clear_all_rounded, size: 16),
+                      label: const Text('كل الأقسام', style: TextStyle(fontSize: 12)),
+                    ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 4),
+              Text(
+                'يمكنك اختيار أكثر من قسم معاً لعرضها وتثبيتها كفلتر افتراضي:',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
 
-            // Action Buttons Group
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              // Wrap of FilterChips for all 10 departments
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilterChip(
+                    label: const Text('كل الأقسام'),
+                    avatar: isAll
+                        ? const Icon(Icons.check_circle_rounded, size: 16)
+                        : const Icon(Icons.apps_rounded, size: 16),
+                    selected: isAll,
+                    selectedColor: colorScheme.primaryContainer,
+                    checkmarkColor: colorScheme.primary,
+                    labelStyle: TextStyle(
+                      color: isAll ? colorScheme.primary : colorScheme.onSurface,
+                      fontWeight: isAll ? FontWeight.bold : FontWeight.normal,
                     ),
-                    child: const Text('إلغاء'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      setState(() {
-                        _selectedDepartments = tempSelected;
-                        _isPinned = tempPinned;
-                      });
-                      final prefs = await SharedPreferences.getInstance();
-                      final key = 'pinned_photo_departments_${widget.marketingDelegate.uid}';
-                      if (tempPinned && tempSelected.isNotEmpty) {
-                        await prefs.setStringList(key, tempSelected.toList());
-                      } else {
-                        await prefs.remove(key);
-                        setState(() => _isPinned = false);
-                      }
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        if (tempPinned && tempSelected.isNotEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                tempSelected.length == 1
-                                    ? 'تم تثبيت قسم (${tempSelected.first}) كفلتر افتراضي'
-                                    : 'تم تثبيت (${tempSelected.length}) أقسام كفلتر افتراضي',
-                              ),
-                              backgroundColor: colorScheme.primary,
-                              behavior: SnackBarBehavior.floating,
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      }
+                    onSelected: (val) {
+                      setSheetState(() => tempSelected.clear());
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.check_rounded, size: 18),
-                    label: Text(
-                      tempSelected.isEmpty
-                          ? 'عرض كل الأقسام'
-                          : 'تطبيق (${tempSelected.length} أقسام)',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                  ),
+                  ...kPhotoPermissionDepartments.map((dept) {
+                    final isSelected = tempSelected.contains(dept);
+                    return FilterChip(
+                      label: Text(dept),
+                      selected: isSelected,
+                      selectedColor: colorScheme.primary,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : colorScheme.onSurface,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      ),
+                      onSelected: (val) {
+                        setSheetState(() {
+                          if (val) {
+                            tempSelected.add(dept);
+                          } else {
+                            tempSelected.remove(dept);
+                          }
+                        });
+                      },
+                    );
+                  }),
+                ],
+              ),
+              const SizedBox(height: 18),
+
+              // Pin toggle card inside the selector
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: tempPinned
+                      ? Colors.amber.withValues(alpha: 0.15)
+                      : colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: tempPinned
+                        ? Colors.amber.shade700
+                        : colorScheme.outlineVariant.withValues(alpha: 0.5),
                   ),
                 ),
-              ],
-            ),
-          ],
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.push_pin_rounded,
+                      size: 20,
+                      color: tempPinned ? Colors.amber.shade900 : colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tempPinned ? 'تثبيت الفلتر مفعل' : 'تثبيت الفلتر كافتراضي',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: tempPinned ? Colors.amber.shade900 : colorScheme.onSurface,
+                            ),
+                          ),
+                          Text(
+                            tempSelected.isEmpty
+                                ? 'سيتم فتح الشاشة دائماً على كل الأقسام'
+                                : 'سيتم حفظ (${tempSelected.length}) أقسام كافتراضي عند فتح التطبيق',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: tempPinned,
+                      activeTrackColor: Colors.amber.shade700,
+                      thumbColor: WidgetStateProperty.resolveWith((states) {
+                        if (states.contains(WidgetState.selected)) {
+                          return Colors.white;
+                        }
+                        return null;
+                      }),
+                      onChanged: (val) {
+                        setSheetState(() => tempPinned = val);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Connected Action Button Group
+              _buildConnectedActionGroup(
+                colorScheme: colorScheme,
+                cancelLabel: 'إلغاء',
+                onCancel: () => Navigator.pop(modalContext),
+                primaryLabel: tempSelected.isEmpty
+                    ? 'عرض كل الأقسام'
+                    : 'تطبيق (${tempSelected.length} أقسام)',
+                primaryIcon: Icons.check_rounded,
+                primaryColor: colorScheme.primary,
+                onPrimary: () async {
+                  setState(() {
+                    _selectedDepartments = tempSelected;
+                    _isPinned = tempPinned;
+                  });
+                  final prefs = await SharedPreferences.getInstance();
+                  final key = 'pinned_photo_departments_${widget.marketingDelegate.uid}';
+                  if (tempPinned && tempSelected.isNotEmpty) {
+                    await prefs.setStringList(key, tempSelected.toList());
+                  } else {
+                    await prefs.remove(key);
+                    if (mounted) {
+                      setState(() => _isPinned = false);
+                    }
+                  }
+                  if (modalContext.mounted) {
+                    Navigator.pop(modalContext);
+                  }
+                  if (context.mounted && tempPinned && tempSelected.isNotEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          tempSelected.length == 1
+                              ? 'تم تثبيت قسم (${tempSelected.first}) كفلتر افتراضي'
+                              : 'تم تثبيت (${tempSelected.length}) أقسام كفلتر افتراضي',
+                        ),
+                        backgroundColor: colorScheme.primary,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -1283,7 +1470,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: StatefulBuilder(
-              builder: (ctx, setSheetState) => buildPickerContent(setSheetState),
+              builder: (ctx, setSheetState) => buildPickerContent(dialogCtx, setSheetState),
             ),
           ),
         ),
@@ -1292,8 +1479,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       await showM3ModalBottomSheet(
         context: context,
         isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
         builder: (sheetCtx) => StatefulBuilder(
-          builder: (ctx, setSheetState) => buildPickerContent(setSheetState),
+          builder: (ctx, setSheetState) => buildPickerContent(sheetCtx, setSheetState),
         ),
       );
     }
@@ -1701,6 +1891,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: colorScheme.surfaceContainerLow,
       elevation: isExpanded ? 2.5 : 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -1739,9 +1930,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         fontSize: 14.5,
                       ),
                       codeStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
                       ),
                     ),
                   ),
@@ -1757,9 +1948,16 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Colors.orange.shade300),
                         ),
-                        child: const Text(
-                          'في انتظار الاعتماد ⏳',
-                          style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.schedule_rounded, size: 13, color: Colors.orange),
+                            SizedBox(width: 4),
+                            Text(
+                              'في انتظار الاعتماد',
+                              style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -1840,7 +2038,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                                 companyUID: permission.companyUID,
                                 currentUserUid: widget.marketingDelegate.uid,
                                 currentUserName: widget.marketingDelegate.fullName,
-                                prefix: 'بواسطة: ',
+                                prefix: '',
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
                                 style: const TextStyle(
@@ -2028,6 +2226,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: colorScheme.surfaceContainerLow,
       elevation: isExpanded ? 2.5 : 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -2066,9 +2265,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         fontSize: 14.5,
                       ),
                       codeStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
                       ),
                     ),
                   ),
@@ -2156,7 +2355,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                                 companyUID: permission.companyUID,
                                 currentUserUid: widget.marketingDelegate.uid,
                                 currentUserName: widget.marketingDelegate.fullName,
-                                prefix: 'بواسطة: ',
+                                prefix: '',
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
                                 style: const TextStyle(

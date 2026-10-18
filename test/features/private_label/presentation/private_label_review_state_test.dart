@@ -72,5 +72,27 @@ void main() {
 
       expect(state.allAvailableBranches, ['Abo Yousif', 'Glim', 'Semouha']);
     });
+
+    test('filters by selectedProduct and selectedMarketer and computes product counts', () {
+      final state = PrivateLabelReviewState(
+        date: '2026-10-07',
+        audits: [audit1, audit2],
+        selectedProduct: 'Milk',
+      );
+
+      expect(state.filteredAudits.length, 1);
+      expect(state.filteredAudits.first.productName, 'Milk');
+      expect(state.countForProduct('Milk'), 1);
+      expect(state.countForProduct('Cheese'), 1);
+      expect(state.countForProduct(null), 2);
+
+      final byMarketer = state.copyWith(
+        clearSelectedProduct: true,
+        selectedMarketer: 'Mohamed',
+      );
+      expect(byMarketer.filteredAudits.length, 1);
+      expect(byMarketer.filteredAudits.first.delegateName, 'Mohamed');
+      expect(byMarketer.allAvailableMarketers, ['Ahmed', 'Mohamed']);
+    });
   });
 }

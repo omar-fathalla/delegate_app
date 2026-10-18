@@ -104,10 +104,10 @@ abstract class AppLocalizations {
   /// **'Tashil'**
   String get appTitle;
 
-  /// Delegate app subtitle
+  /// Employees app subtitle
   ///
   /// In en, this message translates to:
-  /// **'Delegate App'**
+  /// **'Employees App'**
   String get delegateApp;
 
   /// Login label

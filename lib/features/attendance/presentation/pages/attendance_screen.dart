@@ -53,40 +53,189 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   List<Attendance> _filteredHistory = [];
   Map<String, List<Attendance>> _groupedByDay = {};
   List<String> _dayKeys = [];
-  String _chainFilter = 'all'; // 'all' or 'active'
+  String _chainFilter = 'all'; // 'all' or normalized chain name
   int _allAttendedDaysCount = 0;
-  int _activeOrgDaysCount = 0;
+  List<String> _availableChains = [];
+  Map<String, int> _chainDaysCount = {};
   int _approvedLeavesThisMonth = 0;
 
   static final Map<String, String> _orgNamesCache = {
-    'PiioBFgxaHAeuRdjlDgj': 'fathalla market',
+    'PiioBFgxaHAeuRdjlDgj': 'فتح الله ماركت',
     '5DE6702w6hFwycJfZyqM': 'جملة ماركت',
     'gOaRsmPocj2xV018m0hY': 'جملة ماركت',
   };
 
-  String _resolveOrgName(String orgId) {
-    if (orgId.isEmpty) return widget.delegate.organizationName;
-    if (_orgNamesCache.containsKey(orgId)) {
-      return _orgNamesCache[orgId]!;
+  static String _formatChainName(
+    String rawOrgName, {
+    String? branchName,
+    bool isArabic = true,
+  }) {
+    final bLower = (branchName ?? '').trim().toLowerCase();
+    if (bLower.startsWith('جملة ماركت') ||
+        bLower.startsWith('جمله ماركت') ||
+        bLower.startsWith('gomla market') ||
+        bLower.startsWith('jomla market')) {
+      return isArabic ? 'جملة ماركت' : 'Gomla Market';
     }
-    if (orgId == widget.delegate.organizationUID) {
-      return widget.delegate.organizationName;
+    if (bLower.startsWith('فتح الله') || bLower.startsWith('fathalla')) {
+      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
     }
-    FirebaseFirestore.instance
-        .collection('organizations')
-        .doc(orgId)
-        .getResilient(forceServer: false)
-        .then((doc) {
-      if (doc.exists && mounted) {
-        final name = (doc.data()?['name'] as String?)?.trim() ?? '';
-        if (name.isNotEmpty) {
-          setState(() {
-            _orgNamesCache[orgId] = name;
-          });
+    if (bLower.startsWith('زهران') || bLower.startsWith('zahran')) {
+      return isArabic ? 'زهران ماركت' : 'Zahran Market';
+    }
+    if (bLower.startsWith('كارفور') || bLower.startsWith('carrefour')) {
+      return isArabic ? 'كارفور' : 'Carrefour';
+    }
+    if (bLower.startsWith('بيت الجملة') || bLower.startsWith('beit')) {
+      return isArabic ? 'بيت الجملة' : 'Beit El Gomla';
+    }
+
+    final clean = rawOrgName.trim();
+    final lower = clean.toLowerCase();
+    if (lower.contains('fathalla') ||
+        clean.contains('فتح الله') ||
+        clean.contains('فتح_الله')) {
+      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
+    }
+    if (lower.contains('gomla') ||
+        lower.contains('jomla') ||
+        clean.contains('جملة') ||
+        clean.contains('جمله')) {
+      return isArabic ? 'جملة ماركت' : 'Gomla Market';
+    }
+    if (lower.contains('zahran') || clean.contains('زهران')) {
+      return isArabic ? 'زهران ماركت' : 'Zahran Market';
+    }
+    if (lower.contains('carrefour') || clean.contains('كارفور')) {
+      return isArabic ? 'كارفور' : 'Carrefour';
+    }
+    if (lower.contains('beit') || clean.contains('بيت الجملة')) {
+      return isArabic ? 'بيت الجملة' : 'Beit El Gomla';
+    }
+    return clean;
+  }
+
+  static String _cleanBranchName(String rawBranchName) {
+    final trimmed = rawBranchName.trim();
+    if (trimmed.isEmpty) return trimmed;
+    final prefixRegex = RegExp(
+      r'^(?:جملة\s*ماركت|جمله\s*ماركت|فتح\s*الله\s*ماركت|فتح\s*الله|زهران\s*ماركت|زهران|كارفور|بيت\s*الجملة|fathalla\s*market|fathallah\s*market|fathalla|gomla\s*market|jomla\s*market|zahran\s*market|carrefour)\s*[-–—:،/]\s*',
+      caseSensitive: false,
+    );
+    final cleaned = trimmed.replaceFirst(prefixRegex, '').trim();
+    return cleaned.isNotEmpty ? cleaned : trimmed;
+  }
+
+  static (Color bg, Color fg, Color border) _getChainBadgeColors(
+    BuildContext context,
+    String chainName,
+  ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final lower = chainName.toLowerCase().trim();
+
+    // Gomla Market (Emerald Green)
+    if (lower.contains('جملة') ||
+        lower.contains('جمله') ||
+        lower.contains('gomla') ||
+        lower.contains('jomla')) {
+      return isDark
+          ? (
+              const Color(0xFF143823),
+              const Color(0xFF81C784),
+              const Color(0xFF2E7D32),
+            )
+          : (
+              const Color(0xFFE8F5E9),
+              const Color(0xFF1B5E20),
+              const Color(0xFF81C784),
+            );
+    }
+
+    // Fathalla Market (Royal Blue)
+    if (lower.contains('فتح الله') || lower.contains('fathalla')) {
+      return isDark
+          ? (
+              const Color(0xFF102844),
+              const Color(0xFF90CAF9),
+              const Color(0xFF1976D2),
+            )
+          : (
+              const Color(0xFFE3F2FD),
+              const Color(0xFF0D47A1),
+              const Color(0xFF64B5F6),
+            );
+    }
+
+    // Zahran Market (Warm Amber / Orange)
+    if (lower.contains('زهران') || lower.contains('zahran')) {
+      return isDark
+          ? (
+              const Color(0xFF3E240D),
+              const Color(0xFFFFB74D),
+              const Color(0xFFF57C00),
+            )
+          : (
+              const Color(0xFFFFF3E0),
+              const Color(0xFFE65100),
+              const Color(0xFFFFB74D),
+            );
+    }
+
+    // Carrefour (Sky Blue)
+    if (lower.contains('كارفور') || lower.contains('carrefour')) {
+      return isDark
+          ? (
+              const Color(0xFF0C2D48),
+              const Color(0xFF38BDF8),
+              const Color(0xFF0284C7),
+            )
+          : (
+              const Color(0xFFE0F2FE),
+              const Color(0xFF0369A1),
+              const Color(0xFF7DD3FC),
+            );
+    }
+
+    final cs = theme.colorScheme;
+    return (
+      cs.secondaryContainer.withValues(alpha: 0.6),
+      cs.onSecondaryContainer,
+      cs.secondary.withValues(alpha: 0.35),
+    );
+  }
+
+  String _resolveOrgName(
+    String orgId, {
+    String? branchName,
+    bool isArabic = true,
+  }) {
+    String raw = '';
+    if (orgId.isEmpty) {
+      raw = widget.delegate.organizationName;
+    } else if (_orgNamesCache.containsKey(orgId)) {
+      raw = _orgNamesCache[orgId]!;
+    } else if (orgId == widget.delegate.organizationUID) {
+      raw = widget.delegate.organizationName;
+    } else {
+      FirebaseFirestore.instance
+          .collection('organizations')
+          .doc(orgId)
+          .getResilient(forceServer: false)
+          .then((doc) {
+        if (doc.exists && mounted) {
+          final name = (doc.data()?['name'] as String?)?.trim() ?? '';
+          if (name.isNotEmpty) {
+            setState(() {
+              _orgNamesCache[orgId] = name;
+              _recomputeFilteredHistory();
+            });
+          }
         }
-      }
-    }).ignore();
-    return widget.delegate.organizationName;
+      }).ignore();
+      raw = widget.delegate.organizationName;
+    }
+    return _formatChainName(raw, branchName: branchName, isArabic: isArabic);
   }
 
   Future<void> _loadApprovedLeaves() async {
@@ -170,12 +319,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         phoneNumber: widget.delegate.phoneNumber,
       ),
     );
-    // Delay sync request to allow history to load first
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!_attendanceBloc.isClosed) {
-        _attendanceBloc.add(const SyncRequested());
-      }
-    }).ignore();
+    // Delay sync request to allow history to load first (only for active delegate's own session)
+    if (!widget.viewOnly) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (!_attendanceBloc.isClosed) {
+          _attendanceBloc.add(const SyncRequested());
+        }
+      }).ignore();
+    }
 
     // Subscribe to connectivity changes once
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
@@ -192,7 +343,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2400),
     );
-    if (!kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (!widget.viewOnly &&
+        !kIsWeb &&
+        !Platform.environment.containsKey('FLUTTER_TEST')) {
       _radarController.repeat();
     }
     _radarAnimation = CurvedAnimation(
@@ -201,7 +354,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
 
     // If Geofence mode is expected, load organization settings and branches
-    if (!kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (!widget.viewOnly &&
+        !kIsWeb &&
+        !Platform.environment.containsKey('FLUTTER_TEST')) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _fetchOrganizationSettings().then((_) {
@@ -214,6 +369,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
   }
 
+  @override
+  void reassemble() {
+    super.reassemble();
+    final state = _attendanceBloc.state;
+    if (state is AttendanceHistoryLoaded) {
+      _rawHistory = state.history;
+    }
+    _recomputeFilteredHistory();
+  }
+
   void _onScroll() {
     if (_isBottom) {
       final state = _attendanceBloc.state;
@@ -223,7 +388,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _attendanceBloc.add(
           LoadMoreHistoryRequested(
             userId: widget.delegate.uid,
-            organizationId: widget.delegate.organizationUID,
+            organizationId: '', // Cross-org query for unified monthly attendance
             nationalityID: widget.delegate.nationalityID,
             phoneNumber: widget.delegate.phoneNumber,
           ),
@@ -261,11 +426,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _isInsideGeofence = false;
         _recomputeFilteredHistory();
       });
-      _fetchOrganizationSettings().then((_) {
-        if (mounted && _isGeofenceMode) {
-          _loadBranches();
-        }
-      });
+      if (!widget.viewOnly) {
+        _fetchOrganizationSettings().then((_) {
+          if (mounted && _isGeofenceMode) {
+            _loadBranches();
+          }
+        });
+      }
       _loadApprovedLeaves();
       _attendanceBloc.add(
         HistoryRequested(
@@ -281,33 +448,72 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   /// Recomputes filtered/grouped data only when source data or month changes.
   void _recomputeFilteredHistory() {
     final currentOrg = widget.delegate.organizationUID.trim();
+    final isArabic = true; // Canonical chain keys in Arabic for consistent matching
 
     final allDaysSet = <String>{};
-    final activeDaysSet = <String>{};
+    final chainDaysSets = <String, Set<String>>{};
+    final chainsOrdered = <String>[];
+
+    void registerChain(String name) {
+      final norm = _formatChainName(name, isArabic: isArabic).trim();
+      if (norm.isNotEmpty && !chainsOrdered.contains(norm)) {
+        chainsOrdered.add(norm);
+        chainDaysSets.putIfAbsent(norm, () => <String>{});
+      }
+    }
+
+    if (widget.delegate.organizationName.isNotEmpty) {
+      registerChain(widget.delegate.organizationName);
+    }
+    for (final orgName in widget.delegate.allOrganizationNames) {
+      registerChain(orgName);
+    }
 
     for (final item in _rawHistory) {
       if (item.checkInTime.month == _selectedMonth.month &&
           item.checkInTime.year == _selectedMonth.year) {
         final dayKey = DateFormat('yyyy-MM-dd').format(item.checkInTime);
         allDaysSet.add(dayKey);
-        if (currentOrg.isEmpty || item.organizationId.isEmpty || item.organizationId == currentOrg) {
-          activeDaysSet.add(dayKey);
+        final itemChain = _resolveOrgName(
+          item.organizationId,
+          branchName: item.branchName,
+          isArabic: isArabic,
+        );
+        if (itemChain.isNotEmpty) {
+          registerChain(itemChain);
+          chainDaysSets.putIfAbsent(itemChain, () => <String>{}).add(dayKey);
         }
       }
     }
 
     _allAttendedDaysCount = allDaysSet.length;
-    _activeOrgDaysCount = activeDaysSet.length;
+    _availableChains = chainsOrdered;
+    _chainDaysCount = {
+      for (final entry in chainDaysSets.entries) entry.key: entry.value.length,
+    };
+
+    if (_chainFilter != 'all' &&
+        _chainFilter != 'active' &&
+        !_availableChains.contains(_chainFilter)) {
+      _chainFilter = 'all';
+    }
 
     _filteredHistory = _rawHistory.where((attendance) {
       final inMonth = attendance.checkInTime.month == _selectedMonth.month &&
           attendance.checkInTime.year == _selectedMonth.year;
       if (!inMonth) return false;
 
+      if (_chainFilter == 'all') return true;
       if (_chainFilter == 'active' && currentOrg.isNotEmpty) {
-        return attendance.organizationId.isEmpty || attendance.organizationId == currentOrg;
+        return attendance.organizationId.isEmpty ||
+            attendance.organizationId == currentOrg;
       }
-      return true; // 'all'
+      final itemChain = _resolveOrgName(
+        attendance.organizationId,
+        branchName: attendance.branchName,
+        isArabic: isArabic,
+      );
+      return itemChain == _chainFilter;
     }).toList();
 
     _filteredHistory.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
@@ -329,7 +535,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
-            DelegateTrackingEngine().startTrackingSession(delegateId: widget.delegate.uid);
+            if (!widget.viewOnly) {
+              DelegateTrackingEngine().startTrackingSession(delegateId: widget.delegate.uid);
+            }
             if (state.attendance.isSynced) {
               AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
             } else {
@@ -347,7 +555,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               ),
             );
           } else if (state is AttendanceCheckedOut) {
-            DelegateTrackingEngine().stopTrackingSession();
+            if (!widget.viewOnly) {
+              DelegateTrackingEngine().stopTrackingSession();
+            }
             if (state.attendance.isSynced) {
               AppSnackBar.showSuccess(context, l10n.checkedOutSuccessfully);
             } else {
@@ -377,7 +587,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               context.read<AttendanceBloc>().add(
                 LoadMoreHistoryRequested(
                   userId: widget.delegate.uid,
-                  organizationId: widget.delegate.organizationUID,
+                  organizationId: '', // Cross-org query for unified monthly attendance
                   nationalityID: widget.delegate.nationalityID,
                   phoneNumber: widget.delegate.phoneNumber,
                 ),
@@ -393,7 +603,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   context.read<AttendanceBloc>().add(
                     HistoryRequested(
                       userId: widget.delegate.uid,
-                      organizationId: widget.delegate.organizationUID,
+                      organizationId: '', // Cross-org query for unified monthly attendance
                       nationalityID: widget.delegate.nationalityID,
                       phoneNumber: widget.delegate.phoneNumber,
                     ),
@@ -412,10 +622,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           bool isSyncing = false;
 
           if (state is AttendanceHistoryLoaded) {
+            if (!identical(_rawHistory, state.history) ||
+                (_rawHistory.isNotEmpty && _availableChains.isEmpty)) {
+              _rawHistory = state.history;
+              _recomputeFilteredHistory();
+            }
             isCheckedIn = state.activeAttendance != null;
             activeAttendance = state.activeAttendance;
             isSyncing = state.syncStatus == SyncStatus.inProgress;
           } else if (_rawHistory.isNotEmpty) {
+            if (_availableChains.isEmpty) {
+              _recomputeFilteredHistory();
+            }
             activeAttendance = _rawHistory.cast<Attendance?>().firstWhere(
               (element) => element?.checkOutTime == null,
               orElse: () => null,
@@ -423,7 +641,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             isCheckedIn = activeAttendance != null;
           }
 
-          if (isCheckedIn && !DelegateTrackingEngine().isTracking) {
+          if (!widget.viewOnly &&
+              isCheckedIn &&
+              !DelegateTrackingEngine().isTracking) {
             DelegateTrackingEngine()
                 .startTrackingSession(delegateId: widget.delegate.uid);
           }
@@ -1152,12 +1372,135 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isArabic = Localizations.localeOf(context).languageCode.startsWith('ar');
-    final activeOrgName = widget.delegate.organizationName.isNotEmpty
-        ? widget.delegate.organizationName
-        : (isArabic ? 'السلسلة الحالية' : 'Active Chain');
+    final chains = _availableChains.isNotEmpty
+        ? _availableChains
+        : [
+            _formatChainName(
+              widget.delegate.organizationName.isNotEmpty
+                  ? widget.delegate.organizationName
+                  : (isArabic ? 'السلسلة الحالية' : 'Active Chain'),
+              isArabic: isArabic,
+            ),
+          ];
+
+    Widget buildTab({
+      required String filterKey,
+      required String label,
+      required int count,
+      required IconData icon,
+      Color? accentFg,
+      Color? accentBg,
+    }) {
+      final isSelected = _chainFilter == filterKey;
+      final activeFg = accentFg ?? colorScheme.primary;
+      final activeBg = accentBg ?? colorScheme.primaryContainer;
+
+      return InkWell(
+        onTap: () {
+          if (_chainFilter != filterKey) {
+            setState(() {
+              _chainFilter = filterKey;
+              _recomputeFilteredHistory();
+            });
+          }
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: AppMotionDurations.short4,
+          curve: AppMotionCurves.standard,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 5),
+          decoration: BoxDecoration(
+            color: isSelected ? colorScheme.surface : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: isSelected && accentFg != null
+                ? Border.all(color: accentFg.withValues(alpha: 0.35), width: 1)
+                : null,
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected
+                    ? activeFg
+                    : (accentFg?.withValues(alpha: 0.8) ??
+                        colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      color: isSelected ? activeFg : colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? activeBg
+                      : colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected
+                        ? activeFg
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final allTab = buildTab(
+      filterKey: 'all',
+      label: isArabic ? 'جميع السلاسل' : 'All Chains',
+      count: _allAttendedDaysCount,
+      icon: Icons.hub_rounded,
+    );
+
+    final chainTabs = chains.map((chainKey) {
+      final displayLabel = _formatChainName(chainKey, isArabic: isArabic);
+      final (bg, fg, _) = _getChainBadgeColors(context, chainKey);
+      final count = _chainDaysCount[chainKey] ?? 0;
+      return buildTab(
+        filterKey: chainKey,
+        label: displayLabel,
+        count: count,
+        icon: Icons.storefront_rounded,
+        accentFg: fg,
+        accentBg: bg,
+      );
+    }).toList();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
@@ -1166,178 +1509,28 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           color: colorScheme.outlineVariant.withValues(alpha: 0.5),
         ),
       ),
-      child: Row(
-        children: [
-          // 1. All Chains Tab
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                if (_chainFilter != 'all') {
-                  setState(() {
-                    _chainFilter = 'all';
-                    _recomputeFilteredHistory();
-                  });
-                }
-              },
-              borderRadius: BorderRadius.circular(10),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                decoration: BoxDecoration(
-                  color: _chainFilter == 'all'
-                      ? colorScheme.surface
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: _chainFilter == 'all'
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.hub_rounded,
-                      size: 15,
-                      color: _chainFilter == 'all'
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        isArabic ? 'جميع السلاسل' : 'All Chains',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: _chainFilter == 'all'
-                              ? FontWeight.bold
-                              : FontWeight.w500,
-                          color: _chainFilter == 'all'
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+      child: chains.length <= 2
+          ? Row(
+              children: [
+                Expanded(child: allTab),
+                for (final tab in chainTabs) ...[
+                  const SizedBox(width: 4),
+                  Expanded(child: tab),
+                ],
+              ],
+            )
+          : SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  allTab,
+                  for (final tab in chainTabs) ...[
                     const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: _chainFilter == 'all'
-                            ? colorScheme.primaryContainer
-                            : colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '$_allAttendedDaysCount',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: _chainFilter == 'all'
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
+                    tab,
                   ],
-                ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: 4),
-
-          // 2. Active Chain Tab
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                if (_chainFilter != 'active') {
-                  setState(() {
-                    _chainFilter = 'active';
-                    _recomputeFilteredHistory();
-                  });
-                }
-              },
-              borderRadius: BorderRadius.circular(10),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                decoration: BoxDecoration(
-                  color: _chainFilter == 'active'
-                      ? colorScheme.surface
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: _chainFilter == 'active'
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.storefront_rounded,
-                      size: 15,
-                      color: _chainFilter == 'active'
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        activeOrgName,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: _chainFilter == 'active'
-                              ? FontWeight.bold
-                              : FontWeight.w500,
-                          color: _chainFilter == 'active'
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: _chainFilter == 'active'
-                            ? colorScheme.primaryContainer
-                            : colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '$_activeOrgDaysCount',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: _chainFilter == 'active'
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1383,9 +1576,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     } else if (state is AttendanceHistoryLoaded) {
       final colorScheme = Theme.of(context).colorScheme;
       final isArabic = locale.startsWith('ar');
-      final activeOrgName = widget.delegate.organizationName.isNotEmpty
-          ? widget.delegate.organizationName
-          : (isArabic ? 'السلسلة الحالية' : 'Active Chain');
+      final selectedChainLabel = _chainFilter != 'all' && _chainFilter != 'active'
+          ? _formatChainName(_chainFilter, isArabic: isArabic)
+          : _formatChainName(
+              widget.delegate.organizationName.isNotEmpty
+                  ? widget.delegate.organizationName
+                  : (isArabic ? 'السلسلة الحالية' : 'Active Chain'),
+              isArabic: isArabic,
+            );
 
       if (_dayKeys.isEmpty) {
         return RefreshIndicator(
@@ -1412,7 +1610,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 _buildUnifiedAttendanceCard(context),
                 _buildChainFilterBar(context),
                 const SizedBox(height: 24),
-                if (_chainFilter == 'active' && _allAttendedDaysCount > 0) ...[
+                if (_chainFilter != 'all' && _allAttendedDaysCount > 0) ...[
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 20),
                     padding: const EdgeInsets.all(20),
@@ -1433,8 +1631,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         const SizedBox(height: 12),
                         Text(
                           isArabic
-                              ? 'لا توجد جلسات حضور مسجلة في $activeOrgName خلال هذا الشهر'
-                              : 'No sessions recorded for $activeOrgName this month',
+                              ? 'لا توجد جلسات حضور مسجلة في $selectedChainLabel خلال هذا الشهر'
+                              : 'No sessions recorded for $selectedChainLabel this month',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -1641,7 +1839,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   final outTime = effectiveOut != null
                       ? DateFormat('hh:mm a', locale).format(effectiveOut)
                       : '--:--';
-                  final branchName = item.branchName ?? l10n.unspecifiedBranch;
+                  final rawBranchName = item.branchName ?? l10n.unspecifiedBranch;
+                  final cleanBranchName = _cleanBranchName(rawBranchName);
+                  final chainName = _resolveOrgName(
+                    item.organizationId,
+                    branchName: item.branchName,
+                    isArabic: isArabic,
+                  );
+                  final (chipBg, chipFg, chipBorder) = _getChainBadgeColors(
+                    context,
+                    chainName,
+                  );
 
                   String durationStr;
                   if (effectiveOut != null) {
@@ -1667,53 +1875,59 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               children: [
                                 Row(
                                   children: [
+                                    if (chainName.isNotEmpty) ...[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3.5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: chipBg,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: chipBorder,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.storefront_rounded,
+                                              size: 13,
+                                              color: chipFg,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              chainName,
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: chipFg,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
                                     Icon(
                                       Icons.location_on_rounded,
-                                      size: 14,
-                                      color: colorScheme.outline,
+                                      size: 15,
+                                      color: colorScheme.primary,
                                     ),
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
-                                        branchName,
+                                        isArabic
+                                            ? 'الفرع: $cleanBranchName'
+                                            : 'Branch: $cleanBranchName',
                                         style: TextStyle(
-                                          fontSize: 12,
-                                          color: colorScheme.outline,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: colorScheme.onSurface,
                                         ),
                                         overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: colorScheme.primary.withValues(alpha: 0.25),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.storefront_rounded,
-                                            size: 11,
-                                            color: colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            _resolveOrgName(item.organizationId),
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: colorScheme.primary,
-                                            ),
-                                          ),
-                                        ],
                                       ),
                                     ),
                                   ],

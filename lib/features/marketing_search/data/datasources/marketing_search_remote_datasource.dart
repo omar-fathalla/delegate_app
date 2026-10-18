@@ -42,6 +42,11 @@ class MarketingSearchRemoteDataSourceImpl
     implements MarketingSearchRemoteDataSource {
   final FirebaseFirestore firestore;
 
+  static final Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+      _orgDelegatesCache = {};
+  static final Map<String, DateTime> _orgDelegatesCacheTime = {};
+  static const Duration _cacheTtl = Duration(minutes: 2);
+
   MarketingSearchRemoteDataSourceImpl({required this.firestore});
 
   @override
@@ -178,11 +183,22 @@ class MarketingSearchRemoteDataSourceImpl
 
       final snapshot = await query.getResilient(forceServer: true);
 
+      // Deduplicate by companyUID + doc.id
+      final seenKeys = <String>{};
+      final uniqueDocs = <QueryDocumentSnapshot>[];
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final key = '${data['companyUID'] ?? ''}_${doc.id}';
+        if (seenKeys.add(key)) {
+          uniqueDocs.add(doc);
+        }
+      }
+
       // Check if we have more items than the limit
-      final hasMore = snapshot.docs.length > limit;
+      final hasMore = uniqueDocs.length > limit;
       final itemsToReturn = hasMore
-          ? snapshot.docs.take(limit).toList()
-          : snapshot.docs;
+          ? uniqueDocs.take(limit).toList()
+          : uniqueDocs;
 
       developer.log('📊 إجمالي النتائج: ${itemsToReturn.length}');
       developer.log('📊 هل يوجد المزيد: $hasMore');
@@ -259,14 +275,34 @@ class MarketingSearchRemoteDataSourceImpl
       developer.log('Limit: $limit');
       developer.log('═══════════════════════════════════════════════════');
 
-      // جلب مناديب المنظمة بالكامل عبر collectionGroup
-      final snapshot = await firestore
-          .collectionGroup('delegates')
-          .where('organizationUID', isEqualTo: organizationUID)
-          .getResilient(forceServer: true);
+      // Use 2-minute in-memory cache per organizationUID so repeated searches / pagination don't re-download all delegates
+      final now = DateTime.now();
+      final cachedAt = _orgDelegatesCacheTime[organizationUID];
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs;
+      if (_orgDelegatesCache.containsKey(organizationUID) &&
+          cachedAt != null &&
+          now.difference(cachedAt) < _cacheTtl) {
+        orgDocs = _orgDelegatesCache[organizationUID]!;
+      } else {
+        final snapshot = await firestore
+            .collectionGroup('delegates')
+            .where('organizationUID', isEqualTo: organizationUID)
+            .getResilient(forceServer: true);
+        final seenKeys = <String>{};
+        orgDocs = [];
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          final key = '${data['companyUID'] ?? ''}_${doc.id}';
+          if (seenKeys.add(key)) {
+            orgDocs.add(doc);
+          }
+        }
+        _orgDelegatesCache[organizationUID] = orgDocs;
+        _orgDelegatesCacheTime[organizationUID] = now;
+      }
 
       // مطابقة الأسماء ذكياً باللغة العربية مع دعم المقاطع المختلفة
-      final matchedDocs = snapshot.docs.where((doc) {
+      final matchedDocs = orgDocs.where((doc) {
         final data = doc.data();
 
         // تصفية الهاتف إن وجد

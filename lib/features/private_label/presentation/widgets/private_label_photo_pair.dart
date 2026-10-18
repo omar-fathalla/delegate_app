@@ -18,6 +18,18 @@ class PrivateLabelImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (path.startsWith('assets/')) {
+      return Image.asset(
+        path,
+        fit: fit,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, _, _) => Icon(
+          Icons.image_not_supported_rounded,
+          color: Theme.of(context).colorScheme.outline,
+        ),
+      );
+    }
     if (kIsWeb && (path.startsWith('blob:') || path.startsWith('data:'))) {
       return Image.network(
         path,

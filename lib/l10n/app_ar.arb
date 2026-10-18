@@ -4,9 +4,9 @@
     "@appTitle": {
         "description": "App title"
     },
-    "delegateApp": "تطبيق المندوب",
+    "delegateApp": "تطبيق الموظفين",
     "@delegateApp": {
-        "description": "Delegate app subtitle"
+        "description": "Employees app subtitle"
     },
     "login": "تسجيل الدخول",
     "@login": {

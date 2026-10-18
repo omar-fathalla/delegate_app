@@ -57,6 +57,8 @@ class PrivateLabelReviewBloc
     on<PrivateLabelReviewAuditDeleted>(_onAuditDeleted);
     on<PrivateLabelReviewAuditUpdated>(_onAuditUpdated);
     on<PrivateLabelReviewBranchSelected>(_onBranchSelected);
+    on<PrivateLabelReviewProductSelected>(_onProductSelected);
+    on<PrivateLabelReviewMarketerSelected>(_onMarketerSelected);
   }
 
   PrivateLabelReviewFeedback _feedback(String message, {bool isError = false}) =>
@@ -66,13 +68,13 @@ class PrivateLabelReviewBloc
     PrivateLabelReviewStarted event,
     Emitter<PrivateLabelReviewState> emit,
   ) async {
-    _org = event.organizationUID;
+    _org = event.organizationUID.trim().isNotEmpty
+        ? event.organizationUID.trim()
+        : 'PiioBFgxaHAeuRdjlDgj';
     _company = event.companyUID;
     _reviewerUid = event.reviewerUid;
     _reviewerName = event.reviewerName;
     await _loadAudits(emit);
-    final products = await getProducts(_org);
-    emit(state.copyWith(products: products.fold((_) => state.products, (p) => p)));
   }
 
   Future<void> _onDateChanged(
@@ -96,6 +98,26 @@ class PrivateLabelReviewBloc
     ));
   }
 
+  void _onProductSelected(
+    PrivateLabelReviewProductSelected event,
+    Emitter<PrivateLabelReviewState> emit,
+  ) {
+    emit(state.copyWith(
+      selectedProduct: event.productName,
+      clearSelectedProduct: event.productName == null,
+    ));
+  }
+
+  void _onMarketerSelected(
+    PrivateLabelReviewMarketerSelected event,
+    Emitter<PrivateLabelReviewState> emit,
+  ) {
+    emit(state.copyWith(
+      selectedMarketer: event.marketerName,
+      clearSelectedMarketer: event.marketerName == null,
+    ));
+  }
+
   Future<void> _loadAudits(Emitter<PrivateLabelReviewState> emit) async {
     if (_org.isEmpty) return;
     final date = state.date;
@@ -108,18 +130,22 @@ class PrivateLabelReviewBloc
         companyUID: _company,
       )),
       getBranches(_org),
+      getProducts(_org),
     ]);
 
     if (state.date != date) return; // Stale response.
 
     final auditsRes = results[0] as Either<Failure, List<PrivateLabelAudit>>;
     final branchesRes = results[1] as Either<Failure, List<String>>;
+    final productsRes = results[2] as Either<Failure, List<PrivateLabelProduct>>;
 
     final branches = branchesRes.fold((_) => state.branches, (b) => b);
+    final products = productsRes.fold((_) => state.products, (p) => p);
 
     auditsRes.fold(
       (failure) => emit(state.copyWith(
         status: PrivateLabelReviewStatusView.failure,
+        products: products,
         errorMessage: failure.message,
       )),
       (audits) {
@@ -127,6 +153,7 @@ class PrivateLabelReviewBloc
           status: PrivateLabelReviewStatusView.ready,
           audits: audits,
           branches: branches,
+          products: products,
           clearError: true,
         ));
       },

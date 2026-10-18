@@ -13,6 +13,8 @@ class PrivateLabelKpiCard extends StatelessWidget {
   final bool isSyncing;
   final int pendingCount;
   final VoidCallback? onOpen;
+  final VoidCallback? onOpenCatalog;
+  final String? catalogButtonLabel;
   final VoidCallback? onRegisterRestToday;
   final VoidCallback? onCancelRestToday;
 
@@ -24,6 +26,8 @@ class PrivateLabelKpiCard extends StatelessWidget {
     this.isSyncing = false,
     this.pendingCount = 0,
     this.onOpen,
+    this.onOpenCatalog,
+    this.catalogButtonLabel,
     this.onRegisterRestToday,
     this.onCancelRestToday,
   });
@@ -134,24 +138,56 @@ class PrivateLabelKpiCard extends StatelessWidget {
               ),
             ],
           ],
-          if (compact && onOpen != null) ...[
-            const SizedBox(height: 12),
+          if (!compact && onOpenCatalog != null) ...[
+            const SizedBox(height: 10),
             Align(
-              alignment: AlignmentDirectional.centerEnd,
+              alignment: AlignmentDirectional.centerStart,
               child: FilledButton.tonalIcon(
-                onPressed: onOpen,
-                icon: const Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 18,
-                  textDirection: TextDirection.ltr,
-                ),
-                label: const Text('Open Private Label'),
+                onPressed: onOpenCatalog,
+                icon: const Icon(Icons.inventory_2_rounded, size: 18),
+                label: Text(catalogButtonLabel ?? 'Catalog'),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 44),
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   shape: const StadiumBorder(),
                 ),
               ),
+            ),
+          ],
+          if (compact && (onOpen != null || onOpenCatalog != null)) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (onOpenCatalog != null)
+                  OutlinedButton.icon(
+                    onPressed: onOpenCatalog,
+                    icon: const Icon(Icons.inventory_2_rounded, size: 18),
+                    label: Text(catalogButtonLabel ?? 'Catalog'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      shape: const StadiumBorder(),
+                    ),
+                  ),
+                if (onOpen != null)
+                  FilledButton.tonalIcon(
+                    onPressed: onOpen,
+                    icon: const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 18,
+                      textDirection: TextDirection.ltr,
+                    ),
+                    label: const Text('Open Private Label'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      shape: const StadiumBorder(),
+                    ),
+                  ),
+              ],
             ),
           ],
         ],

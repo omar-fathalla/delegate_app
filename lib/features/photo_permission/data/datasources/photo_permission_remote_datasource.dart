@@ -541,8 +541,11 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         if (branchName != null && branchName.trim().isNotEmpty && branchName != 'all') {
           query = query.where('branchName', isEqualTo: branchName.trim());
         }
-        if (limit != null && limit > 0) {
-          query = query.limit(limit);
+        final effectiveLimit = (limit != null && limit > 0)
+            ? limit
+            : (companyUID.isEmpty ? 200 : null);
+        if (effectiveLimit != null) {
+          query = query.limit(effectiveLimit);
         }
         final snapshot = await query.getResilient();
 

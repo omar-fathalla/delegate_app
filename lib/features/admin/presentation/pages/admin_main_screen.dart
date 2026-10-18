@@ -49,6 +49,7 @@ import 'package:delegate_app/features/hr/presentation/pages/hr_device_unbind_req
 import 'package:delegate_app/features/hr/presentation/pages/hr_field_photos_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuses_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_monthly_payroll_screen.dart';
+import 'package:delegate_app/features/private_label/presentation/pages/private_label_hub_screen.dart';
 
 class AdminMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -131,11 +132,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           onNavigateTab: (tabIndex) => setState(() => _currentIndex = tabIndex),
         ),
         BlocProvider(
-          create: (_) => di.sl<PhotoPermissionBloc>()
-            ..add(const LoadPermissionsRequested(
-              organizationUID: '',
-              companyUID: '',
-            )),
+          create: (_) => di.sl<PhotoPermissionBloc>(),
           child: MarketingPermissionsScreen(marketingDelegate: delegate),
         ),
         BranchHomeScreen(marketingUser: delegate),
@@ -150,11 +147,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         AdminTasksScreen(adminDelegate: delegate),
         // تبويب أذونات التصوير
         BlocProvider(
-          create: (_) => di.sl<PhotoPermissionBloc>()
-            ..add(const LoadPermissionsRequested(
-              organizationUID: '',
-              companyUID: '',
-            )),
+          create: (_) => di.sl<PhotoPermissionBloc>(),
           child: MarketingPermissionsScreen(marketingDelegate: delegate),
         ),
         // تبويب المخالفات والغرامات (قراءة + إضافة لمشرف الشركات)
@@ -482,6 +475,16 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           MaterialPageRoute(
             builder: (_) => MarketingSearchScreen(
               organizationUID: widget.delegate.organizationUID,
+            ),
+          ),
+        );
+        break;
+      case 'private_label_hub':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PrivateLabelHubScreen(
+              delegate: widget.delegate,
+              showAppBar: true,
             ),
           ),
         );
@@ -832,6 +835,21 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               value: 'search',
               icon: Icons.person_search_rounded,
               title: isArabic ? 'الاستعلامات والبحث' : 'Search',
+            ),
+            buildPopupItem(
+              value: 'permissions_report',
+              icon: Icons.analytics_rounded,
+              title: isArabic ? 'تقرير أذونات التصوير' : 'Photo Permissions Report',
+            ),
+          ],
+
+          if (isSuperAdmin || isBranchesMarketingManager) ...[
+            buildPopupItem(
+              value: 'private_label_hub',
+              icon: Icons.sell_rounded,
+              title: isArabic
+                  ? 'مركز العلامة الخاصة (Private Label)'
+                  : 'Private Label Hub',
             ),
           ],
 

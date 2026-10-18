@@ -18,6 +18,7 @@ import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_p
 import 'package:delegate_app/features/photo_permission/domain/entities/photo_permission.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockRequestPhotoPermission extends Mock implements RequestPhotoPermission {}
 class MockApprovePhotoPermission extends Mock implements ApprovePhotoPermission {}
@@ -299,6 +300,211 @@ void main() {
           ),
         )).called(1);
       },
+    );
+
+    blocTest<PhotoPermissionBloc, PhotoPermissionState>(
+      'should deduplicate permissions with identical companyUID and uid on LoadPermissionsRequested',
+      setUp: () {
+        SharedPreferences.setMockInitialValues({});
+      },
+      build: () {
+        when(() => mockGetPhotoPermissions(any()))
+            .thenAnswer((_) async => Right([tPermission, tPermission]));
+        return bloc;
+      },
+      act: (bloc) => bloc.add(
+        const LoadPermissionsRequested(
+          organizationUID: 'org_dedup',
+          companyUID: 'comp123',
+        ),
+      ),
+      expect: () => [
+        PhotoPermissionLoading(),
+        PhotoPermissionsLoaded(permissions: [tPermission]),
+      ],
+    );
+
+    blocTest<PhotoPermissionBloc, PhotoPermissionState>(
+      'should emit cached permissions immediately without PhotoPermissionLoading on subsequent LoadPermissionsRequested (Stale-While-Revalidate)',
+      setUp: () {
+        SharedPreferences.setMockInitialValues({});
+      },
+      build: () {
+        final updatedPermission = PhotoPermission(
+          uid: 'perm123',
+          organizationUID: 'org_swr',
+          companyUID: 'comp123',
+          companyName: 'Updated Company',
+          companyCode: 99,
+          branchIds: const ['b1', 'b2'],
+          branchNames: const ['Branch 1', 'Branch 2'],
+          startDate: DateTime(2026, 1, 1),
+          endDate: DateTime(2026, 12, 31),
+          status: 'approved',
+          requestedBy: 'user1',
+          isSupervisorEnabled: true,
+          createdAt: DateTime(2026, 1, 1),
+          updatedAt: DateTime(2026, 1, 2),
+        );
+        var callCount = 0;
+        when(() => mockGetPhotoPermissions(any())).thenAnswer((_) async {
+          callCount++;
+          return Right(callCount == 1 ? [tPermission] : [updatedPermission]);
+        });
+        return bloc;
+      },
+      act: (bloc) async {
+        bloc.add(
+          const LoadPermissionsRequested(
+            organizationUID: 'org_swr',
+            companyUID: 'comp123',
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        bloc.add(
+          const LoadPermissionsRequested(
+            organizationUID: 'org_swr',
+            companyUID: 'comp123',
+          ),
+        );
+      },
+      expect: () => [
+        PhotoPermissionLoading(),
+        PhotoPermissionsLoaded(permissions: [tPermission]),
+        PhotoPermissionsLoaded(
+          permissions: [
+            PhotoPermission(
+              uid: 'perm123',
+              organizationUID: 'org_swr',
+              companyUID: 'comp123',
+              companyName: 'Updated Company',
+              companyCode: 99,
+              branchIds: const ['b1', 'b2'],
+              branchNames: const ['Branch 1', 'Branch 2'],
+              startDate: DateTime(2026, 1, 1),
+              endDate: DateTime(2026, 12, 31),
+              status: 'approved',
+              requestedBy: 'user1',
+              isSupervisorEnabled: true,
+              createdAt: DateTime(2026, 1, 1),
+              updatedAt: DateTime(2026, 1, 2),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    blocTest<PhotoPermissionBloc, PhotoPermissionState>(
+      'should optimistically update cached permission dates on UpdatePhotoPermissionDatesRequested so subsequent LoadPermissionsRequested emits updated dates immediately',
+      setUp: () {
+        SharedPreferences.setMockInitialValues({});
+      },
+      build: () {
+        var callCount = 0;
+        when(() => mockGetPhotoPermissions(any())).thenAnswer((_) async {
+          callCount++;
+          if (callCount == 1) {
+            return Right([tPermission]);
+          }
+          // Simulate slow network on second load so 0ms cache emit is distinct
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          return Right([
+            PhotoPermission(
+              uid: tPermission.uid,
+              organizationUID: tPermission.organizationUID,
+              companyUID: tPermission.companyUID,
+              companyName: tPermission.companyName,
+              companyCode: tPermission.companyCode,
+              branchIds: tPermission.branchIds,
+              branchNames: tPermission.branchNames,
+              startDate: DateTime(2026, 3, 1),
+              endDate: DateTime(2026, 4, 1),
+              status: tPermission.status,
+              requestedBy: tPermission.requestedBy,
+              isSupervisorEnabled: tPermission.isSupervisorEnabled,
+              createdAt: tPermission.createdAt,
+              updatedAt: tPermission.updatedAt,
+            ),
+          ]);
+        });
+        when(() => mockUpdatePhotoPermissionDates(any()))
+            .thenAnswer((_) async => const Right(null));
+        return bloc;
+      },
+      act: (bloc) async {
+        bloc.add(
+          const LoadPermissionsRequested(
+            organizationUID: 'org_dates_cache',
+            companyUID: 'comp123',
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        bloc.add(
+          UpdatePhotoPermissionDatesRequested(
+            organizationUID: 'org123',
+            companyUID: 'comp123',
+            permissionId: 'perm123',
+            startDate: DateTime(2026, 3, 1),
+            endDate: DateTime(2026, 4, 1),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        bloc.add(
+          const LoadPermissionsRequested(
+            organizationUID: 'org_dates_cache',
+            companyUID: 'comp123',
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      },
+      verify: (bloc) {
+        final state = bloc.state;
+        expect(state, isA<PhotoPermissionsLoaded>());
+        final loaded = state as PhotoPermissionsLoaded;
+        expect(loaded.permissions.first.startDate, DateTime(2026, 3, 1));
+        expect(loaded.permissions.first.endDate, DateTime(2026, 4, 1));
+      },
+    );
+
+    blocTest<PhotoPermissionBloc, PhotoPermissionState>(
+      'should optimistically update cached permission branches on UpdatePhotoPermissionBranchesRequested',
+      setUp: () {
+        SharedPreferences.setMockInitialValues({});
+      },
+      build: () {
+        when(() => mockGetPhotoPermissions(any()))
+            .thenAnswer((_) async => Right([tPermission]));
+        when(() => mockUpdatePhotoPermissionBranches(any()))
+            .thenAnswer((_) async => const Right(null));
+        return bloc;
+      },
+      act: (bloc) async {
+        bloc.add(
+          const LoadPermissionsRequested(
+            organizationUID: 'org_branches_cache',
+            companyUID: 'comp123',
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        bloc.add(
+          const UpdatePhotoPermissionBranchesRequested(
+            organizationUID: 'org123',
+            companyUID: 'comp123',
+            permissionId: 'perm123',
+            branchIds: ['b1', 'b2', 'b3'],
+            branchNames: ['Branch 1', 'Branch 2', 'Branch 3'],
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      expect: () => [
+        PhotoPermissionLoading(),
+        PhotoPermissionsLoaded(permissions: [tPermission]),
+        PhotoPermissionLoading(),
+        const PhotoPermissionActionSuccess(
+          message: 'تم تعديل الفروع بنجاح',
+        ),
+      ],
     );
   });
 }

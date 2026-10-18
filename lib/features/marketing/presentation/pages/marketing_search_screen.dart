@@ -56,16 +56,41 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'ابحث عن مندوب في المنظمة بالاسم أو الهاتف...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 44,
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: InputDecoration(
+                  hintText: 'ابحث عن مندوب في المنظمة بالاسم أو الهاتف...',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.normal,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
               ),
             ),
           ),
@@ -89,6 +114,7 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
                       child: Text('لا يوجد مناديب مطابقين للبحث.'),
                     );
                   }
+                  final colorScheme = Theme.of(context).colorScheme;
                   return ListView.builder(
                     padding: const EdgeInsets.only(
                       bottom: 16,
@@ -98,7 +124,22 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
                     itemCount: state.delegates.length,
                     itemBuilder: (context, index) {
                       final delegate = state.delegates[index];
+                      final trimmedName = delegate.fullName.trim();
+                      final initial = trimmedName.isNotEmpty
+                          ? trimmedName.substring(0, 1)
+                          : '؟';
                       return Card(
+                        elevation: 0,
+                        color: colorScheme.surfaceContainerLow,
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: colorScheme.outlineVariant.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
                         margin: const EdgeInsets.only(bottom: 12),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -108,11 +149,14 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
                               Row(
                                 children: [
                                   CircleAvatar(
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primaryContainer,
+                                    backgroundColor:
+                                        colorScheme.primaryContainer,
                                     child: Text(
-                                      delegate.fullName.substring(0, 1),
+                                      initial,
+                                      style: TextStyle(
+                                        color: colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),

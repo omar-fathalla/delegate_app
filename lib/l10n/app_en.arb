@@ -4,9 +4,9 @@
     "@appTitle": {
         "description": "App title"
     },
-    "delegateApp": "Delegate App",
+    "delegateApp": "Employees App",
     "@delegateApp": {
-        "description": "Delegate app subtitle"
+        "description": "Employees app subtitle"
     },
     "login": "Login",
     "@login": {

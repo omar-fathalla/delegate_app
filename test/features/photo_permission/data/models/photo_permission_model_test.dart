@@ -86,4 +86,51 @@ void main() {
       expect(result['isSupervisorEnabled'], equals(true));
     });
   });
+
+  group('toJson / fromJson / fromEntity', () {
+    test('should round-trip through toJson and fromJson for SharedPreferences cache', () {
+      final jsonMap = tModel.toJson();
+      final restored = PhotoPermissionModel.fromJson(jsonMap);
+
+      expect(restored.uid, equals(tModel.uid));
+      expect(restored.organizationUID, equals(tModel.organizationUID));
+      expect(restored.companyUID, equals(tModel.companyUID));
+      expect(restored.companyName, equals(tModel.companyName));
+      expect(restored.companyCode, equals(tModel.companyCode));
+      expect(restored.branchIds, equals(tModel.branchIds));
+      expect(restored.branchNames, equals(tModel.branchNames));
+      expect(restored.startDate, equals(tModel.startDate));
+      expect(restored.endDate, equals(tModel.endDate));
+      expect(restored.status, equals(tModel.status));
+      expect(restored.requestedBy, equals(tModel.requestedBy));
+      expect(restored.approvedBy, equals(tModel.approvedBy));
+      expect(restored.isSupervisorEnabled, equals(tModel.isSupervisorEnabled));
+    });
+
+    test('fromEntity should preserve all entity fields', () {
+      final entity = PhotoPermission(
+        uid: 'entity_1',
+        organizationUID: 'org_1',
+        companyUID: 'comp_1',
+        companyName: 'Comp 1',
+        companyCode: 45,
+        branchIds: const ['b1', 'b2'],
+        branchNames: const ['Branch 1', 'Branch 2'],
+        startDate: tDate,
+        endDate: tDate,
+        status: 'approved',
+        requestedBy: 'req_1',
+        approvedBy: 'app_1',
+        department: 'Grocery',
+        createdAt: tDate,
+        updatedAt: tDate,
+        isSupervisorEnabled: false,
+      );
+
+      final model = PhotoPermissionModel.fromEntity(entity);
+      expect(model.uid, equals('entity_1'));
+      expect(model.department, equals('Grocery'));
+      expect(model.isSupervisorEnabled, isFalse);
+    });
+  });
 }

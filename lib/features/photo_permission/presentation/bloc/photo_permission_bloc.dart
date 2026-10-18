@@ -1,11 +1,14 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:bloc/bloc.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:equatable/equatable.dart';
 import 'package:get_it/get_it.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/core/services/sync_manager.dart';
 import 'package:delegate_app/features/photo_permission/data/datasources/photo_offline_datasource.dart';
 import 'package:delegate_app/features/photo_permission/data/models/captured_photo_model.dart';
+import 'package:delegate_app/features/photo_permission/data/models/photo_permission_model.dart';
 import 'package:delegate_app/features/photo_permission/domain/entities/photo_permission.dart';
 import 'package:delegate_app/features/photo_permission/domain/entities/captured_photo.dart';
 import 'package:delegate_app/features/photo_permission/domain/usecases/request_photo_permission.dart';
@@ -26,6 +29,86 @@ part 'photo_permission_event.dart';
 part 'photo_permission_state.dart';
 
 class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionState> {
+  static final Map<String, List<PhotoPermission>> _permissionsCache = {};
+  static final Map<String, List<PhotoPermission>> _ongoingCache = {};
+
+  /// Clears in-memory caches (useful for testing or session switches).
+  static void clearMemoryCache() {
+    _permissionsCache.clear();
+    _ongoingCache.clear();
+  }
+
+  /// Synchronously returns cached permissions if available in memory.
+  static List<PhotoPermission>? getCachedPermissionsSync({
+    required String organizationUID,
+    String? companyUID,
+  }) {
+    final key = '${organizationUID}_${companyUID ?? "all"}';
+    return _permissionsCache[key];
+  }
+
+  /// Synchronously returns cached ongoing permissions if available in memory.
+  static List<PhotoPermission>? getCachedOngoingPermissionsSync({
+    required String organizationUID,
+  }) {
+    return _ongoingCache[organizationUID];
+  }
+
+  static List<PhotoPermission> _deduplicatePermissions(List<PhotoPermission> list) {
+    final seen = <String>{};
+    final result = <PhotoPermission>[];
+    for (final p in list) {
+      final key = p.uid.isNotEmpty
+          ? '${p.companyUID}_${p.uid}'
+          : '${p.companyUID}_${p.createdAt.millisecondsSinceEpoch}';
+      if (seen.add(key)) {
+        result.add(p);
+      }
+    }
+    return result;
+  }
+
+  static Future<List<PhotoPermission>?> _loadDiskCache(String storageKey) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(storageKey);
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded
+          .map((e) => PhotoPermissionModel.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> _saveDiskCache(
+    String storageKey,
+    List<PhotoPermission> permissions, {
+    String? organizationUIDForMetrics,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final capped = permissions.take(100).map((p) => PhotoPermissionModel.fromEntity(p).toJson()).toList();
+      await prefs.setString(storageKey, jsonEncode(capped));
+
+      if (organizationUIDForMetrics != null && organizationUIDForMetrics.isNotEmpty) {
+        final now = DateTime.now();
+        int pending = 0;
+        int active = 0;
+        for (final p in permissions) {
+          if (p.status == 'pending') {
+            pending++;
+          } else if (p.status == 'approved' && !now.isAfter(p.endDate)) {
+            active++;
+          }
+        }
+        await prefs.setInt('photo_permissions_pending_count_$organizationUIDForMetrics', pending);
+        await prefs.setInt('photo_permissions_active_count_$organizationUIDForMetrics', active);
+      }
+    } catch (_) {}
+  }
+
   final RequestPhotoPermission requestPhotoPermission;
   final ApprovePhotoPermission approvePhotoPermission;
   final TogglePhotoPermission togglePhotoPermission;
@@ -105,16 +188,55 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     LoadPermissionsRequested event,
     Emitter<PhotoPermissionState> emit,
   ) async {
-    emit(PhotoPermissionLoading());
+    final cacheKey =
+        '${event.organizationUID}_${event.companyUID.isEmpty ? "all" : event.companyUID}';
+    final storageKey = 'photo_permissions_cache_v1_$cacheKey';
+    bool hasEmittedCache = false;
+
+    // 1. Instant 0ms In-Memory Cache Emit
+    final memCached = _permissionsCache[cacheKey];
+    if (memCached != null && memCached.isNotEmpty) {
+      emit(PhotoPermissionsLoaded(permissions: memCached));
+      hasEmittedCache = true;
+    } else {
+      // 2. Persistent Disk Cache (SharedPreferences) Emit
+      final diskCached = await _loadDiskCache(storageKey);
+      if (diskCached != null && diskCached.isNotEmpty) {
+        final deduped = _deduplicatePermissions(diskCached);
+        _permissionsCache[cacheKey] = deduped;
+        emit(PhotoPermissionsLoaded(permissions: deduped));
+        hasEmittedCache = true;
+      }
+    }
+
+    if (!hasEmittedCache) {
+      emit(PhotoPermissionLoading());
+    }
+
+    // 3. Stale-While-Revalidate Background Network Fetch
     final result = await getPhotoPermissions(
       GetPhotoPermissionsParams(
         organizationUID: event.organizationUID,
         companyUID: event.companyUID,
       ),
     );
-    result.fold(
-      (failure) => emit(PhotoPermissionError(message: failure.message)),
-      (permissions) => emit(PhotoPermissionsLoaded(permissions: permissions)),
+    await result.fold(
+      (failure) async {
+        if (!hasEmittedCache) {
+          emit(PhotoPermissionError(message: failure.message));
+        }
+      },
+      (permissions) async {
+        final deduped = _deduplicatePermissions(permissions);
+        _permissionsCache[cacheKey] = deduped;
+        await _saveDiskCache(
+          storageKey,
+          deduped,
+          organizationUIDForMetrics:
+              event.companyUID.isEmpty ? event.organizationUID : null,
+        );
+        emit(PhotoPermissionsLoaded(permissions: deduped));
+      },
     );
   }
 
@@ -122,16 +244,191 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     LoadOngoingPermissionsRequested event,
     Emitter<PhotoPermissionState> emit,
   ) async {
-    emit(PhotoPermissionLoading());
+    final cacheKey = event.organizationUID;
+    final storageKey = 'ongoing_photo_permissions_cache_v1_$cacheKey';
+    bool hasEmittedCache = false;
+
+    // 1. Instant 0ms In-Memory Cache Emit
+    final memCached = _ongoingCache[cacheKey];
+    if (memCached != null && memCached.isNotEmpty) {
+      emit(OngoingPermissionsLoaded(permissions: memCached));
+      hasEmittedCache = true;
+    } else {
+      // 2. Persistent Disk Cache (SharedPreferences) Emit
+      final diskCached = await _loadDiskCache(storageKey);
+      if (diskCached != null && diskCached.isNotEmpty) {
+        final deduped = _deduplicatePermissions(diskCached);
+        _ongoingCache[cacheKey] = deduped;
+        emit(OngoingPermissionsLoaded(permissions: deduped));
+        hasEmittedCache = true;
+      }
+    }
+
+    if (!hasEmittedCache) {
+      emit(PhotoPermissionLoading());
+    }
+
+    // 3. Stale-While-Revalidate Background Network Fetch
     final result = await getOngoingPhotoPermissions(
       GetOngoingPhotoPermissionsParams(
         organizationUID: event.organizationUID,
       ),
     );
-    result.fold(
-      (failure) => emit(PhotoPermissionError(message: failure.message)),
-      (permissions) => emit(OngoingPermissionsLoaded(permissions: permissions)),
+    await result.fold(
+      (failure) async {
+        if (!hasEmittedCache) {
+          emit(PhotoPermissionError(message: failure.message));
+        }
+      },
+      (permissions) async {
+        final deduped = _deduplicatePermissions(permissions);
+        _ongoingCache[cacheKey] = deduped;
+        await _saveDiskCache(storageKey, deduped);
+        emit(OngoingPermissionsLoaded(permissions: deduped));
+      },
     );
+  }
+
+  void _updateCachedPermission(PhotoPermission updated) {
+    for (final key in _permissionsCache.keys.toList()) {
+      final list = _permissionsCache[key];
+      if (list != null) {
+        final next = list
+            .map((p) => (p.uid == updated.uid && p.companyUID == updated.companyUID) ? updated : p)
+            .toList();
+        _permissionsCache[key] = next;
+        _saveDiskCache('photo_permissions_cache_v1_$key', next);
+      }
+    }
+    for (final key in _ongoingCache.keys.toList()) {
+      final list = _ongoingCache[key];
+      if (list != null) {
+        final next = list
+            .map((p) => (p.uid == updated.uid && p.companyUID == updated.companyUID) ? updated : p)
+            .toList();
+        _ongoingCache[key] = next;
+        _saveDiskCache('ongoing_photo_permissions_cache_v1_$key', next);
+      }
+    }
+  }
+
+  void _updateCachedPermissionBranches({
+    required String companyUID,
+    required String permissionId,
+    required List<String> branchIds,
+    required List<String> branchNames,
+  }) {
+    PhotoPermission mapItem(PhotoPermission p) {
+      if (p.uid == permissionId && (companyUID.isEmpty || p.companyUID == companyUID)) {
+        return PhotoPermissionModel(
+          uid: p.uid,
+          organizationUID: p.organizationUID,
+          companyUID: p.companyUID,
+          companyName: p.companyName,
+          companyCode: p.companyCode,
+          branchIds: branchIds,
+          branchNames: branchNames,
+          startDate: p.startDate,
+          endDate: p.endDate,
+          status: p.status,
+          requestedBy: p.requestedBy,
+          approvedBy: p.approvedBy,
+          createdAt: p.createdAt,
+          updatedAt: DateTime.now(),
+          isSupervisorEnabled: p.isSupervisorEnabled,
+          department: p.department,
+        );
+      }
+      return p;
+    }
+
+    for (final key in _permissionsCache.keys.toList()) {
+      final list = _permissionsCache[key];
+      if (list != null) {
+        final next = list.map(mapItem).toList();
+        _permissionsCache[key] = next;
+        _saveDiskCache('photo_permissions_cache_v1_$key', next);
+      }
+    }
+    for (final key in _ongoingCache.keys.toList()) {
+      final list = _ongoingCache[key];
+      if (list != null) {
+        final next = list.map(mapItem).toList();
+        _ongoingCache[key] = next;
+        _saveDiskCache('ongoing_photo_permissions_cache_v1_$key', next);
+      }
+    }
+  }
+
+  void _updateCachedPermissionDates({
+    required String companyUID,
+    required String permissionId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) {
+    PhotoPermission mapItem(PhotoPermission p) {
+      if (p.uid == permissionId && (companyUID.isEmpty || p.companyUID == companyUID)) {
+        return PhotoPermissionModel(
+          uid: p.uid,
+          organizationUID: p.organizationUID,
+          companyUID: p.companyUID,
+          companyName: p.companyName,
+          companyCode: p.companyCode,
+          branchIds: p.branchIds,
+          branchNames: p.branchNames,
+          startDate: startDate,
+          endDate: endDate,
+          status: p.status,
+          requestedBy: p.requestedBy,
+          approvedBy: p.approvedBy,
+          createdAt: p.createdAt,
+          updatedAt: DateTime.now(),
+          isSupervisorEnabled: p.isSupervisorEnabled,
+          department: p.department,
+        );
+      }
+      return p;
+    }
+
+    for (final key in _permissionsCache.keys.toList()) {
+      final list = _permissionsCache[key];
+      if (list != null) {
+        final next = list.map(mapItem).toList();
+        _permissionsCache[key] = next;
+        _saveDiskCache('photo_permissions_cache_v1_$key', next);
+      }
+    }
+    for (final key in _ongoingCache.keys.toList()) {
+      final list = _ongoingCache[key];
+      if (list != null) {
+        final next = list.map(mapItem).toList();
+        _ongoingCache[key] = next;
+        _saveDiskCache('ongoing_photo_permissions_cache_v1_$key', next);
+      }
+    }
+  }
+
+  void _removeCachedPermission(String companyUID, String permissionId) {
+    for (final key in _permissionsCache.keys.toList()) {
+      final list = _permissionsCache[key];
+      if (list != null) {
+        final next = list
+            .where((p) => !(p.uid == permissionId && (companyUID.isEmpty || p.companyUID == companyUID)))
+            .toList();
+        _permissionsCache[key] = next;
+        _saveDiskCache('photo_permissions_cache_v1_$key', next);
+      }
+    }
+    for (final key in _ongoingCache.keys.toList()) {
+      final list = _ongoingCache[key];
+      if (list != null) {
+        final next = list
+            .where((p) => !(p.uid == permissionId && (companyUID.isEmpty || p.companyUID == companyUID)))
+            .toList();
+        _ongoingCache[key] = next;
+        _saveDiskCache('ongoing_photo_permissions_cache_v1_$key', next);
+      }
+    }
   }
 
   Future<void> _onApprovePermission(
@@ -150,14 +447,17 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     );
     result.fold(
       (failure) => emit(PhotoPermissionError(message: failure.message)),
-      (permission) => emit(
-        PermissionActionSuccess(
-          permission: permission,
-          message: event.status == 'approved'
-              ? 'تمت الموافقة على إذن التصوير وتفعيله بنجاح.'
-              : 'تم رفض طلب إذن التصوير.',
-        ),
-      ),
+      (permission) {
+        _updateCachedPermission(permission);
+        emit(
+          PermissionActionSuccess(
+            permission: permission,
+            message: event.status == 'approved'
+                ? 'تمت الموافقة على إذن التصوير وتفعيله بنجاح.'
+                : 'تم رفض طلب إذن التصوير.',
+          ),
+        );
+      },
     );
   }
 
@@ -176,14 +476,17 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     );
     result.fold(
       (failure) => emit(PhotoPermissionError(message: failure.message)),
-      (permission) => emit(
-        PermissionActionSuccess(
-          permission: permission,
-          message: event.isEnabled
-              ? 'تم تفعيل إذن التصوير بنجاح للمناديب.'
-              : 'تم إيقاف/تجميد إذن التصوير مؤقتاً.',
-        ),
-      ),
+      (permission) {
+        _updateCachedPermission(permission);
+        emit(
+          PermissionActionSuccess(
+            permission: permission,
+            message: event.isEnabled
+                ? 'تم تفعيل إذن التصوير بنجاح للمناديب.'
+                : 'تم إيقاف/تجميد إذن التصوير مؤقتاً.',
+          ),
+        );
+      },
     );
   }
 
@@ -517,7 +820,10 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     );
     result.fold(
       (failure) => emit(PhotoPermissionError(message: failure.message)),
-      (_) => emit(const PhotoPermissionActionSuccess(message: 'تم حذف إذن التصوير بنجاح.')),
+      (_) {
+        _removeCachedPermission(event.companyUID, event.permissionId);
+        emit(const PhotoPermissionActionSuccess(message: 'تم حذف إذن التصوير بنجاح.'));
+      },
     );
   }
 
@@ -537,7 +843,15 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     );
     result.fold(
       (failure) => emit(PhotoPermissionError(message: failure.message)),
-      (_) => emit(PhotoPermissionActionSuccess(message: 'تم تعديل الفروع بنجاح')),
+      (_) {
+        _updateCachedPermissionBranches(
+          companyUID: event.companyUID,
+          permissionId: event.permissionId,
+          branchIds: event.branchIds,
+          branchNames: event.branchNames,
+        );
+        emit(const PhotoPermissionActionSuccess(message: 'تم تعديل الفروع بنجاح'));
+      },
     );
   }
 
@@ -557,7 +871,16 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     );
     result.fold(
       (failure) => emit(PhotoPermissionError(message: failure.message)),
-      (_) => emit(const PhotoPermissionActionSuccess(message: 'تم تعديل تاريخ صلاحية إذن التصوير بنجاح')),
+      (_) {
+        _updateCachedPermissionDates(
+          companyUID: event.companyUID,
+          permissionId: event.permissionId,
+          startDate: event.startDate,
+          endDate: event.endDate,
+        );
+        emit(const PhotoPermissionActionSuccess(message: 'تم تعديل تاريخ صلاحية إذن التصوير بنجاح'));
+      },
     );
   }
 }
+

@@ -12,7 +12,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get appTitle => 'تسهيل';
 
   @override
-  String get delegateApp => 'تطبيق المندوب';
+  String get delegateApp => 'تطبيق الموظفين';
 
   @override
   String get login => 'تسجيل الدخول';

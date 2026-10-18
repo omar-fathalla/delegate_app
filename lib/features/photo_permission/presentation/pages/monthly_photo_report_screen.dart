@@ -122,7 +122,10 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
 
     if (isGeneralManagerOrAdmin) {
       context.read<PhotoPermissionBloc>().add(
-            LoadCompanyCapturedPhotosRequested(companyUID: widget.delegate.companyUID),
+            LoadCompanyCapturedPhotosRequested(
+              companyUID: widget.delegate.companyUID,
+              limit: widget.delegate.companyUID.isEmpty ? 200 : null,
+            ),
           );
     } else {
       context.read<PhotoPermissionBloc>().add(
@@ -134,26 +137,46 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
   Future<void> _confirmDeletePhoto(CapturedPhoto photo) async {
     final bloc = context.read<PhotoPermissionBloc>();
     final colorScheme = Theme.of(context).colorScheme;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: colorScheme.error, size: 28),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'تأكيد حذف الصورة',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-            ),
-          ],
+    final isDesktop = MediaQuery.sizeOf(context).width > 768;
+
+    Widget buildConfirmContent(BuildContext modalContext) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          isDesktop ? 20 : 12,
+          20,
+          24 + MediaQuery.viewInsetsOf(modalContext).bottom,
         ),
-        content: Column(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (!isDesktop) ...[
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: colorScheme.error, size: 28),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'تأكيد حذف الصورة',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             Text(
               'هل أنت متأكد من حذف هذه الصورة المرسلة من "${photo.delegateName}" بفرع "${photo.branchName}"؟',
               style: const TextStyle(fontSize: 14),
@@ -163,7 +186,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: colorScheme.error.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: colorScheme.error.withValues(alpha: 0.3)),
               ),
               child: Row(
@@ -179,26 +202,104 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                 ],
               ),
             ),
+            const SizedBox(height: 20),
+            Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+                  width: 1,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Navigator.pop(modalContext, false),
+                        child: Center(
+                          child: Text(
+                            'إلغاء',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+                  ),
+                  Expanded(
+                    child: Material(
+                      color: colorScheme.error.withValues(alpha: 0.12),
+                      child: InkWell(
+                        onTap: () => Navigator.pop(modalContext, true),
+                        child: Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.delete_forever_rounded, size: 18, color: colorScheme.error),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'حذف نهائي',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: colorScheme.error,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('إلغاء'),
+      );
+    }
+
+    if (!mounted) return;
+    final bool? confirmed;
+    if (isDesktop) {
+      confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: buildConfirmContent(dialogContext),
           ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              foregroundColor: colorScheme.onError,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_forever_rounded, size: 18),
-            label: const Text('حذف نهائي'),
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+    } else {
+      confirmed = await showM3ModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (sheetContext) => buildConfirmContent(sheetContext),
+      );
+    }
 
     if (confirmed == true && mounted) {
       bloc.add(
@@ -505,7 +606,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: colorScheme.surface,
+                          color: colorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: colorScheme.outlineVariant.withValues(alpha: 0.4),
@@ -961,7 +1062,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
@@ -1093,7 +1194,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
@@ -1102,7 +1203,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: false,
-          collapsedBackgroundColor: colorScheme.surface,
+          collapsedBackgroundColor: colorScheme.surfaceContainerLow,
           backgroundColor: colorScheme.surfaceContainerLowest,
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),

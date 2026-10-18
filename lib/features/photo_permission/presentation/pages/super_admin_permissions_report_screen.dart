@@ -21,6 +21,7 @@ class SuperAdminPermissionsReportScreen extends StatefulWidget {
 class _SuperAdminPermissionsReportScreenState
     extends State<SuperAdminPermissionsReportScreen> {
   final Map<String, int?> _companyCodes = {};
+  final Set<String> _fetchingCompanyUIDs = {};
 
   @override
   void initState() {
@@ -30,18 +31,33 @@ class _SuperAdminPermissionsReportScreenState
 
   void _loadData() {
     context.read<PhotoPermissionBloc>().add(
-          LoadPermissionsRequested(
-            organizationUID: widget.delegate.organizationUID,
+          const LoadPermissionsRequested(
+            organizationUID: '',
             companyUID: '',
           ),
         );
   }
 
   Future<void> _fetchCompanyCodes(List<PhotoPermission> permissions) async {
+    final toFetch = <PhotoPermission>[];
+    for (final p in permissions) {
+      if (p.companyCode != null) {
+        _companyCodes[p.companyUID] = p.companyCode;
+        continue;
+      }
+      if (p.companyUID.isNotEmpty &&
+          !_companyCodes.containsKey(p.companyUID) &&
+          !_fetchingCompanyUIDs.contains(p.companyUID)) {
+        _fetchingCompanyUIDs.add(p.companyUID);
+        toFetch.add(p);
+      }
+    }
+
+    if (toFetch.isEmpty) return;
+
     final firestore = FirebaseFirestore.instance;
-    bool updated = false;
-    for (var p in permissions) {
-      if (!_companyCodes.containsKey(p.companyUID)) {
+    await Future.wait(
+      toFetch.map((p) async {
         try {
           final compDoc = await firestore
               .collection('organizations')
@@ -50,18 +66,18 @@ class _SuperAdminPermissionsReportScreenState
               .doc(p.companyUID)
               .get();
           final data = compDoc.data();
-          if (data != null && data['code'] != null) {
-            _companyCodes[p.companyUID] = int.tryParse(data['code'].toString());
-          } else {
-            _companyCodes[p.companyUID] = null;
-          }
+          final rawCode = data?['code'] ?? data?['companyCodeInOrg'] ?? data?['companyCode'];
+          _companyCodes[p.companyUID] =
+              rawCode != null ? int.tryParse(rawCode.toString()) : null;
         } catch (_) {
           _companyCodes[p.companyUID] = null;
+        } finally {
+          _fetchingCompanyUIDs.remove(p.companyUID);
         }
-        updated = true;
-      }
-    }
-    if (updated && mounted) {
+      }),
+    );
+
+    if (mounted) {
       setState(() {});
     }
   }
@@ -278,6 +294,7 @@ class _SuperAdminPermissionsReportScreenState
                   // Table Card
                   Card(
                     elevation: 0,
+                    color: colorScheme.surfaceContainerLow,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                       side: BorderSide(color: colorScheme.outlineVariant),

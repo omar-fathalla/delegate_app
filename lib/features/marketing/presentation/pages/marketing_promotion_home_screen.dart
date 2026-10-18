@@ -2,12 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_permissions.dart';
 import 'package:delegate_app/features/private_label/data/datasources/private_label_permissions_remote_data_source.dart';
-import 'package:delegate_app/features/private_label/presentation/pages/private_label_screen.dart';
-import 'package:delegate_app/features/private_label/presentation/pages/private_label_review_screen.dart';
-import 'package:delegate_app/features/private_label/presentation/pages/private_label_report_screen.dart';
 import 'package:delegate_app/injection_container.dart';
 
 /// الشاشة الرئيسية الترحيبية لمسؤول تسويق العروض الترويجية (Marketing Promotion Home)
@@ -15,11 +14,13 @@ import 'package:delegate_app/injection_container.dart';
 class MarketingPromotionHomeScreen extends StatefulWidget {
   final Delegate delegate;
   final Function(int tabIndex) onNavigateTab;
+  final FirebaseFirestore? firestore;
 
   const MarketingPromotionHomeScreen({
     super.key,
     required this.delegate,
     required this.onNavigateTab,
+    this.firestore,
   });
 
   @override
@@ -28,6 +29,8 @@ class MarketingPromotionHomeScreen extends StatefulWidget {
 
 class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScreen> {
   Set<String> _pinnedDepartments = {};
+  int _cachedPendingCount = 0;
+  int _cachedActiveCount = 0;
   StreamSubscription<PrivateLabelPermissions?>? _permissionsSubscription;
   PrivateLabelPermissions? _permissions;
 
@@ -35,6 +38,8 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
   bool get _canCapture => _isSuperAdmin || (_permissions?.canCapture ?? false);
   bool get _canViewReports => _isSuperAdmin || (_permissions?.canViewReports ?? false);
   bool get _canReviewAudit => _isSuperAdmin || (_permissions?.canReviewAudit ?? false);
+  bool get _hasPrivateLabelAccess =>
+      _isSuperAdmin || _canCapture || _canViewReports || _canReviewAudit;
 
   @override
   void initState() {
@@ -64,11 +69,25 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
       final prefs = await SharedPreferences.getInstance();
       final key = 'pinned_photo_departments_${widget.delegate.uid}';
       final list = prefs.getStringList(key);
+      final orgId = widget.delegate.organizationUID;
+      final cachedPending = prefs.getInt('photo_permissions_pending_count_$orgId') ?? 0;
+      final cachedActive = prefs.getInt('photo_permissions_active_count_$orgId') ?? 0;
       if (mounted) {
         setState(() {
           _pinnedDepartments = list != null ? list.toSet() : {};
+          _cachedPendingCount = cachedPending;
+          _cachedActiveCount = cachedActive;
         });
       }
+    } catch (_) {}
+  }
+
+  Future<void> _saveCachedPulseCounts(int pending, int active) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final orgId = widget.delegate.organizationUID;
+      await prefs.setInt('photo_permissions_pending_count_$orgId', pending);
+      await prefs.setInt('photo_permissions_active_count_$orgId', active);
     } catch (_) {}
   }
 
@@ -94,22 +113,10 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
 
             const SizedBox(height: 16),
 
-            // 1.1 مدخل تدقيق البرايفت ليبل
-            if (_canReviewAudit) ...[
-              _buildPrivateLabelAuditEntry(context, colorScheme),
-              const SizedBox(height: 10),
-            ],
-
-            // 1.2 مدخل تقارير البرايفت ليبل (نسب الإنجاز الشهرية للفروع والمسوقين)
-            if (_canViewReports) ...[
-              _buildPrivateLabelReportEntry(context, colorScheme),
-              const SizedBox(height: 10),
-            ],
-
-            // 1.3 مدخل التوثيق الميداني للبرايفت ليبل (تصوير المنتجات وبطاقات الأسعار)
-            if (_canCapture) ...[
-              _buildPrivateLabelCaptureEntry(context, colorScheme),
-              const SizedBox(height: 10),
+            // 1.1 مدخل وصول سريع لتبويب العلامة الخاصة الموحد (Private Label)
+            if (_hasPrivateLabelAccess) ...[
+              _buildPrivateLabelShortcutCard(context, colorScheme, isArabic),
+              const SizedBox(height: 16),
             ],
 
             // 2. النبض اللحظي والمؤشرات (طلبات الانتظار والأذونات السارية)
@@ -172,176 +179,98 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
     );
   }
 
-  /// مدخل شاشة تدقيق البرايفت ليبل (صور المنتج + بطاقة السعر من الفروع)
-  Widget _buildPrivateLabelAuditEntry(BuildContext context, ColorScheme colorScheme) {
+  /// بطاقة وصول سريعة وأنيقة لتبويب Private Label الموحد الجديد
+  Widget _buildPrivateLabelShortcutCard(BuildContext context, ColorScheme colorScheme, bool isArabic) {
     final theme = Theme.of(context);
     return Material(
-      color: colorScheme.surface,
+      color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: colorScheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         hoverColor: colorScheme.primary.withValues(alpha: 0.05),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PrivateLabelReviewScreen(delegate: widget.delegate),
-          ),
-        ),
+        onTap: () => widget.onNavigateTab(3), // الانتقال لتبويب Private Label الموحد
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.fact_check_rounded, color: colorScheme.onPrimaryContainer),
+                child: Icon(Icons.sell_rounded, size: 20, color: colorScheme.onPrimaryContainer),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Private Label Audit',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          isArabic ? 'مركز العلامة الخاصة' : 'Private Label Hub',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Private Label',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'مراجعة صور المنتجات وبطاقات الأسعار من الفروع وفلترة مخالفات الأسعار',
+                      isArabic
+                          ? 'كافة أدوات التوثيق الميداني والتدقيق والتقارير في مكان واحد'
+                          : 'All capture, audit, and report tools unified in one tab',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
+                        fontSize: 11.5,
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// مدخل شاشة تقارير البرايفت ليبل (نسب الإنجاز الشهرية وترتيب الفروع والمسوقين)
-  Widget _buildPrivateLabelReportEntry(BuildContext context, ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    return Material(
-      color: colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PrivateLabelReportScreen(delegate: widget.delegate),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(14),
+                  color: colorScheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.analytics_rounded, color: colorScheme.onSecondaryContainer),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Private Label Report',
-                      style: theme.textTheme.titleSmall?.copyWith(
+                      isArabic ? 'فتح' : 'Open',
+                      style: TextStyle(
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
+                        color: colorScheme.primary,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'مؤشرات ونسب إنجاز الفروع والمسوقين وترتيب الأداء الشهري',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 11, color: colorScheme.primary),
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// مدخل شاشة التوثيق الميداني للبرايفت ليبل (تصوير المنتجات وبطاقات الأسعار)
-  Widget _buildPrivateLabelCaptureEntry(BuildContext context, ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    return Material(
-      color: colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PrivateLabelScreen(delegate: widget.delegate),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: colorScheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(Icons.camera_alt_rounded, color: colorScheme.onTertiaryContainer),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Private Label Capture',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'التوثيق الميداني اليومي للمنتجات وبطاقات الأسعار في الفروع',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: colorScheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -377,20 +306,24 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: colorScheme.primary.withValues(alpha: 0.3),
-                    width: 2,
+              Hero(
+                tag: 'header_avatar_${delegate.uid}',
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.3),
+                      width: 2,
+                    ),
                   ),
-                ),
-                child: Icon(
-                  Icons.campaign_rounded,
-                  color: colorScheme.primary,
-                  size: 28,
+                  child: AppAvatar(
+                    imageUrl: delegate.personalPhotoUrl,
+                    fallbackText: delegate.firstName,
+                    radius: 26,
+                    fallbackIcon: Icons.campaign_rounded,
+                    backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
+                    foregroundColor: colorScheme.primary,
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -467,7 +400,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                 : 'Branch Marketing Coordination',
             subtitle: isArabic
                 ? 'إرسال وتوجيه المهام الميدانية لمسؤولي الفروع لمتابعة تجهيز العروض والالتزام بالمعايير.'
-                : 'Send & monitor operational tasks to branch marketing teams for display readiness.',
+                : 'Send & monitor operational tasks to branch marketing specialists for display readiness.',
             colorScheme: colorScheme,
           ),
 
@@ -548,19 +481,36 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
     ColorScheme colorScheme,
     bool isArabic,
   ) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collectionGroup('permissions').snapshots(),
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: (widget.firestore ?? FirebaseFirestore.instance)
+          .collectionGroup('photo_permissions')
+          .orderBy('createdAt', descending: true)
+          .limit(100)
+          .streamResilient(includeMetadataChanges: true),
       builder: (context, permissionsSnapshot) {
-        int pendingCount = 0;
-        int activeCount = 0;
+        int pendingCount = _cachedPendingCount;
+        int activeCount = _cachedActiveCount;
 
         if (permissionsSnapshot.hasData) {
+          pendingCount = 0;
+          activeCount = 0;
           final now = DateTime.now();
           final todayStart = DateTime(now.year, now.month, now.day);
           final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+          final seenKeys = <String>{};
+          final orgUID = widget.delegate.organizationUID;
 
           for (final doc in permissionsSnapshot.data!.docs) {
-            final data = doc.data() as Map<String, dynamic>;
+            final data = doc.data();
+            final docOrg = (data['organizationUID'] ?? '').toString();
+            if (orgUID.isNotEmpty && docOrg.isNotEmpty && docOrg != orgUID) {
+              continue;
+            }
+            final compId = (data['companyUID'] ?? '').toString();
+            if (!seenKeys.add('${compId}_${doc.id}')) {
+              continue;
+            }
+
             final status = (data['status'] ?? '').toString().toLowerCase();
             final isEnabled = data['isSupervisorEnabled'] ?? true;
             final startDate = (data['startDate'] as Timestamp?)?.toDate();
@@ -586,6 +536,12 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
               }
             }
           }
+
+          if (pendingCount != _cachedPendingCount || activeCount != _cachedActiveCount) {
+            _cachedPendingCount = pendingCount;
+            _cachedActiveCount = activeCount;
+            _saveCachedPulseCounts(pendingCount, activeCount);
+          }
         }
 
         return Row(
@@ -593,9 +549,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
             Expanded(
               child: _buildMetricCard(
                 title: isArabic ? 'طلبات بانتظار الاعتماد' : 'Pending Requests',
-                value: permissionsSnapshot.connectionState == ConnectionState.waiting
-                    ? '...'
-                    : '$pendingCount',
+                value: '$pendingCount',
                 icon: Icons.pending_actions_rounded,
                 color: colorScheme.tertiary,
                 onTap: () => widget.onNavigateTab(1), // الانتقال المباشر لتبويب أذونات التصوير
@@ -605,9 +559,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
             Expanded(
               child: _buildMetricCard(
                 title: isArabic ? 'أذونات نشطة وسارية' : 'Active Permissions',
-                value: permissionsSnapshot.connectionState == ConnectionState.waiting
-                    ? '...'
-                    : '$activeCount',
+                value: '$activeCount',
                 icon: Icons.verified_rounded,
                 color: colorScheme.primary,
                 onTap: () => widget.onNavigateTab(1), // الانتقال المباشر لتبويب أذونات التصوير
@@ -626,10 +578,16 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
     required Color color,
     required VoidCallback onTap,
   }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
+        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
@@ -652,7 +610,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 13,
-                    color: Theme.of(context).colorScheme.outline,
+                    color: colorScheme.outline,
                   ),
                 ],
               ),
@@ -674,7 +632,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

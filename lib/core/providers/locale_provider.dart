@@ -6,14 +6,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Persists the user's language preference to [SharedPreferences].
 class LocaleProvider extends ChangeNotifier {
   static const _kLocaleKey = 'app_locale';
+  static const _kDefaultEnAppliedKey = 'app_locale_default_en_v1';
 
-  Locale _locale = const Locale('ar');
+  Locale _locale = const Locale('en');
   final SharedPreferences _prefs;
 
   LocaleProvider(this._prefs) {
-    final savedLocale = _prefs.getString(_kLocaleKey);
-    if (savedLocale != null) {
-      _locale = Locale(savedLocale);
+    final defaultEnApplied = _prefs.getBool(_kDefaultEnAppliedKey) ?? false;
+    if (!defaultEnApplied) {
+      _locale = const Locale('en');
+      _prefs.setString(_kLocaleKey, 'en');
+      _prefs.setBool(_kDefaultEnAppliedKey, true);
+    } else {
+      final savedLocale = _prefs.getString(_kLocaleKey);
+      if (savedLocale != null) {
+        _locale = Locale(savedLocale);
+      }
     }
   }
 

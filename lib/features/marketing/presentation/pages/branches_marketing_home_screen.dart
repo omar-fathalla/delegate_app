@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/create_task_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
@@ -29,6 +32,36 @@ class BranchesMarketingHomeScreen extends StatefulWidget {
 
 class _BranchesMarketingHomeScreenState
     extends State<BranchesMarketingHomeScreen> {
+  int _cachedPendingCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCachedMetrics();
+  }
+
+  Future<void> _loadCachedMetrics() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final orgId = widget.delegate.organizationUID;
+      final cachedPending =
+          prefs.getInt('photo_permissions_pending_count_$orgId') ?? 0;
+      if (mounted) {
+        setState(() {
+          _cachedPendingCount = cachedPending;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveCachedPendingCount(int pending) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final orgId = widget.delegate.organizationUID;
+      await prefs.setInt('photo_permissions_pending_count_$orgId', pending);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -37,6 +70,7 @@ class _BranchesMarketingHomeScreenState
 
     return RefreshIndicator(
       onRefresh: () async {
+        await _loadCachedMetrics();
         setState(() {});
       },
       child: SingleChildScrollView(
@@ -163,22 +197,25 @@ class _BranchesMarketingHomeScreenState
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // الأيقونة والرمز الدائري
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: colorScheme.primary.withValues(alpha: 0.3),
-                    width: 2,
+              // الأيقونة والصورة الشخصية
+              Hero(
+                tag: 'header_avatar_${delegate.uid}',
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.3),
+                      width: 2,
+                    ),
                   ),
-                ),
-                child: Icon(
-                  Icons.campaign_rounded,
-                  color: colorScheme.primary,
-                  size: 28,
+                  child: AppAvatar(
+                    imageUrl: delegate.personalPhotoUrl,
+                    fallbackText: delegate.firstName,
+                    radius: 26,
+                    fallbackIcon: Icons.campaign_rounded,
+                    backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
+                    foregroundColor: colorScheme.primary,
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -316,14 +353,35 @@ class _BranchesMarketingHomeScreenState
     ColorScheme colorScheme,
     bool isArabic,
   ) {
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collectionGroup('photo_permissions')
           .where('status', isEqualTo: 'pending')
-          .limit(20)
-          .snapshots(),
+          .limit(100)
+          .streamResilient(includeMetadataChanges: true),
       builder: (context, snapshot) {
-        final pendingCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
+        int pendingCount = _cachedPendingCount;
+        if (snapshot.hasData) {
+          final seenKeys = <String>{};
+          final orgUID = widget.delegate.organizationUID;
+          int count = 0;
+          for (final doc in snapshot.data!.docs) {
+            final data = doc.data();
+            final docOrg = (data['organizationUID'] ?? '').toString();
+            if (orgUID.isNotEmpty && docOrg.isNotEmpty && docOrg != orgUID) {
+              continue;
+            }
+            final compId = (data['companyUID'] ?? '').toString();
+            if (seenKeys.add('${compId}_${doc.id}')) {
+              count++;
+            }
+          }
+          pendingCount = count;
+          if (pendingCount != _cachedPendingCount) {
+            _cachedPendingCount = pendingCount;
+            _saveCachedPendingCount(pendingCount);
+          }
+        }
 
         return Row(
           children: [
@@ -340,14 +398,12 @@ class _BranchesMarketingHomeScreenState
                   decoration: BoxDecoration(
                     color: pendingCount > 0
                         ? colorScheme.tertiaryContainer.withValues(alpha: 0.35)
-                        : colorScheme.surfaceContainerHighest.withValues(
-                            alpha: 0.5,
-                          ),
+                        : colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: pendingCount > 0
                           ? colorScheme.tertiary.withValues(alpha: 0.5)
-                          : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                          : colorScheme.outlineVariant,
                       width: 1.2,
                     ),
                   ),
@@ -358,7 +414,7 @@ class _BranchesMarketingHomeScreenState
                         decoration: BoxDecoration(
                           color: pendingCount > 0
                               ? colorScheme.tertiaryContainer
-                              : colorScheme.surface,
+                              : colorScheme.surfaceContainerHighest,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -485,7 +541,7 @@ class _BranchesMarketingHomeScreenState
         _buildExecutiveDutyCard(
           context: context,
           icon: Icons.verified_user_rounded,
-          iconColor: const Color(0xFFD97706), // Amber-orange
+          iconColor: colorScheme.tertiary,
           badgeText: isArabic ? 'مهمة أساسية' : 'Core Duty',
           title: isArabic
               ? 'الموافقة على أذونات التصوير'
@@ -521,7 +577,7 @@ class _BranchesMarketingHomeScreenState
         _buildExecutiveDutyCard(
           context: context,
           icon: Icons.edit_calendar_rounded,
-          iconColor: const Color(0xFF7C3AED), // Purple accent
+          iconColor: colorScheme.secondary,
           badgeText: isArabic ? 'إدارة وتوجيه' : 'Task Dispatch',
           title: isArabic
               ? 'تعديل وإدارة مهام التسويق'
@@ -572,10 +628,10 @@ class _BranchesMarketingHomeScreenState
 
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.65),
+          color: colorScheme.outlineVariant,
           width: 1.2,
         ),
         boxShadow: [
@@ -801,18 +857,19 @@ class _BranchesMarketingHomeScreenState
     final colorScheme = Theme.of(context).colorScheme;
 
     return Material(
-      color: colorScheme.surface,
-      borderRadius: BorderRadius.circular(16),
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colorScheme.outlineVariant,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
+        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-            ),
-          ),
+        child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

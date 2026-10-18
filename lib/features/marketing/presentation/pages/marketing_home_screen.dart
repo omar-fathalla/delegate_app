@@ -6,9 +6,9 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:delegate_app/features/private_label/presentation/widgets/private_label_home_card.dart';
-import 'package:delegate_app/features/private_label/domain/entities/private_label_permissions.dart';
-import 'package:delegate_app/features/private_label/data/datasources/private_label_permissions_remote_data_source.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
+import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
 import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
 import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
@@ -168,23 +168,9 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
 
             const SizedBox(height: 16),
 
-            // 1.1 مهام البرايفت ليبل (KPI الشهري + حالة توثيق اليوم)
-            StreamBuilder<PrivateLabelPermissions?>(
-              stream: di.sl<PrivateLabelPermissionsRemoteDataSource>()
-                  .streamUserPermissions(widget.delegate.uid),
-              builder: (context, snapshot) {
-                final isAllowed = widget.delegate.role == UserRole.superAdmin ||
-                    (snapshot.data?.canCapture ?? false);
-                if (!isAllowed) return const SizedBox.shrink();
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    PrivateLabelHomeCard(delegate: widget.delegate),
-                    const SizedBox(height: 20),
-                  ],
-                );
-              },
-            ),
+            // 1.1 مدخل وصول سريع لتبويب العلامة الخاصة الموحد (Private Label)
+            _buildPrivateLabelShortcutCard(context, colorScheme, isArabic),
+            const SizedBox(height: 16),
 
             // 2. عنوان لوحة العمليات والوصول السريع
             Row(
@@ -353,14 +339,18 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
               // صورة الأفاتار الدائرية لمسؤول التسويق
               Builder(
                 builder: (context) {
-                  final photoUrl = widget.delegate.personalPhotoUrl ??
+                  String? photoUrl = widget.delegate.personalPhotoUrl ??
                       (widget.delegate.documents
                           .where((d) =>
                               d.documentKey == DocumentKey.personalPhoto &&
                               d.documentURL.isNotEmpty)
                           .firstOrNull
-                          ?.documentURL) ??
-                      FirebaseAuth.instance.currentUser?.photoURL;
+                          ?.documentURL);
+                  if (photoUrl == null) {
+                    try {
+                      photoUrl = FirebaseAuth.instance.currentUser?.photoURL;
+                    } catch (_) {}
+                  }
 
                   return Container(
                     decoration: BoxDecoration(
@@ -441,6 +431,93 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
             colorScheme: colorScheme,
           ),
         ],
+      ),
+    );
+  }
+
+  /// بطاقة وصول سريعة وأنيقة لتبويب Private Label الموحد الجديد
+  Widget _buildPrivateLabelShortcutCard(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isArabic,
+  ) {
+    final theme = Theme.of(context);
+    return Material(
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
+        onTap: () => widget.onNavigateTab(3), // الانتقال لتبويب Private Label الموحد
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.sell_rounded, size: 20, color: colorScheme.onPrimaryContainer),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          isArabic ? 'مركز العلامة الخاصة' : 'Private Label Hub',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Private Label',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isArabic
+                          ? 'كافة أدوات التوثيق الميداني والتدقيق والتقارير في مكان واحد'
+                          : 'All capture, audit, and report tools unified in one tab',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -554,7 +631,19 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
           subtitle: isArabic
               ? 'تطبيق لائحة الجزاءات'
               : 'Record fines & violations',
-          onTap: () => widget.onNavigateTab(3),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => BlocProvider(
+                  create: (_) => di.sl<PenaltyBloc>(),
+                  child: CompanyPenaltiesSettingsPage(
+                    delegate: widget.delegate,
+                    showAppBar: true,
+                  ),
+                ),
+              ),
+            );
+          },
         ),
 
         // كارت 4: البحث والاستعلام السريع
@@ -682,10 +771,10 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+          color: colorScheme.outlineVariant,
         ),
         boxShadow: [
           BoxShadow(
@@ -699,6 +788,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          hoverColor: colorScheme.primary.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(20),
           onTap: () => widget.onNavigateTab(1),
           child: Padding(
@@ -774,7 +864,9 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                           fontWeight: FontWeight.bold,
                           color: isComplete
                               ? const Color(0xFF2E7D32)
-                              : colorScheme.primary,
+                              : (percentInt == 0
+                                  ? colorScheme.onSurfaceVariant
+                                  : colorScheme.primary),
                         ),
                       ),
                     ),

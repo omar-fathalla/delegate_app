@@ -190,7 +190,7 @@ class _MyAppState extends State<MyApp> {
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, themeState) {
           return MaterialApp.router(
-            title: 'Tashil Delegate',
+            title: 'Tashil Employee',
             theme: AppTheme.lightTheme(themeState.seedColor),
             darkTheme: AppTheme.darkTheme(themeState.seedColor),
             themeMode: themeState.themeMode,

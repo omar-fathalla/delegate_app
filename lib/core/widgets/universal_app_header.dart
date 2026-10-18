@@ -24,6 +24,7 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
   final ValueChanged<String> onMenuSelected;
   final bool showBackButton;
   final VoidCallback? onBackPressed;
+  final FirebaseFirestore? firestore;
 
   const UniversalAppHeader({
     super.key,
@@ -35,6 +36,7 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
     this.extraActions,
     this.showBackButton = false,
     this.onBackPressed,
+    this.firestore,
   });
 
   @override
@@ -74,15 +76,41 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
     }
   }
 
+  String _formatOrgLabel(String raw) {
+    final clean = raw.trim();
+    final lower = clean.toLowerCase();
+    if (lower.contains('fathalla') ||
+        clean.contains('فتح الله') ||
+        clean.contains('فتح_الله')) {
+      return 'فتح الله ماركت';
+    }
+    if (lower.contains('gomla') ||
+        lower.contains('jomla') ||
+        clean.contains('جملة') ||
+        clean.contains('جمله')) {
+      return 'جملة ماركت';
+    }
+    if (lower.contains('zahran') || clean.contains('زهران')) {
+      return 'زهران ماركت';
+    }
+    if (lower.contains('carrefour') || clean.contains('كارفور')) {
+      return 'كارفور';
+    }
+    if (lower.contains('beit') || clean.contains('بيت الجملة')) {
+      return 'بيت الجملة';
+    }
+    return clean;
+  }
+
   String _getActiveOrganizationLabel(Delegate del, Map<String, dynamic>? userData) {
     // إظهار المنظمة النشطة الحالية فقط في الهيدر العلوي
     if (del.organizationName.trim().isNotEmpty) {
-      return del.organizationName.trim();
+      return _formatOrgLabel(del.organizationName);
     }
     if (userData != null) {
       final singleOrg = (userData['organizationName'] as String?)?.trim();
       if (singleOrg != null && singleOrg.isNotEmpty) {
-        return singleOrg;
+        return _formatOrgLabel(singleOrg);
       }
     }
     if (del.companyName.trim().isNotEmpty) {
@@ -131,13 +159,15 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
     }
 
     // 2. تحقق من FirebaseAuth currentUser (فقط إذا كان نفس المستخدم صاحب الحساب)
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser != null && authUser.uid == del.uid) {
-      final authPhoto = authUser.photoURL;
-      if (authPhoto != null && authPhoto.trim().isNotEmpty) {
-        return authPhoto.trim();
+    try {
+      final authUser = FirebaseAuth.instance.currentUser;
+      if (authUser != null && authUser.uid == del.uid) {
+        final authPhoto = authUser.photoURL;
+        if (authPhoto != null && authPhoto.trim().isNotEmpty) {
+          return authPhoto.trim();
+        }
       }
-    }
+    } catch (_) {}
 
     // 3. تحقق من الصورة في كائن المندوب
     if (del.personalPhotoUrl != null && del.personalPhotoUrl!.trim().isNotEmpty) {
@@ -210,11 +240,17 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
               ],
             )
           : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(delegate.uid)
-            .snapshots(),
-        builder: (context, snapshot) {
+              stream: () {
+                try {
+                  return (firestore ?? FirebaseFirestore.instance)
+                      .collection('users')
+                      .doc(delegate.uid)
+                      .snapshots();
+                } catch (_) {
+                  return const Stream<DocumentSnapshot<Map<String, dynamic>>>.empty();
+                }
+              }(),
+              builder: (context, snapshot) {
           final userData = snapshot.data?.data();
 
           // حل الصورة الحية

@@ -292,6 +292,8 @@ class PrivateLabelRepositoryImpl implements PrivateLabelRepository {
     } catch (e) {
       final cached = localDataSource.getCachedProducts(organizationUID);
       if (cached.isNotEmpty) return Right(cached);
+      final defaults = PrivateLabelProduct.defaultCatalog(organizationUID);
+      if (defaults.isNotEmpty) return Right(defaults);
       return Left(_toFailure(e, 'فشل في تحميل كتالوج المنتجات.'));
     }
   }
@@ -304,6 +306,12 @@ class PrivateLabelRepositoryImpl implements PrivateLabelRepository {
       final saved = await remoteDataSource.saveProduct(
         PrivateLabelProductModel.fromEntity(product),
       );
+      final cached = localDataSource.getCachedProducts(product.organizationUID);
+      final updatedCache = [
+        ...cached.where((p) => p.id != saved.id),
+        saved,
+      ]..sort((a, b) => a.name.compareTo(b.name));
+      await localDataSource.cacheProducts(product.organizationUID, updatedCache);
       return Right(saved);
     } catch (e) {
       return Left(_toFailure(e, 'فشل في حفظ المنتج.'));

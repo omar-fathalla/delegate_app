@@ -76,4 +76,77 @@ class PhotoPermissionModel extends PhotoPermission {
       if (department != null && department!.isNotEmpty) 'department': department,
     };
   }
+
+  factory PhotoPermissionModel.fromEntity(PhotoPermission entity) {
+    if (entity is PhotoPermissionModel) return entity;
+    return PhotoPermissionModel(
+      uid: entity.uid,
+      organizationUID: entity.organizationUID,
+      companyUID: entity.companyUID,
+      companyName: entity.companyName,
+      companyCode: entity.companyCode,
+      branchIds: entity.branchIds,
+      branchNames: entity.branchNames,
+      startDate: entity.startDate,
+      endDate: entity.endDate,
+      status: entity.status,
+      requestedBy: entity.requestedBy,
+      approvedBy: entity.approvedBy,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+      isSupervisorEnabled: entity.isSupervisorEnabled,
+      department: entity.department,
+    );
+  }
+
+  factory PhotoPermissionModel.fromJson(Map<String, dynamic> json) {
+    DateTime parseDate(dynamic v) {
+      if (v is int) return DateTime.fromMillisecondsSinceEpoch(v);
+      if (v is String) return DateTime.tryParse(v) ?? DateTime.now();
+      return DateTime.now();
+    }
+
+    return PhotoPermissionModel(
+      uid: json['uid']?.toString() ?? '',
+      organizationUID: json['organizationUID']?.toString() ?? '',
+      companyUID: json['companyUID']?.toString() ?? '',
+      companyName: json['companyName']?.toString() ?? '',
+      companyCode: json['companyCode'] != null
+          ? int.tryParse(json['companyCode'].toString())
+          : null,
+      branchIds: List<String>.from(json['branchIds'] as List? ?? const []),
+      branchNames: List<String>.from(json['branchNames'] as List? ?? const []),
+      startDate: parseDate(json['startDate']),
+      endDate: parseDate(json['endDate']),
+      status: json['status']?.toString() ?? 'pending',
+      requestedBy: json['requestedBy']?.toString() ?? '',
+      approvedBy: json['approvedBy']?.toString(),
+      createdAt: parseDate(json['createdAt']),
+      updatedAt: parseDate(json['updatedAt']),
+      isSupervisorEnabled: json['isSupervisorEnabled'] != false,
+      department: json['department']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'uid': uid,
+      'organizationUID': organizationUID,
+      'companyUID': companyUID,
+      'companyName': companyName,
+      'companyCode': companyCode,
+      'branchIds': branchIds,
+      'branchNames': branchNames,
+      'startDate': startDate.millisecondsSinceEpoch,
+      'endDate': endDate.millisecondsSinceEpoch,
+      'status': status,
+      'requestedBy': requestedBy,
+      'approvedBy': approvedBy,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+      'updatedAt': updatedAt.millisecondsSinceEpoch,
+      'isSupervisorEnabled': isSupervisorEnabled,
+      if (department != null && department!.isNotEmpty) 'department': department,
+    };
+  }
 }
+

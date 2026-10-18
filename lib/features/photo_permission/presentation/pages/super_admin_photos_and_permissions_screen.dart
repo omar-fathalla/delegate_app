@@ -1387,9 +1387,9 @@ class _SuperAdminPhotosAndPermissionsScreenState
                               fontSize: 14.5,
                             ),
                             codeStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.primary,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w500,
+                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
                             ),
                           ),
                         ),
@@ -1483,7 +1483,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
                                       companyUID: permission.companyUID,
                                       currentUserUid: widget.delegate.uid,
                                       currentUserName: widget.delegate.fullName,
-                                      prefix: 'بواسطة: ',
+                                      prefix: '',
                                       overflow: TextOverflow.ellipsis,
                                       maxLines: 1,
                                       style: TextStyle(

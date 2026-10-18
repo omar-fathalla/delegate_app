@@ -83,8 +83,11 @@ class _PrivateLabelCaptureSheetState extends State<PrivateLabelCaptureSheet> {
   late String _productPath = widget.initialProductPath;
   late String _pricePath = widget.initialPricePath ?? '';
   late String _branch = widget.initialBranch ?? (widget.branches.length == 1 ? widget.branches.first : '');
-  final _productCtrl = TextEditingController();
-  final _productFocus = FocusNode();
+  late final List<PrivateLabelProduct> _catalogProducts = (widget.products.isNotEmpty
+          ? widget.products
+          : PrivateLabelProduct.defaultCatalog(widget.organizationUID))
+      .where((p) => p.isActive)
+      .toList();
   final _priceCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   final _branchCtrl = TextEditingController();
@@ -95,35 +98,22 @@ class _PrivateLabelCaptureSheetState extends State<PrivateLabelCaptureSheet> {
   @override
   void initState() {
     super.initState();
-    _productCtrl.addListener(_onProductTextChanged);
     _priceCtrl.addListener(() => setState(() {}));
     _branchCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _productCtrl.dispose();
-    _productFocus.dispose();
     _priceCtrl.dispose();
     _notesCtrl.dispose();
     _branchCtrl.dispose();
     super.dispose();
   }
 
-  void _onProductTextChanged() {
-    final selected = _selectedProduct;
-    if (selected != null && selected.name != _productCtrl.text) {
-      _selectedProduct = null;
-    }
-    setState(() {});
-  }
-
   void _selectProduct(PrivateLabelProduct p) {
-    _productCtrl.text = p.name;
-    _productCtrl.selection = TextSelection.collapsed(offset: p.name.length);
     setState(() {
       _selectedProduct = p;
-      _barcode = p.barcode ?? _barcode;
+      _barcode = p.barcode;
     });
   }
 
@@ -135,7 +125,8 @@ class _PrivateLabelCaptureSheetState extends State<PrivateLabelCaptureSheet> {
       _productPath.isNotEmpty &&
       _pricePath.isNotEmpty &&
       _effectiveBranch.isNotEmpty &&
-      _productCtrl.text.trim().isNotEmpty &&
+      _selectedProduct != null &&
+      _selectedProduct!.name.trim().isNotEmpty &&
       (_price ?? 0) > 0;
 
   Future<void> _retake({required bool product}) async {
@@ -151,20 +142,20 @@ class _PrivateLabelCaptureSheetState extends State<PrivateLabelCaptureSheet> {
       builder: (ctx, layout) => _BarcodeScannerSheet(layout: layout),
     );
     if (code == null || code.isEmpty || !mounted) return;
-    final match = widget.products.where((p) => p.barcode == code).firstOrNull;
+    final match = _catalogProducts.where((p) => p.barcode == code).firstOrNull;
     if (match != null) {
       _selectProduct(match);
     } else {
       setState(() => _barcode = code);
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text('الباركود $code مش موجود في الكتالوج، اكتب اسم المنتج.')),
+        SnackBar(content: Text('الباركود $code غير مسجل في الكتالوج، اختار المنتج من القائمة.')),
       );
     }
   }
 
   void _save() {
     if (!_isValid) return;
-    final product = _selectedProduct;
+    final product = _selectedProduct!;
     final draft = PrivateLabelAuditDraft(
       id: const Uuid().v4().replaceAll('-', ''),
       organizationUID: widget.organizationUID,
@@ -172,10 +163,10 @@ class _PrivateLabelCaptureSheetState extends State<PrivateLabelCaptureSheet> {
       delegateUid: widget.delegateUid,
       delegateName: widget.delegateName,
       branchName: _effectiveBranch,
-      productId: product?.id,
-      productName: _productCtrl.text.trim(),
-      barcode: _barcode,
-      referencePrice: product?.referencePrice,
+      productId: product.id,
+      productName: product.name.trim(),
+      barcode: _barcode ?? product.barcode,
+      referencePrice: product.referencePrice,
       shelfPrice: _price!,
       stockStatus: _stock,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
@@ -215,11 +206,16 @@ class _PrivateLabelCaptureSheetState extends State<PrivateLabelCaptureSheet> {
     final price = _price;
     final mismatch = ref != null && price != null && (price - ref).abs() > PrivateLabelAudit.priceTolerance;
 
+    final recentProducts = widget.recentProductNames
+        .map((name) => _catalogProducts.where((p) => p.name == name).firstOrNull)
+        .whereType<PrivateLabelProduct>()
+        .toList();
+
     return PrivateLabelSheetFrame(
       layout: widget.layout,
       icon: Icons.add_a_photo_rounded,
       title: 'فحص منتج جديد',
-      subtitle: 'راجع الصورتين واكتب سعر الرف',
+      subtitle: 'راجع الصورتين واختار المنتج من الكتالوج واكتب سعر الرف',
       actions: PrivateLabelConnectedActions(
         primaryLabel: 'حفظ التوثيق',
         primaryIcon: Icons.check_rounded,
@@ -266,92 +262,55 @@ class _PrivateLabelCaptureSheetState extends State<PrivateLabelCaptureSheet> {
               onSelected: (b) => setState(() => _branch = b),
             ),
           const SizedBox(height: 16),
-          _sectionLabel(theme, 'المنتج'),
+          _sectionLabel(theme, 'المنتج (من الكتالوج)'),
           const SizedBox(height: 6),
-          RawAutocomplete<PrivateLabelProduct>(
-            textEditingController: _productCtrl,
-            focusNode: _productFocus,
-            displayStringForOption: (p) => p.name,
-            optionsBuilder: (value) {
-              final q = value.text.trim().toLowerCase();
-              if (q.length < 2) return const Iterable<PrivateLabelProduct>.empty();
-              return widget.products
-                  .where((p) =>
-                      p.name.toLowerCase().contains(q) ||
-                      (p.barcode ?? '').contains(q))
-                  .take(8);
-            },
-            onSelected: _selectProduct,
-            fieldViewBuilder: (context, controller, focusNode, onSubmitted) => TextField(
-              controller: controller,
-              focusNode: focusNode,
-              textInputAction: TextInputAction.next,
-              decoration: _decoration(
-                cs,
-                label: 'اسم المنتج',
-                hint: 'اكتب حرفين علشان تظهر الاقتراحات',
-                icon: Icons.search_rounded,
-                suffix: IconButton(
+          Row(
+            children: [
+              Expanded(
+                child: PrivateLabelProductDropdownMenu(
+                  products: _catalogProducts,
+                  selectedProduct: _selectedProduct,
+                  onSelected: _selectProduct,
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 44,
+                width: 44,
+                child: IconButton.filledTonal(
                   tooltip: 'مسح الباركود',
-                  icon: const Icon(Icons.qr_code_scanner_rounded),
                   onPressed: _scanBarcode,
-                ),
-              ),
-            ),
-            optionsViewBuilder: (context, onSelected, options) => Align(
-              alignment: AlignmentDirectional.topStart,
-              child: Material(
-                color: cs.surfaceContainerHigh,
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-                ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 260, maxWidth: 480),
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    shrinkWrap: true,
-                    children: options
-                        .map((p) => ListTile(
-                              dense: true,
-                              leading: Icon(Icons.sell_rounded, color: cs.primary, size: 20),
-                              title: Text(p.name),
-                              subtitle: p.referencePrice == null
-                                  ? null
-                                  : Text('السعر الرسمي ${PrivateLabelLabels.price(p.referencePrice!)}'),
-                              onTap: () => onSelected(p),
-                            ))
-                        .toList(),
+                  style: IconButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
+                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
                 ),
               ),
-            ),
+            ],
           ),
-          if (widget.recentProductNames.isNotEmpty && _productCtrl.text.isEmpty) ...[
+          if (recentProducts.isNotEmpty && _selectedProduct == null) ...[
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: widget.recentProductNames
+              children: recentProducts
                   .take(6)
-                  .map((name) => ActionChip(
+                  .map((p) => ActionChip(
                         avatar: const Icon(Icons.history_rounded, size: 16),
-                        label: Text(name),
+                        label: Text(p.name),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        onPressed: () {
-                          final match = widget.products.where((p) => p.name == name).firstOrNull;
-                          if (match != null) {
-                            _selectProduct(match);
-                          } else {
-                            _productCtrl.text = name;
-                          }
-                        },
+                        onPressed: () => _selectProduct(p),
                       ))
                   .toList(),
             ),
           ],
-          if (_barcode != null) ...[
+          if (_selectedProduct != null) ...[
+            const SizedBox(height: 8),
+            _SelectedProductSummaryCard(
+              product: _selectedProduct!,
+              barcode: _barcode ?? _selectedProduct!.barcode,
+            ),
+          ] else if (_barcode != null) ...[
             const SizedBox(height: 6),
             Text(
               'الباركود: $_barcode',
@@ -597,6 +556,247 @@ class _BranchMenu extends StatelessWidget {
             Icon(Icons.expand_more_rounded, color: cs.onSurfaceVariant),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// M3 Dropdown Menu (44dp trigger + surfaceContainerHigh menu) for selecting a
+/// Private Label product from the catalog instead of manual typing.
+class PrivateLabelProductDropdownMenu extends StatelessWidget {
+  final List<PrivateLabelProduct> products;
+  final PrivateLabelProduct? selectedProduct;
+  final ValueChanged<PrivateLabelProduct> onSelected;
+  final String placeholder;
+
+  const PrivateLabelProductDropdownMenu({
+    super.key,
+    required this.products,
+    required this.selectedProduct,
+    required this.onSelected,
+    this.placeholder = 'اختار المنتج من الكتالوج',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final selected = selectedProduct;
+    final hasImage = selected?.imageUrl != null && selected!.imageUrl!.trim().isNotEmpty;
+
+    return PopupMenuButton<PrivateLabelProduct>(
+      tooltip: 'اختيار المنتج من الكتالوج',
+      offset: const Offset(0, 48),
+      color: cs.surfaceContainerHigh,
+      elevation: 3,
+      constraints: const BoxConstraints(maxHeight: 380, minWidth: 280),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      onSelected: onSelected,
+      itemBuilder: (context) => products.map((p) {
+        final isSelected = selected != null && (p.id == selected.id || p.name == selected.name);
+        final itemHasImage = p.imageUrl != null && p.imageUrl!.trim().isNotEmpty;
+        return PopupMenuItem<PrivateLabelProduct>(
+          value: p,
+          height: 54,
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: itemHasImage
+                    ? PrivateLabelImage(path: p.imageUrl!)
+                    : Icon(
+                        Icons.inventory_2_rounded,
+                        size: 18,
+                        color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                      ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      p.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        fontSize: 13,
+                        color: isSelected ? cs.primary : cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (p.referencePrice != null)
+                          'السعر الرسمي: ${PrivateLabelLabels.price(p.referencePrice!)}',
+                        if (p.barcode != null && p.barcode!.isNotEmpty) p.barcode!,
+                      ].join(' • '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected) ...[
+                const SizedBox(width: 8),
+                Icon(Icons.check_rounded, size: 18, color: cs.primary),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected != null ? cs.primary.withValues(alpha: 0.6) : cs.outlineVariant,
+          ),
+        ),
+        child: Row(
+          children: [
+            if (hasImage)
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: PrivateLabelImage(path: selected.imageUrl!),
+              )
+            else
+              Icon(Icons.inventory_2_rounded, size: 20, color: cs.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                selected == null ? placeholder : selected.name,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: selected == null ? cs.onSurfaceVariant : cs.onSurface,
+                ),
+              ),
+            ),
+            if (selected?.referencePrice != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  PrivateLabelLabels.price(selected!.referencePrice!),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: cs.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+            Icon(Icons.expand_more_rounded, color: cs.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectedProductSummaryCard extends StatelessWidget {
+  final PrivateLabelProduct product;
+  final String? barcode;
+
+  const _SelectedProductSummaryCard({
+    required this.product,
+    this.barcode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final hasImage = product.imageUrl != null && product.imageUrl!.trim().isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.7)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: hasImage
+                ? PrivateLabelImage(path: product.imageUrl!)
+                : Icon(Icons.inventory_2_rounded, color: cs.primary, size: 22),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 2,
+                  children: [
+                    if (product.referencePrice != null)
+                      Text(
+                        'السعر الرسمي: ${PrivateLabelLabels.price(product.referencePrice!)}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    if (barcode != null && barcode!.isNotEmpty)
+                      Text(
+                        'باركود: $barcode',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

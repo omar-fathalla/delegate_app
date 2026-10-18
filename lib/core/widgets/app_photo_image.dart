@@ -49,7 +49,10 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
   }
 
   Future<void> _checkLocalFile() async {
-    if (kIsWeb || widget.photoUrl.startsWith('http://') || widget.photoUrl.startsWith('https://')) {
+    if (kIsWeb ||
+        widget.photoUrl.startsWith('http://') ||
+        widget.photoUrl.startsWith('https://') ||
+        widget.photoUrl.startsWith('assets/')) {
       return;
     }
 
@@ -71,9 +74,19 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
     final colorScheme = Theme.of(context).colorScheme;
 
     Widget content;
+    final isAsset = widget.photoUrl.startsWith('assets/');
     final isNetwork = widget.photoUrl.startsWith('http://') || widget.photoUrl.startsWith('https://');
 
-    if (isNetwork) {
+    if (isAsset) {
+      content = Image.asset(
+        widget.photoUrl,
+        width: widget.width,
+        height: widget.height,
+        fit: widget.fit,
+        errorBuilder: (context, error, stackTrace) =>
+            widget.errorWidget ?? _defaultErrorWidget(colorScheme),
+      );
+    } else if (isNetwork) {
       if (kIsWeb) {
         final webUrl = ImageUrlHelper.getWebSafeUrl(
           widget.photoUrl,

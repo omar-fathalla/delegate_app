@@ -65,7 +65,9 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
       if (mounted) {
         setState(() {
           _availableOrganizations = snap.docs.map((d) {
-            final name = d.data()['name']?.toString() ?? d.id;
+            final name = formatChainDisplayName(
+              d.data()['name']?.toString() ?? d.id,
+            );
             return {'id': d.id, 'name': name};
           }).toList();
         });
@@ -96,8 +98,11 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
       final matchesOrg = _selectedOrgUID == null ||
           delegate.organizationUID == _selectedOrgUID ||
           (selectedOrgName != null &&
-              (delegate.organizationName == selectedOrgName ||
-                  delegate.allOrganizationNames.contains(selectedOrgName)));
+              (formatChainDisplayName(delegate.organizationName) ==
+                      selectedOrgName ||
+                  delegate.allOrganizationNames.any(
+                    (o) => formatChainDisplayName(o) == selectedOrgName,
+                  )));
       return matchesName && matchesStatus && matchesOrg;
     }).toList();
   }
@@ -148,15 +153,17 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
           // Build dynamic map of organizations from fetched orgs + loaded delegates
           final orgsMap = <String, String>{};
           for (final org in _availableOrganizations) {
-            orgsMap[org['id']!] = org['name']!;
+            orgsMap[org['id']!] = formatChainDisplayName(org['name']!);
           }
           for (final d in allDelegates) {
             if (d.organizationUID.isNotEmpty) {
               orgsMap.putIfAbsent(
                 d.organizationUID,
-                () => d.organizationName.isNotEmpty
-                    ? d.organizationName
-                    : d.organizationUID,
+                () => formatChainDisplayName(
+                  d.organizationName.isNotEmpty
+                      ? d.organizationName
+                      : d.organizationUID,
+                ),
               );
             }
           }
@@ -288,8 +295,8 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
                                           getOrgBadgeColors(context, entry.value);
                                       final count = allDelegates.where((d) =>
                                           d.organizationUID == entry.key ||
-                                          d.organizationName == entry.value ||
-                                          d.allOrganizationNames.contains(entry.value)).length;
+                                          formatChainDisplayName(d.organizationName) == entry.value ||
+                                          d.allOrganizationNames.any((o) => formatChainDisplayName(o) == entry.value)).length;
                                       return DropdownMenuItem<String?>(
                                         value: entry.key,
                                         child: Row(
@@ -674,6 +681,33 @@ class _NoResultsView extends StatelessWidget {
   }
 }
 
+/// Normalizes raw organization / retail chain names into clean Arabic display names.
+String formatChainDisplayName(String raw) {
+  final clean = raw.trim();
+  final lower = clean.toLowerCase();
+  if (lower.contains('fathalla') ||
+      clean.contains('فتح الله') ||
+      clean.contains('فتح_الله')) {
+    return 'فتح الله ماركت';
+  }
+  if (lower.contains('gomla') ||
+      lower.contains('jomla') ||
+      clean.contains('جملة') ||
+      clean.contains('جمله')) {
+    return 'جملة ماركت';
+  }
+  if (lower.contains('zahran') || clean.contains('زهران')) {
+    return 'زهران ماركت';
+  }
+  if (lower.contains('carrefour') || clean.contains('كارفور')) {
+    return 'كارفور';
+  }
+  if (lower.contains('beit') || clean.contains('بيت الجملة')) {
+    return 'بيت الجملة';
+  }
+  return clean;
+}
+
 /// Returns a tuple of (backgroundColor, foregroundColor, borderColor) for an organization
 /// with distinct, recognizable colors for quick visual differentiation.
 (Color bg, Color fg, Color border) getOrgBadgeColors(
@@ -917,8 +951,9 @@ class _CompactDelegateTile extends StatelessWidget {
     String orgName, {
     double? maxWidth,
   }) {
-    if (orgName.isEmpty) return const SizedBox.shrink();
-    final (bg, fg, border) = getOrgBadgeColors(context, orgName);
+    final displayOrg = formatChainDisplayName(orgName);
+    if (displayOrg.isEmpty) return const SizedBox.shrink();
+    final (bg, fg, border) = getOrgBadgeColors(context, displayOrg);
     Widget badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -927,7 +962,7 @@ class _CompactDelegateTile extends StatelessWidget {
         border: Border.all(color: border, width: 0.8),
       ),
       child: Text(
-        orgName,
+        displayOrg,
         style: TextStyle(
           color: fg,
           fontSize: 10.5,
@@ -1067,8 +1102,10 @@ class _CompactDelegateTile extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: allOrgs.asMap().entries.map((entry) {
                         final idx = entry.key;
-                        final name = entry.value;
-                        final isPrimary = (idx == 0 && delegate.organizationName == name);
+                        final name = formatChainDisplayName(entry.value);
+                        final isPrimary = (idx == 0 &&
+                            formatChainDisplayName(delegate.organizationName) ==
+                                name);
                         final (bg, fg, border) = getOrgBadgeColors(context, name);
 
                         return Container(
@@ -1171,7 +1208,11 @@ class _CompactDelegateTile extends StatelessWidget {
         : (delegate.organizationName.isNotEmpty
             ? [delegate.organizationName]
             : <String>[]);
-    final allOrgs = rawList.where((name) => name.trim().isNotEmpty).toSet().toList();
+    final allOrgs = rawList
+        .map(formatChainDisplayName)
+        .where((name) => name.isNotEmpty)
+        .toSet()
+        .toList();
 
     if (allOrgs.isEmpty) {
       return const SizedBox.shrink();

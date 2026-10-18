@@ -48,7 +48,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
   List<Attendance> _recentSessions = [];
   static final Map<String, String> _orgNamesCache = {
-    'PiioBFgxaHAeuRdjlDgj': 'fathalla market',
+    'PiioBFgxaHAeuRdjlDgj': 'فتح الله ماركت',
     '5DE6702w6hFwycJfZyqM': 'جملة ماركت',
     'gOaRsmPocj2xV018m0hY': 'جملة ماركت',
   };
@@ -1446,17 +1446,127 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     }
   }
 
-  String _resolveOrgLabel(String orgId) {
+  String _resolveOrgLabel(
+    String orgId, {
+    String? branchName,
+    bool isArabic = true,
+  }) {
     final clean = orgId.trim();
-    if (clean.isEmpty) return widget.delegate.organizationName;
-    if (_orgNamesCache.containsKey(clean)) {
-      return _orgNamesCache[clean]!;
-    }
-    if (clean == widget.delegate.organizationUID) {
+    String raw = '';
+    if (clean.isEmpty) {
+      raw = widget.delegate.organizationName;
+    } else if (_orgNamesCache.containsKey(clean)) {
+      raw = _orgNamesCache[clean]!;
+    } else if (clean == widget.delegate.organizationUID) {
       _orgNamesCache[clean] = widget.delegate.organizationName;
-      return widget.delegate.organizationName;
+      raw = widget.delegate.organizationName;
+    } else {
+      raw = widget.delegate.organizationName;
     }
-    return widget.delegate.organizationName;
+
+    final bLower = (branchName ?? '').trim().toLowerCase();
+    if (bLower.startsWith('جملة ماركت') ||
+        bLower.startsWith('جمله ماركت') ||
+        bLower.startsWith('gomla market') ||
+        bLower.startsWith('jomla market')) {
+      return isArabic ? 'جملة ماركت' : 'Gomla Market';
+    }
+    if (bLower.startsWith('فتح الله') || bLower.startsWith('fathalla')) {
+      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
+    }
+    if (bLower.startsWith('زهران') || bLower.startsWith('zahran')) {
+      return isArabic ? 'زهران ماركت' : 'Zahran Market';
+    }
+
+    final rClean = raw.trim();
+    final lower = rClean.toLowerCase();
+    if (lower.contains('fathalla') ||
+        rClean.contains('فتح الله') ||
+        rClean.contains('فتح_الله')) {
+      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
+    }
+    if (lower.contains('gomla') ||
+        lower.contains('jomla') ||
+        rClean.contains('جملة') ||
+        rClean.contains('جمله')) {
+      return isArabic ? 'جملة ماركت' : 'Gomla Market';
+    }
+    if (lower.contains('zahran') || rClean.contains('زهران')) {
+      return isArabic ? 'زهران ماركت' : 'Zahran Market';
+    }
+    return rClean;
+  }
+
+  String _cleanBranchName(String rawBranchName) {
+    final trimmed = rawBranchName.trim();
+    if (trimmed.isEmpty) return trimmed;
+    final prefixRegex = RegExp(
+      r'^(?:جملة\s*ماركت|جمله\s*ماركت|فتح\s*الله\s*ماركت|فتح\s*الله|زهران\s*ماركت|زهران|كارفور|بيت\s*الجملة|fathalla\s*market|fathallah\s*market|fathalla|gomla\s*market|jomla\s*market|zahran\s*market|carrefour)\s*[-–—:،/]\s*',
+      caseSensitive: false,
+    );
+    final cleaned = trimmed.replaceFirst(prefixRegex, '').trim();
+    return cleaned.isNotEmpty ? cleaned : trimmed;
+  }
+
+  (Color bg, Color fg, Color border) _getChainBadgeColors(
+    BuildContext context,
+    String chainName,
+  ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final lower = chainName.toLowerCase().trim();
+
+    if (lower.contains('جملة') ||
+        lower.contains('جمله') ||
+        lower.contains('gomla') ||
+        lower.contains('jomla')) {
+      return isDark
+          ? (
+              const Color(0xFF143823),
+              const Color(0xFF81C784),
+              const Color(0xFF2E7D32),
+            )
+          : (
+              const Color(0xFFE8F5E9),
+              const Color(0xFF1B5E20),
+              const Color(0xFF81C784),
+            );
+    }
+
+    if (lower.contains('فتح الله') || lower.contains('fathalla')) {
+      return isDark
+          ? (
+              const Color(0xFF102844),
+              const Color(0xFF90CAF9),
+              const Color(0xFF1976D2),
+            )
+          : (
+              const Color(0xFFE3F2FD),
+              const Color(0xFF0D47A1),
+              const Color(0xFF64B5F6),
+            );
+    }
+
+    if (lower.contains('زهران') || lower.contains('zahran')) {
+      return isDark
+          ? (
+              const Color(0xFF3E240D),
+              const Color(0xFFFFB74D),
+              const Color(0xFFF57C00),
+            )
+          : (
+              const Color(0xFFFFF3E0),
+              const Color(0xFFE65100),
+              const Color(0xFFFFB74D),
+            );
+    }
+
+    final cs = theme.colorScheme;
+    return (
+      cs.secondaryContainer.withValues(alpha: 0.6),
+      cs.onSecondaryContainer,
+      cs.secondary.withValues(alpha: 0.35),
+    );
   }
 
   Widget _buildRecentActivityBriefCard(BuildContext context) {
@@ -1537,9 +1647,18 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
           // Session Items (latest 2-3 sessions)
           ..._recentSessions.take(3).map((session) {
-            final branchName = session.branchName ??
+            final rawBranchName = session.branchName ??
                 (isArabic ? 'فرع غير محدد' : 'Unknown Branch');
-            final orgName = _resolveOrgLabel(session.organizationId);
+            final cleanBranchName = _cleanBranchName(rawBranchName);
+            final orgName = _resolveOrgLabel(
+              session.organizationId,
+              branchName: session.branchName,
+              isArabic: isArabic,
+            );
+            final (chipBg, chipFg, chipBorder) = _getChainBadgeColors(
+              context,
+              orgName,
+            );
             final checkInStr =
                 DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkInTime);
             final checkOutStr = session.checkOutTime != null
@@ -1585,18 +1704,53 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Row 1: Branch Name + Org Chip
+                  // Row 1: Chain Chip + Clean Branch Name
                   Row(
                     children: [
+                      if (orgName.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: chipBg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: chipBorder,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.storefront_rounded,
+                                size: 12,
+                                color: chipFg,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                orgName,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: chipFg,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       Icon(
                         Icons.location_on_rounded,
                         size: 15,
                         color: colorScheme.primary,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          branchName,
+                          isArabic
+                              ? 'الفرع: $cleanBranchName'
+                              : 'Branch: $cleanBranchName',
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.bold,
@@ -1604,36 +1758,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      // Organization Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: colorScheme.primary.withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.storefront_rounded,
-                              size: 11,
-                              color: colorScheme.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              orgName,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     ],

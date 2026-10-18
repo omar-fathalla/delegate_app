@@ -437,15 +437,15 @@ class _MainScreenState extends State<MainScreen> {
       if (delegate.role == UserRole.admin ||
           delegate.role == UserRole.superAdmin ||
           delegate.role == UserRole.organizationAdmin ||
-          delegate.role == UserRole.technicalSupport) {
+          delegate.role == UserRole.technicalSupport ||
+          delegate.role == UserRole.branchesMarketingManager) {
         context.go('/admin/home', extra: delegate);
       } else if (delegate.role == UserRole.accountant) {
         context.go('/accountant/home', extra: delegate);
       } else if (delegate.role == UserRole.hr) {
         context.go('/hr/home', extra: delegate);
       } else if (delegate.role == UserRole.marketing ||
-          delegate.role == UserRole.marketingPromotion ||
-          delegate.role == UserRole.branchesMarketingManager) {
+          delegate.role == UserRole.marketingPromotion) {
         context.go('/marketing/home', extra: delegate);
       } else {
         context.go('/home', extra: delegate);

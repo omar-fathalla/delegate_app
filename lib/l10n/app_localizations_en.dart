@@ -12,7 +12,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Tashil';
 
   @override
-  String get delegateApp => 'Delegate App';
+  String get delegateApp => 'Employees App';
 
   @override
   String get login => 'Login';

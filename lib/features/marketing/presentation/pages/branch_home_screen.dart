@@ -1321,7 +1321,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainerLow,
         border: Border.all(color: colorScheme.outlineVariant),
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(4),
@@ -2662,47 +2662,159 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
 
   // ─── Remove Branch ─────────────────────────────────────────────────────────
   void _confirmRemoveBranch(BuildContext context, String branchName) {
-    showDialog(
-      context: context,
-      builder: (dialogCtx) {
-        final theme = Theme.of(dialogCtx);
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Icon(Icons.delete_rounded, color: theme.colorScheme.error),
-              const SizedBox(width: 8),
-              const Text('حذف الفرع'),
-            ],
-          ),
-          content: Text('هل تريد إزالة "$branchName" من قائمة فروعك المتابعة؟'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: theme.colorScheme.error,
-                foregroundColor: theme.colorScheme.onError,
+    final bloc = context.read<MarketingBloc>();
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDesktop = MediaQuery.sizeOf(context).width > 768;
+
+    Widget buildConfirmContent(BuildContext modalContext) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          isDesktop ? 20 : 12,
+          20,
+          24 + MediaQuery.viewInsetsOf(modalContext).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!isDesktop) ...[
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
               ),
-              onPressed: () {
-                Navigator.pop(dialogCtx);
-                setState(() {
-                  _collapsedBranches.remove(branchName);
-                });
-                final bloc = context.read<MarketingBloc>();
-                bloc.add(RemoveFavoriteBranch(
-                  userId: widget.marketingUser.uid,
-                  branchName: branchName,
-                ));
-              },
-              child: const Text('حذف'),
+              const SizedBox(height: 16),
+            ],
+            Row(
+              children: [
+                Icon(Icons.delete_rounded, color: colorScheme.error, size: 24),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'حذف الفرع',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'هل تريد إزالة "$branchName" من قائمة فروعك المتابعة؟',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+                  width: 1,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Navigator.pop(modalContext),
+                        child: Center(
+                          child: Text(
+                            'إلغاء',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+                  ),
+                  Expanded(
+                    child: Material(
+                      color: colorScheme.error.withValues(alpha: 0.12),
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.pop(modalContext);
+                          setState(() {
+                            _collapsedBranches.remove(branchName);
+                          });
+                          bloc.add(RemoveFavoriteBranch(
+                            userId: widget.marketingUser.uid,
+                            branchName: branchName,
+                          ));
+                        },
+                        child: Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.delete_rounded, size: 18, color: colorScheme.error),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'حذف',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: colorScheme.error,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-        );
-      },
-    );
+        ),
+      );
+    }
+
+    if (isDesktop) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: buildConfirmContent(dialogCtx),
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (sheetCtx) => buildConfirmContent(sheetCtx),
+      );
+    }
   }
 
   // ─── Export Attendance to Excel Modal ──────────────────────────────────────

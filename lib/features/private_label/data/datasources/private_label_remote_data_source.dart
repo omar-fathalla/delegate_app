@@ -10,6 +10,7 @@ import 'package:delegate_app/features/private_label/domain/entities/private_labe
 import 'package:delegate_app/features/private_label/domain/entities/private_label_audit_draft.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_dates.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_day.dart';
+import 'package:delegate_app/features/private_label/domain/entities/private_label_product.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
@@ -94,6 +95,7 @@ abstract class PrivateLabelRemoteDataSource {
 class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
   static const int defaultMonthlyRestDays = 4;
   static const String restAllowanceField = 'privateLabelMonthlyRestDays';
+  static const String defaultOrganizationUID = 'PiioBFgxaHAeuRdjlDgj';
   static const Duration _timeout = Duration(seconds: 25);
 
   final FirebaseFirestore firestore;
@@ -101,8 +103,11 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
 
   PrivateLabelRemoteDataSourceImpl({required this.firestore, required this.storage});
 
+  String _resolveOrg(String org) =>
+      org.trim().isNotEmpty ? org.trim() : defaultOrganizationUID;
+
   DocumentReference<Map<String, dynamic>> _org(String org) =>
-      firestore.collection('organizations').doc(org);
+      firestore.collection('organizations').doc(_resolveOrg(org));
 
   CollectionReference<Map<String, dynamic>> _audits(String org) =>
       _org(org).collection('private_label_audits');
@@ -114,9 +119,7 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
       _org(org).collection('private_label_products');
 
   void _requireOrg(String org) {
-    if (org.trim().isEmpty) {
-      throw const ServerFailure('حسابك غير مربوط بمنظمة. تواصل مع الدعم الفني.');
-    }
+    // Empty organizationUID falls back to defaultOrganizationUID via _resolveOrg.
   }
 
   Future<void> _ensureAuth() async {
@@ -610,18 +613,91 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     await _ensureAuth();
     try {
       final snap = await _products(organizationUID).get().timeout(_timeout);
+      final rawDocs = <String, Map<String, dynamic>>{
+        for (final d in snap.docs) d.id: d.data(),
+      };
       final list = snap.docs
           .map((d) => PrivateLabelProductModel.fromJson(d.data(), d.id))
           // Inactive items are returned too (catalog manager can reactivate them);
           // the marketer's capture sheet filters them out.
           .where((p) => p.name.trim().isNotEmpty)
           .toList();
+
+      await _ensureDefaultCatalogProducts(
+        organizationUID: organizationUID,
+        list: list,
+        rawDocs: rawDocs,
+      );
+
       list.sort((a, b) => a.name.compareTo(b.name));
       return list;
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في تحميل كتالوج المنتجات.');
     } on TimeoutException {
       throwTimeoutFailure();
+    }
+  }
+
+  /// Ensures the 4 core Fathalla Private Label products exist in Firestore with
+  /// their default images, prices, and barcodes, without overwriting user edits.
+  Future<void> _ensureDefaultCatalogProducts({
+    required String organizationUID,
+    required List<PrivateLabelProductModel> list,
+    required Map<String, Map<String, dynamic>> rawDocs,
+  }) async {
+    final effectiveOrg = _resolveOrg(organizationUID);
+    final defaults = PrivateLabelProduct.defaultCatalog(effectiveOrg);
+    for (final seed in defaults) {
+      final seedLower = seed.name.trim().toLowerCase();
+      final matchIdx = list.indexWhere((p) =>
+          p.id == seed.id ||
+          (seed.barcode != null && p.barcode == seed.barcode) ||
+          p.name.trim().toLowerCase() == seedLower);
+
+      if (matchIdx == -1) {
+        final model = PrivateLabelProductModel.fromEntity(seed);
+        try {
+          await _products(effectiveOrg).doc(seed.id).set({
+            ...model.toJson(),
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true)).timeout(const Duration(seconds: 8));
+        } catch (_) {}
+        list.add(model);
+      } else {
+        final existing = list[matchIdx];
+        final raw = rawDocs[existing.id] ?? const <String, dynamic>{};
+        final storedImage = (raw['imageUrl'] ?? raw['photoUrl'] ?? '').toString().trim();
+        final storedCategory = (raw['category'] ?? '').toString().trim();
+        final storedBarcode = (raw['barcode'] ?? '').toString().trim();
+        final hasStoredPrice = raw['referencePrice'] != null;
+
+        final needsImage = storedImage.isEmpty && seed.imageUrl != null;
+        final needsCategory = storedCategory.isEmpty && seed.category != null;
+        final needsBarcode = storedBarcode.isEmpty && seed.barcode != null;
+        final needsPrice = !hasStoredPrice && seed.referencePrice != null;
+
+        if (needsImage || needsCategory || needsBarcode || needsPrice) {
+          final updated = PrivateLabelProductModel.fromEntity(
+            existing.copyWith(
+              imageUrl: needsImage ? seed.imageUrl : existing.imageUrl,
+              category: needsCategory ? seed.category : existing.category,
+              barcode: needsBarcode ? seed.barcode : existing.barcode,
+              referencePrice: needsPrice ? seed.referencePrice : existing.referencePrice,
+            ),
+          );
+          list[matchIdx] = updated;
+          try {
+            await _products(effectiveOrg).doc(existing.id).set({
+              if (needsImage) 'imageUrl': seed.imageUrl,
+              if (needsCategory) 'category': seed.category,
+              if (needsBarcode) 'barcode': seed.barcode,
+              if (needsPrice) 'referencePrice': seed.referencePrice,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true)).timeout(const Duration(seconds: 8));
+          } catch (_) {}
+        }
+      }
     }
   }
 
@@ -633,12 +709,35 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
       final ref = product.id.isEmpty
           ? _products(product.organizationUID).doc()
           : _products(product.organizationUID).doc(product.id);
+
+      var finalImageUrl = product.imageUrl?.trim();
+      if (finalImageUrl != null &&
+          finalImageUrl.isNotEmpty &&
+          !finalImageUrl.startsWith('http://') &&
+          !finalImageUrl.startsWith('https://') &&
+          !finalImageUrl.startsWith('assets/')) {
+        try {
+          final bytes = await XFile(finalImageUrl).readAsBytes();
+          final storageRef = storage.ref().child(
+                'organizations/${product.organizationUID}/private_label_products/${ref.id}.jpg',
+              );
+          await storageRef.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+          finalImageUrl = await storageRef.getDownloadURL();
+        } catch (_) {
+          // Keep local path if upload is unavailable so local preview still works.
+        }
+      }
+
+      final toSave = PrivateLabelProductModel.fromEntity(
+        product.copyWith(id: ref.id, imageUrl: finalImageUrl),
+      );
+
       await ref.set({
-        ...product.toJson(),
+        ...toSave.toJson(),
         'updatedAt': FieldValue.serverTimestamp(),
         if (product.id.isEmpty) 'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true)).timeout(_timeout);
-      return PrivateLabelProductModel.fromEntity(product.copyWith(id: ref.id));
+      return toSave;
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في حفظ المنتج.');
     } on TimeoutException {

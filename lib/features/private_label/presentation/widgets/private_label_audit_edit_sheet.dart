@@ -39,8 +39,7 @@ class _AuditEditSheet extends StatefulWidget {
 }
 
 class _AuditEditSheetState extends State<_AuditEditSheet> {
-  late final TextEditingController _productCtrl =
-      TextEditingController(text: widget.audit.productName);
+  late String _productName = widget.audit.productName;
   late final TextEditingController _priceCtrl = TextEditingController(
     text: widget.audit.shelfPrice > 0 ? widget.audit.shelfPrice.toStringAsFixed(2) : '',
   );
@@ -58,13 +57,11 @@ class _AuditEditSheetState extends State<_AuditEditSheet> {
     super.initState();
     _productId = widget.audit.productId;
     _referencePrice = widget.audit.referencePrice;
-    _productCtrl.addListener(() => setState(() {}));
     _priceCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _productCtrl.dispose();
     _priceCtrl.dispose();
     _barcodeCtrl.dispose();
     _notesCtrl.dispose();
@@ -74,25 +71,23 @@ class _AuditEditSheetState extends State<_AuditEditSheet> {
   void _onProductSelected(PrivateLabelProduct p) {
     setState(() {
       _productId = p.id;
-      _productCtrl.text = p.name;
+      _productName = p.name;
       _referencePrice = p.referencePrice;
-      if (p.barcode != null && p.barcode!.isNotEmpty && _barcodeCtrl.text.isEmpty) {
-        _barcodeCtrl.text = p.barcode!;
-      }
+      _barcodeCtrl.text = p.barcode ?? '';
     });
   }
 
   double? get _parsedPrice => parsePrivateLabelPrice(_priceCtrl.text);
 
   bool get _isValid =>
-      _productCtrl.text.trim().isNotEmpty &&
+      _productName.trim().isNotEmpty &&
       _parsedPrice != null &&
       _parsedPrice! > 0;
 
   void _submit() {
     if (!_isValid) return;
     final updated = widget.audit.copyWith(
-      productName: _productCtrl.text.trim(),
+      productName: _productName.trim(),
       productId: _productId,
       referencePrice: _referencePrice,
       shelfPrice: _parsedPrice!,
@@ -108,6 +103,28 @@ class _AuditEditSheetState extends State<_AuditEditSheet> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final parsed = _parsedPrice;
+    final baseCatalog = (widget.products.isNotEmpty
+            ? widget.products
+            : PrivateLabelProduct.defaultCatalog(widget.audit.organizationUID))
+        .where((p) => p.isActive || p.id == _productId || p.name.trim() == _productName.trim())
+        .toList();
+    final hasCurrent = baseCatalog.any(
+      (p) => p.id == _productId || p.name.trim() == _productName.trim(),
+    );
+    final catalogProducts = [
+      if (!hasCurrent && _productName.trim().isNotEmpty)
+        PrivateLabelProduct(
+          id: _productId ?? 'audit_${widget.audit.id}',
+          organizationUID: widget.audit.organizationUID,
+          name: _productName.trim(),
+          barcode: widget.audit.barcode,
+          referencePrice: _referencePrice,
+        ),
+      ...baseCatalog,
+    ];
+    final selectedProduct = catalogProducts
+        .where((p) => p.id == _productId || p.name.trim() == _productName.trim())
+        .firstOrNull;
 
     return PrivateLabelSheetFrame(
       layout: widget.layout,
@@ -125,52 +142,19 @@ class _AuditEditSheetState extends State<_AuditEditSheet> {
         children: [
           const SizedBox(height: 8),
 
-          // Catalog selection quick chips
-          if (widget.products.isNotEmpty) ...[
-            Text(
-              'اختر من كتالوج المنتجات (اختياري)',
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: cs.onSurfaceVariant,
-              ),
+          // Catalog Product Dropdown Menu (no manual product typing)
+          Text(
+            'اختيار المنتج من الكتالوج *',
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: cs.onSurfaceVariant,
             ),
-            const SizedBox(height: 6),
-            SizedBox(
-              height: 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: widget.products.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, i) {
-                  final p = widget.products[i];
-                  final isSelected = p.id == _productId || p.name == _productCtrl.text.trim();
-                  return ChoiceChip(
-                    label: Text(p.name, style: const TextStyle(fontSize: 12)),
-                    selected: isSelected,
-                    onSelected: (_) => _onProductSelected(p),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          // Product Name TextField
-          TextField(
-            controller: _productCtrl,
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: 'اسم المنتج *',
-              prefixIcon: const Icon(Icons.sell_rounded),
-              filled: true,
-              fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.3),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: cs.outlineVariant),
-              ),
-            ),
+          ),
+          const SizedBox(height: 6),
+          PrivateLabelProductDropdownMenu(
+            products: catalogProducts,
+            selectedProduct: selectedProduct,
+            onSelected: _onProductSelected,
           ),
           const SizedBox(height: 14),
 

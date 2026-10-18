@@ -156,7 +156,9 @@ class PrivateLabelBloc extends Bloc<PrivateLabelEvent, PrivateLabelState> {
     PrivateLabelStarted event,
     Emitter<PrivateLabelState> emit,
   ) async {
-    _org = event.organizationUID;
+    _org = event.organizationUID.trim().isNotEmpty
+        ? event.organizationUID.trim()
+        : 'PiioBFgxaHAeuRdjlDgj';
     _company = event.companyUID;
     _uid = event.delegateUid;
     _name = event.delegateName;
@@ -279,6 +281,12 @@ class PrivateLabelBloc extends Bloc<PrivateLabelEvent, PrivateLabelState> {
         month: state.month,
       ),
     );
+    final products = await getProducts(_org);
+    final branches = await getBranches(_org);
+    emit(state.copyWith(
+      products: products.fold((_) => state.products, (p) => p),
+      branches: branches.fold((_) => state.branches, (b) => b),
+    ));
     final date = state.selectedDate;
     if (date != null) await _loadAuditsFor(date, emit);
     if (state.pendingDrafts.isNotEmpty) add(const PrivateLabelSyncRequested());

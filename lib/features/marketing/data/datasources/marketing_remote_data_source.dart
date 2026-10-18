@@ -64,6 +64,18 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         .replaceAll(RegExp(r'\s+'), ' ');
   }
 
+  List<DelegateModel> _deduplicateDelegates(Iterable<DelegateModel> list) {
+    final seen = <String>{};
+    final result = <DelegateModel>[];
+    for (final d in list) {
+      final key = d.uid.isNotEmpty ? '${d.companyUID}_${d.uid}' : '${d.companyUID}_${d.phoneNumber}';
+      if (seen.add(key)) {
+        result.add(d);
+      }
+    }
+    return result;
+  }
+
   @override
   Future<List<Map<String, dynamic>>> getCompanies(
     String organizationUID,
@@ -75,35 +87,39 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           .collection('companies')
           .getResilient(forceServer: true);
 
-      // Get list of companies with their data
-      final companies = snapshot.docs
-          .map((doc) => {'uid': doc.id, ...doc.data()})
-          .toList();
-
-      // For each company, try to find the marketing user
-      for (var company in companies) {
-        try {
-          // Query users collection for marketing user in this company
-          final userQuery = await firestore
-              .collection('users')
-              .where('organizationUID', isEqualTo: organizationUID)
-              .where('companyUID', isEqualTo: company['uid'])
-              .where('role', isEqualTo: 'marketing')
-              .limit(1)
-              .getResilient(forceServer: true);
-
-          if (userQuery.docs.isNotEmpty) {
-            final userData = userQuery.docs.first.data();
-            company['marketingUserName'] =
-                userData['displayName'] ?? 'موظف تسويق';
-          } else {
-            company['marketingUserName'] = null;
-          }
-        } catch (_) {
-          // If query fails, continue without marketing user name
-          company['marketingUserName'] = null;
+      // Get list of companies with their data, deduplicated by uid
+      final seenIds = <String>{};
+      final companies = <Map<String, dynamic>>[];
+      for (final doc in snapshot.docs) {
+        if (seenIds.add(doc.id)) {
+          companies.add({'uid': doc.id, ...doc.data()});
         }
       }
+
+      // Parallelize marketing user lookups across all companies instead of sequential N+1 loop
+      await Future.wait(
+        companies.map((company) async {
+          try {
+            final userQuery = await firestore
+                .collection('users')
+                .where('organizationUID', isEqualTo: organizationUID)
+                .where('companyUID', isEqualTo: company['uid'])
+                .where('role', isEqualTo: 'marketing')
+                .limit(1)
+                .getResilient(forceServer: true);
+
+            if (userQuery.docs.isNotEmpty) {
+              final userData = userQuery.docs.first.data();
+              company['marketingUserName'] =
+                  userData['displayName'] ?? 'موظف تسويق';
+            } else {
+              company['marketingUserName'] = null;
+            }
+          } catch (_) {
+            company['marketingUserName'] = null;
+          }
+        }),
+      );
 
       return companies;
     } on FirebaseException catch (e) {
@@ -139,35 +155,39 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       final hasMore = snapshot.docs.length > limit;
       final docs = hasMore ? snapshot.docs.take(limit).toList() : snapshot.docs;
 
-      // Get list of companies with their data
-      final companies = docs
-          .map((doc) => {'uid': doc.id, ...doc.data() as Map<String, dynamic>})
-          .toList();
-
-      // For each company, try to find the marketing user
-      for (var company in companies) {
-        try {
-          // Query users collection for marketing user in this company
-          final userQuery = await firestore
-              .collection('users')
-              .where('organizationUID', isEqualTo: organizationUID)
-              .where('companyUID', isEqualTo: company['uid'])
-              .where('role', isEqualTo: 'marketing')
-              .limit(1)
-              .get();
-
-          if (userQuery.docs.isNotEmpty) {
-            final userData = userQuery.docs.first.data();
-            company['marketingUserName'] =
-                userData['displayName'] ?? 'موظف تسويق';
-          } else {
-            company['marketingUserName'] = null;
-          }
-        } catch (_) {
-          // If query fails, continue without marketing user name
-          company['marketingUserName'] = null;
+      // Get list of companies with their data, deduplicated by uid
+      final seenIds = <String>{};
+      final companies = <Map<String, dynamic>>[];
+      for (final doc in docs) {
+        if (seenIds.add(doc.id)) {
+          companies.add({'uid': doc.id, ...doc.data() as Map<String, dynamic>});
         }
       }
+
+      // Parallelize marketing user lookups across the page instead of sequential N+1 loop
+      await Future.wait(
+        companies.map((company) async {
+          try {
+            final userQuery = await firestore
+                .collection('users')
+                .where('organizationUID', isEqualTo: organizationUID)
+                .where('companyUID', isEqualTo: company['uid'])
+                .where('role', isEqualTo: 'marketing')
+                .limit(1)
+                .getResilient(forceServer: true);
+
+            if (userQuery.docs.isNotEmpty) {
+              final userData = userQuery.docs.first.data();
+              company['marketingUserName'] =
+                  userData['displayName'] ?? 'موظف تسويق';
+            } else {
+              company['marketingUserName'] = null;
+            }
+          } catch (_) {
+            company['marketingUserName'] = null;
+          }
+        }),
+      );
 
       return {
         'companies': companies,
@@ -195,9 +215,9 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             .doc(companyUID)
             .collection('delegates')
             .getResilient(forceServer: true);
-        return snapshot.docs
-            .map((doc) => DelegateModel.fromJson(doc.data(), doc.id))
-            .toList();
+        return _deduplicateDelegates(
+          snapshot.docs.map((doc) => DelegateModel.fromJson(doc.data(), doc.id)),
+        );
       } else {
         // If companyUID is null, fetch all delegates in the organization
         // We can do this via collectionGroup 'delegates' where organizationUID matches
@@ -205,9 +225,9 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             .collectionGroup('delegates')
             .where('organizationUID', isEqualTo: organizationUID)
             .getResilient(forceServer: true);
-        return snapshot.docs
-            .map((doc) => DelegateModel.fromJson(doc.data(), doc.id))
-            .toList();
+        return _deduplicateDelegates(
+          snapshot.docs.map((doc) => DelegateModel.fromJson(doc.data(), doc.id)),
+        );
       }
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في جلب المندوبين.');
@@ -233,9 +253,9 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             .where('organizationUID', isEqualTo: organizationUID);
 
     return query.streamResilient(includeMetadataChanges: true).map((snapshot) {
-      return snapshot.docs
-          .map((doc) => DelegateModel.fromJson(doc.data(), doc.id))
-          .toList();
+      return _deduplicateDelegates(
+        snapshot.docs.map((doc) => DelegateModel.fromJson(doc.data(), doc.id)),
+      );
     });
   }
 

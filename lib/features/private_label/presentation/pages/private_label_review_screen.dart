@@ -4,10 +4,11 @@ import 'package:delegate_app/features/private_label/domain/entities/private_labe
 import 'package:delegate_app/features/private_label/domain/entities/private_label_dates.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_product.dart';
 import 'package:delegate_app/features/private_label/presentation/bloc/private_label_review_bloc.dart';
+import 'package:delegate_app/features/private_label/presentation/pages/private_label_catalog_screen.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_audit_edit_sheet.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_audit_tile.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_labels.dart';
-import 'package:delegate_app/features/private_label/presentation/widgets/private_label_product_sheet.dart';
+import 'package:delegate_app/features/private_label/presentation/widgets/private_label_photo_pair.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_review_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -307,12 +308,19 @@ class _ReviewView extends StatelessWidget {
               },
             ),
             IconButton(
-              tooltip: 'كتالوج المنتجات',
+              tooltip: 'الكتالوج (منتجات البرايفت ليبل)',
               icon: const Icon(Icons.inventory_2_rounded),
-              onPressed: () => showPrivateLabelCatalogSheet(
-                context: context,
-                organizationUID: delegate.organizationUID,
-              ),
+              onPressed: () async {
+                final bloc = context.read<PrivateLabelReviewBloc>();
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PrivateLabelCatalogScreen(delegate: delegate),
+                  ),
+                );
+                if (context.mounted) {
+                  bloc.add(const PrivateLabelReviewRefreshRequested());
+                }
+              },
             ),
             IconButton(
               tooltip: 'تحديث',
@@ -455,23 +463,41 @@ class _Toolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusFilter = _StatusFilterDropdown(state: state);
     final branchFilter = _BranchFilterButton(state: state);
+    final productFilter = _ProductFilterButton(state: state);
+    final marketerFilter = _MarketerFilterButton(state: state);
 
     if (desktop) {
       return Row(
         children: [
-          SizedBox(width: 240, child: statusFilter),
+          SizedBox(width: 220, child: statusFilter),
           const SizedBox(width: 10),
-          SizedBox(width: 220, child: branchFilter),
+          SizedBox(width: 200, child: branchFilter),
+          const SizedBox(width: 10),
+          SizedBox(width: 220, child: productFilter),
+          const SizedBox(width: 10),
+          SizedBox(width: 200, child: marketerFilter),
           const Spacer(),
         ],
       );
     }
 
-    return Row(
+    return Column(
       children: [
-        Expanded(child: statusFilter),
-        const SizedBox(width: 8),
-        Expanded(child: branchFilter),
+        Row(
+          children: [
+            Expanded(child: statusFilter),
+            const SizedBox(width: 8),
+            Expanded(child: branchFilter),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(child: productFilter),
+            const SizedBox(width: 8),
+            Expanded(child: marketerFilter),
+          ],
+        ),
       ],
     );
   }
@@ -747,6 +773,284 @@ class _BranchFilterButton extends StatelessWidget {
   }
 }
 
+class _ProductFilterButton extends StatelessWidget {
+  final PrivateLabelReviewState state;
+
+  const _ProductFilterButton({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final bloc = context.read<PrivateLabelReviewBloc>();
+    final availableProducts = state.allAvailableProducts.isNotEmpty
+        ? state.allAvailableProducts
+        : PrivateLabelProduct.defaultCatalog('fathalla').map((p) => p.name).toList();
+    final selected = state.selectedProduct;
+    final selectedCatalogProduct = selected == null
+        ? null
+        : (state.productForName(selected) ??
+            PrivateLabelProduct.defaultCatalog('fathalla')
+                .where((p) => p.name == selected)
+                .firstOrNull);
+    final hasThumb = selectedCatalogProduct?.imageUrl != null &&
+        selectedCatalogProduct!.imageUrl!.trim().isNotEmpty;
+
+    return Theme(
+      data: theme.copyWith(
+        popupMenuTheme: PopupMenuThemeData(
+          color: cs.surfaceContainerHigh,
+          elevation: 3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+          ),
+        ),
+      ),
+      child: PopupMenuButton<String?>(
+        tooltip: 'فلترة بمنتجات الكتالوج',
+        offset: const Offset(0, 48),
+        onSelected: (productName) => bloc.add(PrivateLabelReviewProductSelected(productName)),
+        itemBuilder: (context) => [
+          PopupMenuItem<String?>(
+            value: null,
+            child: Row(
+              children: [
+                Icon(Icons.inventory_2_rounded, size: 18, color: cs.primary),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text('كل المنتجات', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                _CountBadge(count: state.countForProduct(null), isActive: selected == null),
+                if (selected == null) ...[
+                  const SizedBox(width: 8),
+                  Icon(Icons.check_rounded, size: 18, color: cs.primary),
+                ],
+              ],
+            ),
+          ),
+          if (availableProducts.isNotEmpty) const PopupMenuDivider(),
+          for (final pName in availableProducts)
+            _buildProductMenuItem(cs, pName, selected == pName),
+        ],
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: selected != null ? cs.primary.withValues(alpha: 0.08) : cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected != null ? cs.primary.withValues(alpha: 0.6) : cs.outlineVariant,
+            ),
+          ),
+          child: Row(
+            children: [
+              if (hasThumb)
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: PrivateLabelImage(path: selectedCatalogProduct.imageUrl!),
+                )
+              else
+                Icon(
+                  Icons.inventory_2_rounded,
+                  size: 18,
+                  color: selected != null ? cs.primary : cs.onSurfaceVariant,
+                ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  selected ?? 'كل المنتجات',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: selected != null ? cs.primary : cs.onSurface,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(
+                Icons.expand_more_rounded,
+                size: 18,
+                color: selected != null ? cs.primary : cs.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String?> _buildProductMenuItem(
+    ColorScheme cs,
+    String pName,
+    bool isSelected,
+  ) {
+    final catalogProd = state.productForName(pName) ??
+        PrivateLabelProduct.defaultCatalog('fathalla')
+            .where((p) => p.name == pName)
+            .firstOrNull;
+    final itemHasImage =
+        catalogProd?.imageUrl != null && catalogProd!.imageUrl!.trim().isNotEmpty;
+    return PopupMenuItem<String?>(
+      value: pName,
+      child: Row(
+        children: [
+          if (itemHasImage)
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: PrivateLabelImage(path: catalogProd.imageUrl!),
+            )
+          else
+            Icon(Icons.inventory_2_outlined, size: 18, color: cs.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              pName,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          _CountBadge(
+            count: state.countForProduct(pName),
+            isActive: isSelected,
+          ),
+          if (isSelected) ...[
+            const SizedBox(width: 8),
+            Icon(Icons.check_rounded, size: 18, color: cs.primary),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MarketerFilterButton extends StatelessWidget {
+  final PrivateLabelReviewState state;
+
+  const _MarketerFilterButton({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final bloc = context.read<PrivateLabelReviewBloc>();
+    final marketers = state.allAvailableMarketers;
+    final selected = state.selectedMarketer;
+
+    return Theme(
+      data: theme.copyWith(
+        popupMenuTheme: PopupMenuThemeData(
+          color: cs.surfaceContainerHigh,
+          elevation: 3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+          ),
+        ),
+      ),
+      child: PopupMenuButton<String?>(
+        tooltip: 'فلترة بالمسوّق',
+        offset: const Offset(0, 48),
+        onSelected: (marketer) => bloc.add(PrivateLabelReviewMarketerSelected(marketer)),
+        itemBuilder: (context) => [
+          PopupMenuItem<String?>(
+            value: null,
+            child: Row(
+              children: [
+                Icon(Icons.groups_rounded, size: 18, color: cs.primary),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text('كل المسوّقين', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                if (selected == null) Icon(Icons.check_rounded, size: 18, color: cs.primary),
+              ],
+            ),
+          ),
+          if (marketers.isNotEmpty) const PopupMenuDivider(),
+          for (final m in marketers)
+            PopupMenuItem<String?>(
+              value: m,
+              child: Row(
+                children: [
+                  Icon(Icons.person_outline_rounded, size: 18, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      m,
+                      style: TextStyle(
+                        fontWeight: selected == m ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (selected == m) ...[
+                    const SizedBox(width: 8),
+                    Icon(Icons.check_rounded, size: 18, color: cs.primary),
+                  ],
+                ],
+              ),
+            ),
+        ],
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: selected != null ? cs.primary.withValues(alpha: 0.08) : cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected != null ? cs.primary.withValues(alpha: 0.6) : cs.outlineVariant,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.groups_rounded,
+                size: 18,
+                color: selected != null ? cs.primary : cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  selected ?? 'كل المسوّقين',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: selected != null ? cs.primary : cs.onSurface,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(
+                Icons.expand_more_rounded,
+                size: 18,
+                color: selected != null ? cs.primary : cs.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─────────────────────────── Summary Strip ───────────────────────────
 
 class _SummaryStrip extends StatelessWidget {
@@ -765,10 +1069,15 @@ class _SummaryStrip extends StatelessWidget {
     return AnimatedSwitcher(
       duration: AppMotionDurations.medium1,
       reverseDuration: AppMotionDurations.short3,
-      child: state.audits.isEmpty
+      child: state.audits.isEmpty &&
+              state.selectedBranch == null &&
+              state.selectedProduct == null &&
+              state.selectedMarketer == null
           ? const SizedBox.shrink()
           : Wrap(
-              key: ValueKey('${state.date}-${state.audits.length}-$issues-${state.selectedBranch}'),
+              key: ValueKey(
+                '${state.date}-${state.audits.length}-$issues-${state.selectedBranch}-${state.selectedProduct}-${state.selectedMarketer}',
+              ),
               spacing: 8,
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
@@ -804,6 +1113,24 @@ class _SummaryStrip extends StatelessWidget {
                     label: Text('فرع: ${state.selectedBranch}'),
                     deleteIcon: const Icon(Icons.close_rounded, size: 16),
                     onDeleted: () => bloc.add(const PrivateLabelReviewBranchSelected(null)),
+                  ),
+
+                // Active product filter chip
+                if (state.selectedProduct != null)
+                  InputChip(
+                    avatar: Icon(Icons.inventory_2_rounded, size: 16, color: cs.primary),
+                    label: Text('منتج: ${state.selectedProduct}'),
+                    deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                    onDeleted: () => bloc.add(const PrivateLabelReviewProductSelected(null)),
+                  ),
+
+                // Active marketer filter chip
+                if (state.selectedMarketer != null)
+                  InputChip(
+                    avatar: Icon(Icons.person_rounded, size: 16, color: cs.primary),
+                    label: Text('مسوّق: ${state.selectedMarketer}'),
+                    deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                    onDeleted: () => bloc.add(const PrivateLabelReviewMarketerSelected(null)),
                   ),
               ],
             ),

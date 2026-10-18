@@ -28,6 +28,7 @@ import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
+import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 
 class AdminHomeScreen extends StatelessWidget {
@@ -1873,12 +1874,22 @@ class _AttendanceDetailsBottomSheet extends StatefulWidget {
 
 class _AttendanceDetailsBottomSheetState
     extends State<_AttendanceDetailsBottomSheet> {
+  static final Map<
+      String,
+      ({
+        List<_DelegateAttendanceData> data,
+        Map<String, String> orgs,
+      })> _sheetMemoryCache = {};
+
   bool _isLoading = true;
   late String _filter;
   String _selectedOrgId = 'all';
   String _searchQuery = '';
   List<_DelegateAttendanceData> _allData = [];
   Map<String, String> _availableOrgs = {'all': 'جميع السلاسل'};
+
+  String get _sheetCacheKey =>
+      '${widget.adminDelegate.companyUID}_${widget.adminDelegate.organizationUID}';
 
   @override
   void initState() {
@@ -1887,11 +1898,89 @@ class _AttendanceDetailsBottomSheetState
     _filter = (widget.initialFilter.isNotEmpty && widget.initialFilter != 'all')
         ? widget.initialFilter
         : 'checked_in';
-    _fetchAttendanceData();
+    final cached = _sheetMemoryCache[_sheetCacheKey];
+    if (cached != null) {
+      _allData = cached.data;
+      _availableOrgs = cached.orgs;
+      if (_filter == 'checked_in' &&
+          _allData.isNotEmpty &&
+          _allData.every((i) => i.checkInTime == null)) {
+        _filter = 'all';
+      }
+      _isLoading = false;
+      _fetchAttendanceData(silent: true);
+    } else {
+      _fetchAttendanceData();
+    }
   }
 
-  Future<void> _fetchAttendanceData() async {
-    setState(() => _isLoading = true);
+  @override
+  void reassemble() {
+    super.reassemble();
+    _fetchAttendanceData(silent: _allData.isNotEmpty);
+  }
+
+  String _formatChainName(String raw, {String? branchName}) {
+    final bLower = (branchName ?? '').trim().toLowerCase();
+    if (bLower.startsWith('جملة ماركت') ||
+        bLower.startsWith('جمله ماركت') ||
+        bLower.startsWith('gomla market') ||
+        bLower.startsWith('jomla market')) {
+      return 'جملة ماركت';
+    }
+    if (bLower.startsWith('فتح الله') || bLower.startsWith('fathalla')) {
+      return 'فتح الله ماركت';
+    }
+    if (bLower.startsWith('زهران') || bLower.startsWith('zahran')) {
+      return 'زهران ماركت';
+    }
+    if (bLower.startsWith('كارفور') || bLower.startsWith('carrefour')) {
+      return 'كارفور';
+    }
+    if (bLower.startsWith('بيت الجملة') || bLower.startsWith('beit')) {
+      return 'بيت الجملة';
+    }
+
+    final clean = raw.trim();
+    final lower = clean.toLowerCase();
+    if (lower.contains('fathalla') ||
+        clean.contains('فتح الله') ||
+        clean.contains('فتح_الله')) {
+      return 'فتح الله ماركت';
+    }
+    if (lower.contains('gomla') ||
+        lower.contains('jomla') ||
+        clean.contains('جملة') ||
+        clean.contains('جمله')) {
+      return 'جملة ماركت';
+    }
+    if (lower.contains('zahran') || clean.contains('زهران')) {
+      return 'زهران ماركت';
+    }
+    if (lower.contains('carrefour') || clean.contains('كارفور')) {
+      return 'كارفور';
+    }
+    if (lower.contains('beit') || clean.contains('بيت الجملة')) {
+      return 'بيت الجملة';
+    }
+    return clean;
+  }
+
+  String _cleanBranchName(String rawBranchName) {
+    final trimmed = rawBranchName.trim();
+    if (trimmed.isEmpty) return trimmed;
+    final prefixRegex = RegExp(
+      r'^(?:جملة\s*ماركت|جمله\s*ماركت|فتح\s*الله\s*ماركت|فتح\s*الله|زهران\s*ماركت|زهران|كارفور|بيت\s*الجملة|fathalla\s*market|fathallah\s*market|fathalla|gomla\s*market|jomla\s*market|zahran\s*market|carrefour)\s*[-–—:،/]\s*',
+      caseSensitive: false,
+    );
+    final cleaned = trimmed.replaceFirst(prefixRegex, '').trim();
+    return cleaned.isNotEmpty ? cleaned : trimmed;
+  }
+
+  Future<void> _fetchAttendanceData({bool silent = false}) async {
+    if (!silent && mounted) {
+      setState(() => _isLoading = true);
+    }
     final firestore = FirebaseFirestore.instance;
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
@@ -1902,41 +1991,73 @@ class _AttendanceDetailsBottomSheetState
       final Map<String, String> orgNamesById = {};
       final Map<String, String> discoveredOrgs = {'all': 'جميع السلاسل'};
 
-      // 1. Fetch delegates for the company across organizations
+      // 1. Fetch delegates for the company across organizations resiliently
       if (widget.adminDelegate.companyUID.isNotEmpty) {
-        final orgsSnap = await firestore.collection('organizations').get();
+        final orgsSnap = await firestore
+            .collection('organizations')
+            .getResilient(timeout: const Duration(seconds: 4), forceServer: false);
         for (final doc in orgsSnap.docs) {
           final data = doc.data();
-          final name = (data['name'] ?? data['title'] ?? doc.id).toString();
-          orgNamesById[doc.id] = name;
+          final rawName = (data['name'] ?? data['title'] ?? doc.id).toString();
+          orgNamesById[doc.id] = _formatChainName(rawName);
         }
 
-        final futures = orgsSnap.docs.map((orgDoc) => firestore
-            .collection('organizations')
-            .doc(orgDoc.id)
-            .collection('companies')
-            .doc(widget.adminDelegate.companyUID)
-            .collection('delegates')
-            .get());
+        final futures = orgsSnap.docs.map((orgDoc) async {
+          try {
+            return await firestore
+                .collection('organizations')
+                .doc(orgDoc.id)
+                .collection('companies')
+                .doc(widget.adminDelegate.companyUID)
+                .collection('delegates')
+                .getResilient(
+                  timeout: const Duration(seconds: 4),
+                  forceServer: false,
+                );
+          } catch (_) {
+            return null;
+          }
+        });
         final results = await Future.wait(futures);
 
         final Map<String, DelegateModel> unique = {};
         final Map<String, Set<String>> delegateOrgs = {};
         for (var i = 0; i < results.length; i++) {
-          final orgId = orgsSnap.docs[i].id;
-          final orgName = orgNamesById[orgId] ?? orgId;
           final res = results[i];
+          if (res == null) continue;
+          final orgId = orgsSnap.docs[i].id;
+          final orgName = orgNamesById[orgId] ?? _formatChainName(orgId);
           if (res.docs.isNotEmpty) {
             discoveredOrgs[orgId] = orgName;
           }
           for (final doc in res.docs) {
-            delegateOrgs.putIfAbsent(doc.id, () => {}).add(orgName);
-            unique[doc.id] = DelegateModel.fromJson(doc.data(), doc.id);
+            try {
+              final rawMap = Map<String, dynamic>.from(doc.data());
+              if ((rawMap['organizationUID'] as String?)?.isEmpty ?? true) {
+                rawMap['organizationUID'] = orgId;
+              }
+              if ((rawMap['organizationName'] as String?)?.isEmpty ?? true) {
+                rawMap['organizationName'] = orgName;
+              }
+              final model = DelegateModel.fromJson(rawMap, doc.id);
+              final key = model.uid.isNotEmpty ? model.uid : doc.id;
+              final orgsSet = delegateOrgs.putIfAbsent(key, () => {});
+              if (orgName.isNotEmpty) orgsSet.add(orgName);
+              if (model.organizationName.isNotEmpty) {
+                orgsSet.add(_formatChainName(model.organizationName));
+              }
+              for (final o in model.allOrganizationNames) {
+                final formatted = _formatChainName(o);
+                if (formatted.isNotEmpty) orgsSet.add(formatted);
+              }
+              unique[key] = model;
+            } catch (_) {}
           }
         }
         for (final entry in unique.entries) {
           final orgsList = delegateOrgs[entry.key]?.toList() ?? [];
           delegates.add(entry.value.copyWith(
+            organizationName: _formatChainName(entry.value.organizationName),
             allOrganizationNames:
                 orgsList.isNotEmpty ? orgsList : entry.value.allOrganizationNames,
           ));
@@ -1948,35 +2069,63 @@ class _AttendanceDetailsBottomSheetState
             .collection('companies')
             .doc(widget.adminDelegate.companyUID)
             .collection('delegates')
-            .get();
-        delegates.addAll(
-          delegatesSnapshot.docs
-              .map((doc) => DelegateModel.fromJson(doc.data(), doc.id)),
-        );
+            .getResilient(timeout: const Duration(seconds: 4), forceServer: false);
+        for (final doc in delegatesSnapshot.docs) {
+          try {
+            final model = DelegateModel.fromJson(doc.data(), doc.id);
+            delegates.add(model.copyWith(
+              organizationName: _formatChainName(model.organizationName),
+              allOrganizationNames: model.allOrganizationNames
+                  .map(_formatChainName)
+                  .where((s) => s.isNotEmpty)
+                  .toSet()
+                  .toList(),
+            ));
+          } catch (_) {}
+        }
         if (widget.adminDelegate.organizationUID.isNotEmpty) {
-          final name = widget.adminDelegate.organizationName.isNotEmpty
+          final rawName = widget.adminDelegate.organizationName.isNotEmpty
               ? widget.adminDelegate.organizationName
               : widget.adminDelegate.organizationUID;
+          final name = _formatChainName(rawName);
           discoveredOrgs[widget.adminDelegate.organizationUID] = name;
           orgNamesById[widget.adminDelegate.organizationUID] = name;
         }
       }
 
-      // 2. Fetch today's attendance logs
-      Query<Map<String, dynamic>> attendanceQuery =
+      // 2. Fetch today's attendance logs resiliently
+      Query<Map<String, dynamic>> baseAttendanceQuery =
           firestore.collection(kAttendanceCollection);
       if (widget.adminDelegate.companyUID.isNotEmpty) {
-        attendanceQuery = attendanceQuery.where(
+        baseAttendanceQuery = baseAttendanceQuery.where(
           'companyId',
           isEqualTo: widget.adminDelegate.companyUID,
         );
       } else if (widget.adminDelegate.organizationUID.isNotEmpty) {
-        attendanceQuery = attendanceQuery.where(
+        baseAttendanceQuery = baseAttendanceQuery.where(
           'organizationId',
           isEqualTo: widget.adminDelegate.organizationUID,
         );
       }
-      final attendanceSnapshot = await attendanceQuery.get();
+
+      QuerySnapshot<Map<String, dynamic>> attendanceSnapshot;
+      try {
+        attendanceSnapshot = await baseAttendanceQuery
+            .where(
+              'timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+            )
+            .where('timestamp', isLessThan: Timestamp.fromDate(endOfDay))
+            .getResilient(
+              timeout: const Duration(seconds: 4),
+              forceServer: false,
+            );
+      } catch (_) {
+        attendanceSnapshot = await baseAttendanceQuery.getResilient(
+          timeout: const Duration(seconds: 4),
+          forceServer: false,
+        );
+      }
 
       final Map<String, List<Map<String, dynamic>>> logsByDelegate = {};
       for (var doc in attendanceSnapshot.docs) {
@@ -1996,12 +2145,27 @@ class _AttendanceDetailsBottomSheetState
 
       final List<_DelegateAttendanceData> list = [];
       for (var d in delegates) {
-        final logs = logsByDelegate[d.uid] ?? [];
+        final logs = List<Map<String, dynamic>>.from(logsByDelegate[d.uid] ?? []);
+        logs.sort((a, b) {
+          final ta = a['timestamp'];
+          final tb = b['timestamp'];
+          final da = ta is Timestamp ? ta.toDate() : DateTime(1970);
+          final db = tb is Timestamp ? tb.toDate() : DateTime(1970);
+          return db.compareTo(da); // Newest first
+        });
+
         DateTime? checkIn;
         DateTime? checkOut;
         String? branch;
         String? orgId;
         String? orgName;
+        final List<({String branchName, String chainName, String organizationId})>
+            todayVisits = [];
+        final Set<String> seenVisitKeys = {};
+        final Set<String> mergedDelegateChains = {
+          ...d.allOrganizationNames.map(_formatChainName).where((s) => s.isNotEmpty),
+          if (d.organizationName.isNotEmpty) _formatChainName(d.organizationName),
+        };
 
         for (var log in logs) {
           final type = (log['type'] ?? '').toString();
@@ -2014,14 +2178,39 @@ class _AttendanceDetailsBottomSheetState
                 (logTime != null && logTime.isBefore(checkIn))) {
               checkIn = logTime;
             }
-            if (branch == null && log['branchName'] != null) {
-              branch = log['branchName'].toString();
+            final logBranch = (log['branchName'] ?? '').toString().trim();
+            final logOrgId = (log['organizationId'] ?? '').toString().trim();
+            final rawOrg = log['organizationName']?.toString() ??
+                orgNamesById[logOrgId] ??
+                (logOrgId.isNotEmpty ? logOrgId : d.organizationName);
+            final logChainName = _formatChainName(rawOrg, branchName: logBranch);
+
+            if (logChainName.isNotEmpty) {
+              mergedDelegateChains.add(logChainName);
+              if (logOrgId.isNotEmpty) {
+                discoveredOrgs.putIfAbsent(logOrgId, () => logChainName);
+              }
             }
-            if (orgId == null && log['organizationId'] != null) {
-              orgId = log['organizationId'].toString();
-              orgName = log['organizationName']?.toString() ??
-                  orgNamesById[orgId] ??
-                  orgId;
+
+            if (branch == null && logBranch.isNotEmpty) {
+              branch = logBranch;
+              orgId = logOrgId.isNotEmpty ? logOrgId : d.organizationUID;
+              orgName = logChainName;
+            } else if (orgId == null && logOrgId.isNotEmpty) {
+              orgId = logOrgId;
+              orgName = logChainName;
+            }
+
+            if (logBranch.isNotEmpty || logChainName.isNotEmpty) {
+              final cleanedB = _cleanBranchName(logBranch);
+              final visitKey = '$logChainName|$cleanedB';
+              if (seenVisitKeys.add(visitKey)) {
+                todayVisits.add((
+                  branchName: logBranch,
+                  chainName: logChainName,
+                  organizationId: logOrgId,
+                ));
+              }
             }
           } else if (type == 'check_out') {
             if (checkOut == null ||
@@ -2033,24 +2222,43 @@ class _AttendanceDetailsBottomSheetState
 
         // Fallbacks for organization metadata if not checked-in today
         orgId ??= d.organizationUID;
-        orgName ??= (d.organizationName.isNotEmpty
-            ? d.organizationName
-            : (orgNamesById[d.organizationUID] ?? ''));
+        orgName ??= _formatChainName(
+          d.organizationName.isNotEmpty
+              ? d.organizationName
+              : (orgNamesById[d.organizationUID] ?? ''),
+          branchName: branch,
+        );
+
+        final updatedDelegate = d.copyWith(
+          organizationName: _formatChainName(d.organizationName),
+          allOrganizationNames: mergedDelegateChains.toList(),
+        );
 
         list.add(_DelegateAttendanceData(
-          delegate: d,
+          delegate: updatedDelegate,
           checkInTime: checkIn,
           checkOutTime: checkOut,
           branchName: branch,
           organizationId: orgId,
           organizationName: orgName,
+          todayVisits: todayVisits,
         ));
       }
+
+      _sheetMemoryCache[_sheetCacheKey] = (
+        data: list,
+        orgs: discoveredOrgs,
+      );
 
       if (mounted) {
         setState(() {
           _allData = list;
           _availableOrgs = discoveredOrgs;
+          if (_filter == 'checked_in' &&
+              _allData.isNotEmpty &&
+              _allData.every((i) => i.checkInTime == null)) {
+            _filter = 'all';
+          }
           _isLoading = false;
         });
       }
@@ -2082,7 +2290,10 @@ class _AttendanceDetailsBottomSheetState
       if (_selectedOrgId != 'all') {
         final targetOrgName = _availableOrgs[_selectedOrgId] ?? '';
         final matchesCheckedInOrg = item.organizationId == _selectedOrgId ||
-            (targetOrgName.isNotEmpty && item.organizationName == targetOrgName);
+            (targetOrgName.isNotEmpty && item.organizationName == targetOrgName) ||
+            item.todayVisits.any((v) =>
+                v.organizationId == _selectedOrgId ||
+                (targetOrgName.isNotEmpty && v.chainName == targetOrgName));
         final matchesAssignedOrg = item.delegate.organizationUID == _selectedOrgId ||
             (targetOrgName.isNotEmpty &&
                 item.delegate.allOrganizationNames.contains(targetOrgName)) ||
@@ -2300,6 +2511,9 @@ class _AttendanceDetailsBottomSheetState
                                   final targetName = entry.value;
                                   return item.organizationId == entry.key ||
                                       (targetName.isNotEmpty && item.organizationName == targetName) ||
+                                      item.todayVisits.any((v) =>
+                                          v.organizationId == entry.key ||
+                                          (targetName.isNotEmpty && v.chainName == targetName)) ||
                                       item.delegate.organizationUID == entry.key ||
                                       (targetName.isNotEmpty &&
                                           item.delegate.allOrganizationNames.contains(targetName)) ||
@@ -2475,7 +2689,7 @@ class _AttendanceDetailsBottomSheetState
                                                             borderRadius: BorderRadius.circular(6),
                                                           ),
                                                           child: Text(
-                                                            item.organizationName!,
+                                                            _formatChainName(item.organizationName!),
                                                             style: TextStyle(
                                                               fontSize: 10,
                                                               fontWeight: FontWeight.w600,
@@ -2549,61 +2763,131 @@ class _AttendanceDetailsBottomSheetState
                                           ],
                                         ),
                                         const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            if (item.organizationName != null && item.organizationName!.isNotEmpty) ...[
-                                              Builder(
-                                                builder: (ctx) {
-                                                  final (bg, fg, border) = getOrgBadgeColors(ctx, item.organizationName!);
-                                                  return Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                                    decoration: BoxDecoration(
-                                                      color: bg,
-                                                      borderRadius: BorderRadius.circular(6),
-                                                      border: Border.all(color: border, width: 0.5),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisSize: MainAxisSize.min,
+                                        if (item.todayVisits.isNotEmpty)
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              for (int vIdx = 0; vIdx < item.todayVisits.length; vIdx++) ...[
+                                                if (vIdx > 0) const SizedBox(height: 6),
+                                                Builder(
+                                                  builder: (ctx) {
+                                                    final visit = item.todayVisits[vIdx];
+                                                    final displayChain = _formatChainName(
+                                                      visit.chainName,
+                                                      branchName: visit.branchName,
+                                                    );
+                                                    final (bg, fg, border) = getOrgBadgeColors(ctx, displayChain);
+                                                    return Row(
                                                       children: [
-                                                        Icon(Icons.storefront_rounded, size: 13, color: fg),
-                                                        const SizedBox(width: 4),
-                                                        Text(
-                                                          item.organizationName!,
-                                                          style: TextStyle(
-                                                            fontSize: 11,
-                                                            fontWeight: FontWeight.bold,
-                                                            color: fg,
+                                                        if (displayChain.isNotEmpty) ...[
+                                                          Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                                            decoration: BoxDecoration(
+                                                              color: bg,
+                                                              borderRadius: BorderRadius.circular(8),
+                                                              border: Border.all(color: border, width: 0.8),
+                                                            ),
+                                                            child: Row(
+                                                              mainAxisSize: MainAxisSize.min,
+                                                              children: [
+                                                                Icon(Icons.storefront_rounded, size: 13, color: fg),
+                                                                const SizedBox(width: 4),
+                                                                Text(
+                                                                  displayChain,
+                                                                  style: TextStyle(
+                                                                    fontSize: 11,
+                                                                    fontWeight: FontWeight.bold,
+                                                                    color: fg,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
                                                           ),
-                                                        ),
+                                                          const SizedBox(width: 8),
+                                                        ],
+                                                        if (visit.branchName.isNotEmpty) ...[
+                                                          Icon(Icons.location_on_rounded, size: 16, color: colorScheme.primary),
+                                                          const SizedBox(width: 4),
+                                                          Expanded(
+                                                            child: Text(
+                                                              'الفرع: ${_cleanBranchName(visit.branchName)}',
+                                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                                fontWeight: FontWeight.w700,
+                                                                color: colorScheme.onSurface,
+                                                              ),
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ],
-                                                    ),
-                                                  );
-                                                },
-                                              ),
-                                              const SizedBox(width: 8),
-                                            ],
-                                            if (item.branchName != null && item.branchName!.isNotEmpty) ...[
-                                              Icon(Icons.location_on_rounded, size: 16, color: colorScheme.primary),
-                                              const SizedBox(width: 4),
-                                              Expanded(
-                                                child: Text(
-                                                  'الفرع: ${item.branchName}',
-                                                  style: theme.textTheme.bodySmall?.copyWith(
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                  overflow: TextOverflow.ellipsis,
+                                                    );
+                                                  },
                                                 ),
-                                              ),
+                                              ],
                                             ],
-                                          ],
-                                        ),
+                                          )
+                                        else
+                                          Row(
+                                            children: [
+                                              if (item.organizationName != null && item.organizationName!.isNotEmpty) ...[
+                                                Builder(
+                                                  builder: (ctx) {
+                                                    final displayChain = _formatChainName(
+                                                      item.organizationName!,
+                                                      branchName: item.branchName,
+                                                    );
+                                                    final (bg, fg, border) = getOrgBadgeColors(ctx, displayChain);
+                                                    return Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                                      decoration: BoxDecoration(
+                                                        color: bg,
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        border: Border.all(color: border, width: 0.8),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(Icons.storefront_rounded, size: 13, color: fg),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            displayChain,
+                                                            style: TextStyle(
+                                                              fontSize: 11,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: fg,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                                const SizedBox(width: 8),
+                                              ],
+                                              if (item.branchName != null && item.branchName!.isNotEmpty) ...[
+                                                Icon(Icons.location_on_rounded, size: 16, color: colorScheme.primary),
+                                                const SizedBox(width: 4),
+                                                Expanded(
+                                                  child: Text(
+                                                    'الفرع: ${_cleanBranchName(item.branchName!)}',
+                                                    style: theme.textTheme.bodySmall?.copyWith(
+                                                      fontWeight: FontWeight.w700,
+                                                      color: colorScheme.onSurface,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
                                       ] else if (item.delegate.allOrganizationNames.isNotEmpty) ...[
                                         const SizedBox(height: 8),
                                         Wrap(
                                           spacing: 6,
                                           runSpacing: 4,
                                           children: item.delegate.allOrganizationNames.map((orgName) {
-                                            final (bg, fg, border) = getOrgBadgeColors(context, orgName);
+                                            final displayChain = _formatChainName(orgName);
+                                            final (bg, fg, border) = getOrgBadgeColors(context, displayChain);
                                             return Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
@@ -2612,7 +2896,7 @@ class _AttendanceDetailsBottomSheetState
                                                 border: Border.all(color: border, width: 0.5),
                                               ),
                                               child: Text(
-                                                orgName,
+                                                displayChain,
                                                 style: TextStyle(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.bold,
@@ -2645,6 +2929,11 @@ class _DelegateAttendanceData {
   final String? branchName;
   final String? organizationId;
   final String? organizationName;
+  final List<({String branchName, String chainName, String organizationId})>?
+      _todayVisits;
+
+  List<({String branchName, String chainName, String organizationId})>
+      get todayVisits => _todayVisits ?? const [];
 
   _DelegateAttendanceData({
     required this.delegate,
@@ -2653,5 +2942,7 @@ class _DelegateAttendanceData {
     this.branchName,
     this.organizationId,
     this.organizationName,
-  });
+    List<({String branchName, String chainName, String organizationId})>?
+        todayVisits,
+  }) : _todayVisits = todayVisits;
 }

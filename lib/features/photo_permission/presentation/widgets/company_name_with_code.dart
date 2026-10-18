@@ -18,7 +18,7 @@ class CompanyNameWithCode extends StatelessWidget {
     this.companyCode,
     this.style,
     this.codeStyle,
-    this.twoLines = false,
+    this.twoLines = true,
   });
 
   @override
@@ -26,9 +26,9 @@ class CompanyNameWithCode extends StatelessWidget {
     final theme = Theme.of(context);
     final effectiveCodeStyle = codeStyle ??
         TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
+          fontSize: 10.5,
+          fontWeight: FontWeight.w500,
+          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
         );
 
     Widget buildTwoLines(String? code) {
@@ -47,6 +47,8 @@ class CompanyNameWithCode extends StatelessWidget {
             Text(
               'كود: $code',
               style: effectiveCodeStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ],
@@ -60,6 +62,8 @@ class CompanyNameWithCode extends StatelessWidget {
       return Text(
         '$companyName - كود: $companyCode',
         style: style,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       );
     }
 
@@ -112,6 +116,8 @@ class CompanyNameWithCode extends StatelessWidget {
         return Text(
           display,
           style: style,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         );
       },
     );
