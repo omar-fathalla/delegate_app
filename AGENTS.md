@@ -109,5 +109,13 @@
   - **Dropdown Triggers**: Height `44px`, corner radius `14px`, background `colorScheme.surfaceContainerLow`, outline border `colorScheme.outlineVariant`. In RTL: leading Google icon on the right, label in the center (`Expanded`), and `Icons.expand_more_rounded` on the far left.
   - **No Unicode Emojis or Non-Material Symbols**: Never embed unicode symbols like `⬇`, `⬆`, or custom glyphs in labels; use official Google Material rounded icons (`Icons.*_rounded`) exclusively.
 
+## Cursor Cloud specific instructions
+
+- Flutter 3.41.2 (Dart 3.11.0) is installed at `/opt/flutter` and linked as `flutter` and `dart` on the default PATH. This is the version pinned in `.github/workflows/deploy-ios.yml`. `pubspec.lock` requires Flutter `>=3.38.4` and Dart `>=3.11.0 <4.0.0`.
+- The Android SDK and Linux desktop toolchain are not installed. Use the web target and `flutter test`. Do not run `flutter build apk`, `flutter build appbundle`, or `flutter build ipa` unless the user explicitly asks.
+- Dependencies: `flutter pub get` from the repo root. It is idempotent. Code generation is not required to compile or test; there are no `part '*.g.dart'` / `part '*.freezed.dart'` directives.
+- Web is the local app target. On boot, `start` serves it with `flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080`. The first compile takes about a minute. If nothing is listening yet, run that same command. Open `http://127.0.0.1:8080`.
+- Unauthenticated sessions show the Tashil splash, then the HR login screen (on web, `LoginScreen` renders `HrLoginScreen`). `ADMIN_PHONE` and `ADMIN_PASSWORD` are optional `--dart-define` values and are not required to reach that screen. Do not submit real credentials to production Firebase during setup checks.
+- Validation: `flutter analyze` and `flutter test`.
 
 
