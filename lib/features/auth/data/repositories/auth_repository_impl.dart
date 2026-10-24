@@ -16,6 +16,40 @@ class AuthRepositoryImpl implements AuthRepository {
   });
 
   @override
+  Future<Either<Failure, List<Delegate>>> loginDelegate({
+    required String phoneNumber,
+    required String nationalId,
+  }) async {
+    try {
+      final delegates = await remoteDataSource.loginDelegate(
+        phoneNumber: phoneNumber,
+        nationalId: nationalId,
+      );
+      final validDelegates = delegates
+          .where(
+            (delegate) =>
+                delegate.status != DelegateStatus.suspended &&
+                delegate.status != DelegateStatus.rejected,
+          )
+          .toList();
+
+      if (validDelegates.isEmpty) {
+        return const Left(
+          DelegateAccountInactiveFailure(
+            'تم تجميد هذا الحساب من قبل الإدارة. يرجى التواصل مع مسؤول المنظمة.',
+          ),
+        );
+      }
+
+      return Right(validDelegates);
+    } on Failure catch (failure) {
+      return Left(failure);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<Delegate>>> getDelegatesByPhone(
     String phoneNumber,
   ) async {

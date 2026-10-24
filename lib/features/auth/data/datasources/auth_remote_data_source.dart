@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
+import 'package:delegate_app/features/auth/data/datasources/delegate_login_api.dart';
+import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,9 +12,21 @@ abstract class AuthRemoteDataSource {
   /// Queries the `delegates` collectionGroup by phone number.
   /// Returns a list of [DelegateModel] matching the phone number.
   /// May contain multiple documents if delegate is registered in multiple orgs.
+  ///
+  /// Staff and other non-delegate roles still use this path. Delegate
+  /// credential login uses [loginDelegate] and does not call it.
   Future<List<DelegateModel>> getDelegatesByPhone(String phoneNumber);
 
-  /// Signs in the user anonymously to satisfy Firestore rules.
+  /// Verifies phone + national ID with `delegateLoginV2`, then signs in with
+  /// the returned custom token. Does not sign in anonymously and does not
+  /// compare the national ID on the device.
+  Future<List<DelegateModel>> loginDelegate({
+    required String phoneNumber,
+    required String nationalId,
+  });
+
+  /// Anonymous sign-in for the staff lookup path only.
+  /// Delegate credential login must not call this.
   Future<void> signInAnonymously();
 
   /// Verifies admin password using Firebase Authentication
@@ -25,44 +39,245 @@ abstract class AuthRemoteDataSource {
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseFirestore firestore;
   final FirebaseAuth firebaseAuth;
+  final DelegateLoginApi? delegateLoginApi;
 
   AuthRemoteDataSourceImpl({
     required this.firestore,
     required this.firebaseAuth,
+    this.delegateLoginApi,
   });
 
   /// Normalises a phone number by stripping common Egyptian prefixes
   /// (`+2`, `+20`, `002`, `0020`) so queries match the bare format
   /// stored in Firestore (e.g. `"01274114404"`).
-  String _normalizePhone(String phone) {
-    // Replace Arabic digits with English digits
-    const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-    const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    
-    String normalized = phone.trim();
-    
-    // Remove any spaces or invisible characters that might be added by phone keyboards
-    normalized = normalized.replaceAll(RegExp(r'[^\d+٠-٩]'), '');
+  String _normalizePhone(String phone) => normalizeEgyptianPhone(phone);
 
-    for (int i = 0; i < arabic.length; i++) {
-      normalized = normalized.replaceAll(arabic[i], english[i]);
+  @override
+  Future<List<DelegateModel>> loginDelegate({
+    required String phoneNumber,
+    required String nationalId,
+  }) async {
+    final api = delegateLoginApi;
+    if (api == null) {
+      throw const AuthFailure(
+        'تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.',
+        'unavailable',
+      );
     }
 
-    if (normalized.startsWith('+20')) {
-      normalized = '0${normalized.substring(3)}';
-    } else if (normalized.startsWith('+2')) {
-      normalized = normalized.substring(2);
-    } else if (normalized.startsWith('0020')) {
-      normalized = '0${normalized.substring(4)}';
-    } else if (normalized.startsWith('002')) {
-      normalized = normalized.substring(3);
+    late final DelegateLoginResponse response;
+    try {
+      response = await api.login(phone: phoneNumber, nationalId: nationalId);
+    } on DelegateLoginException catch (error) {
+      throw _failureForDelegateLogin(error);
     }
 
-    if (normalized.length == 10 && RegExp(r'^1[0125]').hasMatch(normalized)) {
-      normalized = '0$normalized';
+    try {
+      await firebaseAuth.signInWithCustomToken(response.token);
+    } catch (error) {
+      debugPrint('delegate custom token sign-in failed: $error');
+      throw const AuthFailure(
+        'تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.',
+        'unavailable',
+      );
     }
 
-    return normalized;
+    try {
+      final normalizedPhone = _normalizePhone(phoneNumber);
+      final models = await _loadDelegateModelsByPhone(normalizedPhone);
+      final allowed = response.delegateIds.toSet();
+      final matched = models.where((model) => allowed.contains(model.uid)).toList();
+      if (matched.isEmpty) {
+        await _signOutQuietly();
+        throw const AuthFailure(
+          'تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.',
+          'unavailable',
+        );
+      }
+      return matched;
+    } on Failure {
+      await _signOutQuietly();
+      rethrow;
+    } catch (error) {
+      await _signOutQuietly();
+      debugPrint('delegate profile load failed: $error');
+      throw const AuthFailure(
+        'تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.',
+        'unavailable',
+      );
+    }
+  }
+
+  Failure _failureForDelegateLogin(DelegateLoginException error) {
+    switch (error.reason) {
+      case 'not_found':
+      case 'bad_credentials':
+        return const DelegateCredentialsFailure(
+          'رقم الهاتف أو الرقم القومي غير صحيح',
+        );
+      case 'account_inactive':
+        return const DelegateAccountInactiveFailure(
+          'هذا الحساب قيد المراجعة أو موقوف. يرجى التواصل مع مسؤول الشركة.',
+        );
+      case 'rate_limited':
+        return const DelegateRateLimitFailure(
+          'تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً.',
+        );
+      case 'invalid_phone':
+        return const AuthFailure(
+          'يرجى إدخال رقم موبايل صحيح',
+          'invalid_phone',
+        );
+      case 'invalid_national_id':
+        return const AuthFailure(
+          'يرجى إدخال الرقم القومي',
+          'invalid_national_id',
+        );
+      default:
+        return const AuthFailure(
+          'تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.',
+          'unavailable',
+        );
+    }
+  }
+
+  Future<void> _signOutQuietly() async {
+    try {
+      await firebaseAuth.signOut();
+    } catch (_) {}
+  }
+
+  Future<QuerySnapshot<Map<String, dynamic>>?> _safeLoginQuery(
+    Query<Map<String, dynamic>> query,
+    String debugLabel,
+  ) async {
+    try {
+      return await query
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 12));
+    } catch (serverError) {
+      debugPrint('$debugLabel server query error ($serverError). Trying serverAndCache fallback.');
+      try {
+        final fallbackSnap = await query
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(const Duration(seconds: 8));
+        return fallbackSnap;
+      } catch (e) {
+        debugPrint('$debugLabel fallback error: $e');
+        try {
+          final cacheSnap = await query.get(const GetOptions(source: Source.cache));
+          if (cacheSnap.docs.isNotEmpty) {
+            return cacheSnap;
+          }
+        } catch (_) {}
+
+        final errStr = serverError.toString().toLowerCase();
+        if (errStr.contains('timeout')) {
+          throw const ServerFailure(
+            'انتهت مهلة الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.',
+          );
+        } else if (errStr.contains('socket') ||
+            errStr.contains('network') ||
+            errStr.contains('unavailable')) {
+          throw const ServerFailure(
+            'تعذر الاتصال بالإنترنت. يرجى التأكد من تشغيل البيانات أو الواي فاي والمحاولة ثانية.',
+          );
+        }
+        throw const ServerFailure(
+          'تعذر التحقق من الحساب حالياً بسبب ضعف الاتصال. يرجى المحاولة مرة أخرى.',
+        );
+      }
+    }
+  }
+
+  Future<List<DelegateModel>> _loadDelegateModelsByPhone(String normalizedPhone) async {
+    final variants = egyptianPhoneVariants(normalizedPhone);
+    final byPath = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+
+    Future<void> collect(String field) async {
+      final snap = await _safeLoginQuery(
+        firestore.collectionGroup('delegates').where(field, whereIn: variants),
+        'delegate login $field',
+      );
+      for (final doc in snap?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[]) {
+        byPath[doc.reference.path] = doc;
+      }
+    }
+
+    await collect('phoneNumber');
+    if (byPath.isEmpty) {
+      try {
+        await collect('phone');
+      } catch (error) {
+        debugPrint('delegate phone-field fallback skipped: $error');
+      }
+    }
+    return _modelsFromDelegateDocs(byPath.values);
+  }
+
+  List<DelegateModel> _modelsFromDelegateDocs(
+    Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    final delegatesMap = <String, DelegateModel>{};
+    for (final doc in docs) {
+      final data = doc.data();
+      var model = DelegateModel.fromJson(data, doc.id);
+
+      // Path: organizations/{orgUID}/companies/{compUID}/delegates/{delegateUID}
+      final pathSegments = doc.reference.path.split('/');
+      final pathOrgUID = (pathSegments.length >= 2 && pathSegments[0] == 'organizations')
+          ? pathSegments[1]
+          : '';
+      final pathCompUID = (pathSegments.length >= 4 && pathSegments[2] == 'companies')
+          ? pathSegments[3]
+          : '';
+
+      if (pathOrgUID.isNotEmpty && model.organizationUID != pathOrgUID) {
+        model = model.copyWith(organizationUID: pathOrgUID);
+      }
+      if (pathCompUID.isNotEmpty && model.companyUID != pathCompUID) {
+        model = model.copyWith(companyUID: pathCompUID);
+      }
+
+      final key = '${model.uid}_${model.organizationUID}_${model.companyUID}';
+      if (delegatesMap.containsKey(key)) {
+        final existing = delegatesMap[key]!;
+        if (existing.status != DelegateStatus.approved &&
+            existing.status != DelegateStatus.active &&
+            (model.status == DelegateStatus.approved || model.status == DelegateStatus.active)) {
+          delegatesMap[key] = model;
+        }
+      } else {
+        delegatesMap[key] = model;
+      }
+    }
+
+    final allOrgNames = delegatesMap.values
+        .map((d) => d.organizationName.trim())
+        .where((name) => name.isNotEmpty)
+        .toSet()
+        .toList();
+
+    DateTime? earliestCreatedAt;
+    for (final d in delegatesMap.values) {
+      if (earliestCreatedAt == null || d.createdAt.isBefore(earliestCreatedAt)) {
+        earliestCreatedAt = d.createdAt;
+      }
+    }
+
+    for (final key in delegatesMap.keys.toList()) {
+      var current = delegatesMap[key]!;
+      if (allOrgNames.length > 1) {
+        final mergedNames = {...current.allOrganizationNames, ...allOrgNames}.toList();
+        current = current.copyWith(allOrganizationNames: mergedNames);
+      }
+      if (earliestCreatedAt != null && current.createdAt != earliestCreatedAt) {
+        current = current.copyWith(createdAt: earliestCreatedAt);
+      }
+      delegatesMap[key] = current;
+    }
+
+    return delegatesMap.values.toList();
   }
 
   @override
@@ -70,67 +285,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       final normalizedPhone = _normalizePhone(phoneNumber);
 
-      // Sign in anonymously first to query Firestore
-      // (will be replaced by admin auth if admin is found)
+      // Staff lookup still needs an auth session when nobody is signed in.
+      // Delegate credential login does not come through this method.
       await signInAnonymously();
 
-      // Safe resilient query helper for login:
-      // Tries live server first with 12s timeout for mobile data latency.
-      // If server times out or fails, it only uses local cache if cache actually has docs;
-      // otherwise it reports a network/timeout error so the user isn't falsely told their phone is not registered.
-      Future<QuerySnapshot<Map<String, dynamic>>?> safeQuery(
-        Query<Map<String, dynamic>> query,
-        String debugLabel,
-      ) async {
-        try {
-          return await query
-              .get(const GetOptions(source: Source.server))
-              .timeout(const Duration(seconds: 12));
-        } catch (serverError) {
-          debugPrint('$debugLabel server query error ($serverError). Trying serverAndCache fallback.');
-          try {
-            final fallbackSnap = await query
-                .get(const GetOptions(source: Source.serverAndCache))
-                .timeout(const Duration(seconds: 8));
-            return fallbackSnap;
-          } catch (e) {
-            debugPrint('$debugLabel fallback error: $e');
-            // If offline, check local cache. If cache actually has docs, use it.
-            try {
-              final cacheSnap = await query.get(const GetOptions(source: Source.cache));
-              if (cacheSnap.docs.isNotEmpty) {
-                return cacheSnap;
-              }
-            } catch (_) {}
-
-            // Re-throw meaningful network/timeout failure
-            final errStr = serverError.toString().toLowerCase();
-            if (errStr.contains('timeout')) {
-              throw const ServerFailure(
-                'انتهت مهلة الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.',
-              );
-            } else if (errStr.contains('socket') ||
-                errStr.contains('network') ||
-                errStr.contains('unavailable')) {
-              throw const ServerFailure(
-                'تعذر الاتصال بالإنترنت. يرجى التأكد من تشغيل البيانات أو الواي فاي والمحاولة ثانية.',
-              );
-            }
-            throw const ServerFailure(
-              'تعذر التحقق من الحساب حالياً بسبب ضعف الاتصال. يرجى المحاولة مرة أخرى.',
-            );
-          }
-        }
-      }
-
-      final delegatesFuture = safeQuery(
+      final delegatesFuture = _safeLoginQuery(
         firestore
             .collectionGroup('delegates')
             .where('phoneNumber', isEqualTo: normalizedPhone),
         'delegates collectionGroup',
       );
 
-      final usersFuture = safeQuery(
+      final usersFuture = _safeLoginQuery(
         firestore
             .collection('users')
             .where('phoneNumber', isEqualTo: normalizedPhone),
@@ -141,71 +307,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final querySnapshot = results[0];
       var userQuery = results[1];
 
-      final delegatesMap = <String, DelegateModel>{};
-      if (querySnapshot != null) {
-        for (final doc in querySnapshot.docs) {
-          final data = doc.data();
-          var model = DelegateModel.fromJson(data, doc.id);
-
-          // Extract true organizationUID and companyUID from the Firestore document path
-          // Path: organizations/{orgUID}/companies/{compUID}/delegates/{delegateUID}
-          final pathSegments = doc.reference.path.split('/');
-          final pathOrgUID = (pathSegments.length >= 2 && pathSegments[0] == 'organizations')
-              ? pathSegments[1]
-              : '';
-          final pathCompUID = (pathSegments.length >= 4 && pathSegments[2] == 'companies')
-              ? pathSegments[3]
-              : '';
-
-          if (pathOrgUID.isNotEmpty && model.organizationUID != pathOrgUID) {
-            model = model.copyWith(organizationUID: pathOrgUID);
-          }
-          if (pathCompUID.isNotEmpty && model.companyUID != pathCompUID) {
-            model = model.copyWith(companyUID: pathCompUID);
-          }
-
-          // Key based on uid, organizationUID, and companyUID to prevent identical duplicate records
-          final key = '${model.uid}_${model.organizationUID}_${model.companyUID}';
-          if (delegatesMap.containsKey(key)) {
-            final existing = delegatesMap[key]!;
-            if (existing.status != DelegateStatus.approved &&
-                existing.status != DelegateStatus.active &&
-                (model.status == DelegateStatus.approved || model.status == DelegateStatus.active)) {
-              delegatesMap[key] = model;
-            }
-          } else {
-            delegatesMap[key] = model;
-          }
-        }
-
-        // Cross-populate allOrganizationNames and synchronize earliest createdAt across all profiles
-        final allOrgNames = delegatesMap.values
-            .map((d) => d.organizationName.trim())
-            .where((name) => name.isNotEmpty)
-            .toSet()
-            .toList();
-
-        DateTime? earliestCreatedAt;
-        for (final d in delegatesMap.values) {
-          if (earliestCreatedAt == null || d.createdAt.isBefore(earliestCreatedAt)) {
-            earliestCreatedAt = d.createdAt;
-          }
-        }
-
-        for (final key in delegatesMap.keys.toList()) {
-          var current = delegatesMap[key]!;
-          if (allOrgNames.length > 1) {
-            final mergedNames = {...current.allOrganizationNames, ...allOrgNames}.toList();
-            current = current.copyWith(allOrganizationNames: mergedNames);
-          }
-          if (earliestCreatedAt != null && current.createdAt != earliestCreatedAt) {
-            current = current.copyWith(createdAt: earliestCreatedAt);
-          }
-          delegatesMap[key] = current;
-        }
-      }
-
-      final delegates = delegatesMap.values.toList();
+      final delegates = _modelsFromDelegateDocs(
+        querySnapshot?.docs ??
+            const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+      );
 
       // Also check if the user is an admin in the 'users' collection
       // (a phone number can exist in both delegates and users collections)

@@ -45,6 +45,14 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   Future<bool> verifyPhonePassword(String phone, String password) async {
     return false;
   }
+
+  @override
+  Future<List<DelegateModel>> loginDelegate({
+    required String phoneNumber,
+    required String nationalId,
+  }) async {
+    throw UnimplementedError();
+  }
 }
 
 class MockAuthLocalDataSource implements AuthLocalDataSource {

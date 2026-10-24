@@ -3,6 +3,13 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 abstract class AuthRepository {
+  /// Delegate login: phone and national ID are both checked by
+  /// `delegateLoginV2`. The returned profiles are the caller's own documents.
+  Future<Either<Failure, List<Delegate>>> loginDelegate({
+    required String phoneNumber,
+    required String nationalId,
+  });
+
   Future<Either<Failure, List<Delegate>>> getDelegatesByPhone(
     String phoneNumber,
   );

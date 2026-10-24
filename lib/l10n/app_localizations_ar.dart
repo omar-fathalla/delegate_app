@@ -45,6 +45,38 @@ class AppLocalizationsAr extends AppLocalizations {
   String get enterPassword => 'يرجى إدخال كلمة المرور';
 
   @override
+  String get nationalIdNumber => 'الرقم القومي';
+
+  @override
+  String get enterNationalId => 'يرجى إدخال الرقم القومي';
+
+  @override
+  String get invalidNationalId => 'يجب أن يتكون الرقم القومي من 14 رقمًا';
+
+  @override
+  String get invalidMobileNumber => 'يرجى إدخال رقم موبايل صحيح';
+
+  @override
+  String get loginNationalIdHelp =>
+      'المندوب يسجّل الدخول بالرقم القومي. باقي الأدوار تستخدم كلمة المرور.';
+
+  @override
+  String get invalidLoginCredentials =>
+      'رقم الهاتف أو الرقم القومي أو كلمة المرور غير صحيح.';
+
+  @override
+  String get delegateAccountInactive =>
+      'هذا الحساب قيد المراجعة أو موقوف. يرجى التواصل مع مسؤول الشركة.';
+
+  @override
+  String get tooManyLoginAttempts =>
+      'تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً.';
+
+  @override
+  String get loginTemporarilyUnavailable =>
+      'تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.';
+
+  @override
   String get rememberMe => 'تذكرني';
 
   @override

@@ -7,18 +7,40 @@ import 'package:flutter_test/flutter_test.dart';
 
 class MockAuthRepository implements AuthRepository {
   Future<Either<Failure, List<Delegate>>> Function(String)?
-  getDelegatesByPhoneStub;
+    getDelegatesByPhoneStub;
+  Future<Either<Failure, List<Delegate>>> Function(String, String)?
+    loginDelegateStub;
   Future<Either<Failure, void>> Function(Delegate)? cacheDelegateStub;
   Future<Either<Failure, void>> Function(List<Delegate>)? cacheAllDelegatesStub;
   Future<Either<Failure, bool>> Function(String, String)?
   verifyAdminPasswordStub;
+  Future<Either<Failure, bool>> Function(String, String)?
+  verifyPhonePasswordStub;
 
   int getDelegatesByPhoneCallCount = 0;
+  int loginDelegateCallCount = 0;
   int cacheDelegateCallCount = 0;
   int cacheAllDelegatesCallCount = 0;
   String? lastPhone;
+  String? lastNationalId;
   Delegate? lastCachedDelegate;
   List<Delegate>? lastCachedAllDelegates;
+
+  @override
+  Future<Either<Failure, List<Delegate>>> loginDelegate({
+    required String phoneNumber,
+    required String nationalId,
+  }) async {
+    loginDelegateCallCount++;
+    lastPhone = phoneNumber;
+    lastNationalId = nationalId;
+    if (loginDelegateStub != null) {
+      return loginDelegateStub!(phoneNumber, nationalId);
+    }
+    return const Left(
+      DelegateCredentialsFailure('رقم الهاتف أو الرقم القومي غير صحيح'),
+    );
+  }
 
   @override
   Future<Either<Failure, List<Delegate>>> getDelegatesByPhone(
@@ -85,6 +107,9 @@ class MockAuthRepository implements AuthRepository {
     String phone,
     String password,
   ) async {
+    if (verifyPhonePasswordStub != null) {
+      return verifyPhonePasswordStub!(phone, password);
+    }
     return const Right(false);
   }
 }
@@ -135,12 +160,9 @@ void main() {
   );
 
   test(
-    'should return list of delegates when phoneNumber exists and password matches nationalityID',
+    'should return delegates from the server login and skip the anonymous lookup',
     () async {
-      // arrange
-      mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
-          Right([tDelegate]);
-      // act
+      mockAuthRepository.loginDelegateStub = (_, _) async => Right([tDelegate]);
       final result = await usecase(
         const LoginParams(
           phoneNumber: tMobile,
@@ -148,49 +170,63 @@ void main() {
           rememberMe: true,
         ),
       );
-      // assert
       expect(result.isRight(), isTrue);
       result.fold(
         (l) => fail('Should be right'),
         (r) => expect(r, [tDelegate]),
       );
-      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
-      expect(
-        mockAuthRepository.cacheDelegateCallCount,
-        1,
-      ); // rememberMe is true and only one delegate
+      expect(mockAuthRepository.loginDelegateCallCount, 1);
+      expect(mockAuthRepository.lastNationalId, tPassword);
+      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
+      expect(mockAuthRepository.cacheDelegateCallCount, 1);
     },
   );
 
   test(
-    'should return AuthFailure when password does not match nationalityID',
+    'should not accept a client-side national ID match after the server rejects it',
     () async {
-      // arrange
+      mockAuthRepository.loginDelegateStub = (_, _) async => const Left(
+        DelegateCredentialsFailure('رقم الهاتف أو الرقم القومي غير صحيح'),
+      );
       mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
           Right([tDelegate]);
-      // act
       final result = await usecase(
-        const LoginParams(phoneNumber: tMobile, password: 'wrongPassword'),
+        const LoginParams(phoneNumber: tMobile, password: tPassword),
       );
-      // assert
-      expect(result, const Left(AuthFailure('كلمة المرور غير صحيحة')));
+      expect(result, isA<Left<Failure, List<Delegate>>>());
+      result.fold((failure) {
+        expect(failure, isA<AuthFailure>());
+        expect((failure as AuthFailure).code, 'invalid_credentials');
+      }, (_) => fail('national ID must not be compared on the client'));
       expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
       expect(mockAuthRepository.cacheDelegateCallCount, 0);
     },
   );
 
-  test('should return failure when repository fails to get delegate', () async {
-    // arrange
-    const tFailure = ServerFailure('Server Failure');
-    mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
-        const Left(tFailure);
-    // act
+  test('should not fall back to staff login when the delegate account is inactive', () async {
+    mockAuthRepository.loginDelegateStub = (_, _) async => const Left(
+      DelegateAccountInactiveFailure('inactive'),
+    );
     final result = await usecase(
       const LoginParams(phoneNumber: tMobile, password: tPassword),
     );
-    // assert
+    expect(result, isA<Left<Failure, List<Delegate>>>());
+    result.fold(
+      (failure) => expect(failure, isA<DelegateAccountInactiveFailure>()),
+      (_) => fail('inactive delegate must not sign in'),
+    );
+    expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
+  });
+
+  test('should return failure when delegate login fails before staff lookup', () async {
+    const tFailure = ServerFailure('Server Failure');
+    mockAuthRepository.loginDelegateStub = (_, _) async => const Left(tFailure);
+    final result = await usecase(
+      const LoginParams(phoneNumber: tMobile, password: tPassword),
+    );
     expect(result, const Left(tFailure));
-    expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
+    expect(mockAuthRepository.loginDelegateCallCount, 1);
+    expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
   });
 
   group('User provided test cases', () {
@@ -227,8 +263,45 @@ void main() {
         documents: const [],
       );
 
+      final staffDelegate = Delegate(
+        uid: adminDelegate.uid,
+        firstName: adminDelegate.firstName,
+        middleName: adminDelegate.middleName,
+        lastName: adminDelegate.lastName,
+        fullName: adminDelegate.fullName,
+        nationalityID: '__phone_auth__:01508899965',
+        motherName: adminDelegate.motherName,
+        city: adminDelegate.city,
+        phoneNumber: adminDelegate.phoneNumber,
+        gender: adminDelegate.gender,
+        position: adminDelegate.position,
+        birthDate: adminDelegate.birthDate,
+        organizationUID: adminDelegate.organizationUID,
+        organizationName: adminDelegate.organizationName,
+        companyUID: adminDelegate.companyUID,
+        companyName: adminDelegate.companyName,
+        status: adminDelegate.status,
+        delegatePublicId: adminDelegate.delegatePublicId,
+        allReceiptCodes: adminDelegate.allReceiptCodes,
+        createdAt: adminDelegate.createdAt,
+        createdBy: adminDelegate.createdBy,
+        hasPendingUpdate: adminDelegate.hasPendingUpdate,
+        isDeductedFromCompany: adminDelegate.isDeductedFromCompany,
+        isPrinted: adminDelegate.isPrinted,
+        isProfileComplete: adminDelegate.isProfileComplete,
+        numberOfDocuments: adminDelegate.numberOfDocuments,
+        paymentAmount: adminDelegate.paymentAmount,
+        version: adminDelegate.version,
+        documents: adminDelegate.documents,
+        role: UserRole.superAdmin,
+      );
+      mockAuthRepository.loginDelegateStub = (_, _) async => const Left(
+        DelegateCredentialsFailure('not a delegate'),
+      );
       mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
-          Right([adminDelegate]);
+          Right([staffDelegate]);
+      mockAuthRepository.verifyPhonePasswordStub = (_, _) async =>
+          const Right(true);
 
       final result = await usecase(
         const LoginParams(phoneNumber: '01508899965', password: '4816361Aa'),
@@ -239,6 +312,7 @@ void main() {
         (l) => fail('Should be right'),
         (r) => expect(r.first.position, DelegatePosition.supervisor),
       );
+      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
     });
 
     test('Delegate login with 01281769997 and 29712200201981', () async {
@@ -274,7 +348,7 @@ void main() {
         documents: const [],
       );
 
-      mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
+      mockAuthRepository.loginDelegateStub = (_, _) async =>
           Right([promoterDelegate]);
 
       final result = await usecase(

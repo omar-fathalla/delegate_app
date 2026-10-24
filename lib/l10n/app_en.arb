@@ -48,6 +48,42 @@
     "@enterPassword": {
         "description": "Password validation error"
     },
+    "nationalIdNumber": "National ID number",
+    "@nationalIdNumber": {
+        "description": "Delegate login national ID field label"
+    },
+    "enterNationalId": "Please enter the national ID number",
+    "@enterNationalId": {
+        "description": "Empty national ID validation error"
+    },
+    "invalidNationalId": "National ID must be 14 digits",
+    "@invalidNationalId": {
+        "description": "National ID format validation error"
+    },
+    "invalidMobileNumber": "Enter a valid mobile number",
+    "@invalidMobileNumber": {
+        "description": "Mobile number format validation error"
+    },
+    "loginNationalIdHelp": "Delegates sign in with their national ID. Other roles use their password.",
+    "@loginNationalIdHelp": {
+        "description": "Helper under the delegate login secret field"
+    },
+    "invalidLoginCredentials": "The phone number, national ID, or password is incorrect.",
+    "@invalidLoginCredentials": {
+        "description": "Delegate credential mismatch"
+    },
+    "delegateAccountInactive": "This account is pending or suspended. Contact your company admin.",
+    "@delegateAccountInactive": {
+        "description": "Pending or blocked delegate login error"
+    },
+    "tooManyLoginAttempts": "Too many attempts. Please try again later.",
+    "@tooManyLoginAttempts": {
+        "description": "Delegate login lockout message"
+    },
+    "loginTemporarilyUnavailable": "Sign-in is temporarily unavailable. Please try again.",
+    "@loginTemporarilyUnavailable": {
+        "description": "Delegate login service unavailable"
+    },
     "rememberMe": "Remember Me",
     "@rememberMe": {
         "description": "Remember me checkbox label"

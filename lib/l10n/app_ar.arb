@@ -56,6 +56,42 @@
     "@enterPassword": {
         "description": "Password validation error"
     },
+    "nationalIdNumber": "الرقم القومي",
+    "@nationalIdNumber": {
+        "description": "Delegate login national ID field label"
+    },
+    "enterNationalId": "يرجى إدخال الرقم القومي",
+    "@enterNationalId": {
+        "description": "Empty national ID validation error"
+    },
+    "invalidNationalId": "يجب أن يتكون الرقم القومي من 14 رقمًا",
+    "@invalidNationalId": {
+        "description": "National ID format validation error"
+    },
+    "invalidMobileNumber": "يرجى إدخال رقم موبايل صحيح",
+    "@invalidMobileNumber": {
+        "description": "Mobile number format validation error"
+    },
+    "loginNationalIdHelp": "المندوب يسجّل الدخول بالرقم القومي. باقي الأدوار تستخدم كلمة المرور.",
+    "@loginNationalIdHelp": {
+        "description": "Helper under the delegate login secret field"
+    },
+    "invalidLoginCredentials": "رقم الهاتف أو الرقم القومي أو كلمة المرور غير صحيح.",
+    "@invalidLoginCredentials": {
+        "description": "Delegate credential mismatch"
+    },
+    "delegateAccountInactive": "هذا الحساب قيد المراجعة أو موقوف. يرجى التواصل مع مسؤول الشركة.",
+    "@delegateAccountInactive": {
+        "description": "Pending or blocked delegate login error"
+    },
+    "tooManyLoginAttempts": "تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً.",
+    "@tooManyLoginAttempts": {
+        "description": "Delegate login lockout message"
+    },
+    "loginTemporarilyUnavailable": "تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.",
+    "@loginTemporarilyUnavailable": {
+        "description": "Delegate login service unavailable"
+    },
     "rememberMe": "تذكرني",
     "@rememberMe": {
         "description": "Remember me checkbox label"

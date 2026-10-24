@@ -12,16 +12,26 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
 
   @override
   Future<Either<Failure, List<Delegate>>> call(LoginParams params) async {
-    // 1. جلب بيانات المندوب من السيرفر بناء على رقم الهاتف
+    final delegateResult = await repository.loginDelegate(
+      phoneNumber: params.phoneNumber,
+      nationalId: params.password,
+    );
+
+    // Only a credential miss falls through to staff. Pending, blocked,
+    // rate-limited, and outages stay on the delegate path.
+    return delegateResult.fold((failure) async {
+      if (failure is! DelegateCredentialsFailure) return Left(failure);
+      return _loginStaff(params);
+    }, (delegates) => _finish(delegates, params));
+  }
+
+  Future<Either<Failure, List<Delegate>>> _loginStaff(LoginParams params) async {
     final result = await repository.getDelegatesByPhone(params.phoneNumber);
 
     return result.fold((failure) => Left(failure), (delegates) async {
-      // 2. تصفية المندوبين بناء على مقارنة الرقم القومي (Password Check)
-      //    أو التحقق عبر Firebase Auth للـ admins
       final matched = <Delegate>[];
 
       for (final delegate in delegates) {
-        // Check if this is a phone-auth user (marketing)
         if (delegate.nationalityID.startsWith('__phone_auth__:')) {
           final phone = delegate.nationalityID.replaceFirst(
             '__phone_auth__:',
@@ -33,8 +43,6 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
           );
           final valid = isValid.fold((_) => false, (v) => v);
           if (valid) matched.add(delegate);
-
-          // Check if this is an admin (marked with __firebase_auth__:email)
         } else if (delegate.nationalityID.startsWith('__firebase_auth__:')) {
           final email = delegate.nationalityID.replaceFirst(
             '__firebase_auth__:',
@@ -46,34 +54,38 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
           );
           final isValid = verifyResult.fold((_) => false, (valid) => valid);
           if (isValid) matched.add(delegate);
-        } else {
-          // Regular delegate: compare nationalityID with password
-          if (delegate.nationalityID == params.password) {
-            matched.add(delegate);
-          }
         }
       }
 
       if (matched.isEmpty) {
         return const Left(
-          AuthFailure('كلمة المرور غير صحيحة'),
-        ); // ❌ الرقم موجود لكن الباسورد غلط
+          AuthFailure(
+            'رقم الهاتف أو الرقم القومي غير صحيح',
+            'invalid_credentials',
+          ),
+        );
       }
 
-      // إذا كان هناك مندوب واحد فقط وريمامبر مي مفعل، حفظ البيانات
-      if (matched.length == 1 && params.rememberMe) {
-        await repository.cacheDelegate(matched.first);
-      }
-      // إذا كانت هناك عدة منظمات، لا نحفظ الآن - سيتم الحفظ بعد اختيار المنظمة
-
-      return Right(matched); // ✅ تطابق! أرجع قائمة المندوبين
+      return _finish(matched, params);
     });
+  }
+
+  Future<Either<Failure, List<Delegate>>> _finish(
+    List<Delegate> matched,
+    LoginParams params,
+  ) async {
+    if (matched.length == 1 && params.rememberMe) {
+      await repository.cacheDelegate(matched.first);
+    }
+    return Right(matched);
   }
 }
 
 class LoginParams extends Equatable {
   final String phoneNumber;
-  final String password; // الرقم القومي (nationalityID)
+
+  /// National ID for delegates. Password for admin and other roles.
+  final String password;
   final bool rememberMe;
 
   const LoginParams({

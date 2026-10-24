@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
+import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -85,7 +86,13 @@ class _HrLoginScreenState extends State<HrLoginScreen>
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
+                content: Text(
+                  localizedAuthError(
+                    l10n,
+                    message: state.message,
+                    code: state.code,
+                  ),
+                ),
                 backgroundColor: colorScheme.error,
                 behavior: SnackBarBehavior.floating,
                 shape: RoundedRectangleBorder(

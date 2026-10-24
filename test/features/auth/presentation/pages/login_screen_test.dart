@@ -138,4 +138,41 @@ void main() {
     ));
     expect(passwordTextField.obscureText, isTrue);
   });
+
+  testWidgets('LoginScreen requires both phone and national ID', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    when(() => mockAuthBloc.add(any())).thenAnswer((_) {});
+    await tester.pumpWidget(createWidgetUnderTest());
+
+    final loginButton = find.widgetWithText(FilledButton, 'Login');
+    await tester.ensureVisible(loginButton);
+    await tester.tap(loginButton);
+    await tester.pump();
+
+    expect(find.text('Please enter mobile number'), findsOneWidget);
+    expect(find.text('Please enter the national ID number'), findsOneWidget);
+    verifyNever(() => mockAuthBloc.add(any()));
+
+    await tester.enterText(find.byType(TextFormField).at(0), '01234567890');
+    await tester.enterText(find.byType(TextFormField).at(1), '1234');
+    await tester.ensureVisible(loginButton);
+    await tester.tap(loginButton);
+    await tester.pump();
+
+    expect(find.text('National ID must be 14 digits'), findsOneWidget);
+    verifyNever(() => mockAuthBloc.add(any()));
+
+    await tester.enterText(find.byType(TextFormField).at(1), '29712200201981');
+    await tester.ensureVisible(loginButton);
+    await tester.tap(loginButton);
+    await tester.pump();
+
+    final captured = verify(() => mockAuthBloc.add(captureAny())).captured.single as LoginRequested;
+    expect(captured.phoneNumber, '01234567890');
+    expect(captured.password, '29712200201981');
+  });
 }

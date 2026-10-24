@@ -1,5 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/core/services/session_management_service.dart';
@@ -48,7 +49,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     await result.fold(
       (failure) async {
-        emit(AuthError(message: failure.message));
+        emit(
+          AuthError(
+            message: failure.message,
+            code: failure is AuthFailure ? failure.code : null,
+          ),
+        );
       },
       (delegates) async {
         // Always cache all delegates for organization switching later

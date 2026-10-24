@@ -44,11 +44,12 @@ class AuthUnauthenticated extends AuthState {
 
 class AuthError extends AuthState {
   final String message;
+  final String? code;
 
-  const AuthError({required this.message});
+  const AuthError({required this.message, this.code});
 
   @override
-  List<Object> get props => [message];
+  List<Object> get props => [message, code ?? ''];
 }
 
 class AuthDeviceMismatchState extends AuthState {
