@@ -127,7 +127,7 @@ match /feedbacks/{feedbackId} {
 1. **تسجيل الدخول كـ Super Admin**
    ```
    رقم الموبيل: 01508899965
-   كلمة المرور: 01508899965000
+   كلمة المرور: [Firebase Auth password, removed from the client]
    ```
 
 2. **الذهاب إلى لوحة الإدارة**

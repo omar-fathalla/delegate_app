@@ -29,10 +29,11 @@ abstract class AuthRemoteDataSource {
   /// Delegate credential login must not call this.
   Future<void> signInAnonymously();
 
-  /// Verifies admin password using Firebase Authentication
+  /// Verifies a non-delegate password with Firebase Auth email/password.
   Future<bool> verifyAdminPassword(String email, String password);
 
-  /// Verifies marketing/phone-based user password from Firestore
+  /// Looks up the staff email for [phoneNumber], then verifies it with
+  /// Firebase Auth. Does not compare a password stored in Firestore.
   Future<bool> verifyPhonePassword(String phoneNumber, String password);
 }
 
@@ -328,6 +329,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             docs = fallbackQuery.docs.toList();
           } catch (_) {}
         }
+        if (docs.isEmpty) {
+          try {
+            final phoneAlias = await firestore
+                .collection('users')
+                .where('phone', isEqualTo: normalizedPhone)
+                .getResilient(
+                  timeout: const Duration(seconds: 5),
+                  forceServer: true,
+                );
+            docs = phoneAlias.docs.toList();
+          } catch (_) {}
+        }
         
         // Prioritize higher roles in case a phone number has multiple accounts
         docs.sort((a, b) {
@@ -384,10 +397,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               isMarketingPromotion ||
               isBranchesMarketing ||
               isHR) {
-            // Get admin email from Firestore
-            final adminEmail = userData['email'] as String? ?? '';
+            // Firebase Auth email comes only from this document.
+            final adminEmail = _stringField(userData, const ['email']);
+            if (adminEmail.isEmpty) continue;
 
-            // Determine the correct UserRole
             final mappedRole = isHR
                 ? UserRole.hr
                 : isAccountant
@@ -406,41 +419,42 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                                             ? UserRole.branchesMarketingManager
                                             : UserRole.admin;
 
-            // Use phone-based password check if user has a stored password or is marketing/technical_support/branches_marketing/accountant/hr
-            final hasStoredPassword = userData['password'] != null ||
-                userData['temporaryPassword'] != null ||
-                userData['tempPassword'] != null;
-
-            final nationalityMark = (hasStoredPassword ||
-                    isMarketing ||
-                    isMarketingPromotion ||
-                    isTechSupport ||
-                    isBranchesMarketing ||
-                    isAccountant ||
-                    isHR)
-                ? '__phone_auth__:$normalizedPhone'
-                : (adminEmail.isNotEmpty)
-                    ? '__firebase_auth__:$adminEmail'
-                    : '__phone_auth__:$normalizedPhone';
+            final displayName = _stringField(
+              userData,
+              const ['displayName', 'fullName', 'name'],
+            );
+            final resolvedName = displayName.isEmpty ? 'Admin' : displayName;
 
             delegates.add(
               DelegateModel(
                 uid: userDoc.id,
-                firstName: userData['displayName'] ?? 'Admin',
+                firstName: resolvedName,
                 middleName: '',
                 lastName: '',
-                fullName: userData['displayName'] ?? 'Admin',
-                nationalityID: nationalityMark,
+                fullName: resolvedName,
+                nationalityID: '__firebase_auth__:$adminEmail',
                 motherName: '',
                 city: '',
                 phoneNumber: normalizedPhone,
                 gender: DelegateGender.male,
                 position: DelegatePosition.supervisor,
                 birthDate: DateTime.now(),
-                organizationUID: userData['organizationUID'] ?? '',
-                organizationName: userData['organizationName'] ?? '',
-                companyUID: userData['companyUID'] ?? '',
-                companyName: userData['companyName'] ?? '',
+                organizationUID: _stringField(
+                  userData,
+                  const ['organizationUID', 'organizationId', 'orgId'],
+                ),
+                organizationName: _stringField(
+                  userData,
+                  const ['organizationName', 'organization_name'],
+                ),
+                companyUID: _stringField(
+                  userData,
+                  const ['companyUID', 'companyId'],
+                ),
+                companyName: _stringField(
+                  userData,
+                  const ['companyName', 'company_name'],
+                ),
                 status: DelegateStatus.approved,
                 delegatePublicId: '',
                 allReceiptCodes: const [],
@@ -467,124 +481,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         // Query failed — continue with delegates only.
       }
 
-      if (delegates.isEmpty && normalizedPhone == '01508899965') {
-        delegates.add(
-          DelegateModel(
-            uid: 'Cq7Xa6OEwEOlRPlS41vohtfBXke2',
-            firstName: 'Omar',
-            middleName: '',
-            lastName: 'Fathalla',
-            fullName: 'Omar Fathalla',
-            nationalityID: '__phone_auth__:01508899965',
-            motherName: '',
-            city: '',
-            phoneNumber: normalizedPhone,
-            gender: DelegateGender.male,
-            position: DelegatePosition.supervisor,
-            birthDate: DateTime.now(),
-            organizationUID: 'PiioBFgxaHAeuRdjlDgj',
-            organizationName: 'fathalla market',
-            companyUID: 's4J0c33Ctom3w64lbcKU',
-            companyName: 'admin',
-            status: DelegateStatus.approved,
-            delegatePublicId: '',
-            allReceiptCodes: const [],
-            createdAt: DateTime.now(),
-            createdBy: 'system_admin',
-            hasPendingUpdate: false,
-            isDeductedFromCompany: false,
-            isPrinted: false,
-            isProfileComplete: true,
-            numberOfDocuments: 0,
-            paymentAmount: 0,
-            version: 1,
-            documents: const [],
-            role: UserRole.superAdmin,
-            email: 'omar.fathalla80800@icloud.com',
-          ),
-        );
-      }
-
       return delegates;
     } on FirebaseException catch (e) {
-      if (_normalizePhone(phoneNumber) == '01508899965') {
-        return [
-          DelegateModel(
-            uid: 'Cq7Xa6OEwEOlRPlS41vohtfBXke2',
-            firstName: 'Omar',
-            middleName: '',
-            lastName: 'Fathalla',
-            fullName: 'Omar Fathalla',
-            nationalityID: '__phone_auth__:01508899965',
-            motherName: '',
-            city: '',
-            phoneNumber: '01508899965',
-            gender: DelegateGender.male,
-            position: DelegatePosition.supervisor,
-            birthDate: DateTime.now(),
-            organizationUID: 'PiioBFgxaHAeuRdjlDgj',
-            organizationName: 'fathalla market',
-            companyUID: 's4J0c33Ctom3w64lbcKU',
-            companyName: 'admin',
-            status: DelegateStatus.approved,
-            delegatePublicId: '',
-            allReceiptCodes: const [],
-            createdAt: DateTime.now(),
-            createdBy: 'system_admin',
-            hasPendingUpdate: false,
-            isDeductedFromCompany: false,
-            isPrinted: false,
-            isProfileComplete: true,
-            numberOfDocuments: 0,
-            paymentAmount: 0,
-            version: 1,
-            documents: const [],
-            role: UserRole.superAdmin,
-            email: 'omar.fathalla80800@icloud.com',
-          ),
-        ];
-      }
       throw ServerFailure(
         'فشل في الاتصال بقاعدة البيانات. يرجى التحقق من الاتصال والمحاولة مرة أخرى. (${e.code})',
       );
     } catch (e) {
-      if (_normalizePhone(phoneNumber) == '01508899965') {
-        return [
-          DelegateModel(
-            uid: 'Cq7Xa6OEwEOlRPlS41vohtfBXke2',
-            firstName: 'Omar',
-            middleName: '',
-            lastName: 'Fathalla',
-            fullName: 'Omar Fathalla',
-            nationalityID: '__phone_auth__:01508899965',
-            motherName: '',
-            city: '',
-            phoneNumber: '01508899965',
-            gender: DelegateGender.male,
-            position: DelegatePosition.supervisor,
-            birthDate: DateTime.now(),
-            organizationUID: 'PiioBFgxaHAeuRdjlDgj',
-            organizationName: 'fathalla market',
-            companyUID: 's4J0c33Ctom3w64lbcKU',
-            companyName: 'admin',
-            status: DelegateStatus.approved,
-            delegatePublicId: '',
-            allReceiptCodes: const [],
-            createdAt: DateTime.now(),
-            createdBy: 'system_admin',
-            hasPendingUpdate: false,
-            isDeductedFromCompany: false,
-            isPrinted: false,
-            isProfileComplete: true,
-            numberOfDocuments: 0,
-            paymentAmount: 0,
-            version: 1,
-            documents: const [],
-            role: UserRole.superAdmin,
-            email: 'omar.fathalla80800@icloud.com',
-          ),
-        ];
-      }
       final errStr = e.toString().toLowerCase();
       if (errStr.contains('timeout')) {
         throw const ServerFailure('انتهت مهلة الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.');
@@ -620,123 +522,115 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<bool> verifyAdminPassword(String email, String password) async {
     final cleanEmail = email.trim();
     final cleanPass = password.trim();
+    if (cleanEmail.isEmpty || cleanPass.isEmpty) return false;
 
-    // ── Step 1: Check stored password in Firestore first (fast, reliable, avoids Play Services hang) ──
-    try {
-      final query = await firestore
-          .collection('users')
-          .where('email', isEqualTo: cleanEmail)
-          .limit(1)
-          .getResilient(
-            timeout: const Duration(seconds: 4),
-            forceServer: true,
-          );
-
-      if (query.docs.isNotEmpty) {
-        final userData = query.docs.first.data();
-        final storedPassword =
-            (userData['password'] as String?) ??
-            (userData['temporaryPassword'] as String?) ??
-            (userData['tempPassword'] as String?);
-
-        if ((storedPassword != null && storedPassword.trim() == cleanPass) ||
-            (cleanEmail == 'omar.fathalla80800@icloud.com' &&
-                (cleanPass == '481636100Aa!' || cleanPass == '01508899965000'))) {
-          // Password matches directly! Try background sign-in non-blockingly
-          firebaseAuth
-              .signInWithEmailAndPassword(
-                email: cleanEmail,
-                password: cleanPass,
-              )
-              .timeout(const Duration(seconds: 3))
-              .catchError((_) => null as dynamic);
-          return true;
-        }
-      }
-    } catch (e) {
-      debugPrint('Firestore admin password check error: $e');
-    }
-
-    // ── Step 2: Try Firebase Authentication with strict timeout ──
     try {
       final credential = await firebaseAuth
           .signInWithEmailAndPassword(
             email: cleanEmail,
             password: cleanPass,
           )
-          .timeout(const Duration(seconds: 4));
-      if (credential.user != null) return true;
+          .timeout(const Duration(seconds: 12));
+      return credential.user != null;
     } on FirebaseAuthException catch (e) {
       debugPrint('FirebaseAuth admin signIn exception: ${e.code}');
+      return false;
     } catch (e) {
       debugPrint('FirebaseAuth admin signIn error: $e');
+      return false;
     }
-
-    if (cleanEmail == 'omar.fathalla80800@icloud.com' &&
-        (cleanPass == '481636100Aa!' || cleanPass == '01508899965000')) {
-      return true;
-    }
-
-    return false;
   }
 
   @override
   Future<bool> verifyPhonePassword(String phoneNumber, String password) async {
     try {
-      final normalizedPhone = _normalizePhone(phoneNumber);
-      final cleanPass = password.trim();
+      final email = await _staffEmailForPhone(phoneNumber);
+      if (email == null) return false;
+      return await verifyAdminPassword(email, password);
+    } catch (_) {
+      return false;
+    }
+  }
 
-      var query = await firestore
-          .collection('users')
-          .where('phoneNumber', isEqualTo: normalizedPhone)
-          .getResilient(
-            timeout: const Duration(seconds: 5),
-            forceServer: true,
-          );
+  Future<String?> _staffEmailForPhone(String phoneNumber) async {
+    final normalizedPhone = _normalizePhone(phoneNumber);
+    final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-      var docs = query.docs;
-      if (docs.isEmpty && phoneNumber.trim() != normalizedPhone) {
-        query = await firestore
+    Future<void> addQuery(String field, String value) async {
+      if (value.isEmpty) return;
+      try {
+        final snap = await firestore
             .collection('users')
-            .where('phoneNumber', isEqualTo: phoneNumber.trim())
+            .where(field, isEqualTo: value)
             .getResilient(
               timeout: const Duration(seconds: 5),
               forceServer: true,
             );
-        docs = query.docs;
-      }
-
-      if (docs.isEmpty) {
-        if (normalizedPhone == '01508899965') {
-          return cleanPass == '481636100Aa!' || cleanPass == '01508899965000';
-        }
-        return false;
-      }
-
-      for (final doc in docs) {
-        final userData = doc.data();
-        final storedPassword =
-            (userData['password'] as String?) ??
-            (userData['temporaryPassword'] as String?) ??
-            (userData['tempPassword'] as String?);
-
-        if (storedPassword != null && storedPassword.trim() == cleanPass) {
-          return true;
-        }
-      }
-
-      if (normalizedPhone == '01508899965' &&
-          (cleanPass == '481636100Aa!' || cleanPass == '01508899965000')) {
-        return true;
-      }
-
-      return false;
-    } catch (_) {
-      if (_normalizePhone(phoneNumber) == '01508899965') {
-        final cleanPass = password.trim();
-        return cleanPass == '481636100Aa!' || cleanPass == '01508899965000';
-      }
-      return false;
+        docs.addAll(snap.docs);
+      } catch (_) {}
     }
+
+    await addQuery('phoneNumber', normalizedPhone);
+    if (phoneNumber.trim() != normalizedPhone) {
+      await addQuery('phoneNumber', phoneNumber.trim());
+    }
+    if (docs.isEmpty) {
+      await addQuery('phone', normalizedPhone);
+    }
+
+    docs.sort((a, b) {
+      final weightA = _staffRoleWeight(a.data()['role'] as String? ?? '');
+      final weightB = _staffRoleWeight(b.data()['role'] as String? ?? '');
+      return weightB.compareTo(weightA);
+    });
+
+    for (final doc in docs) {
+      final data = doc.data();
+      if (_staffRoleWeight(data['role'] as String? ?? '') == 0) continue;
+      final email = _stringField(data, const ['email']);
+      if (email.isNotEmpty) return email;
+    }
+    return null;
+  }
+
+  static String _stringField(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      final value = data[key];
+      if (value is String && value.trim().isNotEmpty) return value.trim();
+    }
+    return '';
+  }
+
+  static int _staffRoleWeight(String role) {
+    final norm = role.toLowerCase().replaceAll('-', '_');
+    if (norm == 'super_admin' || norm == 'superadmin') return 100;
+    if (norm == 'technical_support' ||
+        norm == 'technicalsupport' ||
+        norm == 'tech_support' ||
+        norm == 'techsupport') {
+      return 90;
+    }
+    if (norm == 'accountant' || norm == 'accounting') return 85;
+    if (norm == 'organization_admin' || norm == 'organizationadmin') return 80;
+    if (norm == 'hr' ||
+        norm == 'company_hr' ||
+        norm == 'human_resources') {
+      return 75;
+    }
+    if (norm == 'company_admin' || norm == 'companyadmin' || norm == 'admin') {
+      return 70;
+    }
+    if (norm == 'branches_marketing' ||
+        norm == 'branches_marketing_manager' ||
+        norm == 'branchesmarketingmanager') {
+      return 65;
+    }
+    if (norm == 'supervisor') return 60;
+    if (norm == 'marketing' ||
+        norm == 'marketing_promotion' ||
+        norm == 'marketingpromotion') {
+      return 50;
+    }
+    return 0;
   }
 }

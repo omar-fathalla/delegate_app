@@ -127,7 +127,7 @@ flutter run
 ### 5. سجل دخول من جديد
 ```
 رقم: 01508899965
-كلمة المرور: 01508899965000
+كلمة المرور: [Firebase Auth password, removed from the client]
 ```
 
 ### 6. اذهب إلى الفروع

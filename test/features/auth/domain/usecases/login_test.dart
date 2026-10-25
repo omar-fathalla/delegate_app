@@ -230,7 +230,7 @@ void main() {
   });
 
   group('User provided test cases', () {
-    test('Admin login with exactly 01508899965 and 4816361Aa', () async {
+    test('staff login verifies the looked-up email with Firebase Auth', () async {
       final adminDelegate = Delegate(
         uid: '1',
         firstName: 'Test',
@@ -269,7 +269,8 @@ void main() {
         middleName: adminDelegate.middleName,
         lastName: adminDelegate.lastName,
         fullName: adminDelegate.fullName,
-        nationalityID: '__phone_auth__:01508899965',
+        nationalityID: '__firebase_auth__:staff@example.com',
+        email: 'staff@example.com',
         motherName: adminDelegate.motherName,
         city: adminDelegate.city,
         phoneNumber: adminDelegate.phoneNumber,
@@ -300,19 +301,43 @@ void main() {
       );
       mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
           Right([staffDelegate]);
-      mockAuthRepository.verifyPhonePasswordStub = (_, _) async =>
-          const Right(true);
+      String? verifiedEmail;
+      String? verifiedPassword;
+      mockAuthRepository.verifyAdminPasswordStub = (email, password) async {
+        verifiedEmail = email;
+        verifiedPassword = password;
+        return Right(password == 'correct-password');
+      };
 
       final result = await usecase(
-        const LoginParams(phoneNumber: '01508899965', password: '4816361Aa'),
+        const LoginParams(
+          phoneNumber: '01500000000',
+          password: 'correct-password',
+        ),
       );
 
+      expect(verifiedEmail, 'staff@example.com');
+      expect(verifiedPassword, 'correct-password');
       expect(result.isRight(), isTrue);
       result.fold(
         (l) => fail('Should be right'),
-        (r) => expect(r.first.position, DelegatePosition.supervisor),
+        (r) => expect(r.first.role, UserRole.superAdmin),
       );
-      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
+
+      final denied = await usecase(
+        const LoginParams(
+          phoneNumber: '01500000000',
+          password: 'wrong-password',
+        ),
+      );
+      expect(denied.isLeft(), isTrue);
+      denied.fold(
+        (failure) {
+          expect(failure, isA<AuthFailure>());
+          expect((failure as AuthFailure).code, 'invalid_credentials');
+        },
+        (_) => fail('wrong password must not sign in'),
+      );
     });
 
     test('Delegate login with 01281769997 and 29712200201981', () async {

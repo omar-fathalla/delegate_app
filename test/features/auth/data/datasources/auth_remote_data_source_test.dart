@@ -7,6 +7,27 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+class _EmailPasswordAuth extends MockFirebaseAuth {
+  _EmailPasswordAuth({required this.acceptedPassword});
+
+  final String acceptedPassword;
+  final List<String> emails = [];
+  final List<String> passwords = [];
+
+  @override
+  Future<UserCredential> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) {
+    emails.add(email);
+    passwords.add(password);
+    if (password != acceptedPassword) {
+      throw FirebaseAuthException(code: 'wrong-password');
+    }
+    return super.signInWithEmailAndPassword(email: email, password: password);
+  }
+}
+
 class _NoAnonymousAuth extends MockFirebaseAuth {
   @override
   Future<UserCredential> signInAnonymously() {
@@ -123,8 +144,9 @@ void main() {
 
     test('should find admin in users collection', () async {
       await fakeFirestore.collection('users').doc('admin1').set({
-        'phoneNumber': '01508899965',
+        'phoneNumber': '01500000000',
         'role': 'company-admin',
+        'email': 'admin@example.com',
         'displayName': 'مدير',
         'organizationUID': 'org1',
         'organizationName': 'منظمة تسهيل',
@@ -132,10 +154,132 @@ void main() {
         'companyName': 'شركة تسهيل',
       });
 
-      final result = await dataSource.getDelegatesByPhone('01508899965');
+      final result = await dataSource.getDelegatesByPhone('01500000000');
 
       expect(result, isNotEmpty);
       expect(result.first.position, DelegatePosition.supervisor);
+      expect(result.first.email, 'admin@example.com');
+      expect(
+        result.first.nationalityID,
+        '__firebase_auth__:admin@example.com',
+      );
+    });
+
+    test('loads a super-admin user from the real document', () async {
+      await fakeFirestore.collection('users').doc('auth-uid').set({
+        'phoneNumber': '01500000001',
+        'role': 'super-admin',
+        'email': 'super@example.com',
+        'displayName': 'Omar Fathalla',
+        'organizationUID': 'org-real',
+        'organizationName': 'Org',
+      });
+
+      final result = await dataSource.getDelegatesByPhone('01500000001');
+
+      expect(result, hasLength(1));
+      expect(result.single.uid, 'auth-uid');
+      expect(result.single.role, UserRole.superAdmin);
+      expect(result.single.email, 'super@example.com');
+      expect(result.single.organizationUID, 'org-real');
+      expect(
+        result.single.nationalityID,
+        '__firebase_auth__:super@example.com',
+      );
+    });
+
+    test('still reads a legacy super_admin role string', () async {
+      await fakeFirestore.collection('users').doc('legacy').set({
+        'phoneNumber': '01500000002',
+        'role': 'super_admin',
+        'email': 'legacy@example.com',
+        'displayName': 'Legacy',
+      });
+
+      final result = await dataSource.getDelegatesByPhone('01500000002');
+
+      expect(result.single.role, UserRole.superAdmin);
+    });
+
+    test('does not invent a staff account when the phone has no document', () async {
+      final result = await dataSource.getDelegatesByPhone('01500000099');
+      expect(result, isEmpty);
+    });
+  });
+
+  group('staff password login', () {
+    test('signs in with the email looked up from the phone', () async {
+      await fakeFirestore.collection('users').doc('auth-uid').set({
+        'phoneNumber': '01500000001',
+        'role': 'super-admin',
+        'email': 'super@example.com',
+        'password': 'stored-in-firestore',
+      });
+      final auth = _EmailPasswordAuth(acceptedPassword: 'auth-secret');
+      final source = AuthRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        firebaseAuth: auth,
+      );
+
+      final signedIn = await source.verifyPhonePassword(
+        '01500000001',
+        'auth-secret',
+      );
+
+      expect(signedIn, isTrue);
+      expect(auth.emails, ['super@example.com']);
+      expect(auth.passwords, ['auth-secret']);
+      expect(auth.currentUser, isNotNull);
+      expect(auth.currentUser!.isAnonymous, isFalse);
+    });
+
+    test('a wrong password fails even when Firestore stores that password', () async {
+      await fakeFirestore.collection('users').doc('auth-uid').set({
+        'phoneNumber': '01500000001',
+        'role': 'super-admin',
+        'email': 'super@example.com',
+        'password': 'stored-in-firestore',
+      });
+      final auth = _EmailPasswordAuth(acceptedPassword: 'auth-secret');
+      final source = AuthRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        firebaseAuth: auth,
+      );
+
+      final stored = await source.verifyPhonePassword(
+        '01500000001',
+        'stored-in-firestore',
+      );
+      final wrong = await source.verifyAdminPassword(
+        'super@example.com',
+        'wrong-password',
+      );
+
+      expect(stored, isFalse);
+      expect(wrong, isFalse);
+      expect(auth.currentUser, isNull);
+      expect(auth.emails, ['super@example.com', 'super@example.com']);
+    });
+
+    test('does not sign in when the user document has no email', () async {
+      await fakeFirestore.collection('users').doc('auth-uid').set({
+        'phoneNumber': '01500000001',
+        'role': 'super-admin',
+        'displayName': 'Omar Fathalla',
+      });
+      final auth = _EmailPasswordAuth(acceptedPassword: 'auth-secret');
+      final source = AuthRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        firebaseAuth: auth,
+      );
+
+      final signedIn = await source.verifyPhonePassword(
+        '01500000001',
+        'auth-secret',
+      );
+
+      expect(signedIn, isFalse);
+      expect(auth.emails, isEmpty);
     });
   });
 

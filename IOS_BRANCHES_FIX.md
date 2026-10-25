@@ -81,7 +81,7 @@ match /branches/{branchId} {
 2. أعد تثبيته: `flutter run`
 3. سجل دخول كـ Super Admin:
    - رقم الهاتف: `01508899965`
-   - كلمة المرور: `01508899965000`
+   - كلمة المرور: `[Firebase Auth password, removed from the client]`
 4. اذهب إلى "الفروع"
 5. يجب أن تظهر البيانات ✅
 
