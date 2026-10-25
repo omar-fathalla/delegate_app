@@ -294,6 +294,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             .collection('users')
             .where('role', whereIn: [
               'super-admin',
+              'super_admin',
               'superAdmin',
               'technicalSupport',
               'technical-support',

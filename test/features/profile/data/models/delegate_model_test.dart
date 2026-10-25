@@ -144,5 +144,30 @@ void main() {
       final delegate3 = DelegateModel.fromJson(jsonCompanyHRUnderscore, "hr_123");
       expect(delegate3.role, UserRole.hr);
     });
+
+    test('serializes superAdmin as super-admin and parses both legacy forms', () {
+      expect(DelegateModel.roleToString(UserRole.superAdmin), 'super-admin');
+
+      final base = {
+        'firstName': 'Omar',
+        'middleName': '',
+        'lastName': 'Admin',
+        'fullName': 'Omar Admin',
+        'phoneNumber': '01000000000',
+        'birthDate': '2026-01-01T00:00:00.000',
+        'createdAt': '2026-01-01T00:00:00.000',
+      };
+
+      for (final raw in ['super-admin', 'super_admin', 'superadmin', 'Super-Admin']) {
+        final parsed = DelegateModel.fromJson({...base, 'role': raw}, 'sa');
+        expect(parsed.role, UserRole.superAdmin, reason: raw);
+      }
+
+      final legacy = DelegateModel.fromJson({...base, 'role': 'super_admin'}, 'sa');
+      expect(legacy.toLocalJson()['role'], 'super-admin');
+      final roundTrip = DelegateModel.fromJson(legacy.toLocalJson(), 'sa');
+      expect(roundTrip.role, UserRole.superAdmin);
+      expect(DelegateModel.roleToString(roundTrip.role), 'super-admin');
+    });
   });
 }

@@ -114,7 +114,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     final displayName = (data['displayName'] ?? '').toString().trim();
     final fullName = (data['fullName'] ?? data['name'] ?? '').toString().trim();
 
-    if (role == 'super-admin' || role == 'superAdmin') {
+    final normRole = role.toLowerCase().replaceAll('-', '_');
+    if (normRole == 'super_admin' || normRole == 'superadmin') {
       return 'Super Admin';
     }
     if (role == 'technicalSupport' || role == 'technical-support') {

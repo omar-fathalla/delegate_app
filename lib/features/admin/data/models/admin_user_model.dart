@@ -19,12 +19,21 @@ class AdminUserModel extends AdminUser {
     super.isActive,
   });
 
+  /// Rules grant super-admin access only for the hyphen form. Legacy
+  /// underscore and camel-case values are rewritten on the way out so a
+  /// save does not persist a role the rules reject.
+  static String storedRole(String role) {
+    final norm = role.trim().toLowerCase().replaceAll('-', '_');
+    if (norm == 'super_admin' || norm == 'superadmin') return 'super-admin';
+    return role;
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'phoneNumber': phoneNumber,
       'email': email,
       'displayName': displayName,
-      'role': role,
+      'role': storedRole(role),
       'organizationUID': organizationUID ?? '',
       'companyUID': companyUID ?? '',
       if (companyName != null && companyName!.isNotEmpty) 'companyName': companyName,

@@ -153,6 +153,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
       final filteredRaw = rawList.where((d) {
         final role = d['role']?.toString().toLowerCase() ?? '';
         final isExcludedRole = role == 'admin' ||
+            role == 'super-admin' ||
             role == 'superadmin' ||
             role == 'super_admin' ||
             role == 'technicalsupport' ||

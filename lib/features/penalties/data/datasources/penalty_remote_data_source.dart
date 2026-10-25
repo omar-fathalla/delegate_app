@@ -363,8 +363,8 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
         // Direct manager user accounts in Firestore
         final queryRoles = finalPenalty.isConfidential
-            ? ['organizationAdmin', 'superAdmin', 'super-admin', 'technicalSupport', 'technical_support']
-            : ['branchesMarketingManager', 'organizationAdmin', 'superAdmin', 'super-admin', 'branches_marketing'];
+            ? ['organizationAdmin', 'superAdmin', 'super-admin', 'super_admin', 'technicalSupport', 'technical_support']
+            : ['branchesMarketingManager', 'organizationAdmin', 'superAdmin', 'super-admin', 'super_admin', 'branches_marketing'];
 
         final usersSnap = await firestore
             .collection('users')
