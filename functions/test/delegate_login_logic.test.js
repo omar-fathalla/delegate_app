@@ -128,7 +128,23 @@ test("custom claims carry role and ids and never a national id", () => {
   assert.deepEqual(claims.orgIds, ["org-1", "org-2"]);
   assert.equal(Object.prototype.hasOwnProperty.call(claims, "nationalId"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(claims, "nationalityID"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(claims, "phones"), false);
   assert.equal(logic.stableDelegateAuthUid("delegate-doc"), "delegate-doc");
+});
+
+test("custom claims include phone variants and never the national id", () => {
+  const claims = logic.buildCustomClaims({
+    id: "delegate-doc",
+    status: "active",
+    companyId: "company-1",
+    orgId: "org-1",
+    phone: "01234567890",
+    createdAtMillis: 1,
+    nationalIdMatches: true,
+  }, ["delegate-doc"]);
+  assert.ok(claims.phones.includes("01234567890"));
+  assert.ok(claims.phones.includes("+201234567890"));
+  assert.equal(Object.prototype.hasOwnProperty.call(claims, "nationalId"), false);
 });
 
 test("rate limit locks on the fifth failure and does not extend an active lock", () => {

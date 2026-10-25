@@ -35,6 +35,20 @@ class _NoAnonymousAuth extends MockFirebaseAuth {
   }
 }
 
+class _FakeStaffLookup implements StaffPhoneLookupApi {
+  _FakeStaffLookup(this.profile, {this.error});
+
+  final StaffPhoneProfile? profile;
+  final StaffPhoneLookupException? error;
+
+  @override
+  Future<StaffPhoneProfile?> lookup(String phone) async {
+    final failure = error;
+    if (failure != null) throw failure;
+    return profile;
+  }
+}
+
 class _FakeDelegateLoginApi implements DelegateLoginApi {
   _FakeDelegateLoginApi(this.response, {this.error});
 
@@ -103,6 +117,74 @@ void main() {
           });
 
       final result = await dataSource.getDelegatesByPhone('01000000000');
+
+      expect(result, isEmpty);
+    });
+
+    test('uses staffPhoneLookup and does not need a users document', () async {
+      final source = AuthRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        firebaseAuth: mockFirebaseAuth,
+        staffPhoneLookupApi: _FakeStaffLookup(
+          const StaffPhoneProfile(
+            uid: 'auth-uid',
+            email: 'omar@example.com',
+            role: 'super_admin',
+            displayName: 'Omar Fathalla',
+            phoneNumber: '01508899965',
+            organizationUID: 'org-1',
+            companyUID: 'comp-1',
+          ),
+        ),
+      );
+
+      final result = await source.getDelegatesByPhone('01508899965');
+
+      expect(result, hasLength(1));
+      expect(result.first.uid, 'auth-uid');
+      expect(result.first.role, UserRole.superAdmin);
+      expect(result.first.email, 'omar@example.com');
+      expect(result.first.nationalityID, '__firebase_auth__:omar@example.com');
+    });
+
+    test('falls back to users when staffPhoneLookup is not deployed', () async {
+      await fakeFirestore.collection('users').doc('staff-1').set({
+        'role': 'hr',
+        'email': 'hr@example.com',
+        'displayName': 'HR',
+        'phoneNumber': '01000000000',
+        'organizationUID': 'org1',
+        'companyUID': 'comp1',
+      });
+      final source = AuthRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        firebaseAuth: mockFirebaseAuth,
+        staffPhoneLookupApi: _FakeStaffLookup(
+          null,
+          error: const StaffPhoneLookupException('unavailable'),
+        ),
+      );
+
+      final result = await source.getDelegatesByPhone('01000000000');
+
+      expect(result, hasLength(1));
+      expect(result.first.role, UserRole.hr);
+      expect(result.first.email, 'hr@example.com');
+    });
+
+    test('does not fall back to users when the callable says not found', () async {
+      await fakeFirestore.collection('users').doc('staff-1').set({
+        'role': 'hr',
+        'email': 'hr@example.com',
+        'phoneNumber': '01000000000',
+      });
+      final source = AuthRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        firebaseAuth: mockFirebaseAuth,
+        staffPhoneLookupApi: _FakeStaffLookup(null),
+      );
+
+      final result = await source.getDelegatesByPhone('01000000000');
 
       expect(result, isEmpty);
     });

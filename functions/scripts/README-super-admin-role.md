@@ -1,6 +1,6 @@
 # Optional super-admin role migration
 
-Firestore rules grant super-admin access only when `users/{uid}.role` is exactly `super-admin`. Older app builds wrote `super_admin`. The current app reads both forms and writes `super-admin`. Documents that still store the underscore fail `isSuperAdmin()` until they are rewritten.
+The app writes `super-admin`. `isSuperAdmin()` also accepts the legacy spellings `super_admin`, `superadmin`, and `superAdmin` until this script is applied. A client write of those legacy spellings is rejected. Documents that still store `super_admin` keep super-admin access, and this script rewrites them to `super-admin`.
 
 Do not run this as part of deploy. `functions/scripts/migrate-super-admin-role.js` is not imported by `index.ts`.
 

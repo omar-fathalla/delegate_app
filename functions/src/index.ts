@@ -498,4 +498,5 @@ export const onNotificationCreated = functions.firestore
   });
 
 export {delegateLoginV2} from "./delegate_login";
+export {staffPhoneLookup} from "./staff_phone_lookup";
 

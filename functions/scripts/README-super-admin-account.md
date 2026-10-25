@@ -2,7 +2,7 @@
 
 Staff login looks up `users` by phone, reads that document's `email`, and calls `FirebaseAuth.signInWithEmailAndPassword`. The app has no built-in email, uid, or password. Production Auth has no user for the address the old client hardcoded, so that address cannot be used unless someone creates it.
 
-`isSuperAdmin()` reads `users/{request.auth.uid}.role` and allows the role only when it is exactly `super-admin`. The Firestore document id must be the Firebase Auth uid.
+`isSuperAdmin()` reads `users/{request.auth.uid}.role`. The canonical value is `super-admin`. Legacy `super_admin`, `superadmin`, and `superAdmin` still grant access until `migrate-super-admin-role.js` runs. The Firestore document id must be the Firebase Auth uid. Anonymous sign-in is denied.
 
 Do not run the script as part of deploy. `functions/scripts/create-super-admin-user.js` is not imported by `index.ts`. It does not create the Auth user and it does not take a password.
 
@@ -22,7 +22,9 @@ Do not run the script as part of deploy. `functions/scripts/create-super-admin-u
 
 The removed client fallback used to invent `organizationUID` `PiioBFgxaHAeuRdjlDgj`, `organizationName` `fathalla market`, `companyUID` `s4J0c33Ctom3w64lbcKU`, and `companyName` `admin` when no document was found. Put those values on the real document only if they are still the right organization and company. The app no longer fills them in.
 
-If a `users` document for this phone already exists under a different id, rules still check `users/{Auth uid}`. The document id has to be the Auth uid. A stored `role` of `super_admin` still signs in inside the app, and it still fails `isSuperAdmin()` until it is `super-admin`.
+If a `users` document for this phone already exists under a different id, rules still check `users/{Auth uid}`. The document id has to be the Auth uid. A stored `role` of `super_admin` still signs in inside the app and is treated as super-admin by the rules until the migration script rewrites it. New writes must use `super-admin`.
+
+Staff phone lookup no longer depends on a public `users` read. Deploy `staffPhoneLookup` before the tightened rules. Until that function is deployed, the app falls back to the `users` phone query, which the tightened rules reject.
 
 ## Optional script
 

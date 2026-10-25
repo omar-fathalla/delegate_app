@@ -9,9 +9,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 abstract class AuthRemoteDataSource {
-  /// Staff lookup by phone. Reads only the `users` collection, which is
-  /// readable before sign-in. Does not query `delegates` and does not create
-  /// an auth session.
+  /// Staff lookup by phone. Uses `staffPhoneLookup` when it is deployed.
+  /// Falls back to the `users` collection only when that callable is missing.
+  /// Does not query `delegates` and does not create an auth session.
   ///
   /// Delegate credential login uses [loginDelegate] and does not call this.
   Future<List<DelegateModel>> getDelegatesByPhone(String phoneNumber);
@@ -39,11 +39,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseFirestore firestore;
   final FirebaseAuth firebaseAuth;
   final DelegateLoginApi? delegateLoginApi;
+  final StaffPhoneLookupApi? staffPhoneLookupApi;
 
   AuthRemoteDataSourceImpl({
     required this.firestore,
     required this.firebaseAuth,
     this.delegateLoginApi,
+    this.staffPhoneLookupApi,
   });
 
   /// Normalises a phone number by stripping common Egyptian prefixes
@@ -286,6 +288,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<List<DelegateModel>> getDelegatesByPhone(String phoneNumber) async {
     try {
       final normalizedPhone = _normalizePhone(phoneNumber);
+      final lookedUp = await _staffFromCallable(phoneNumber, normalizedPhone);
+      if (lookedUp != null) return lookedUp;
       final docs = await _staffUserDocs(phoneNumber);
       final delegates = <DelegateModel>[];
       for (final userDoc in docs) {
@@ -348,6 +352,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   Future<String?> _staffEmailForPhone(String phoneNumber) async {
     try {
+      final lookedUp = await _staffFromCallable(
+        phoneNumber,
+        _normalizePhone(phoneNumber),
+      );
+      if (lookedUp != null) {
+        if (lookedUp.isEmpty) return null;
+        final email = lookedUp.first.email?.trim() ?? '';
+        return email.isEmpty ? null : email;
+      }
       final docs = await _staffUserDocs(phoneNumber);
       for (final doc in docs) {
         final email = _stringField(doc.data(), const ['email']);
@@ -360,8 +373,41 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return null;
   }
 
-  /// Users-collection lookup shared by staff login. `users` is readable
-  /// before authentication, so this does not sign in.
+  /// Null means the callable is not deployed and the users query should run.
+  /// An empty list means the callable answered and there is no staff account.
+  Future<List<DelegateModel>?> _staffFromCallable(
+    String phoneNumber,
+    String normalizedPhone,
+  ) async {
+    final api = staffPhoneLookupApi;
+    if (api == null) return null;
+    try {
+      final profile = await api.lookup(phoneNumber);
+      if (profile == null) return const [];
+      final model = _staffModelFromData(
+        profile.uid,
+        {
+          'role': profile.role,
+          'email': profile.email,
+          'displayName': profile.displayName,
+          'organizationUID': profile.organizationUID,
+          'organizationName': profile.organizationName,
+          'companyUID': profile.companyUID,
+          'companyName': profile.companyName,
+        },
+        normalizedPhone,
+      );
+      if (model == null) return const [];
+      return [model];
+    } on StaffPhoneLookupException catch (error) {
+      if (error.reason == 'unavailable') return null;
+      if (error.reason == 'not_found') return const [];
+      return const [];
+    }
+  }
+
+  /// Users-collection lookup shared by staff login. Used only when
+  /// `staffPhoneLookup` is not deployed yet. The tightened rules reject it.
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _staffUserDocs(
     String phoneNumber,
   ) async {
@@ -413,7 +459,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     QueryDocumentSnapshot<Map<String, dynamic>> userDoc,
     String normalizedPhone,
   ) {
-    final userData = userDoc.data();
+    return _staffModelFromData(userDoc.id, userDoc.data(), normalizedPhone);
+  }
+
+  DelegateModel? _staffModelFromData(
+    String uid,
+    Map<String, dynamic> userData,
+    String normalizedPhone,
+  ) {
     final userRole = userData['role'] as String? ?? '';
     final normRole = userRole.toLowerCase().replaceAll('-', '_');
     final isSuperAdmin =
@@ -483,7 +536,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final resolvedName = displayName.isEmpty ? 'Admin' : displayName;
 
     return DelegateModel(
-      uid: userDoc.id,
+      uid: uid,
       firstName: resolvedName,
       middleName: '',
       lastName: '',
@@ -546,7 +599,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         norm == 'techsupport') {
       return 90;
     }
-    if (norm == 'accountant' || norm == 'accounting') return 85;
+    if (norm == 'accountant' || norm == 'accounting' || norm == 'account_admin') {
+      return 85;
+    }
     if (norm == 'organization_admin' || norm == 'organizationadmin') return 80;
     if (norm == 'hr' ||
         norm == 'company_hr' ||

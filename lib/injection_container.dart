@@ -216,11 +216,17 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       FirebaseFunctions.instanceFor(region: 'us-central1'),
     ),
   );
+  sl.registerLazySingleton<StaffPhoneLookupApi>(
+    () => FirebaseStaffPhoneLookupApi(
+      FirebaseFunctions.instanceFor(region: 'us-central1'),
+    ),
+  );
   sl.registerLazySingleton<AuthRemoteDataSource>(
     () => AuthRemoteDataSourceImpl(
       firestore: sl(),
       firebaseAuth: sl(),
       delegateLoginApi: sl(),
+      staffPhoneLookupApi: sl(),
     ),
   );
 

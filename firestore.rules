@@ -2,648 +2,1028 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ==================== HELPER FUNCTIONS ====================
+    // =====================================================================
+    // Single source of truth for project practice-firebase-72df1.
+    //
+    // One database has one ruleset. The Angular repo YousseFathalla/tashil
+    // must stop deploying rules: remove its firebase.json "firestore" section
+    // and replace its firestore.rules with a pointer at this file. A web
+    // deploy that still publishes rules will overwrite this file.
+    //
+    // These rules are NOT deployed by this change.
+    //
+    // Old app versions that sign in anonymously lose every read and write.
+    // Deploy staffPhoneLookup and delegateLoginV2 before these rules. Until
+    // staffPhoneLookup is deployed, staff login falls back to a users query
+    // that these rules reject.
+    //
+    // Delegate custom tokens (delegateLoginV2) carry role "delegate",
+    // delegateId, delegateIds, orgId, companyId, optional orgIds/companyIds,
+    // and phones. Staff authority comes from users/{auth.uid}.role, never
+    // from a custom claim. Legacy role spellings are accepted on read until
+    // migrate-super-admin-role.js runs. New role writes must be canonical,
+    // and super-admin can only be written by an existing super-admin.
+    // =====================================================================
 
-    // Helper function to check if user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
+    // ==================== HELPERS ====================
+
+    function signedIn() {
+      return request.auth != null && !isAnonymous();
     }
 
-    // Helper function to get user document
-    // NOTE: Firestore rules cache get() calls within the same rule evaluation,
-    // so multiple calls to getUserDoc() in the same rule are efficient.
-    // However, we use getUserData() helper to access data more efficiently.
-    function getUserDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    function isAnonymous() {
+      return request.auth != null
+        && request.auth.token.keys().hasAll(['firebase'])
+        && request.auth.token.firebase.keys().hasAll(['sign_in_provider'])
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
-    // Helper function to get user data (optimized to reduce redundant .data access)
-    // This helps with code readability and ensures consistent access patterns
-    function getUserData() {
-      return getUserDoc().data;
+    function userExists() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    // Helper function to check if user is super admin
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function userRole() {
+      return userExists() && userDoc().keys().hasAll(['role']) && userDoc().role is string
+        ? userDoc().role
+        : '';
+    }
+
+    function roleIs(roles) {
+      return userRole() in roles;
+    }
+
     function isSuperAdmin() {
-      return isAuthenticated() &&
-             getUserData().role == 'super-admin';
+      return roleIs([
+        'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+        'Super-Admin', 'SUPER_ADMIN'
+      ]);
     }
 
-    // Helper function to check if user is organization admin
+    function isTechnicalSupport() {
+      return roleIs([
+        'technical_support', 'technical-support', 'technicalSupport',
+        'technicalsupport', 'tech_support', 'techsupport'
+      ]);
+    }
+
     function isOrgAdmin() {
-      return isAuthenticated() &&
-             getUserData().role == 'organization-admin';
+      return roleIs([
+        'organization-admin', 'organization_admin', 'organizationadmin',
+        'organizationAdmin'
+      ]);
     }
 
-    // Helper function to check if user is company admin
     function isCompanyAdmin() {
-      return isAuthenticated() &&
-             getUserData().role == 'company-admin';
+      return roleIs([
+        'company-admin', 'company_admin', 'companyadmin', 'admin',
+        'supervisor', 'company_supervisor'
+      ]);
     }
 
-    // Helper function to check if user is HR
     function isHR() {
-      return isAuthenticated() &&
-             (getUserData().role == 'hr' || getUserData().role == 'company-hr' || getUserData().role == 'company_hr');
+      return roleIs(['hr', 'company-hr', 'company_hr', 'human_resources']);
     }
 
-    // Helper function to check if user is marketing
     function isMarketing() {
-      return isAuthenticated() &&
-             (getUserData().role == 'marketing' || getUserData().role == 'marketing_promotion');
+      return roleIs([
+        'marketing', 'marketing_promotion', 'marketingpromotion',
+        'marketingPromotion'
+      ]);
     }
 
-    // Helper function to check if user belongs to organization
-    function belongsToOrganization(orgId) {
-      return isAuthenticated() &&
-             getUserData().organizationUID == orgId;
+    function isBranchesMarketing() {
+      return roleIs([
+        'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+        'branches-marketing-manager', 'branchesmarketingmanager'
+      ]);
     }
 
-    // Helper function to check if user belongs to company
-    function belongsToCompany(orgId, compId) {
-      return isAuthenticated() &&
-             getUserData().organizationUID == orgId &&
-             getUserData().companyUID == compId;
+    function isAccountant() {
+      return roleIs(['accountant', 'accounting', 'account_admin']);
     }
 
-    // Helper function to check if user can access organization (read + write)
-    function canAccessOrganization(orgId) {
-      return isSuperAdmin() ||
-             (isOrgAdmin() && belongsToOrganization(orgId));
+    // Cross-company readers. Organization admins are scoped to their org.
+    function isGlobalStaff() {
+      return isSuperAdmin() || isTechnicalSupport();
     }
 
-    // Helper function to check if user can READ organization (includes marketing)
-    function canReadOrganization(orgId) {
-      return isSuperAdmin() ||
-             (isOrgAdmin() && belongsToOrganization(orgId)) ||
-             (isMarketing() && belongsToOrganization(orgId));
+    function isOrgScopedStaff() {
+      return isOrgAdmin() || isMarketing();
     }
 
-    // Helper function to check if user can access company (read + write)
-    function canAccessCompany(orgId, compId) {
-      return isSuperAdmin() ||
-             (isOrgAdmin() && belongsToOrganization(orgId)) ||
-             (isCompanyAdmin() && belongsToCompany(orgId, compId)) ||
-             (isHR() && belongsToCompany(orgId, compId));
+    function isCompanyScopedStaff() {
+      return isCompanyAdmin() || isHR() || isAccountant() || isBranchesMarketing();
     }
 
-    // Helper function to check if the update is only incrementing the admin count
-    function isAdminCountIncrement() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['admins', 'updatedAt']) &&
-             request.resource.data.admins == resource.data.admins + 1;
+    function isStaffWriter() {
+      return isGlobalStaff() || isOrgScopedStaff() || isCompanyScopedStaff();
     }
 
-    // ==================== COLLECTION GROUP RULES ====================
-
-    // Requests collectionGroup (Web Dashboard queries)
-    match /{path=**}/requests/{requestId} {
-      allow read: if isAuthenticated() && canAccessCompany(resource.data.organizationUID, resource.data.companyUID);
+    function claimString(key) {
+      return signedIn() && request.auth.token.keys().hasAll([key]) && request.auth.token[key] is string
+        ? request.auth.token[key]
+        : '';
     }
 
-    // Delegates collectionGroup (Web Dashboard + Mobile App + Marketing Search)
-    // NOTE: Mobile app uses anonymous auth to query delegates by phone number for login.
-    // Anonymous users don't have a /users/{uid} document, so canAccessCompany() would fail.
-    // We allow authenticated reads but restrict to phone-based queries only for anonymous users.
-    // Authenticated admin users get full read access via canAccessCompany() in nested rules.
-    // Marketing users can read delegates for search purposes (read-only).
-    match /{path=**}/delegates/{delegateId} {
-      allow read, write: if isAuthenticated();
+    function claimListHas(key, value) {
+      return signedIn()
+        && request.auth.token.keys().hasAll([key])
+        && request.auth.token[key] is list
+        && value in request.auth.token[key];
     }
 
-    // Companies collectionGroup (Marketing Search + Delegate Supervisor Lookup)
-    match /{path=**}/companies/{companyId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+    function isDelegate() {
+      return claimString('role') == 'delegate';
     }
 
-    // Photo Permissions & Captured Photos collectionGroups
-    match /{path=**}/photo_permissions/{permissionId} {
-      allow read, delete: if isAuthenticated();
-    }
-    match /{path=**}/captured_photos/{photoId} {
-      allow read, delete: if isAuthenticated();
-    }
-
-    // ==================== PENALTIES COLLECTION ====================
-    match /penalties/{penaltyId} {
-      allow read, create, update, delete: if isAuthenticated();
+    function callerOrg() {
+      return userExists()
+        && userDoc().keys().hasAll(['organizationUID'])
+        && userDoc().organizationUID is string
+        && userDoc().organizationUID != ''
+          ? userDoc().organizationUID
+          : claimString('orgId');
     }
 
-    // ==================== DELEGATE SUBSCRIPTION REQUESTS & USED CODES ====================
-    match /delegate_requests/{requestId} {
-      allow read, write: if isAuthenticated();
-    }
-    match /used_receipt_codes/{code} {
-      allow read, write: if isAuthenticated();
+    function callerCompany() {
+      return userExists()
+        && userDoc().keys().hasAll(['companyUID'])
+        && userDoc().companyUID is string
+        && userDoc().companyUID != ''
+          ? userDoc().companyUID
+          : claimString('companyId');
     }
 
-    // ==================== INVITES COLLECTION ====================
-    match /invites/{inviteId} {
-      // Read: Allow unauthenticated reads for invite validation during signup
-      // SECURITY NOTE: This is secure because:
-      // 1. Invite IDs are generated using Firestore's doc().id which creates cryptographically random IDs
-      // 2. The inviteId itself acts as a secret token (UUID-like, unpredictable)
-      // 3. Email validation happens server-side during claimInvite
-      // 4. Enumeration attacks are impractical due to the large ID space (20 random characters)
-      // 5. Rate limiting should be implemented at the application level for additional protection
-      // Also allow authenticated admins to query invites for their organization
-      allow read: if true;
+    function delegateInOrg(orgId) {
+      return isDelegate() && (claimString('orgId') == orgId || claimListHas('orgIds', orgId));
+    }
 
-      // Write: Org admins and super admins can create invites globally.
-      // Company admins can create invites scoped to their company (e.g., company-admin onboarding).
-      allow create: if isAuthenticated() && (
-        isSuperAdmin() ||
-        isOrgAdmin() ||
-        (isCompanyAdmin() &&
-          request.resource.data.organizationId != null &&
-          request.resource.data.companyId != null &&
-          belongsToCompany(request.resource.data.organizationId, request.resource.data.companyId))
+    function delegateInCompany(compId) {
+      return isDelegate() && (claimString('companyId') == compId || claimListHas('companyIds', compId));
+    }
+
+    function delegateOwns(id) {
+      return isDelegate() && (
+        id == request.auth.uid ||
+        claimString('delegateId') == id ||
+        claimListHas('delegateIds', id)
       );
-
-      // Update:
-      // - Super admins can update any invite (e.g., cancel invites)
-      // - Org admins can update invites for their organization
-      // - Company admins can update invites for their own company
-      // - Users can update their own invite when redeeming it (status to 'claimed')
-      allow update: if isAuthenticated() && (
-        isSuperAdmin() ||
-        (isOrgAdmin() && resource.data.organizationId != null && belongsToOrganization(resource.data.organizationId)) ||
-        (isCompanyAdmin() &&
-          resource.data.organizationId != null &&
-          resource.data.companyId != null &&
-          belongsToCompany(resource.data.organizationId, resource.data.companyId)) ||
-        (request.resource.data.status == 'claimed' && request.resource.data.claimedByUid == request.auth.uid)
-      );
-
-      // Delete: Only super admins can delete invites
-      allow delete: if isAuthenticated() && isSuperAdmin();
     }
 
-    // ==================== USERS COLLECTION ====================
+    function companyScoped() {
+      return callerCompany() != '' && (
+        resource.data.companyUID == callerCompany() ||
+        resource.data.companyId == callerCompany()
+      );
+    }
+
+    function orgScoped() {
+      return callerOrg() != '' && (
+        resource.data.organizationUID == callerOrg() ||
+        resource.data.organizationId == callerOrg()
+      );
+    }
+
+    function incomingCompanyScoped() {
+      return callerCompany() != '' && (
+        request.resource.data.companyUID == callerCompany() ||
+        request.resource.data.companyId == callerCompany()
+      );
+    }
+
+    function incomingOrgScoped() {
+      return callerOrg() != '' && (
+        request.resource.data.organizationUID == callerOrg() ||
+        request.resource.data.organizationId == callerOrg()
+      );
+    }
+
+    function delegatePhoneMatch() {
+      return isDelegate() && (
+        (resource.data.keys().hasAll(['phoneNumber'])
+          && resource.data.phoneNumber is string
+          && claimListHas('phones', resource.data.phoneNumber)) ||
+        (resource.data.keys().hasAll(['phone'])
+          && resource.data.phone is string
+          && claimListHas('phones', resource.data.phone))
+      );
+    }
+
+    function legacySuperAdminSpelling(role) {
+      return role in [
+        'super_admin', 'superadmin', 'superAdmin', 'Super_Admin', 'SUPER_ADMIN'
+      ];
+    }
+
+    // Owners cannot grant themselves super-admin, and nobody can persist a
+    // legacy super-admin spelling. Other canonical role strings stay writable
+    // by staff because the app still stores them (admin, technical_support,
+    // marketing_promotion, branches_marketing, hr).
+    function roleWriteAllowed() {
+      return !request.resource.data.keys().hasAll(['role'])
+        || (
+          request.resource.data.role is string
+          && !legacySuperAdminSpelling(request.resource.data.role)
+          && (request.resource.data.role != 'super-admin' || isSuperAdmin())
+        );
+    }
+
+    function escalationKeys() {
+      return [
+        'role', 'status', 'organizationUID', 'companyUID', 'uid',
+        'organizationId', 'companyId'
+      ];
+    }
+
+    function noSelfEscalation() {
+      return request.auth.uid != resource.id
+        || !request.resource.data.diff(resource.data).affectedKeys().hasAny(escalationKeys());
+    }
+
+    function ownerCreateSafe() {
+      return request.auth.uid == request.resource.id
+        && (
+          !request.resource.data.keys().hasAll(['role'])
+          || request.resource.data.role == 'delegate'
+          || request.resource.data.role == ''
+        )
+        && (
+          !request.resource.data.keys().hasAll(['uid'])
+          || request.resource.data.uid == request.auth.uid
+        );
+    }
+
+    function delegateFieldsSafe() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(escalationKeys());
+    }
+
+    // Flat on purpose. Collection-group queries evaluate every delegates
+    // match, and the nested helper form exceeds the 1000-expression limit.
+    function staffRole() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : '';
+    }
+
+    function canReadDelegate() {
+      return signedIn() && (
+        (request.auth.token.keys().hasAll(['phones'])
+          && request.auth.token.phones is list
+          && resource.data.phoneNumber in request.auth.token.phones)
+        || (request.auth.token.keys().hasAll(['phones'])
+          && request.auth.token.phones is list
+          && resource.data.phone in request.auth.token.phones)
+        || (request.auth.token.keys().hasAll(['delegateIds'])
+          && request.auth.token.delegateIds is list
+          && resource.id in request.auth.token.delegateIds)
+        || resource.id == request.auth.uid
+        || staffRole() in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+          'technical_support', 'technical-support', 'technicalSupport'
+        ]
+        || (staffRole() in [
+          'organization-admin', 'organization_admin', 'organizationAdmin',
+          'marketing', 'marketing_promotion'
+        ] && resource.data.organizationUID == callerOrg())
+        || (staffRole() in [
+          'company-admin', 'company_admin', 'admin', 'hr', 'company-hr',
+          'company_hr', 'accountant', 'branches_marketing', 'branches_marketing_manager'
+        ] && resource.data.companyUID == callerCompany())
+      );
+    }
+
+    function canManageDelegate() {
+      return isGlobalStaff()
+        || (isOrgScopedStaff() && orgScoped())
+        || (isCompanyScopedStaff() && companyScoped());
+    }
+
+    function canManageNestedDelegate(orgId, compId) {
+      return isGlobalStaff()
+        || (isOrgScopedStaff() && callerOrg() == orgId)
+        || (isCompanyScopedStaff() && callerOrg() == orgId && callerCompany() == compId);
+    }
+
+    function canReadNestedDelegate(orgId, compId, delegateId) {
+      return signedIn() && (
+        delegateId == request.auth.uid
+        || (request.auth.token.keys().hasAll(['delegateIds'])
+          && request.auth.token.delegateIds is list
+          && delegateId in request.auth.token.delegateIds)
+        || (request.auth.token.keys().hasAll(['orgId'])
+          && request.auth.token.orgId == orgId
+          && request.auth.token.keys().hasAll(['companyId'])
+          && request.auth.token.companyId == compId)
+        || staffRole() in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+          'technical_support', 'technical-support', 'technicalSupport'
+        ]
+        || (callerOrg() == orgId && callerCompany() == compId && staffRole() in [
+          'company-admin', 'company_admin', 'admin', 'hr', 'company-hr',
+          'company_hr', 'accountant', 'branches_marketing'
+        ])
+        || (callerOrg() == orgId && staffRole() in [
+          'organization-admin', 'organization_admin', 'marketing', 'marketing_promotion'
+        ])
+      );
+    }
+
+    // ==================== SHARED: USERS ====================
+
     match /users/{userId} {
-      // Read: Allow all users (including delegates logged in without Firebase Auth) to read user docs
-      allow read: if true;
+      allow get: if signedIn() && (
+        request.auth.uid == userId ||
+        isGlobalStaff() ||
+        (isOrgScopedStaff() && orgScoped()) ||
+        (isCompanyScopedStaff() && companyScoped())
+      );
 
-      // Create:
-      allow create: if isAuthenticated();
+      // Phone/email lookups after sign-in, and the admin directory for
+      // global staff. Unauthenticated list is denied (staffPhoneLookup).
+      allow list: if signedIn() && (
+        isGlobalStaff() ||
+        (isOrgScopedStaff() && orgScoped()) ||
+        (isCompanyScopedStaff() && companyScoped()) ||
+        (userExists()
+          && userDoc().keys().hasAll(['phoneNumber'])
+          && resource.data.phoneNumber == userDoc().phoneNumber) ||
+        (userExists()
+          && userDoc().keys().hasAll(['email'])
+          && resource.data.email == userDoc().email)
+      );
 
-      // Update:
-      allow update: if isAuthenticated();
+      allow create: if signedIn() && roleWriteAllowed() && (
+        ownerCreateSafe() ||
+        isGlobalStaff() ||
+        (isOrgAdmin() && request.resource.data.organizationUID == callerOrg()) ||
+        ((isCompanyAdmin() || isHR()) && incomingCompanyScoped() && incomingOrgScoped())
+      );
 
-      // Delete:
-      allow delete: if isAuthenticated();
+      allow update: if signedIn() && roleWriteAllowed() && (
+        (request.auth.uid == userId && noSelfEscalation()) ||
+        (request.auth.uid != userId && (
+          isGlobalStaff() ||
+          (isOrgAdmin() && orgScoped()) ||
+          ((isCompanyAdmin() || isHR()) && companyScoped())
+        ))
+      );
+
+      allow delete: if signedIn()
+        && request.auth.uid != userId
+        && (
+          isSuperAdmin() ||
+          (
+            !(resource.data.role in [
+              'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+              'Super-Admin', 'SUPER_ADMIN'
+            ]) && (
+              isTechnicalSupport() ||
+              (isOrgAdmin() && orgScoped()) ||
+              ((isCompanyAdmin() || isHR()) && companyScoped())
+            )
+          )
+        );
     }
 
-    // ==================== ORGANIZATIONS COLLECTION ====================
+    // ==================== SHARED: ORGANIZATIONS AND COMPANIES ====================
+
     match /organizations/{orgId} {
-      // Read: Allow read for all clients (needed for mobile app delegates & admins)
-      allow read: if true;
+      allow read: if signedIn();
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin()
+        || (isOrgAdmin() && callerOrg() == orgId)
+        || (signedIn() && callerOrg() == orgId && isStaffWriter()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['admins', 'updatedAt'])
+            && request.resource.data.admins == resource.data.admins + 1);
+      allow delete: if isSuperAdmin();
 
-      // Write: Only super admins can create/delete organizations.
-      // Org admins can update their own organization (e.g. company counts).
-      allow create: if isAuthenticated() && isSuperAdmin();
-      allow update: if isAuthenticated() && (
-        isSuperAdmin() ||
-        (isOrgAdmin() && belongsToOrganization(orgId)) ||
-        isAdminCountIncrement()
-      );
-      allow delete: if isAuthenticated() && isSuperAdmin();
-
-      // Branches subcollection (Organization level)
       match /branches/{branchId} {
-        allow read: if true;
-        allow write: if isAuthenticated();
+        allow read: if signedIn();
+        allow write: if isGlobalStaff() || (isOrgScopedStaff() && callerOrg() == orgId)
+          || (isCompanyScopedStaff() && callerOrg() == orgId);
       }
 
-      // Sent Notifications subcollection (Organization level)
       match /sent_notifications/{notificationId} {
-        // Read: Org Admins, Super Admins, and Marketing (read-only)
-        allow read: if isAuthenticated() && canReadOrganization(orgId);
-
-        // Write: Org Admins and Super Admins only (no marketing)
-        allow create: if isAuthenticated() && (
-          isSuperAdmin() ||
-          (isOrgAdmin() && belongsToOrganization(orgId))
-        );
-
-        // Update/Delete: Org Admins and Super Admins
-        allow update, delete: if isAuthenticated() && (
-          isSuperAdmin() ||
-          (isOrgAdmin() && belongsToOrganization(orgId))
-        );
+        allow read: if isGlobalStaff() || (signedIn() && callerOrg() == orgId && (isOrgScopedStaff() || isCompanyScopedStaff()));
+        allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
       }
 
-      // Members subcollection
-      match /members/{userId} {
-        allow read: if isAuthenticated() && (
-          request.auth.uid == userId ||
-          canReadOrganization(orgId)
-        );
-
-        allow create: if isAuthenticated() &&
-                         request.auth.uid == userId;
-
-        allow update: if isAuthenticated() &&
-                         request.auth.uid == userId;
+      match /members/{memberId} {
+        allow read: if signedIn() && (request.auth.uid == memberId || isGlobalStaff() || callerOrg() == orgId);
+        allow create, update: if signedIn() && request.auth.uid == memberId && callerOrg() == orgId;
+        allow delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
       }
 
-      // Admins subcollection
       match /admins/{adminId} {
-        allow read: if isAuthenticated() && canReadOrganization(orgId);
-
-        allow create, update, delete: if isAuthenticated() && (
-          isSuperAdmin() ||
-          (isOrgAdmin() && belongsToOrganization(orgId))
-        );
+        allow read: if isGlobalStaff() || (signedIn() && callerOrg() == orgId && isStaffWriter());
+        allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
       }
 
-      // Companies subcollection
       match /companies/{compId} {
-        // Read: Allow all users (including delegates) to read company info & supervisor details
-        allow read: if true;
+        allow read: if signedIn();
+        allow create, update, delete: if isGlobalStaff()
+          || (isOrgAdmin() && callerOrg() == orgId)
+          || (isCompanyScopedStaff() && callerOrg() == orgId && callerCompany() == compId);
 
-        // Write: Allow authenticated users (super admins, org admins, company supervisors)
-        allow create, update, delete: if isAuthenticated();
-
-        // Admins subcollection under company
         match /admins/{adminId} {
-          allow read, write: if isAuthenticated();
+          allow read: if signedIn() && (
+            isGlobalStaff() || callerOrg() == orgId || request.auth.uid == adminId
+          );
+          allow create, update, delete: if isSuperAdmin()
+            || (isOrgAdmin() && callerOrg() == orgId)
+            || (isCompanyAdmin() && callerOrg() == orgId && callerCompany() == compId && request.auth.uid == adminId);
         }
 
-        // Members subcollection
-        match /members/{userId} {
-          allow read: if isAuthenticated() && (
-            request.auth.uid == userId ||
-            canAccessCompany(orgId, compId)
+        match /members/{memberId} {
+          allow read: if signedIn() && (
+            request.auth.uid == memberId || isGlobalStaff() || canManageNestedDelegate(orgId, compId)
           );
-
-          allow create: if isAuthenticated() &&
-                           request.auth.uid == userId;
-
-          allow update: if isAuthenticated() &&
-                           request.auth.uid == userId;
-
-          allow delete: if isAuthenticated() && (
-            isSuperAdmin() ||
-            (isOrgAdmin() && belongsToOrganization(orgId))
-          );
+          allow create, update: if signedIn() && request.auth.uid == memberId;
+          allow delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
         }
 
-        // Delegates subcollection
         match /delegates/{delegateId} {
-          allow read, write: if isAuthenticated();
+          allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
+          allow create: if canManageNestedDelegate(orgId, compId);
+          allow update: if canManageNestedDelegate(orgId, compId)
+            || (delegateOwns(delegateId) && delegateFieldsSafe());
+          allow delete: if canManageNestedDelegate(orgId, compId);
         }
 
-        // Requests subcollection
         match /requests/{requestId} {
-          allow read, write: if isAuthenticated();
+          allow read: if signedIn() && (
+            isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId)
+          );
+          allow create, update, delete: if canManageNestedDelegate(orgId, compId);
         }
 
-        // Notifications subcollection
         match /notifications/{notificationId} {
-          allow read: if isAuthenticated();
-
-          allow create: if isAuthenticated() && (
-            isSuperAdmin() ||
-            (isOrgAdmin() && belongsToOrganization(orgId))
-          );
-
-          allow update: if isAuthenticated();
-
-          allow delete: if isAuthenticated() && (
-            isSuperAdmin() ||
-            (isOrgAdmin() && belongsToOrganization(orgId))
-          );
+          allow read: if signedIn() && (isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId));
+          allow create, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
+          allow update: if signedIn() && (isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId));
         }
 
-        // Admins subcollection
-        match /admins/{adminId} {
-          allow read: if isAuthenticated();
-
-          allow create, update, delete: if isAuthenticated() && (
-            isSuperAdmin() ||
-            (isOrgAdmin() && belongsToOrganization(orgId)) ||
-            (isCompanyAdmin() && belongsToCompany(orgId, compId) && request.auth.uid == adminId)
-          );
-        }
-
-        // Photo Permissions subcollection
         match /photo_permissions/{permissionId} {
-          allow read, create, update: if isAuthenticated();
-          allow delete: if isAuthenticated();
+          allow read: if signedIn() && (
+            isGlobalStaff() || canManageNestedDelegate(orgId, compId)
+            || (delegateInOrg(orgId) && delegateInCompany(compId))
+          );
+          allow create, update: if signedIn() && (
+            canManageNestedDelegate(orgId, compId)
+            || (delegateInOrg(orgId) && delegateInCompany(compId))
+          );
+          allow delete: if canManageNestedDelegate(orgId, compId);
 
-          // Captured Photos subcollection
           match /captured_photos/{photoId} {
-            allow read, create: if isAuthenticated();
-            allow update: if false; 
-            allow delete: if isAuthenticated(); // Allow supervisors and super admin to delete photos
+            allow read: if signedIn() && (
+              isGlobalStaff() || canManageNestedDelegate(orgId, compId)
+              || (delegateInOrg(orgId) && delegateInCompany(compId))
+            );
+            allow create: if signedIn() && (
+              canManageNestedDelegate(orgId, compId)
+              || (delegateInOrg(orgId) && delegateInCompany(compId))
+            );
+            allow update: if false;
+            allow delete: if canManageNestedDelegate(orgId, compId);
           }
         }
       }
 
-      // Company Requests subcollection (for organization-level company requests)
       match /companyRequests/{requestId} {
-        allow read: if isAuthenticated();
-
-        allow create: if isAuthenticated() && (
-          canAccessOrganization(orgId) ||
-          (isCompanyAdmin() &&
-            request.resource.data.targetCompanyId != null &&
-            belongsToCompany(orgId, request.resource.data.targetCompanyId))
-        );
-        allow update: if isAuthenticated() && (
-          canAccessOrganization(orgId) ||
-          (isCompanyAdmin() &&
-            resource.data.targetCompanyId != null &&
-            belongsToCompany(orgId, resource.data.targetCompanyId))
-        );
-        allow delete: if isAuthenticated() && (
-          canAccessOrganization(orgId) ||
-          (isCompanyAdmin() &&
-            resource.data.targetCompanyId != null &&
-            belongsToCompany(orgId, resource.data.targetCompanyId))
-        );
+        allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId);
+        allow create, update, delete: if isSuperAdmin()
+          || (isOrgAdmin() && callerOrg() == orgId)
+          || (isCompanyAdmin() && callerOrg() == orgId && callerCompany() != '');
       }
-      
-      // ==================== TASKS COLLECTION ====================
-      // NOTE: Mobile app uses anonymous auth, so we allow any authenticated user
-      // to read/write tasks. Security is enforced by app logic (filtering by delegateId).
+
       match /tasks/{taskId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAuthenticated();
+        allow read: if signedIn() && (
+          isGlobalStaff()
+          || (isOrgScopedStaff() && callerOrg() == orgId)
+          || (isCompanyScopedStaff() && callerOrg() == orgId && companyScoped())
+          || (delegateInOrg(orgId) && (
+            resource.data.companyId == claimString('companyId')
+            || claimListHas('companyIds', resource.data.companyId)
+          ))
+        );
+        allow create: if isGlobalStaff()
+          || (isOrgScopedStaff() && callerOrg() == orgId)
+          || (isCompanyScopedStaff() && callerOrg() == orgId && incomingCompanyScoped());
+        allow update, delete: if isGlobalStaff()
+          || (isOrgScopedStaff() && callerOrg() == orgId)
+          || (isCompanyScopedStaff() && callerOrg() == orgId && companyScoped())
+          || (delegateInOrg(orgId) && (
+            resource.data.assignedTo == request.auth.uid
+            || delegateOwns(resource.data.assignedTo)
+            || resource.data.assignedTo == 'all'
+            || resource.data.assignedTo == 'all_marketing_promotion'
+            || resource.data.assignedTo == 'all_branch_marketing'
+            || resource.data.createdBy == request.auth.uid
+          ));
       }
 
-      // ==================== ATTENDANCE LOGS ====================
-      // Attendance logs scoped to the organization
       match /attendance_logs/{logId} {
-        allow read, create, update: if true;
-        // Prevent deletion of attendance logs
+        allow read: if canReadAttendance();
+        allow create: if canCreateAttendance();
+        allow update: if canUpdateAttendance();
         allow delete: if false;
       }
 
-      // ==================== BRANCHES ====================
-      // Branches scoped to the organization
-      match /branches/{branchId} {
-        allow read: if true;
-        allow write: if isAuthenticated();
-      }
-
-      // ==================== PRIVATE LABEL (Fathalla) ====================
-      // Daily product + price-tag documentation by branch marketing and its review
-      // by marketing promotion. Mobile app uses anonymous auth, so access is
-      // enforced by app logic (org + delegateUid scoping), like tasks above.
       match /private_label_audits/{auditId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated() &&
-                         request.resource.data.organizationUID == orgId &&
-                         request.resource.data.delegateUid is string &&
-                         request.resource.data.productPhotoUrl is string &&
-                         request.resource.data.pricePhotoUrl is string;
-        allow update: if isAuthenticated();
-        // Allowed for authorized marketing promotion and admins
-        allow delete: if isAuthenticated();
+        allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId || delegateInOrg(orgId));
+        allow create: if signedIn() && (
+          (isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId))
+          || (delegateInOrg(orgId) && (
+            request.resource.data.delegateUid == request.auth.uid
+            || delegateOwns(request.resource.data.delegateUid)
+          ))
+        );
+        allow update: if signedIn() && (
+          isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId)
+          || (delegateInOrg(orgId) && delegateOwns(resource.data.delegateUid))
+        );
+        allow delete: if isGlobalStaff() || ((isOrgAdmin() || isMarketing()) && callerOrg() == orgId);
       }
 
-      // One summary doc per marketer per day ({uid}_{yyyy-MM-dd}): worked / rest.
       match /private_label_days/{dayId} {
-        allow read: if isAuthenticated();
-        allow create, update: if isAuthenticated();
-        allow delete: if isAuthenticated();
+        allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId || delegateInOrg(orgId));
+        allow create, update: if signedIn() && (
+          isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId) || delegateInOrg(orgId)
+        );
+        allow delete: if isGlobalStaff() || ((isOrgAdmin() || isMarketing()) && callerOrg() == orgId);
       }
 
-      // Product catalog (reference prices) managed by marketing promotion.
       match /private_label_products/{productId} {
-        allow read: if isAuthenticated();
-        allow create, update: if isAuthenticated();
-        allow delete: if isAuthenticated();
+        allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId || delegateInOrg(orgId));
+        allow create, update, delete: if isGlobalStaff()
+          || ((isOrgAdmin() || isMarketing() || isBranchesMarketing()) && callerOrg() == orgId);
       }
     }
 
-    // ==================== MAIL COLLECTION ====================
-    // Used by Firebase Extensions for sending emails
-    // Create allowed for any authenticated user (mobile app super admin uses anonymous auth to send activation emails)
+    // ==================== COLLECTION GROUP OVERLAPS ====================
+    // One match per collection group. A later "if true" used to OR with the
+    // tighter match and reopen the collection. Those duplicates are gone.
+
+    match /{path=**}/delegates/{delegateId} {
+      allow read: if signedIn() && canReadDelegate();
+      allow create: if signedIn() && (
+        isGlobalStaff() ||
+        (isOrgScopedStaff() && incomingOrgScoped()) ||
+        (isCompanyScopedStaff() && incomingCompanyScoped())
+      );
+      allow update: if signedIn() && (
+        canManageDelegate() || (delegateOwns(delegateId) && delegateFieldsSafe())
+      );
+      allow delete: if signedIn() && canManageDelegate();
+    }
+
+    match /{path=**}/companies/{companyId} {
+      allow read: if signedIn();
+      allow write: if isGlobalStaff() || isOrgAdmin() || (isCompanyScopedStaff() && callerCompany() == companyId);
+    }
+
+    match /{path=**}/photo_permissions/{permissionId} {
+      allow read: if signedIn() && (
+        isGlobalStaff() || orgScoped() || companyScoped() || delegateInOrg(resource.data.organizationUID)
+      );
+      allow create, update: if signedIn() && (
+        isGlobalStaff()
+        || (isCompanyScopedStaff() && incomingCompanyScoped())
+        || (isOrgScopedStaff() && incomingOrgScoped())
+        || (isDelegate() && (
+          delegateInOrg(request.resource.data.organizationUID)
+          || delegateOwns(request.resource.data.delegateUid)
+        ))
+      );
+      allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped());
+    }
+
+    match /{path=**}/captured_photos/{photoId} {
+      allow read: if signedIn() && (
+        isGlobalStaff() || orgScoped() || companyScoped() || delegateInOrg(resource.data.organizationUID)
+      );
+      allow create: if signedIn() && (
+        isGlobalStaff()
+        || (isCompanyScopedStaff() && incomingCompanyScoped())
+        || (isDelegate() && delegateInOrg(request.resource.data.organizationUID))
+      );
+      allow update: if false;
+      allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped());
+    }
+
+    match /{path=**}/requests/{requestId} {
+      allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
+      allow write: if isGlobalStaff() || (isOrgScopedStaff() && incomingOrgScoped()) || (isCompanyScopedStaff() && incomingCompanyScoped());
+    }
+
+    // ==================== WEB DASHBOARD ====================
+
+    match /invites/{inviteId} {
+      // Signup still resolves one invite by its unguessable id.
+      allow get: if true;
+      allow list: if signedIn() && (
+        isGlobalStaff() ||
+        ((isOrgAdmin() || isCompanyAdmin() || isHR()) && (
+          resource.data.organizationId == callerOrg() ||
+          resource.data.organizationUID == callerOrg()
+        ))
+      );
+
+      allow create: if signedIn() && roleWriteAllowed() && (
+        isSuperAdmin() ||
+        isOrgAdmin() ||
+        (isCompanyAdmin() && incomingOrgScoped() && incomingCompanyScoped())
+      );
+
+      allow update: if signedIn() && (
+        isSuperAdmin() ||
+        (isOrgAdmin() && (resource.data.organizationId == callerOrg() || resource.data.organizationUID == callerOrg())) ||
+        (isCompanyAdmin() && companyScoped()) ||
+        (request.resource.data.status == 'claimed' && request.resource.data.claimedByUid == request.auth.uid)
+      );
+
+      allow delete: if isSuperAdmin();
+    }
+
     match /mail/{mailId} {
-      allow read: if isAuthenticated() && isSuperAdmin();
-
-      allow create: if isAuthenticated();
-
-      allow update: if isAuthenticated() && isSuperAdmin();
-      allow delete: if isAuthenticated() && isSuperAdmin();
+      allow read, update, delete: if isSuperAdmin();
+      allow create: if isSuperAdmin() || isTechnicalSupport() || isOrgAdmin() || isCompanyAdmin() || isHR();
     }
 
-    // ==================== GUIDE VIDEOS COLLECTION ====================
     match /guide_videos/{videoId} {
-      allow read: if isAuthenticated();
+      allow read: if signedIn();
       allow write: if isSuperAdmin();
     }
 
-    // ==================== APP UPDATES ====================
     match /app_updates/{updateId} {
-      // Anyone logged in can read updates
-      allow read: if isAuthenticated();
-      // Only super admin can create/edit/delete updates from dashboard
+      allow read: if signedIn();
       allow write: if isSuperAdmin();
     }
 
-    // ==================== MOBILE APP (Tashil Delegate) ====================
+    // ==================== MOBILE: ATTENDANCE ====================
 
-    // Attendance Logs (New System) - Authenticated / HR Adjustments
-    match /attendance_logs/{document=**} {
-      allow read, create, update: if true;
+    function canReadAttendance() {
+      return signedIn() && (
+        isGlobalStaff()
+        || (isCompanyScopedStaff() && companyScoped())
+        || (isOrgScopedStaff() && orgScoped())
+        || resource.data.delegateId == request.auth.uid
+        || resource.data.userId == request.auth.uid
+        || delegateOwns(resource.data.delegateId)
+        || delegateOwns(resource.data.userId)
+      );
+    }
+
+    function canCreateAttendance() {
+      return signedIn() && (
+        isGlobalStaff()
+        || (isCompanyScopedStaff() && incomingCompanyScoped())
+        || (isOrgScopedStaff() && incomingOrgScoped())
+        || (
+          (request.resource.data.delegateId == request.auth.uid
+            || request.resource.data.userId == request.auth.uid
+            || delegateOwns(request.resource.data.delegateId)
+            || delegateOwns(request.resource.data.userId))
+          && (delegateInOrg(request.resource.data.organizationId)
+            || delegateInOrg(request.resource.data.organizationUID)
+            || incomingOrgScoped())
+        )
+      );
+    }
+
+    function canUpdateAttendance() {
+      return canReadAttendance() && (
+        isGlobalStaff() || isCompanyScopedStaff() || isOrgScopedStaff()
+        || resource.data.delegateId == request.auth.uid
+        || resource.data.userId == request.auth.uid
+        || delegateOwns(resource.data.delegateId)
+      );
+    }
+
+    match /attendance_logs/{logId} {
+      allow read: if canReadAttendance();
+      allow create: if canCreateAttendance();
+      allow update: if canUpdateAttendance();
       allow delete: if false;
     }
 
-    // Attendance Logs Testing (Dev Environment)
-    match /attendance_logs_testing/{document=**} {
-      allow read, write: if true;
+    match /attendance_logs_testing/{logId} {
+      allow read: if canReadAttendance();
+      allow create: if canCreateAttendance();
+      allow update: if canUpdateAttendance();
+      allow delete: if false;
     }
 
-    // Attendance (Legacy collection) - Authenticated
     match /attendance/{attendanceId} {
-      allow read, create, update: if isAuthenticated();
+      allow read: if canReadAttendance();
+      allow create: if canCreateAttendance();
+      allow update: if canUpdateAttendance();
       allow delete: if false;
     }
 
-    // Branches (Mobile app admin feature + delegate branch geofence lookup)
+    match /attendance_adjustment_logs/{logId} {
+      allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
+      allow create: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && incomingCompanyScoped()) || (isOrgScopedStaff() && incomingOrgScoped()));
+      allow update, delete: if isGlobalStaff() || (isHR() && companyScoped());
+    }
+
+    match /attendance_adjustment_logs_testing/{logId} {
+      allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
+      allow create: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && incomingCompanyScoped()));
+      allow update, delete: if isGlobalStaff() || (isHR() && companyScoped());
+    }
+
+    // ==================== MOBILE: BRANCHES, NOTIFICATIONS, TOKENS ====================
+
     match /branches/{branchId} {
-      // Allow read for all clients (needed for delegate geofence lookup)
-      allow read: if true;
-      allow create, update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      allow read: if signedIn();
+      allow create, update, delete: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isBranchesMarketing();
     }
 
-    // Counters (System collection for auto-increment IDs)
     match /counters/{counterId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isStaffWriter();
     }
 
-    // ==================== NOTIFICATIONS COLLECTION ====================
-    // Global notifications collection for push notifications
-    // NOTE: Mobile app uses anonymous auth, so we can't match request.auth.uid to delegateUid
-    // Instead, we allow any authenticated user to read/write notifications
-    // Security is enforced by the app logic and Cloud Functions
+    function canReadNotification() {
+      return signedIn() && (
+        isGlobalStaff()
+        || resource.data.delegateUid == request.auth.uid
+        || resource.data.userId == request.auth.uid
+        || delegateOwns(resource.data.delegateUid)
+        || resource.data.delegateUid == 'all'
+        || resource.data.delegateUid == 'delegates'
+        || (isDelegate() && resource.data.delegateUid == 'delegates_' + callerCompany())
+        || (isDelegate() && resource.data.delegateUid == 'company_' + callerCompany())
+        || (isCompanyScopedStaff() && resource.data.delegateUid == 'company_' + callerCompany())
+        || (isCompanyScopedStaff() && resource.data.delegateUid == 'supervisor_' + callerCompany())
+        || (isCompanyScopedStaff() && resource.data.delegateUid == 'all_company_supervisors' && companyScoped())
+        || (isCompanyScopedStaff() && companyScoped())
+        || (isOrgScopedStaff() && orgScoped())
+        || (userExists() && userDoc().keys().hasAll(['phoneNumber']) && resource.data.phoneNumber == userDoc().phoneNumber)
+        || (isSuperAdmin() && resource.data.delegateUid in ['super-admin', 'super_admin', 'superAdmin', 'role_super_admin'])
+        || (isTechnicalSupport() && resource.data.delegateUid in ['technicalSupport', 'technical-support', 'technical_support', 'role_technical_support'])
+        || (isOrgAdmin() && resource.data.delegateUid in ['organizationAdmin', 'organization-admin', 'organization_admin'])
+        || (isHR() && resource.data.delegateUid in ['hr', 'company-hr', 'company_hr'])
+        || (isMarketing() && resource.data.delegateUid in ['marketing', 'marketing_promotion', 'marketingPromotion'])
+        || (isBranchesMarketing() && resource.data.delegateUid in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing'])
+        || (isCompanyAdmin() && resource.data.delegateUid in ['company-admin', 'admin', 'supervisor', 'company_admin'])
+      );
+    }
+
+    function canCreateNotification() {
+      return signedIn() && (
+        isGlobalStaff()
+        || ((isOrgScopedStaff() || isCompanyScopedStaff()) && (incomingOrgScoped() || incomingCompanyScoped() || request.resource.data.createdBy == request.auth.uid))
+        || (isDelegate() && (
+          request.resource.data.delegateUid == request.auth.uid
+          || delegateOwns(request.resource.data.delegateUid)
+          || delegateInOrg(request.resource.data.organizationId)
+          || delegateInOrg(request.resource.data.organizationUID)
+          || request.resource.data.createdBy == request.auth.uid
+        ))
+      );
+    }
+
     match /notifications/{notificationId} {
-      // Read: Any authenticated user can read notifications
-      allow read: if isAuthenticated();
-      
-      // Create: Any authenticated user can create (Cloud Functions will create these)
-      allow create: if isAuthenticated();
-      
-      // Update: Any authenticated user can mark notifications as read
-      allow update: if isAuthenticated() &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-      
-      // Delete: Only super admins can delete notifications
-      allow delete: if isAuthenticated() && isSuperAdmin();
+      allow read: if canReadNotification();
+      allow create: if canCreateNotification();
+      allow update: if canReadNotification() && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedBy']) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt', 'read'])
+      );
+      allow delete: if isSuperAdmin();
     }
 
-    // ==================== FCM TOKENS COLLECTION ====================
-    // Stores FCM tokens for push notifications
-    // NOTE: Mobile app uses anonymous auth, so we can't match request.auth.uid to delegateUid
-    // Instead, we allow any authenticated user to read/write tokens
-    // Security is enforced by the app logic
-    match /fcm_tokens/{delegateUid} {
-      // Read: Any authenticated user can read tokens
-      allow read: if isAuthenticated();
-      
-      // Write: Any authenticated user can write tokens (create/update)
-      allow create, update: if isAuthenticated();
-      
-      // Delete: Any authenticated user can delete tokens
-      allow delete: if isAuthenticated();
-    }
-
-    // ==================== FEEDBACKS COLLECTION ====================
-    // User feedbacks and suggestions system
-    // Delegates and supervisors can submit feedbacks
-    // Super Admin has full control over all feedbacks
-    match /feedbacks/{feedbackId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // ==================== PENALTIES COLLECTION ====================
-    // Penalties & Infractions system
-    // Allows read and write for penalties collection
-    match /penalties/{penaltyId} {
-      allow read, write: if true;
-    }
-    match /penalty_rules/{ruleId} {
-      allow read, write: if true;
-    }
-    match /{path=**}/penalty_rules/{ruleId} {
-      allow read, write: if true;
-    }
-
-    // ==================== NOTIFICATIONS COLLECTIONS ====================
-    match /notifications/{notificationId} {
-      allow read, write: if true;
-    }
     match /sent_notifications/{docId} {
-      allow read, write: if true;
+      allow read: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin();
+      allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
+      allow update, delete: if isSuperAdmin() || isOrgAdmin();
     }
 
-    // ==================== DELEGATE SUBSCRIPTION REQUESTS & USED CODES ====================
+    match /fcm_tokens/{tokenId} {
+      allow read: if signedIn() && (
+        tokenId == request.auth.uid || delegateOwns(tokenId) || isGlobalStaff()
+      );
+      allow create, update, delete: if signedIn() && (
+        tokenId == request.auth.uid || delegateOwns(tokenId)
+      );
+    }
+
+    // ==================== MOBILE: FEEDBACK, PENALTIES, SUBSCRIPTIONS ====================
+
+    match /feedbacks/{feedbackId} {
+      allow read: if signedIn() && (
+        isGlobalStaff()
+        || resource.data.userId == request.auth.uid
+        || delegateOwns(resource.data.userId)
+        || (isOrgAdmin() && orgScoped())
+        || (isCompanyScopedStaff() && companyScoped())
+      );
+      allow create: if signedIn() && (
+        request.resource.data.userId == request.auth.uid
+        || delegateOwns(request.resource.data.userId)
+        || isGlobalStaff()
+      );
+      allow update, delete: if signedIn() && (
+        isGlobalStaff()
+        || resource.data.userId == request.auth.uid
+        || delegateOwns(resource.data.userId)
+      );
+    }
+
+    match /penalties/{penaltyId} {
+      allow read: if signedIn() && (
+        isGlobalStaff()
+        || (isCompanyScopedStaff() && companyScoped())
+        || (isOrgScopedStaff() && orgScoped())
+        || resource.data.targetDelegateId == request.auth.uid
+        || delegateOwns(resource.data.targetDelegateId)
+        || resource.data.delegateUid == request.auth.uid
+        || delegateOwns(resource.data.delegateUid)
+      );
+      allow create, update: if isGlobalStaff()
+        || (isCompanyScopedStaff() && (companyScoped() || incomingCompanyScoped()))
+        || (isOrgScopedStaff() && (orgScoped() || incomingOrgScoped()));
+      allow delete: if isGlobalStaff() || (isCompanyAdmin() && companyScoped()) || (isOrgAdmin() && orgScoped());
+    }
+
+    match /penalty_rules/{ruleId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isStaffWriter();
+    }
+
     match /delegate_requests/{requestId} {
-      allow read, write: if isAuthenticated();
-    }
-    match /used_receipt_codes/{code} {
-      allow read, write: if isAuthenticated();
+      allow read: if signedIn() && (
+        isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR()
+        || resource.data.delegateUid == request.auth.uid
+        || resource.id == request.auth.uid
+        || delegateOwns(resource.data.delegateUid)
+      );
+      allow create, update: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR()
+        || (signedIn() && request.auth.uid == requestId);
+      allow delete: if isSuperAdmin() || isOrgAdmin();
     }
 
-    // ==================== MONTHLY COLLECTIONS & BILLING ====================
-    // Monthly collections, deductions, and invoicing records
+    match /used_receipt_codes/{code} {
+      allow read: if signedIn() && (isStaffWriter() || isDelegate());
+      allow create, update, delete: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
+    }
+
+    // ==================== MOBILE: BILLING ====================
+    // Web and super-admin screens list these collections without a company
+    // filter. Company accountants and org admins can read and write them.
+    // Delegates can read and update only their own wallet.
+
     match /monthly_collections/{periodId} {
-      allow read, write: if true;
+      allow read, write: if isGlobalStaff() || isAccountant() || isOrgAdmin();
       match /transactions/{transactionId} {
-        allow read, write: if true;
+        allow read, write: if isGlobalStaff() || isAccountant() || isOrgAdmin();
       }
       match /allocations/{allocationId} {
-        allow read, write: if true;
+        allow read, write: if isGlobalStaff() || isAccountant() || isOrgAdmin();
       }
     }
-    match /{path=**}/monthly_collections/{periodId} {
-      allow read, write: if true;
-    }
-    match /{path=**}/transactions/{transactionId} {
-      allow read, write: if true;
-    }
-    match /{path=**}/allocations/{allocationId} {
-      allow read, write: if true;
-    }
 
-    // ==================== USER WALLETS & ALLOCATIONS ====================
-    // User wallets and financial dues allocations
-    match /user_wallets/{userId} {
-      allow read, write: if true;
+    match /user_wallets/{walletId} {
+      allow read: if signedIn() && (
+        walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
+      );
+      allow create, update: if signedIn() && (
+        walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
+      );
+      allow delete: if isGlobalStaff() || isAccountant();
       match /transactions/{transactionId} {
-        allow read, write: if true;
+        allow read, write: if signedIn() && (
+          walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
+        );
       }
     }
-    match /{path=**}/user_wallets/{userId} {
-      allow read, write: if true;
-    }
 
-    // ==================== PRIVATE LABEL PERMISSIONS ====================
     match /private_label_permissions/{userId} {
-      allow read, write: if true;
-    }
-    match /{path=**}/private_label_permissions/{userId} {
-      allow read, write: if true;
-    }
-
-    // ==================== ATTENDANCE ADJUSTMENT AUDIT LOGS ====================
-    match /attendance_adjustment_logs/{logId} {
-      allow read, write: if true;
-    }
-    match /{path=**}/attendance_adjustment_logs/{logId} {
-      allow read, write: if true;
-    }
-    match /attendance_adjustment_logs_testing/{logId} {
-      allow read, write: if true;
-    }
-    match /{path=**}/attendance_adjustment_logs_testing/{logId} {
-      allow read, write: if true;
+      allow get: if signedIn() && (
+        userId == request.auth.uid || delegateOwns(userId) || isGlobalStaff() || isMarketing() || isOrgAdmin()
+      );
+      allow list: if isGlobalStaff() || isOrgAdmin();
+      allow create, update, delete: if isGlobalStaff() || isOrgAdmin();
     }
 
-    // ==================== SECURITY AUDIT LOGS ====================
+    // ==================== MOBILE: SECURITY AND DEVICES ====================
+
     match /security_audit_logs/{logId} {
-      allow read, write: if true;
+      allow read: if signedIn() && (
+        isGlobalStaff()
+        || (isCompanyScopedStaff() && companyScoped())
+        || (isOrgScopedStaff() && orgScoped())
+        || resource.data.delegateUid == request.auth.uid
+        || delegateOwns(resource.data.delegateUid)
+      );
+      allow create: if signedIn() && (
+        (
+          (request.resource.data.delegateUid == request.auth.uid || delegateOwns(request.resource.data.delegateUid))
+          && (delegateInOrg(request.resource.data.organizationUID) || incomingOrgScoped() || isDelegate())
+        )
+        || (isCompanyScopedStaff() && incomingCompanyScoped())
+        || isGlobalStaff()
+      );
+      allow update: if isGlobalStaff()
+        || (isCompanyScopedStaff() && companyScoped())
+        || (isOrgScopedStaff() && orgScoped());
+      allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped());
     }
 
-    // ==================== DEVICE UNBIND REQUESTS ====================
     match /device_unbind_requests/{requestId} {
-      allow read, write: if true;
+      allow read: if signedIn() && (
+        isGlobalStaff()
+        || (isCompanyScopedStaff() && companyScoped())
+        || (isOrgScopedStaff() && orgScoped())
+        || resource.data.delegateUid == request.auth.uid
+        || delegateOwns(resource.data.delegateUid)
+      );
+      allow create: if signedIn()
+        && request.resource.data.status == 'pending'
+        && (request.resource.data.delegateUid == request.auth.uid || delegateOwns(request.resource.data.delegateUid))
+        && (delegateInOrg(request.resource.data.organizationUID) || incomingOrgScoped());
+      allow update: if (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()))
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'delegateUid', 'organizationUID', 'companyUID', 'id'
+        ]);
+      allow delete: if false;
     }
 
-    // ==================== DELEGATE LIVE TRACKING ====================
     match /delegate_tracking/{delegateId} {
-      allow read, write: if true;
+      allow read: if signedIn() && (
+        delegateOwns(delegateId) || isGlobalStaff()
+        || (isCompanyScopedStaff() && (companyScoped() || resource.data.companyUID == callerCompany()))
+        || (isOrgScopedStaff() && orgScoped())
+      );
+      allow create, update: if signedIn() && (
+        delegateOwns(delegateId) || isGlobalStaff() || (isHR() && incomingCompanyScoped()) || (isCompanyAdmin() && incomingCompanyScoped())
+      );
+      allow delete: if isGlobalStaff();
 
       match /breadcrumbs/{breadcrumbId} {
-        allow read, write: if true;
+        allow read, create: if signedIn() && (
+          delegateOwns(delegateId)
+          || isGlobalStaff()
+          || (
+            (isCompanyScopedStaff() || isOrgScopedStaff())
+            && get(/databases/$(database)/documents/delegate_tracking/$(delegateId)).data.companyUID == callerCompany()
+          )
+        );
+        allow update, delete: if isGlobalStaff();
       }
     }
 
-    // ==================== LEAVE REQUESTS ====================
     match /leave_requests/{requestId} {
-      allow read, write: if true;
+      allow read: if signedIn() && (
+        isGlobalStaff()
+        || (isCompanyScopedStaff() && companyScoped())
+        || (isOrgScopedStaff() && orgScoped())
+        || (companyScoped() && (resource.data.delegateUid == request.auth.uid || delegateOwns(resource.data.delegateUid)))
+        || resource.data.delegateUid == request.auth.uid
+        || delegateOwns(resource.data.delegateUid)
+      );
+      allow create: if signedIn() && (
+        request.resource.data.delegateUid == request.auth.uid
+        || delegateOwns(request.resource.data.delegateUid)
+        || (isCompanyScopedStaff() && incomingCompanyScoped())
+        || isGlobalStaff()
+      );
+      allow update: if isGlobalStaff()
+        || (isCompanyScopedStaff() && companyScoped())
+        || (resource.data.delegateUid == request.auth.uid && resource.data.status == 'pending')
+        || (delegateOwns(resource.data.delegateUid) && resource.data.status == 'pending');
+      allow delete: if isGlobalStaff()
+        || (isCompanyScopedStaff() && companyScoped())
+        || (resource.data.delegateUid == request.auth.uid && resource.data.status == 'pending')
+        || (delegateOwns(resource.data.delegateUid) && resource.data.status == 'pending');
     }
 
-    // ==================== FLOOR CHECKS / VERIFICATION ====================
     match /floor_checks/{checkId} {
-      allow read, write: if isAuthenticated();
+      allow read: if signedIn() && (isStaffWriter() || isDelegate());
+      allow create, update: if isGlobalStaff() || isMarketing() || isBranchesMarketing() || isCompanyAdmin()
+        || (isDelegate() && (
+          request.resource.data.delegateId == request.auth.uid
+          || delegateOwns(request.resource.data.delegateId)
+        ));
+      allow delete: if isGlobalStaff() || isMarketing() || isBranchesMarketing() || isCompanyAdmin();
     }
 
-    // ==================== COMPANY PAYROLL CONFIGS ====================
     match /company_payroll_configs/{companyId} {
-      allow read, write: if isAuthenticated();
-    }
-    match /{path=**}/company_payroll_configs/{companyId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isGlobalStaff()
+        || (companyId == callerCompany() && (isHR() || isAccountant() || isCompanyAdmin() || isOrgAdmin()));
     }
 
     // ==================== DEFAULT DENY ====================
-    // Any collection not explicitly matched above will be denied
+    // Rate-limit collections (delegate_login_rate_limits, staff_login_rate_limits)
+    // and every other unnamed path fall through to this match.
     match /{document=**} {
       allow read, write: if false;
     }

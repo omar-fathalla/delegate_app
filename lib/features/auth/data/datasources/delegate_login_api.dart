@@ -27,6 +27,105 @@ abstract class DelegateLoginApi {
   });
 }
 
+/// Profile returned by `staffPhoneLookup` before the password is checked.
+class StaffPhoneProfile {
+  final String uid;
+  final String email;
+  final String role;
+  final String displayName;
+  final String phoneNumber;
+  final String organizationUID;
+  final String organizationName;
+  final String companyUID;
+  final String companyName;
+
+  const StaffPhoneProfile({
+    required this.uid,
+    required this.email,
+    required this.role,
+    required this.displayName,
+    required this.phoneNumber,
+    this.organizationUID = '',
+    this.organizationName = '',
+    this.companyUID = '',
+    this.companyName = '',
+  });
+}
+
+class StaffPhoneLookupException implements Exception {
+  /// `not_found` means the phone is not a staff account.
+  /// `unavailable` means the callable is not deployed yet, so the client may
+  /// fall back to the users query until the tightened rules are published.
+  final String reason;
+
+  const StaffPhoneLookupException(this.reason);
+
+  @override
+  String toString() => 'StaffPhoneLookupException($reason)';
+}
+
+abstract class StaffPhoneLookupApi {
+  /// Returns null when the phone is not a staff account.
+  Future<StaffPhoneProfile?> lookup(String phone);
+}
+
+class FirebaseStaffPhoneLookupApi implements StaffPhoneLookupApi {
+  final FirebaseFunctions functions;
+
+  FirebaseStaffPhoneLookupApi(this.functions);
+
+  @override
+  Future<StaffPhoneProfile?> lookup(String phone) async {
+    try {
+      final callable = functions.httpsCallable('staffPhoneLookup');
+      final result = await callable.call({'phone': phone});
+      final raw = result.data;
+      if (raw is! Map) {
+        throw const StaffPhoneLookupException('unavailable');
+      }
+      final data = Map<String, dynamic>.from(raw);
+      final email = data['email'];
+      final uid = data['uid'];
+      if (email is! String || !email.contains('@') || uid is! String || uid.isEmpty) {
+        throw const StaffPhoneLookupException('unavailable');
+      }
+      String text(String key) {
+        final value = data[key];
+        return value is String ? value : '';
+      }
+
+      return StaffPhoneProfile(
+        uid: uid,
+        email: email,
+        role: text('role'),
+        displayName: text('displayName'),
+        phoneNumber: text('phoneNumber'),
+        organizationUID: text('organizationUID'),
+        organizationName: text('organizationName'),
+        companyUID: text('companyUID'),
+        companyName: text('companyName'),
+      );
+    } on FirebaseFunctionsException catch (error) {
+      final details = error.details;
+      final detailed = details is Map ? details['reason'] : null;
+      if (detailed == 'not_found') return null;
+      if (detailed == 'rate_limited') {
+        throw const StaffPhoneLookupException('rate_limited');
+      }
+      if (detailed == 'invalid_phone' || detailed == 'missing_phone') {
+        throw const StaffPhoneLookupException('invalid_phone');
+      }
+      if (error.code == 'not-found' ||
+          error.code == 'unimplemented' ||
+          error.code == 'unavailable' ||
+          error.code == 'internal') {
+        throw const StaffPhoneLookupException('unavailable');
+      }
+      throw const StaffPhoneLookupException('unavailable');
+    }
+  }
+}
+
 class FirebaseDelegateLoginApi implements DelegateLoginApi {
   final FirebaseFunctions functions;
 

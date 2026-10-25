@@ -52,6 +52,8 @@ export interface DelegateCandidate {
   orgId: string;
   createdAtMillis: number | null;
   nationalIdMatches: boolean;
+  /** Normalized phone. Copied into the custom token so rules can scope phone queries. */
+  phone?: string;
 }
 
 export type CandidateDecision =
@@ -258,6 +260,10 @@ export function buildCustomClaims(
   };
   if (primary.companyId) claims.companyId = primary.companyId;
   if (primary.orgId) claims.orgId = primary.orgId;
+  if (primary.phone) {
+    const phones = phoneQueryVariants(normalizePhone(primary.phone));
+    if (phones.length > 0) claims.phones = phones;
+  }
   return claims;
 }
 

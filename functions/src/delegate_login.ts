@@ -212,6 +212,7 @@ async function findCandidates(
       status: data.status,
       companyId,
       orgId,
+      phone: storedPhone,
       createdAtMillis: createdAtMillis(data.createdAt ?? data.hiredAt ?? data.startDate),
       nationalIdMatches: nationalIdsMatch(extractNationalId(data), nationalId),
     });
