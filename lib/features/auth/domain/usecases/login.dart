@@ -26,6 +26,8 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
   }
 
   Future<Either<Failure, List<Delegate>>> _loginStaff(LoginParams params) async {
+    // Staff phone lookup reads only `users`. Delegate documents are not
+    // consulted, and only a Firebase Auth email marker can continue.
     final result = await repository.getDelegatesByPhone(params.phoneNumber);
 
     return result.fold((failure) => Left(failure), (delegates) async {

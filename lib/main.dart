@@ -197,15 +197,41 @@ class _MyAppState extends State<MyApp> {
             routerConfig: appRouter,
             debugShowCheckedModeBanner: false,
             builder: (context, child) {
-              if (!isProduction) {
-                return Banner(
-                  message: 'TEST ENV',
-                  location: BannerLocation.topStart,
-                  color: Theme.of(context).colorScheme.error,
-                  child: child!,
-                );
-              }
-              return child!;
+              final content = !isProduction
+                  ? Banner(
+                      message: 'TEST ENV',
+                      location: BannerLocation.topStart,
+                      color: Theme.of(context).colorScheme.error,
+                      child: child!,
+                    )
+                  : child!;
+              return BlocListener<AuthBloc, AuthState>(
+                listener: (context, state) {
+                  if (state is! AuthUnauthenticated ||
+                      state.message != AuthBloc.freshSignInMessage) {
+                    return;
+                  }
+                  final path =
+                      appRouter.routeInformationProvider.value.uri.path;
+                  if (path != '/login' && path != '/hr/login') {
+                    appRouter.go('/login');
+                  }
+                  final message = state.message!;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    final navContext =
+                        appRouter.routerDelegate.navigatorKey.currentContext;
+                    if (navContext == null || !navContext.mounted) return;
+                    ScaffoldMessenger.of(navContext).showSnackBar(
+                      SnackBar(
+                        content: Text(message),
+                        duration: const Duration(seconds: 5),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  });
+                },
+                child: content,
+              );
             },
             locale: localeProvider.locale,
             supportedLocales: const [Locale('ar'), Locale('en')],

@@ -178,6 +178,12 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       logoutUseCase: sl(),
       cacheDelegateUseCase: sl(),
       cacheAllDelegatesUseCase: sl(),
+      isAnonymousSession: () =>
+          sl<FirebaseAuth>().currentUser?.isAnonymous == true,
+      signOutAuth: () => sl<FirebaseAuth>().signOut(),
+      anonymousSessionRestored: sl<FirebaseAuth>().authStateChanges().map(
+        (user) => user?.isAnonymous == true,
+      ),
     ),
   );
 

@@ -54,7 +54,6 @@ class AuthRepositoryImpl implements AuthRepository {
     String phoneNumber,
   ) async {
     try {
-      // Fetch the delegate data (will handle authentication internally)
       final delegates = await remoteDataSource.getDelegatesByPhone(phoneNumber);
       if (delegates.isEmpty) {
         return const Left(AuthFailure('رقم الهاتف غير مسجل في النظام. يرجى مراجعة مشرف شركتك أو الدعم الفني.'));

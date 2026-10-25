@@ -9,25 +9,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 abstract class AuthRemoteDataSource {
-  /// Queries the `delegates` collectionGroup by phone number.
-  /// Returns a list of [DelegateModel] matching the phone number.
-  /// May contain multiple documents if delegate is registered in multiple orgs.
+  /// Staff lookup by phone. Reads only the `users` collection, which is
+  /// readable before sign-in. Does not query `delegates` and does not create
+  /// an auth session.
   ///
-  /// Staff and other non-delegate roles still use this path. Delegate
-  /// credential login uses [loginDelegate] and does not call it.
+  /// Delegate credential login uses [loginDelegate] and does not call this.
   Future<List<DelegateModel>> getDelegatesByPhone(String phoneNumber);
 
   /// Verifies phone + national ID with `delegateLoginV2`, then signs in with
-  /// the returned custom token. Does not sign in anonymously and does not
-  /// compare the national ID on the device.
+  /// the returned custom token. Does not compare the national ID on the device.
   Future<List<DelegateModel>> loginDelegate({
     required String phoneNumber,
     required String nationalId,
   });
-
-  /// Anonymous sign-in for the staff lookup path only.
-  /// Delegate credential login must not call this.
-  Future<void> signInAnonymously();
 
   /// Verifies a non-delegate password with Firebase Auth email/password.
   Future<bool> verifyAdminPassword(String email, String password);
@@ -285,203 +279,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<List<DelegateModel>> getDelegatesByPhone(String phoneNumber) async {
     try {
       final normalizedPhone = _normalizePhone(phoneNumber);
-
-      // Staff lookup still needs an auth session when nobody is signed in.
-      // Delegate credential login does not come through this method.
-      await signInAnonymously();
-
-      final delegatesFuture = _safeLoginQuery(
-        firestore
-            .collectionGroup('delegates')
-            .where('phoneNumber', isEqualTo: normalizedPhone),
-        'delegates collectionGroup',
-      );
-
-      final usersFuture = _safeLoginQuery(
-        firestore
-            .collection('users')
-            .where('phoneNumber', isEqualTo: normalizedPhone),
-        'users collection',
-      );
-
-      final results = await Future.wait([delegatesFuture, usersFuture]);
-      final querySnapshot = results[0];
-      var userQuery = results[1];
-
-      final delegates = _modelsFromDelegateDocs(
-        querySnapshot?.docs ??
-            const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
-      );
-
-      // Also check if the user is an admin in the 'users' collection
-      // (a phone number can exist in both delegates and users collections)
-      try {
-        var docs = userQuery?.docs.toList() ?? [];
-        if (docs.isEmpty) {
-          try {
-            final fallbackQuery = await firestore
-                .collection('users')
-                .where('phoneNumber', isEqualTo: phoneNumber.trim())
-                .getResilient(
-                  timeout: const Duration(seconds: 5),
-                  forceServer: true,
-                );
-            docs = fallbackQuery.docs.toList();
-          } catch (_) {}
-        }
-        if (docs.isEmpty) {
-          try {
-            final phoneAlias = await firestore
-                .collection('users')
-                .where('phone', isEqualTo: normalizedPhone)
-                .getResilient(
-                  timeout: const Duration(seconds: 5),
-                  forceServer: true,
-                );
-            docs = phoneAlias.docs.toList();
-          } catch (_) {}
-        }
-        
-        // Prioritize higher roles in case a phone number has multiple accounts
-        docs.sort((a, b) {
-          final roleA = a.data()['role'] as String? ?? '';
-          final roleB = b.data()['role'] as String? ?? '';
-          
-          int getRoleWeight(String role) {
-            final norm = role.toLowerCase().replaceAll('-', '_');
-            if (norm == 'super_admin' || norm == 'superadmin') return 100;
-            if (norm == 'technical_support' || norm == 'technicalsupport' || norm == 'tech_support' || norm == 'techsupport') return 90;
-            if (norm == 'accountant' || norm == 'accounting') return 85;
-            if (norm == 'organization_admin' || norm == 'organizationadmin') return 80;
-            if (norm == 'hr' || norm == 'company_hr' || norm == 'company-hr' || norm == 'human_resources') return 75;
-            if (norm == 'company_admin' || norm == 'companyadmin' || norm == 'admin') return 70;
-            if (norm == 'branches_marketing' || norm == 'branches_marketing_manager' || norm == 'branchesmarketingmanager') return 65;
-            if (norm == 'supervisor') return 60;
-            if (norm == 'marketing' || norm == 'marketing_promotion' || norm == 'marketingpromotion') return 50;
-            return 0;
-          }
-          
-          return getRoleWeight(roleB).compareTo(getRoleWeight(roleA));
-        });
-
-        for (final userDoc in docs) {
-          final userData = userDoc.data();
-          final userRole = userData['role'] as String? ?? '';
-          final normRole = userRole.toLowerCase().replaceAll('-', '_');
-          final isSuperAdmin = normRole == 'super_admin' || normRole == 'superadmin';
-          final isTechSupport = normRole == 'technical_support' ||
-              normRole == 'technicalsupport' ||
-              normRole == 'tech_support' ||
-              normRole == 'techsupport';
-          final isAccountant = normRole == 'accountant' || normRole == 'accounting' || normRole == 'account_admin';
-          final isOrgAdmin = normRole == 'organization_admin' || normRole == 'organizationadmin';
-          final isCompanyAdmin = normRole == 'company_admin' || normRole == 'companyadmin' || normRole == 'admin';
-          final isSupervisor = normRole == 'supervisor';
-          final isMarketing = normRole == 'marketing';
-          final isMarketingPromotion = normRole == 'marketing_promotion' || normRole == 'marketingpromotion';
-          final isBranchesMarketing = normRole == 'branches_marketing' ||
-              normRole == 'branches_marketing_manager' ||
-              normRole == 'branchesmarketingmanager';
-          final isHR = normRole == 'hr' ||
-              normRole == 'company_hr' ||
-              normRole == 'company-hr' ||
-              normRole == 'human_resources';
-
-          if (isSuperAdmin ||
-              isTechSupport ||
-              isAccountant ||
-              isOrgAdmin ||
-              isCompanyAdmin ||
-              isSupervisor ||
-              isMarketing ||
-              isMarketingPromotion ||
-              isBranchesMarketing ||
-              isHR) {
-            // Firebase Auth email comes only from this document.
-            final adminEmail = _stringField(userData, const ['email']);
-            if (adminEmail.isEmpty) continue;
-
-            final mappedRole = isHR
-                ? UserRole.hr
-                : isAccountant
-                    ? UserRole.accountant
-                    : isMarketing
-                        ? UserRole.marketing
-                        : isMarketingPromotion
-                            ? UserRole.marketingPromotion
-                            : isOrgAdmin
-                                ? UserRole.organizationAdmin
-                                : isTechSupport
-                                    ? UserRole.technicalSupport
-                                    : isSuperAdmin
-                                        ? UserRole.superAdmin
-                                        : isBranchesMarketing
-                                            ? UserRole.branchesMarketingManager
-                                            : UserRole.admin;
-
-            final displayName = _stringField(
-              userData,
-              const ['displayName', 'fullName', 'name'],
-            );
-            final resolvedName = displayName.isEmpty ? 'Admin' : displayName;
-
-            delegates.add(
-              DelegateModel(
-                uid: userDoc.id,
-                firstName: resolvedName,
-                middleName: '',
-                lastName: '',
-                fullName: resolvedName,
-                nationalityID: '__firebase_auth__:$adminEmail',
-                motherName: '',
-                city: '',
-                phoneNumber: normalizedPhone,
-                gender: DelegateGender.male,
-                position: DelegatePosition.supervisor,
-                birthDate: DateTime.now(),
-                organizationUID: _stringField(
-                  userData,
-                  const ['organizationUID', 'organizationId', 'orgId'],
-                ),
-                organizationName: _stringField(
-                  userData,
-                  const ['organizationName', 'organization_name'],
-                ),
-                companyUID: _stringField(
-                  userData,
-                  const ['companyUID', 'companyId'],
-                ),
-                companyName: _stringField(
-                  userData,
-                  const ['companyName', 'company_name'],
-                ),
-                status: DelegateStatus.approved,
-                delegatePublicId: '',
-                allReceiptCodes: const [],
-                createdAt: DateTime.now(),
-                createdBy: 'system_admin',
-                hasPendingUpdate: false,
-                isDeductedFromCompany: false,
-                isPrinted: false,
-                isProfileComplete: true,
-                numberOfDocuments: 0,
-                paymentAmount: 0,
-                version: 1,
-                documents: const [],
-                role: mappedRole,
-                email: adminEmail,
-              ),
-            );
-            
-            // Break after finding the first valid admin role to prevent duplicate delegates
-            break;
-          }
-        }
-      } on FirebaseException catch (_) {
-        // Query failed — continue with delegates only.
+      final docs = await _staffUserDocs(phoneNumber);
+      final delegates = <DelegateModel>[];
+      for (final userDoc in docs) {
+        final model = _staffModelFromUserDoc(userDoc, normalizedPhone);
+        if (model == null) continue;
+        delegates.add(model);
+        break;
       }
-
       return delegates;
+    } on Failure {
+      rethrow;
     } on FirebaseException catch (e) {
       throw ServerFailure(
         'فشل في الاتصال بقاعدة البيانات. يرجى التحقق من الاتصال والمحاولة مرة أخرى. (${e.code})',
@@ -494,27 +302,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         throw const ServerFailure('تعذر الاتصال بالإنترنت. يرجى التأكد من تشغيل البيانات أو الواي فاي والمحاولة ثانية.');
       }
       throw const ServerFailure('تعذر تسجيل الدخول حالياً. يرجى التأكد من صحة رقم الهاتف والمحاولة ثانية.');
-    }
-  }
-
-  @override
-  Future<void> signInAnonymously() async {
-    try {
-      // Check if already signed in
-      if (firebaseAuth.currentUser != null) {
-        return;
-      }
-      await firebaseAuth
-          .signInAnonymously()
-          .timeout(const Duration(seconds: 12));
-    } catch (_) {
-      try {
-        if (firebaseAuth.currentUser == null) {
-          await firebaseAuth
-              .signInAnonymously()
-              .timeout(const Duration(seconds: 8));
-        }
-      } catch (_) {}
     }
   }
 
@@ -553,29 +340,58 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   Future<String?> _staffEmailForPhone(String phoneNumber) async {
+    try {
+      final docs = await _staffUserDocs(phoneNumber);
+      for (final doc in docs) {
+        final email = _stringField(doc.data(), const ['email']);
+        if (_staffRoleWeight(doc.data()['role'] as String? ?? '') == 0) {
+          continue;
+        }
+        if (email.isNotEmpty) return email;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Users-collection lookup shared by staff login. `users` is readable
+  /// before authentication, so this does not sign in.
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _staffUserDocs(
+    String phoneNumber,
+  ) async {
     final normalizedPhone = _normalizePhone(phoneNumber);
     final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-    Future<void> addQuery(String field, String value) async {
-      if (value.isEmpty) return;
+    final primary = await _safeLoginQuery(
+      firestore
+          .collection('users')
+          .where('phoneNumber', isEqualTo: normalizedPhone),
+      'users collection',
+    );
+    docs.addAll(primary?.docs ?? const []);
+
+    if (docs.isEmpty && phoneNumber.trim() != normalizedPhone) {
       try {
-        final snap = await firestore
+        final fallback = await firestore
             .collection('users')
-            .where(field, isEqualTo: value)
+            .where('phoneNumber', isEqualTo: phoneNumber.trim())
             .getResilient(
               timeout: const Duration(seconds: 5),
               forceServer: true,
             );
-        docs.addAll(snap.docs);
+        docs.addAll(fallback.docs);
       } catch (_) {}
     }
-
-    await addQuery('phoneNumber', normalizedPhone);
-    if (phoneNumber.trim() != normalizedPhone) {
-      await addQuery('phoneNumber', phoneNumber.trim());
-    }
     if (docs.isEmpty) {
-      await addQuery('phone', normalizedPhone);
+      try {
+        final alias = await firestore
+            .collection('users')
+            .where('phone', isEqualTo: normalizedPhone)
+            .getResilient(
+              timeout: const Duration(seconds: 5),
+              forceServer: true,
+            );
+        docs.addAll(alias.docs);
+      } catch (_) {}
     }
 
     docs.sort((a, b) {
@@ -583,14 +399,127 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final weightB = _staffRoleWeight(b.data()['role'] as String? ?? '');
       return weightB.compareTo(weightA);
     });
+    return docs;
+  }
 
-    for (final doc in docs) {
-      final data = doc.data();
-      if (_staffRoleWeight(data['role'] as String? ?? '') == 0) continue;
-      final email = _stringField(data, const ['email']);
-      if (email.isNotEmpty) return email;
+  DelegateModel? _staffModelFromUserDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> userDoc,
+    String normalizedPhone,
+  ) {
+    final userData = userDoc.data();
+    final userRole = userData['role'] as String? ?? '';
+    final normRole = userRole.toLowerCase().replaceAll('-', '_');
+    final isSuperAdmin =
+        normRole == 'super_admin' || normRole == 'superadmin';
+    final isTechSupport = normRole == 'technical_support' ||
+        normRole == 'technicalsupport' ||
+        normRole == 'tech_support' ||
+        normRole == 'techsupport';
+    final isAccountant = normRole == 'accountant' ||
+        normRole == 'accounting' ||
+        normRole == 'account_admin';
+    final isOrgAdmin =
+        normRole == 'organization_admin' || normRole == 'organizationadmin';
+    final isCompanyAdmin = normRole == 'company_admin' ||
+        normRole == 'companyadmin' ||
+        normRole == 'admin';
+    final isSupervisor = normRole == 'supervisor';
+    final isMarketing = normRole == 'marketing';
+    final isMarketingPromotion = normRole == 'marketing_promotion' ||
+        normRole == 'marketingpromotion';
+    final isBranchesMarketing = normRole == 'branches_marketing' ||
+        normRole == 'branches_marketing_manager' ||
+        normRole == 'branchesmarketingmanager';
+    final isHR = normRole == 'hr' ||
+        normRole == 'company_hr' ||
+        normRole == 'company-hr' ||
+        normRole == 'human_resources';
+
+    if (!(isSuperAdmin ||
+        isTechSupport ||
+        isAccountant ||
+        isOrgAdmin ||
+        isCompanyAdmin ||
+        isSupervisor ||
+        isMarketing ||
+        isMarketingPromotion ||
+        isBranchesMarketing ||
+        isHR)) {
+      return null;
     }
-    return null;
+
+    final adminEmail = _stringField(userData, const ['email']);
+    if (adminEmail.isEmpty) return null;
+
+    final mappedRole = isHR
+        ? UserRole.hr
+        : isAccountant
+            ? UserRole.accountant
+            : isMarketing
+                ? UserRole.marketing
+                : isMarketingPromotion
+                    ? UserRole.marketingPromotion
+                    : isOrgAdmin
+                        ? UserRole.organizationAdmin
+                        : isTechSupport
+                            ? UserRole.technicalSupport
+                            : isSuperAdmin
+                                ? UserRole.superAdmin
+                                : isBranchesMarketing
+                                    ? UserRole.branchesMarketingManager
+                                    : UserRole.admin;
+
+    final displayName = _stringField(
+      userData,
+      const ['displayName', 'fullName', 'name'],
+    );
+    final resolvedName = displayName.isEmpty ? 'Admin' : displayName;
+
+    return DelegateModel(
+      uid: userDoc.id,
+      firstName: resolvedName,
+      middleName: '',
+      lastName: '',
+      fullName: resolvedName,
+      nationalityID: '__firebase_auth__:$adminEmail',
+      motherName: '',
+      city: '',
+      phoneNumber: normalizedPhone,
+      gender: DelegateGender.male,
+      position: DelegatePosition.supervisor,
+      birthDate: DateTime.now(),
+      organizationUID: _stringField(
+        userData,
+        const ['organizationUID', 'organizationId', 'orgId'],
+      ),
+      organizationName: _stringField(
+        userData,
+        const ['organizationName', 'organization_name'],
+      ),
+      companyUID: _stringField(
+        userData,
+        const ['companyUID', 'companyId'],
+      ),
+      companyName: _stringField(
+        userData,
+        const ['companyName', 'company_name'],
+      ),
+      status: DelegateStatus.approved,
+      delegatePublicId: '',
+      allReceiptCodes: const [],
+      createdAt: DateTime.now(),
+      createdBy: 'system_admin',
+      hasPendingUpdate: false,
+      isDeductedFromCompany: false,
+      isPrinted: false,
+      isProfileComplete: true,
+      numberOfDocuments: 0,
+      paymentAmount: 0,
+      version: 1,
+      documents: const [],
+      role: mappedRole,
+      email: adminEmail,
+    );
   }
 
   static String _stringField(Map<String, dynamic> data, List<String> keys) {

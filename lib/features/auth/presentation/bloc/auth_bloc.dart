@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/core/error/failures.dart';
@@ -15,11 +17,21 @@ part 'auth_event.dart';
 part 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
+  /// Shown when a leftover anonymous Firebase session is signed out.
+  static const freshSignInMessage =
+      'انتهت جلسة الدخول السابقة. يرجى تسجيل الدخول من جديد.\n'
+      'Your previous session has ended. Please sign in again.';
+
   final Login loginUseCase;
   final CheckAutoLogin checkAutoLoginUseCase;
   final Logout logoutUseCase;
   final CacheDelegate cacheDelegateUseCase;
   final CacheAllDelegates cacheAllDelegatesUseCase;
+  final bool Function()? isAnonymousSession;
+  final Future<void> Function()? signOutAuth;
+  final Stream<bool>? anonymousSessionRestored;
+
+  StreamSubscription<bool>? _anonymousAuthSub;
 
   AuthBloc({
     required this.loginUseCase,
@@ -27,11 +39,31 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     required this.logoutUseCase,
     required this.cacheDelegateUseCase,
     required this.cacheAllDelegatesUseCase,
+    this.isAnonymousSession,
+    this.signOutAuth,
+    this.anonymousSessionRestored,
   }) : super(AuthInitial()) {
     on<LoginRequested>(_onLoginRequested);
     on<CheckAutoLoginRequested>(_onCheckAutoLogin);
     on<LogoutRequested>(_onLogoutRequested);
     on<OrganizationSelected>(_onOrganizationSelected);
+    on<AnonymousSessionDetected>(_onAnonymousSessionDetected);
+
+    final restored = anonymousSessionRestored;
+    if (restored != null) {
+      _anonymousAuthSub = restored.listen(
+        (isAnonymous) {
+          if (isAnonymous) add(const AnonymousSessionDetected());
+        },
+        onError: (_) {},
+      );
+    }
+  }
+
+  @override
+  Future<void> close() {
+    _anonymousAuthSub?.cancel();
+    return super.close();
   }
 
   Future<void> _onLoginRequested(
@@ -122,11 +154,43 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
+  Future<void> _onAnonymousSessionDetected(
+    AnonymousSessionDetected event,
+    Emitter<AuthState> emit,
+  ) async {
+    await _signOutAnonymousSession(emit);
+  }
+
+  Future<void> _signOutAnonymousSession(Emitter<AuthState> emit) async {
+    final stillAnonymous = isAnonymousSession?.call() == true;
+    if (!stillAnonymous && state is AuthAuthenticated) return;
+
+    if (stillAnonymous) {
+      try {
+        await signOutAuth?.call();
+      } catch (_) {}
+    }
+    try {
+      await logoutUseCase(NoParams());
+    } catch (_) {}
+
+    final current = state;
+    if (current is AuthUnauthenticated &&
+        current.message == freshSignInMessage) {
+      return;
+    }
+    emit(const AuthUnauthenticated(message: freshSignInMessage));
+  }
+
   Future<void> _onCheckAutoLogin(
     CheckAutoLoginRequested event,
     Emitter<AuthState> emit,
   ) async {
     emit(AuthLoading());
+    if (isAnonymousSession?.call() == true) {
+      await _signOutAnonymousSession(emit);
+      return;
+    }
     final result = await checkAutoLoginUseCase(NoParams());
 
     await result.fold(

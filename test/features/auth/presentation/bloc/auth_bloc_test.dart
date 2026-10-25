@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
@@ -333,6 +335,69 @@ void main() {
       },
       act: (bloc) => bloc.add(CheckAutoLoginRequested()),
       expect: () => [AuthLoading(), AuthUnauthenticated()],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'signs out an anonymous session, clears remember-me, and asks for a fresh sign-in',
+      build: () {
+        when(
+          () => mockLogout(any()),
+        ).thenAnswer((_) async => const Right(null));
+        var anonymous = true;
+        return AuthBloc(
+          loginUseCase: mockLogin,
+          checkAutoLoginUseCase: mockCheckAutoLogin,
+          logoutUseCase: mockLogout,
+          cacheDelegateUseCase: mockCacheDelegate,
+          cacheAllDelegatesUseCase: mockCacheAllDelegates,
+          isAnonymousSession: () => anonymous,
+          signOutAuth: () async {
+            anonymous = false;
+          },
+        );
+      },
+      act: (bloc) => bloc.add(CheckAutoLoginRequested()),
+      expect: () => [
+        AuthLoading(),
+        const AuthUnauthenticated(message: AuthBloc.freshSignInMessage),
+      ],
+      verify: (_) {
+        verify(() => mockLogout(any())).called(1);
+        verifyNever(() => mockCheckAutoLogin(any()));
+      },
+    );
+
+    late StreamController<bool> restoredAnonymous;
+    blocTest<AuthBloc, AuthState>(
+      'signs out when auth state restores an anonymous user',
+      build: () {
+        when(
+          () => mockLogout(any()),
+        ).thenAnswer((_) async => const Right(null));
+        var anonymous = true;
+        restoredAnonymous = StreamController<bool>();
+        return AuthBloc(
+          loginUseCase: mockLogin,
+          checkAutoLoginUseCase: mockCheckAutoLogin,
+          logoutUseCase: mockLogout,
+          cacheDelegateUseCase: mockCacheDelegate,
+          cacheAllDelegatesUseCase: mockCacheAllDelegates,
+          isAnonymousSession: () => anonymous,
+          signOutAuth: () async {
+            anonymous = false;
+          },
+          anonymousSessionRestored: restoredAnonymous.stream,
+        );
+      },
+      act: (bloc) => restoredAnonymous.add(true),
+      tearDown: () => restoredAnonymous.close(),
+      expect: () => [
+        const AuthUnauthenticated(message: AuthBloc.freshSignInMessage),
+      ],
+      verify: (_) {
+        verify(() => mockLogout(any())).called(1);
+        verifyNever(() => mockCheckAutoLogin(any()));
+      },
     );
   });
 

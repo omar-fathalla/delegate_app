@@ -22,15 +22,6 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     throw UnimplementedError();
   }
 
-  Future<void> Function()? signInAnonymouslyStub;
-
-  @override
-  Future<void> signInAnonymously() async {
-    if (signInAnonymouslyStub != null) {
-      return signInAnonymouslyStub!();
-    }
-  }
-
   Future<bool> Function(String, String)? verifyAdminPasswordStub;
 
   @override

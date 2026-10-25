@@ -73,46 +73,39 @@ void main() {
   });
 
   group('getDelegatesByPhone', () {
-    test(
-      'should return list of DelegateModels when delegate found in collectionGroup',
-      () async {
-        // Seed data in the nested delegates collection
-        await fakeFirestore
-            .collection('organizations')
-            .doc('org1')
-            .collection('companies')
-            .doc('comp1')
-            .collection('delegates')
-            .doc('d1')
-            .set({
-              'firstName': 'أحمد',
-              'middleName': 'محمد',
-              'lastName': 'علي',
-              'fullName': 'أحمد محمد علي',
-              'nationalityID': '12345678901234',
-              'motherName': 'منى',
-              'city': 'القاهرة',
-              'phoneNumber': '01000000000',
-              'gender': 'male',
-              'position': 'promoter',
-              'birthDate': '1995-01-01',
-              'organizationUID': 'org1',
-              'organizationName': 'منظمة تسهيل',
-              'companyUID': 'comp1',
-              'companyName': 'شركة تسهيل',
-              'status': 'active',
-              'delegatePublicId': 'DEL-001',
-              'createdBy': 'admin',
-            });
+    test('ignores delegates collectionGroup documents', () async {
+      await fakeFirestore
+          .collection('organizations')
+          .doc('org1')
+          .collection('companies')
+          .doc('comp1')
+          .collection('delegates')
+          .doc('d1')
+          .set({
+            'firstName': 'أحمد',
+            'middleName': 'محمد',
+            'lastName': 'علي',
+            'fullName': 'أحمد محمد علي',
+            'nationalityID': '12345678901234',
+            'motherName': 'منى',
+            'city': 'القاهرة',
+            'phoneNumber': '01000000000',
+            'gender': 'male',
+            'position': 'promoter',
+            'birthDate': '1995-01-01',
+            'organizationUID': 'org1',
+            'organizationName': 'منظمة تسهيل',
+            'companyUID': 'comp1',
+            'companyName': 'شركة تسهيل',
+            'status': 'active',
+            'delegatePublicId': 'DEL-001',
+            'createdBy': 'admin',
+          });
 
-        final result = await dataSource.getDelegatesByPhone('01000000000');
+      final result = await dataSource.getDelegatesByPhone('01000000000');
 
-        expect(result, isNotEmpty);
-        expect(result.first.firstName, 'أحمد');
-        expect(result.first.phoneNumber, '01000000000');
-        expect(result.first.nationalityID, '12345678901234');
-      },
-    );
+      expect(result, isEmpty);
+    });
 
     test('should return empty list when phone number is not found', () async {
       final result = await dataSource.getDelegatesByPhone('09999999999');
@@ -120,29 +113,35 @@ void main() {
       expect(result, isEmpty);
     });
 
-    test('should normalize phone number with +20 prefix', () async {
+    test('should normalize phone number with +20 prefix against users', () async {
+      await fakeFirestore.collection('users').doc('staff-sara').set({
+        'phoneNumber': '01234567890',
+        'role': 'company-admin',
+        'email': 'sara@example.com',
+        'displayName': 'سارة',
+      });
+
+      final result = await dataSource.getDelegatesByPhone('+201234567890');
+
+      expect(result, isNotEmpty);
+      expect(result.first.firstName, 'سارة');
+      expect(result.first.email, 'sara@example.com');
+    });
+
+    test('should find admin in users collection without anonymous sign-in', () async {
       await fakeFirestore
           .collection('organizations')
           .doc('org1')
           .collection('companies')
           .doc('comp1')
           .collection('delegates')
-          .doc('d2')
+          .doc('same-phone')
           .set({
-            'firstName': 'سارة',
-            'phoneNumber': '01234567890',
-            'gender': 'female',
-            'position': 'promoter',
+            'firstName': 'مندوب',
+            'phoneNumber': '01500000000',
+            'nationalityID': '11111111111111',
             'status': 'active',
           });
-
-      final result = await dataSource.getDelegatesByPhone('+201234567890');
-
-      expect(result, isNotEmpty);
-      expect(result.first.firstName, 'سارة');
-    });
-
-    test('should find admin in users collection', () async {
       await fakeFirestore.collection('users').doc('admin1').set({
         'phoneNumber': '01500000000',
         'role': 'company-admin',
@@ -153,8 +152,12 @@ void main() {
         'companyUID': 'comp1',
         'companyName': 'شركة تسهيل',
       });
+      final source = AuthRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        firebaseAuth: _NoAnonymousAuth(),
+      );
 
-      final result = await dataSource.getDelegatesByPhone('01500000000');
+      final result = await source.getDelegatesByPhone('01500000000');
 
       expect(result, isNotEmpty);
       expect(result.first.position, DelegatePosition.supervisor);

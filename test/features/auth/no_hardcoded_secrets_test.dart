@@ -3,12 +3,13 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('client source has no hardcoded super-admin password or identity', () {
+  test('client source has no hardcoded super-admin password or anonymous sign-in', () {
     const forbidden = <String>[
       '481636100Aa!',
       '01508899965000',
       'Cq7Xa6OEwEOlRPlS41vohtfBXke2',
       'omar.fathalla80800@icloud.com',
+      'signInAnonymously',
     ];
     final hits = <String>[];
     for (final entity in Directory('lib').listSync(recursive: true)) {

@@ -24,6 +24,10 @@ class LoginRequested extends AuthEvent {
 
 class CheckAutoLoginRequested extends AuthEvent {}
 
+class AnonymousSessionDetected extends AuthEvent {
+  const AnonymousSessionDetected();
+}
+
 class LogoutRequested extends AuthEvent {}
 
 class OrganizationSelected extends AuthEvent {

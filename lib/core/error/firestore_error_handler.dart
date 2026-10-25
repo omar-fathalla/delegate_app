@@ -1,7 +1,5 @@
-import 'dart:async';
-
 import 'package:delegate_app/core/error/failures.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 /// Handles Firestore-related exceptions and throws the appropriate [ServerFailure].
 ///
@@ -20,8 +18,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 /// ```
 Never throwFirestoreFailure(FirebaseException e, String message) {
   if (e.code == 'permission-denied') {
-    _healAnonymousSession();
-    throw ServerFailure('$message (خطأ في الصلاحيات، يرجى إعادة المحاولة)');
+    throw ServerFailure('$message (خطأ في الصلاحيات)');
   } else if (e.code == 'unavailable' || e.code == 'network-request-failed') {
     throw const ServerFailure('لا يوجد اتصال بالإنترنت أو الخادم غير متاح مؤقتاً. يرجى التحقق من الشبكة.');
   } else if (e.code == 'deadline-exceeded') {
@@ -39,22 +36,4 @@ Never throwTimeoutFailure([
 
 Never throwUnexpectedFailure([String message = 'حدث خطأ غير متوقع.']) {
   throw ServerFailure(message);
-}
-
-/// Attempts to silently refresh the anonymous authentication session in the background.
-/// This fixes `permission-denied` errors caused by expired anonymous tokens.
-Future<void> _healAnonymousSession() async {
-  try {
-    final auth = FirebaseAuth.instance;
-    // Only heal if they are currently logged in anonymously or not logged in at all.
-    // We avoid touching Email/Password sessions (like Admins).
-    if (auth.currentUser?.isAnonymous == true) {
-      await auth.signOut();
-      await auth.signInAnonymously();
-    } else if (auth.currentUser == null) {
-      await auth.signInAnonymously();
-    }
-  } catch (_) {
-    // Ignore errors during background healing
-  }
 }
