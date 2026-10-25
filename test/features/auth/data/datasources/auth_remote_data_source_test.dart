@@ -57,15 +57,19 @@ class _FakeDelegateLoginApi implements DelegateLoginApi {
   int calls = 0;
   String? phone;
   String? nationalId;
+  String? deviceId;
 
   @override
   Future<DelegateLoginResponse> login({
     required String phone,
     required String nationalId,
+    required String deviceId,
+    String deviceModel = '',
   }) async {
     calls++;
     this.phone = phone;
     this.nationalId = nationalId;
+    this.deviceId = deviceId;
     final failure = error;
     if (failure != null) throw failure;
     return response;
@@ -378,6 +382,10 @@ void main() {
         firestore: fakeFirestore,
         firebaseAuth: auth,
         delegateLoginApi: api,
+        currentDeviceDetails: () async => {
+          'deviceId': 'install-device-1',
+          'deviceModel': 'Test Phone',
+        },
       );
       await fakeFirestore
           .collection('organizations')
@@ -413,6 +421,7 @@ void main() {
 
       expect(api.calls, 1);
       expect(api.nationalId, '12345678901234');
+      expect(api.deviceId, 'install-device-1');
       expect(result, hasLength(1));
       expect(result.single.uid, 'd1');
       expect(result.single.firstName, 'أحمد');
@@ -430,6 +439,7 @@ void main() {
         firestore: fakeFirestore,
         firebaseAuth: auth,
         delegateLoginApi: api,
+        currentDeviceDetails: () async => {'deviceId': 'install-device-1'},
       );
 
       expect(
@@ -438,6 +448,35 @@ void main() {
           nationalId: '00000000000000',
         ),
         throwsA(isA<DelegateCredentialsFailure>()),
+      );
+      expect(auth.currentUser, isNull);
+    });
+
+    test('does not sign in when the server rejects the device', () async {
+      final auth = _NoAnonymousAuth();
+      final api = _FakeDelegateLoginApi(
+        const DelegateLoginResponse(token: 'unused', delegateIds: []),
+        error: const DelegateLoginException('device_mismatch'),
+      );
+      final source = AuthRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        firebaseAuth: auth,
+        delegateLoginApi: api,
+        currentDeviceDetails: () async => {'deviceId': 'other-phone'},
+      );
+
+      expect(
+        () => source.loginDelegate(
+          phoneNumber: '01000000000',
+          nationalId: '12345678901234',
+        ),
+        throwsA(
+          isA<AuthFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'device_mismatch',
+          ),
+        ),
       );
       expect(auth.currentUser, isNull);
     });

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
+import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/auth/data/datasources/delegate_login_api.dart';
 import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
@@ -40,12 +41,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseAuth firebaseAuth;
   final DelegateLoginApi? delegateLoginApi;
   final StaffPhoneLookupApi? staffPhoneLookupApi;
+  final Future<Map<String, String>> Function()? currentDeviceDetails;
 
   AuthRemoteDataSourceImpl({
     required this.firestore,
     required this.firebaseAuth,
     this.delegateLoginApi,
     this.staffPhoneLookupApi,
+    this.currentDeviceDetails,
   });
 
   /// Normalises a phone number by stripping common Egyptian prefixes
@@ -66,9 +69,19 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
     }
 
+    final details = await (currentDeviceDetails ??
+        DeviceBindingService.getCurrentDeviceDetails)();
+    final deviceId = (details['deviceId'] ?? '').trim();
+    final deviceModel = (details['deviceModel'] ?? '').trim();
+
     late final DelegateLoginResponse response;
     try {
-      response = await api.login(phone: phoneNumber, nationalId: nationalId);
+      response = await api.login(
+        phone: phoneNumber,
+        nationalId: nationalId,
+        deviceId: deviceId,
+        deviceModel: deviceModel,
+      );
     } on DelegateLoginException catch (error) {
       throw _failureForDelegateLogin(error);
     }
@@ -123,6 +136,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       case 'rate_limited':
         return const DelegateRateLimitFailure(
           'تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً.',
+        );
+      case 'device_mismatch':
+        return const AuthFailure(
+          'هذا الحساب مقترن بجهاز آخر. تم إرسال طلب تغيير الجهاز إلى إدارة الشركة. بعد الموافقة، سجّل الدخول من هذا الجهاز ليتم اعتماده.',
+          'device_mismatch',
+        );
+      case 'invalid_device':
+        return const AuthFailure(
+          'تعذر قراءة معرّف هذا الجهاز. أعد فتح التطبيق وحاول مرة أخرى.',
+          'invalid_device',
         );
       case 'invalid_phone':
         return const AuthFailure(

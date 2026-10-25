@@ -24,6 +24,8 @@ abstract class DelegateLoginApi {
   Future<DelegateLoginResponse> login({
     required String phone,
     required String nationalId,
+    required String deviceId,
+    String deviceModel = '',
   });
 }
 
@@ -135,12 +137,16 @@ class FirebaseDelegateLoginApi implements DelegateLoginApi {
   Future<DelegateLoginResponse> login({
     required String phone,
     required String nationalId,
+    required String deviceId,
+    String deviceModel = '',
   }) async {
     try {
       final callable = functions.httpsCallable('delegateLoginV2');
       final result = await callable.call({
         'phone': phone,
         'nationalId': nationalId,
+        'deviceId': deviceId,
+        if (deviceModel.isNotEmpty) 'deviceModel': deviceModel,
       });
       final raw = result.data;
       if (raw is! Map) {
@@ -165,6 +171,10 @@ class FirebaseDelegateLoginApi implements DelegateLoginApi {
     final details = error.details;
     final detailed = details is Map ? details['reason'] : null;
     if (detailed is String && detailed.isNotEmpty) {
+      if (detailed == 'device_mismatch') return 'device_mismatch';
+      if (detailed == 'missing_device' || detailed == 'invalid_device') {
+        return 'invalid_device';
+      }
       if (detailed == 'not_found') return 'not_found';
       if (detailed == 'bad_credentials') return 'bad_credentials';
       if (detailed == 'account_inactive') return 'account_inactive';

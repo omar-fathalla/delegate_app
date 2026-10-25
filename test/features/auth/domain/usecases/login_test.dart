@@ -223,6 +223,24 @@ void main() {
     expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
   });
 
+  test('should not fall back to staff login when the device does not match', () async {
+    mockAuthRepository.loginDelegateStub = (_, _) async => const Left(
+      AuthFailure(
+        'هذا الحساب مقترن بجهاز آخر. تم إرسال طلب تغيير الجهاز إلى إدارة الشركة.',
+        'device_mismatch',
+      ),
+    );
+    final result = await usecase(
+      const LoginParams(phoneNumber: tMobile, password: tPassword),
+    );
+    expect(result, isA<Left<Failure, List<Delegate>>>());
+    result.fold(
+      (failure) => expect((failure as AuthFailure).code, 'device_mismatch'),
+      (_) => fail('a mismatched device must not sign in'),
+    );
+    expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
+  });
+
   test('should return failure when delegate login fails before staff lookup', () async {
     const tFailure = ServerFailure('Server Failure');
     mockAuthRepository.loginDelegateStub = (_, _) async => const Left(tFailure);

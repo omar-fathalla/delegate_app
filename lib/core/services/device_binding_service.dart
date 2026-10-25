@@ -116,49 +116,18 @@ class DeviceBindingService {
     final deviceDetails = await getCurrentDeviceDetails();
     final currentDeviceId = deviceDetails['deviceId'] ?? '';
     final currentDeviceModel = deviceDetails['deviceModel'] ?? 'جهاز غير معروف';
-    final currentBrand = deviceDetails['brand'] ?? '';
-    final currentOsVersion = deviceDetails['osVersion'] ?? '';
 
     final boundDeviceId = delegate.boundDeviceId?.trim() ?? '';
     final boundDeviceModel = delegate.boundDeviceModel?.trim() ?? '';
 
-    // 3. الحالة الأولى: الحساب غير مقترن بأي جهاز حتى الآن (أول تسجيل دخول أو بعد Reset)
-    if (boundDeviceId.isEmpty) {
-      try {
-        await _updateDelegateDeviceInFirestore(
-          delegate: delegate,
-          deviceId: currentDeviceId,
-          deviceModel: currentDeviceModel,
-          brand: currentBrand,
-          osVersion: currentOsVersion,
-        );
-
-        debugPrint('Device successfully bound for delegate ${delegate.fullName}: $currentDeviceModel ($currentDeviceId)');
-
-        return DeviceVerificationResult(
-          status: DeviceVerificationStatus.boundNew,
-          currentDeviceId: currentDeviceId,
-          currentDeviceModel: currentDeviceModel,
-          message: 'تم اعتماد وربط هذا الجهاز لحسابك بنجاح',
-        );
-      } catch (e) {
-        debugPrint('Error binding device to Firestore: $e');
-        // في حال حدوث خطأ في الشبكة، نسمح بالمرور
-        return DeviceVerificationResult(
-          status: DeviceVerificationStatus.boundNew,
-          currentDeviceId: currentDeviceId,
-          currentDeviceModel: currentDeviceModel,
-        );
-      }
-    }
-
-    // 4. الحالة الثانية: الجهاز الحالي مطابق للجهاز المعتمد
-    if (boundDeviceId == currentDeviceId) {
-      // تحديث وقت آخر ظهور للجهاز في الخلفية
-      _touchDeviceLastSeen(delegate).ignore();
-
+    // The server binds on delegateLoginV2. An empty field means there is no
+    // legacy binding to compare (or the mirror has not arrived). Do not write
+    // the binding from the client.
+    if (boundDeviceId.isEmpty || boundDeviceId == currentDeviceId) {
       return DeviceVerificationResult(
-        status: DeviceVerificationStatus.allowed,
+        status: boundDeviceId.isEmpty
+            ? DeviceVerificationStatus.boundNew
+            : DeviceVerificationStatus.allowed,
         boundDeviceModel: boundDeviceModel,
         currentDeviceModel: currentDeviceModel,
         currentDeviceId: currentDeviceId,
@@ -185,77 +154,79 @@ class DeviceBindingService {
     );
   }
 
-  /// تحديث بيانات الربط في مستند المندوب بـ Firestore
-  static Future<void> _updateDelegateDeviceInFirestore({
-    required Delegate delegate,
-    required String deviceId,
-    required String deviceModel,
-    required String brand,
-    required String osVersion,
+  /// يسجّل موافقة فورية على فك الربط. تسجيل الدخول التالي يعيد الربط.
+  static Future<void> resetDelegateDeviceBinding({
+    required String delegateUid,
+    String? organizationUID,
+    String? companyUID,
+    String? adminUid,
   }) async {
-    final updateData = {
-      'boundDeviceId': deviceId,
-      'boundDeviceModel': deviceModel,
-      'boundDeviceBrand': brand,
-      'boundDeviceOs': osVersion,
-      'deviceBoundAt': FieldValue.serverTimestamp(),
-      'deviceLastSeenAt': FieldValue.serverTimestamp(),
-      'isDeviceLocked': true,
+    final requestRef = _firestore.collection('device_unbind_requests').doc();
+    await requestRef.set({
+      'id': requestRef.id,
+      'delegateUid': delegateUid,
+      'organizationUID': organizationUID ?? '',
+      'companyUID': companyUID ?? '',
+      'status': 'approved',
+      'reason': 'فك الربط من الإدارة',
+      'createdAt': FieldValue.serverTimestamp(),
+      'resolvedAt': FieldValue.serverTimestamp(),
+      'resolvedBy': adminUid ?? 'admin',
+      'requestedDeviceId': '',
+    });
+    try {
+      await _clearMirroredBinding(
+        delegateUid: delegateUid,
+        organizationUID: organizationUID,
+        companyUID: companyUID,
+        adminUid: adminUid,
+      );
+    } catch (e) {
+      debugPrint('Mirrored device fields were left for the server to replace: $e');
+    }
+  }
+
+  static Future<void> _clearMirroredBinding({
+    required String delegateUid,
+    String? organizationUID,
+    String? companyUID,
+    String? adminUid,
+  }) async {
+    final resetData = {
+      'boundDeviceId': FieldValue.delete(),
+      'boundDeviceModel': FieldValue.delete(),
+      'boundDeviceBrand': FieldValue.delete(),
+      'boundDeviceOs': FieldValue.delete(),
+      'deviceBoundAt': FieldValue.delete(),
+      'isDeviceLocked': false,
+      'deviceResetAt': FieldValue.serverTimestamp(),
+      'deviceResetBy': adminUid ?? 'admin',
     };
 
-    // المسار المباشر إن توفرت معرفات المنظمة والشركة
-    if (delegate.organizationUID.isNotEmpty &&
-        delegate.companyUID.isNotEmpty &&
-        delegate.uid.isNotEmpty) {
+    if (organizationUID != null &&
+        organizationUID.isNotEmpty &&
+        companyUID != null &&
+        companyUID.isNotEmpty) {
       final docRef = _firestore
           .collection('organizations')
-          .doc(delegate.organizationUID)
+          .doc(organizationUID)
           .collection('companies')
-          .doc(delegate.companyUID)
+          .doc(companyUID)
           .collection('delegates')
-          .doc(delegate.uid);
+          .doc(delegateUid);
 
-      await docRef.set(updateData, SetOptions(merge: true));
+      await docRef.update(resetData);
       return;
     }
 
-    // البحث عن المستند عبر collectionGroup
-    final snap = await _firestore
-        .collectionGroup('delegates')
-        .where('phoneNumber', isEqualTo: delegate.phoneNumber)
-        .get();
-
+    final snap = await _firestore.collectionGroup('delegates').get();
     for (final doc in snap.docs) {
-      if (doc.id == delegate.uid || doc.data()['nationalityID'] == delegate.nationalityID) {
-        await doc.reference.set(updateData, SetOptions(merge: true));
+      if (doc.id == delegateUid) {
+        await doc.reference.update(resetData);
+        return;
       }
     }
   }
-
-  /// تحديث توقيت آخر نشاط للجهاز
-  static Future<void> _touchDeviceLastSeen(Delegate delegate) async {
-    try {
-      if (delegate.organizationUID.isNotEmpty &&
-          delegate.companyUID.isNotEmpty &&
-          delegate.uid.isNotEmpty) {
-        final docRef = _firestore
-            .collection('organizations')
-            .doc(delegate.organizationUID)
-            .collection('companies')
-            .doc(delegate.companyUID)
-            .collection('delegates')
-            .doc(delegate.uid);
-        final snap = await docRef.get().timeout(const Duration(seconds: 3));
-        if (snap.exists) {
-          await docRef.update({
-            'deviceLastSeenAt': FieldValue.serverTimestamp(),
-          }).timeout(const Duration(seconds: 3));
-        }
-      }
-    } catch (_) {}
-  }
-
-  /// توثيق محاولة الدخول المخالفة في سجل الأمان
   static Future<void> _logUnauthorizedDeviceAttempt({
     required Delegate delegate,
     required String boundDeviceModel,
@@ -290,50 +261,6 @@ class DeviceBindingService {
         'status': 'blocked',
       });
     } catch (_) {}
-  }
-
-  /// فك ربط جهاز المندوب (إعادة تعيين الجهاز من قبل المدير أو الدعم الفني)
-  static Future<void> resetDelegateDeviceBinding({
-    required String delegateUid,
-    String? organizationUID,
-    String? companyUID,
-    String? adminUid,
-  }) async {
-    final resetData = {
-      'boundDeviceId': FieldValue.delete(),
-      'boundDeviceModel': FieldValue.delete(),
-      'boundDeviceBrand': FieldValue.delete(),
-      'boundDeviceOs': FieldValue.delete(),
-      'deviceBoundAt': FieldValue.delete(),
-      'isDeviceLocked': false,
-      'deviceResetAt': FieldValue.serverTimestamp(),
-      'deviceResetBy': adminUid ?? 'admin',
-    };
-
-    if (organizationUID != null &&
-        organizationUID.isNotEmpty &&
-        companyUID != null &&
-        companyUID.isNotEmpty) {
-      final docRef = _firestore
-          .collection('organizations')
-          .doc(organizationUID)
-          .collection('companies')
-          .doc(companyUID)
-          .collection('delegates')
-          .doc(delegateUid);
-
-      await docRef.update(resetData);
-      return;
-    }
-
-    // البحث عن المستند عبر collectionGroup
-    final snap = await _firestore.collectionGroup('delegates').get();
-    for (final doc in snap.docs) {
-      if (doc.id == delegateUid) {
-        await doc.reference.update(resetData);
-        return;
-      }
-    }
   }
 
   /// التحقق مما إذا كان لدى المندوب طلب فك ارتباط معلق حالياً
@@ -407,14 +334,17 @@ class DeviceBindingService {
     required String adminName,
   }) async {
     // 1. فك ربط جهاز المندوب
-    await resetDelegateDeviceBinding(
-      delegateUid: delegateUid,
-      organizationUID: organizationUID,
-      companyUID: companyUID,
-      adminUid: adminUid,
-    );
+    try {
+      await _clearMirroredBinding(
+        delegateUid: delegateUid,
+        organizationUID: organizationUID,
+        companyUID: companyUID,
+        adminUid: adminUid,
+      );
+    } catch (e) {
+      debugPrint('Mirrored device fields were left for the server to replace: $e');
+    }
 
-    // 2. تحديث حالة الطلب إلى معتمد
     await _firestore.collection('device_unbind_requests').doc(requestId).update({
       'status': 'approved',
       'resolvedAt': FieldValue.serverTimestamp(),

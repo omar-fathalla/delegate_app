@@ -407,6 +407,10 @@ class _HRDeviceUnbindRequestsScreenState
       statusColor = colorScheme.error;
       statusLabel = 'مرفوض';
       statusIcon = Icons.cancel_rounded;
+    } else if (status == 'completed') {
+      statusColor = colorScheme.primary;
+      statusLabel = 'تم الربط';
+      statusIcon = Icons.phonelink_lock_rounded;
     } else {
       statusColor = const Color(0xFFE65100);
       statusLabel = 'قيد المراجعة';

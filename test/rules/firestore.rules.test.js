@@ -418,6 +418,50 @@ describe("firestore tightened rules", () => {
       resolvedBy: "comp",
     }));
     await assertFails(dbFor("comp").doc("device_unbind_requests/u2").update({status: "approved"}));
+    await assertFails(dbFor("org2").doc("device_unbind_requests/u1").update({status: "approved"}));
+    await assertFails(delegate.doc("device_unbind_requests/u1").update({status: "approved"}));
+    await assertSucceeds(dbFor("comp").collection("device_unbind_requests").add({
+      delegateUid: "del-1",
+      organizationUID: "o1",
+      companyUID: "c1",
+      status: "approved",
+    }));
+    await assertFails(delegate.collection("device_unbind_requests").add({
+      delegateUid: "del-1",
+      organizationUID: "o1",
+      companyUID: "c1",
+      status: "approved",
+    }));
+    await assertFails(dbFor("comp2").collection("device_unbind_requests").add({
+      delegateUid: "del-1",
+      organizationUID: "o1",
+      companyUID: "c1",
+      status: "approved",
+    }));
+  });
+
+  test("clients cannot write device bindings or the mirrored delegate fields", async () => {
+    const delegate = dbFor("del-1", DELEGATE);
+    const companyAdmin = dbFor("comp");
+    await assertFails(delegate.doc("deviceBindings/del-1").set({deviceId: "phone-a"}));
+    await assertFails(companyAdmin.doc("deviceBindings/del-1").get());
+    await assertFails(dbFor("super").doc("deviceBindings/del-1").set({deviceId: "phone-a"}));
+    await assertFails(
+      delegate.doc("organizations/o1/companies/c1/delegates/del-1").update({
+        boundDeviceId: "phone-a",
+      }),
+    );
+    await assertFails(
+      companyAdmin.doc("organizations/o1/companies/c1/delegates/del-1").update({
+        boundDeviceId: "",
+        isDeviceLocked: false,
+      }),
+    );
+    await assertSucceeds(
+      companyAdmin.doc("organizations/o1/companies/c1/delegates/del-1").update({
+        status: "suspended",
+      }),
+    );
   });
 
   test("security logs can be created by the delegate and deleted only inside the company", async () => {

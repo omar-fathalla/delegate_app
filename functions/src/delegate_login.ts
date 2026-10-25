@@ -5,6 +5,7 @@ import {
   buildCustomClaimsForProfiles,
   clearedRateLimit,
   createdAtMillis,
+  decideDeviceBinding,
   evaluateCandidates,
   extractNationalId,
   extractPhone,
@@ -12,15 +13,19 @@ import {
   lockStatus,
   nationalIdsMatch,
   normalizePhone,
+  optionalDeviceLabel,
   phoneQueryVariants,
   rateLimitDocId,
   readString,
   recordFailedAttempt,
   stableDelegateAuthUid,
+  validateDeviceId,
   validateLoginInput,
 } from "./delegate_login_logic";
 
 const RATE_LIMIT_COLLECTION = "delegate_login_rate_limits";
+const DEVICE_BINDINGS = "deviceBindings";
+const UNBIND_REQUESTS = "device_unbind_requests";
 
 /**
  * delegateLoginV2
@@ -36,6 +41,14 @@ const RATE_LIMIT_COLLECTION = "delegate_login_rate_limits";
  * Do not deploy Firestore rules in the same change. See
  * functions/scripts/README-delegate-auth-backfill.md for the optional backfill
  * that is NOT required before the first login.
+ *
+ * deviceId is required. The released app does not call this function, so
+ * publishing it does not change those installs. A build that calls it without
+ * deviceId is rejected with missing_device. Delegates who already have
+ * boundDeviceId and no deviceBindings doc keep that device on the first V2
+ * login. Delegates with neither are bound to the device that calls. After
+ * the rules in this repo are published, clients can no longer write
+ * boundDeviceId; an old build that still tries will fail that write.
  */
 export const delegateLoginV2 = functions
   .region("us-central1")
@@ -66,6 +79,15 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
       { reason: validated.reason },
     );
   }
+  const device = validateDeviceId(payload.deviceId ?? payload.device_id);
+  if (!device.ok) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "A device id is required.",
+      { reason: device.reason },
+    );
+  }
+  const deviceModel = optionalDeviceLabel(payload.deviceModel ?? payload.device_model);
 
   const phoneKey = rateLimitDocId(validated.phone);
   const lock = await readLock(phoneKey);
@@ -109,7 +131,29 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
     (candidate) => decision.ids.indexOf(candidate.id) !== -1,
   );
   const uid = stableDelegateAuthUid(decision.primary.id);
-  const claims = buildCustomClaimsForProfiles(profiles, decision.primary, decision.ids);
+  const deviceDecision = await enforceDeviceBinding({
+    uid,
+    primary: decision.primary,
+    profiles,
+    deviceId: device.deviceId,
+    deviceModel,
+    phone: validated.phone,
+  });
+  if (deviceDecision.action === "mismatch") {
+    await clearFailures(phoneKey);
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "This account is bound to another device.",
+      { reason: "device_mismatch", requestStatus: "pending" },
+    );
+  }
+
+  const claims = buildCustomClaimsForProfiles(
+    profiles,
+    decision.primary,
+    decision.ids,
+    deviceDecision.deviceId,
+  );
 
   try {
     await admin.auth().setCustomUserClaims(uid, claims);
@@ -187,6 +231,155 @@ function millisOf(value: unknown): number {
   return createdAtMillis(value) ?? 0;
 }
 
+async function enforceDeviceBinding(input: {
+  uid: string;
+  primary: DelegateCandidate;
+  profiles: DelegateCandidate[];
+  deviceId: string;
+  deviceModel: string;
+  phone: string;
+}): Promise<{ action: "bind" | "allow"; deviceId: string } | { action: "mismatch" }> {
+  const db = admin.firestore();
+  const bindingRef = db.collection(DEVICE_BINDINGS).doc(input.uid);
+  const requests = await loadOpenUnbindRequests(input.profiles.map((profile) => profile.id));
+  const approved = requests.find((request) => request.status === "approved") || null;
+  const pending = requests.find((request) => request.status === "pending") || null;
+
+  const outcome = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(bindingRef);
+    const serverId = snap.exists ? readString(snap.data() || {}, ["deviceId"]) : "";
+    const legacyId = input.primary.boundDeviceId || "";
+    const decision = decideDeviceBinding({
+      storedDeviceId: serverId || legacyId,
+      requestedDeviceId: input.deviceId,
+      approvedRequestId: approved ? approved.id : null,
+      pendingRequestId: pending ? pending.id : null,
+    });
+    if (decision.action === "mismatch") return decision;
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const payload: Record<string, unknown> = {
+      deviceId: decision.deviceId,
+      delegateId: input.primary.id,
+      orgId: input.primary.orgId,
+      companyId: input.primary.companyId,
+      updatedAt: now,
+    };
+    if (decision.action === "bind" || !snap.exists) {
+      payload.boundAt = now;
+    }
+    if (input.deviceModel) payload.deviceModel = input.deviceModel;
+    tx.set(bindingRef, payload, { merge: true });
+    if (decision.action === "bind" && decision.consumeRequestId) {
+      tx.update(db.collection(UNBIND_REQUESTS).doc(decision.consumeRequestId), {
+        status: "completed",
+        consumedAt: now,
+        consumedDeviceId: decision.deviceId,
+      });
+    }
+    return decision;
+  });
+
+  if (outcome.action === "mismatch") {
+    await upsertPendingUnbindRequest({
+      existingId: outcome.pendingRequestId,
+      primary: input.primary,
+      phone: input.phone,
+      requestedDeviceId: input.deviceId,
+      requestedDeviceModel: input.deviceModel,
+      boundDeviceId: outcome.boundDeviceId,
+    });
+    return { action: "mismatch" };
+  }
+
+  await mirrorBoundDevice(
+    input.profiles,
+    outcome.deviceId,
+    input.deviceModel,
+    outcome.action === "bind",
+  );
+  return { action: outcome.action, deviceId: outcome.deviceId };
+}
+
+async function loadOpenUnbindRequests(
+  delegateIds: string[],
+): Promise<Array<{ id: string; status: string }>> {
+  const ids = Array.from(new Set(delegateIds.filter((id) => id))).slice(0, 10);
+  if (ids.length === 0) return [];
+  try {
+    const snap = await admin.firestore()
+      .collection(UNBIND_REQUESTS)
+      .where("delegateUid", "in", ids)
+      .limit(20)
+      .get();
+    return snap.docs
+      .map((doc) => ({
+        id: doc.id,
+        status: readString(doc.data(), ["status"]),
+      }))
+      .filter((request) => request.status === "pending" || request.status === "approved");
+  } catch {
+    console.error("delegateLoginV2 unbind lookup failed");
+    return [];
+  }
+}
+
+async function upsertPendingUnbindRequest(input: {
+  existingId: string | null;
+  primary: DelegateCandidate;
+  phone: string;
+  requestedDeviceId: string;
+  requestedDeviceModel: string;
+  boundDeviceId: string;
+}): Promise<void> {
+  const db = admin.firestore();
+  const ref = input.existingId
+    ? db.collection(UNBIND_REQUESTS).doc(input.existingId)
+    : db.collection(UNBIND_REQUESTS).doc();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const payload: Record<string, unknown> = {
+    id: ref.id,
+    delegateUid: input.primary.id,
+    delegateName: input.primary.fullName || "",
+    delegatePhone: input.phone,
+    organizationUID: input.primary.orgId,
+    companyUID: input.primary.companyId,
+    boundDeviceId: input.boundDeviceId,
+    boundDeviceModel: input.primary.boundDeviceModel || "",
+    requestedDeviceId: input.requestedDeviceId,
+    requestedDeviceModel: input.requestedDeviceModel,
+    status: "pending",
+    reason: "طلب تغيير الجهاز من تسجيل الدخول",
+    updatedAt: now,
+  };
+  if (!input.existingId) payload.createdAt = now;
+  await ref.set(payload, { merge: true });
+}
+
+async function mirrorBoundDevice(
+  profiles: DelegateCandidate[],
+  deviceId: string,
+  deviceModel: string,
+  firstBind: boolean,
+): Promise<void> {
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await Promise.all(profiles.map(async (profile) => {
+    if (!profile.path) return;
+    const update: Record<string, unknown> = {
+      boundDeviceId: deviceId,
+      deviceLastSeenAt: now,
+      isDeviceLocked: true,
+    };
+    if (firstBind) update.deviceBoundAt = now;
+    if (deviceModel) update.boundDeviceModel = deviceModel;
+    try {
+      await admin.firestore().doc(profile.path).set(update, { merge: true });
+    } catch {
+      console.error("delegateLoginV2 device mirror failed", profile.id);
+    }
+  }));
+}
+
 async function findCandidates(
   phone: string,
   nationalId: string,
@@ -213,6 +406,10 @@ async function findCandidates(
       companyId,
       orgId,
       phone: storedPhone,
+      path: doc.ref.path,
+      boundDeviceId: readString(data, ["boundDeviceId"]),
+      boundDeviceModel: readString(data, ["boundDeviceModel"]),
+      fullName: readString(data, ["fullName", "name"]),
       createdAtMillis: createdAtMillis(data.createdAt ?? data.hiredAt ?? data.startDate),
       nationalIdMatches: nationalIdsMatch(extractNationalId(data), nationalId),
     });

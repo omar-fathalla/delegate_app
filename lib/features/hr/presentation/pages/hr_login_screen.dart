@@ -85,22 +85,26 @@ class _HrLoginScreenState extends State<HrLoginScreen>
               delegate: state.delegate,
             );
           } else if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  localizedAuthError(
-                    l10n,
-                    message: state.message,
-                    code: state.code,
+            if (state.code == 'device_mismatch') {
+              DeviceLockDialog.show(context, requestAlreadyFiled: true);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    localizedAuthError(
+                      l10n,
+                      message: state.message,
+                      code: state.code,
+                    ),
+                  ),
+                  backgroundColor: colorScheme.error,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                backgroundColor: colorScheme.error,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            );
+              );
+            }
           } else if (state is AuthOrganizationSelectionRequired) {
             _showOrganizationSelector(
               context,

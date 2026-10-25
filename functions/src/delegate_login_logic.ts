@@ -54,6 +54,12 @@ export interface DelegateCandidate {
   nationalIdMatches: boolean;
   /** Normalized phone. Copied into the custom token so rules can scope phone queries. */
   phone?: string;
+  /** Firestore path of the delegate document, used to mirror the bound device. */
+  path?: string;
+  /** Legacy client-written binding. Used only when deviceBindings/{uid} is absent. */
+  boundDeviceId?: string;
+  boundDeviceModel?: string;
+  fullName?: string;
 }
 
 export type CandidateDecision =
@@ -252,6 +258,7 @@ export function evaluateCandidates(candidates: DelegateCandidate[]): CandidateDe
 export function buildCustomClaims(
   primary: DelegateCandidate,
   ids: string[],
+  deviceId?: string,
 ): Record<string, unknown> {
   const claims: Record<string, unknown> = {
     role: "delegate",
@@ -264,6 +271,7 @@ export function buildCustomClaims(
     const phones = phoneQueryVariants(normalizePhone(primary.phone));
     if (phones.length > 0) claims.phones = phones;
   }
+  if (deviceId) claims.deviceId = deviceId;
   return claims;
 }
 
@@ -275,8 +283,9 @@ export function buildCustomClaimsForProfiles(
   profiles: DelegateCandidate[],
   primary: DelegateCandidate,
   ids: string[],
+  deviceId?: string,
 ): Record<string, unknown> {
-  const claims = buildCustomClaims(primary, ids);
+  const claims = buildCustomClaims(primary, ids, deviceId);
   const companyIds = Array.from(
     new Set(profiles.map((profile) => profile.companyId).filter((value) => value)),
   );
@@ -336,4 +345,69 @@ export function clearedRateLimit(now: number): RateLimitState {
 
 export function rateLimitDocId(normalizedPhone: string): string {
   return crypto.createHash("sha256").update(normalizedPhone).digest("hex");
+}
+
+export type DeviceBindingAction =
+  | { action: "bind"; deviceId: string; consumeRequestId: string | null }
+  | { action: "allow"; deviceId: string }
+  | { action: "mismatch"; boundDeviceId: string; pendingRequestId: string | null };
+
+/**
+ * Server-side device decision.
+ *
+ * An empty stored id is a legacy delegate with no binding: the first V2
+ * login binds the calling device. A stored id comes from deviceBindings/{uid}
+ * when that doc exists, otherwise from the delegate's boundDeviceId.
+ * An approved, not-yet-consumed device_unbind_requests doc lets the next
+ * login rebind. The device that is already bound does not consume it.
+ */
+export function decideDeviceBinding(input: {
+  storedDeviceId: string;
+  requestedDeviceId: string;
+  approvedRequestId: string | null;
+  pendingRequestId: string | null;
+}): DeviceBindingAction {
+  const stored = input.storedDeviceId.trim();
+  const requested = input.requestedDeviceId.trim();
+  if (!stored) {
+    return {
+      action: "bind",
+      deviceId: requested,
+      consumeRequestId: input.approvedRequestId,
+    };
+  }
+  if (stored === requested) {
+    return { action: "allow", deviceId: stored };
+  }
+  if (input.approvedRequestId) {
+    return {
+      action: "bind",
+      deviceId: requested,
+      consumeRequestId: input.approvedRequestId,
+    };
+  }
+  return {
+    action: "mismatch",
+    boundDeviceId: stored,
+    pendingRequestId: input.pendingRequestId,
+  };
+}
+
+/** Stable per install. Required so a missing client cannot skip the check. */
+export function validateDeviceId(
+  raw: unknown,
+): { ok: true; deviceId: string } | { ok: false; reason: "missing_device" | "invalid_device" } {
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return { ok: false, reason: "missing_device" };
+  }
+  const deviceId = raw.trim();
+  if (deviceId.length < 4 || deviceId.length > 128 || /[\u0000-\u001f]/.test(deviceId)) {
+    return { ok: false, reason: "invalid_device" };
+  }
+  return { ok: true, deviceId };
+}
+
+export function optionalDeviceLabel(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw.trim().slice(0, 80);
 }

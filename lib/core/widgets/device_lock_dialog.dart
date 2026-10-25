@@ -8,6 +8,7 @@ class DeviceLockDialog extends StatefulWidget {
   final String? currentDeviceModel;
   final String? delegateName;
   final Delegate? delegate;
+  final bool requestAlreadyFiled;
 
   const DeviceLockDialog({
     super.key,
@@ -15,6 +16,7 @@ class DeviceLockDialog extends StatefulWidget {
     this.currentDeviceModel,
     this.delegateName,
     this.delegate,
+    this.requestAlreadyFiled = false,
   });
 
   static Future<void> show(
@@ -23,6 +25,7 @@ class DeviceLockDialog extends StatefulWidget {
     String? currentDeviceModel,
     String? delegateName,
     Delegate? delegate,
+    bool requestAlreadyFiled = false,
   }) {
     return showDialog<void>(
       context: context,
@@ -32,6 +35,7 @@ class DeviceLockDialog extends StatefulWidget {
         currentDeviceModel: currentDeviceModel,
         delegateName: delegateName,
         delegate: delegate,
+        requestAlreadyFiled: requestAlreadyFiled,
       ),
     );
   }
@@ -52,6 +56,15 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
   }
 
   Future<void> _checkExistingRequest() async {
+    if (widget.requestAlreadyFiled) {
+      if (mounted) {
+        setState(() {
+          _isPending = true;
+          _isChecking = false;
+        });
+      }
+      return;
+    }
     if (widget.delegate != null && widget.delegate!.uid.isNotEmpty) {
       final pending = await DeviceBindingService.hasPendingUnbindRequest(widget.delegate!.uid);
       if (mounted) {

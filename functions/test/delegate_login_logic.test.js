@@ -132,6 +132,58 @@ test("custom claims carry role and ids and never a national id", () => {
   assert.equal(logic.stableDelegateAuthUid("delegate-doc"), "delegate-doc");
 });
 
+test("custom claims include the bound device id", () => {
+  const claims = logic.buildCustomClaims({
+    id: "delegate-doc",
+    status: "active",
+    companyId: "company-1",
+    orgId: "org-1",
+    createdAtMillis: 1,
+    nationalIdMatches: true,
+  }, ["delegate-doc"], "install-device-1");
+  assert.equal(claims.deviceId, "install-device-1");
+});
+
+test("decideDeviceBinding binds a legacy delegate and rebinds only after approval", () => {
+  assert.deepEqual(logic.decideDeviceBinding({
+    storedDeviceId: "",
+    requestedDeviceId: "phone-a",
+    approvedRequestId: null,
+    pendingRequestId: null,
+  }), { action: "bind", deviceId: "phone-a", consumeRequestId: null });
+
+  assert.deepEqual(logic.decideDeviceBinding({
+    storedDeviceId: "phone-a",
+    requestedDeviceId: "phone-a",
+    approvedRequestId: "req-1",
+    pendingRequestId: null,
+  }), { action: "allow", deviceId: "phone-a" });
+
+  assert.deepEqual(logic.decideDeviceBinding({
+    storedDeviceId: "phone-a",
+    requestedDeviceId: "phone-b",
+    approvedRequestId: null,
+    pendingRequestId: "pending-1",
+  }), {
+    action: "mismatch",
+    boundDeviceId: "phone-a",
+    pendingRequestId: "pending-1",
+  });
+
+  assert.deepEqual(logic.decideDeviceBinding({
+    storedDeviceId: "phone-a",
+    requestedDeviceId: "phone-b",
+    approvedRequestId: "req-1",
+    pendingRequestId: "pending-1",
+  }), { action: "bind", deviceId: "phone-b", consumeRequestId: "req-1" });
+});
+
+test("validateDeviceId requires a stable install id", () => {
+  assert.equal(logic.validateDeviceId("").ok, false);
+  assert.equal(logic.validateDeviceId("abc").reason, "invalid_device");
+  assert.equal(logic.validateDeviceId("install-device-1").deviceId, "install-device-1");
+});
+
 test("custom claims include phone variants and never the national id", () => {
   const claims = logic.buildCustomClaims({
     id: "delegate-doc",

@@ -262,6 +262,24 @@ service cloud.firestore {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(escalationKeys());
     }
 
+    function deviceBindingKeys() {
+      return [
+        'boundDeviceId', 'boundDeviceModel', 'boundDeviceBrand', 'boundDeviceOs',
+        'deviceBoundAt', 'deviceLastSeenAt', 'isDeviceLocked', 'deviceResetAt', 'deviceResetBy'
+      ];
+    }
+
+    // delegateLoginV2 is the only writer. Admins approve device_unbind_requests
+    // and the next login rebinds. A client, including an admin, cannot change
+    // these fields.
+    function deviceBindingUntouched() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(deviceBindingKeys());
+    }
+
+    function deviceBindingAbsent() {
+      return !request.resource.data.keys().hasAny(deviceBindingKeys());
+    }
+
     // Flat on purpose. Collection-group queries evaluate every delegates
     // match, and the nested helper form exceeds the 1000-expression limit.
     function staffRole() {
@@ -449,9 +467,11 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if canManageNestedDelegate(orgId, compId);
-          allow update: if canManageNestedDelegate(orgId, compId)
-            || (delegateOwns(delegateId) && delegateFieldsSafe());
+          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent();
+          allow update: if deviceBindingUntouched() && (
+            canManageNestedDelegate(orgId, compId)
+            || (delegateOwns(delegateId) && delegateFieldsSafe())
+          );
           allow delete: if canManageNestedDelegate(orgId, compId);
         }
 
@@ -571,12 +591,12 @@ service cloud.firestore {
 
     match /{path=**}/delegates/{delegateId} {
       allow read: if signedIn() && canReadDelegate();
-      allow create: if signedIn() && (
+      allow create: if signedIn() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
       );
-      allow update: if signedIn() && (
+      allow update: if signedIn() && deviceBindingUntouched() && (
         canManageDelegate() || (delegateOwns(delegateId) && delegateFieldsSafe())
       );
       allow delete: if signedIn() && canManageDelegate();
@@ -946,10 +966,21 @@ service cloud.firestore {
         || resource.data.delegateUid == request.auth.uid
         || delegateOwns(resource.data.delegateUid)
       );
-      allow create: if signedIn()
-        && request.resource.data.status == 'pending'
-        && (request.resource.data.delegateUid == request.auth.uid || delegateOwns(request.resource.data.delegateUid))
-        && (delegateInOrg(request.resource.data.organizationUID) || incomingOrgScoped());
+      allow create: if signedIn() && (
+        (
+          request.resource.data.status == 'pending'
+          && (request.resource.data.delegateUid == request.auth.uid || delegateOwns(request.resource.data.delegateUid))
+          && (delegateInOrg(request.resource.data.organizationUID) || incomingOrgScoped())
+        )
+        || (
+          request.resource.data.status == 'approved'
+          && (
+            isGlobalStaff()
+            || (isOrgScopedStaff() && incomingOrgScoped())
+            || (isCompanyScopedStaff() && incomingCompanyScoped())
+          )
+        )
+      );
       allow update: if (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()))
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'delegateUid', 'organizationUID', 'companyUID', 'id'
@@ -1019,6 +1050,12 @@ service cloud.firestore {
     match /company_payroll_configs/{companyId} {
       allow read, write: if isGlobalStaff()
         || (companyId == callerCompany() && (isHR() || isAccountant() || isCompanyAdmin() || isOrgAdmin()));
+    }
+
+    // Server-only device binding written by delegateLoginV2. Clients read the
+    // mirrored boundDeviceId on the delegate document, which they cannot write.
+    match /deviceBindings/{bindingId} {
+      allow read, write: if false;
     }
 
     // ==================== DEFAULT DENY ====================
