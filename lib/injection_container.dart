@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:delegate_app/features/auth/data/datasources/firebase_phone_otp.dart';
+import 'package:delegate_app/features/auth/domain/phone_otp.dart';
 import 'package:delegate_app/features/admin/data/datasources/admin_remote_data_source.dart';
 import 'package:delegate_app/features/admin/data/datasources/manage_marketing_remote_datasource.dart';
 import 'package:delegate_app/features/admin/data/repositories/admin_repository_impl.dart';
@@ -648,6 +650,9 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   sl.registerLazySingleton(() => FirebaseFirestore.instance);
   sl.registerLazySingleton(() => FirebaseAuth.instance);
+  sl.registerLazySingleton<DelegatePhoneOtpClient>(
+    () => FirebaseDelegatePhoneOtpClient(sl<FirebaseAuth>()),
+  );
   sl.registerLazySingleton(() => FirebaseStorage.instance);
 }
 

@@ -11,6 +11,21 @@ class AuthInitial extends AuthState {}
 
 class AuthLoading extends AuthState {}
 
+class AuthPhoneOtpRequired extends AuthState {
+  final List<Delegate> delegates;
+  final bool rememberMe;
+  final String e164Phone;
+
+  const AuthPhoneOtpRequired({
+    required this.delegates,
+    required this.rememberMe,
+    required this.e164Phone,
+  });
+
+  @override
+  List<Object> get props => [delegates, rememberMe, e164Phone];
+}
+
 class AuthOrganizationSelectionRequired extends AuthState {
   final List<Delegate> delegates;
   final bool rememberMe;
@@ -77,4 +92,3 @@ class AuthDeviceMismatchState extends AuthState {
     message,
   ];
 }
-

@@ -7,6 +7,8 @@ import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/core/services/session_management_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
+import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
@@ -53,15 +55,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<LogoutRequested>(_onLogoutRequested);
     on<OrganizationSelected>(_onOrganizationSelected);
     on<AnonymousSessionDetected>(_onAnonymousSessionDetected);
+    on<PhoneOtpVerified>(_onPhoneOtpVerified);
+    on<PhoneOtpCancelled>(_onPhoneOtpCancelled);
 
     final restored = anonymousSessionRestored;
     if (restored != null) {
-      _anonymousAuthSub = restored.listen(
-        (isAnonymous) {
-          if (isAnonymous) add(const AnonymousSessionDetected());
-        },
-        onError: (_) {},
-      );
+      _anonymousAuthSub = restored.listen((isAnonymous) {
+        if (isAnonymous) add(const AnonymousSessionDetected());
+      }, onError: (_) {});
     }
   }
 
@@ -95,68 +96,134 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       },
       (delegates) async {
         _explicitLogout = false;
-        // Always cache all delegates for organization switching later
         await cacheAllDelegatesUseCase(delegates);
 
-        // Group delegates by distinct organization
-        final uniqueOrgs = <String, List<Delegate>>{};
-        for (final d in delegates) {
-          final orgKey = d.organizationUID.isNotEmpty ? d.organizationUID : d.organizationName;
-          uniqueOrgs.putIfAbsent(orgKey, () => []).add(d);
-        }
-
-        // If the user belongs to only ONE organization (or all records belong to the same org),
-        // log in directly without prompting the user to choose!
-        if (uniqueOrgs.length <= 1) {
-          final orgDelegates = uniqueOrgs.isNotEmpty ? uniqueOrgs.values.first : delegates;
-          final delegate = orgDelegates.firstWhere(
-            (d) => d.status == DelegateStatus.approved || d.status == DelegateStatus.active,
-            orElse: () => orgDelegates.first,
-          );
-
-          if (event.rememberMe) {
-            await cacheDelegateUseCase(delegate);
-          }
-
-          // التحقق من بصمة الجهاز وقفل الحساب
-          final deviceCheck = await DeviceBindingService.verifyOrBindDevice(delegate: delegate);
-          if (deviceCheck.isMismatched) {
+        if (delegateLoginNeedsPhoneOtp(delegates)) {
+          final e164 = egyptianPhoneToE164(event.phoneNumber);
+          if (e164 == null) {
+            await _signOutIncompleteSession();
             emit(
-              AuthDeviceMismatchState(
-                delegate: delegate,
-                boundDeviceModel: deviceCheck.boundDeviceModel,
-                currentDeviceModel: deviceCheck.currentDeviceModel,
-                message: deviceCheck.message ?? 'هذا الحساب مقترن بجهاز آخر',
+              const AuthError(
+                message: 'تعذر إرسال رمز التحقق لهذا الرقم.',
+                code: 'invalid_phone',
               ),
             );
             return;
           }
-
-          // تصفير علامة الخروج الإجباري فور تسجيل الدخول بنجاح
-          SessionManagementService.clearReLoginFlag(
-            delegateUid: delegate.uid,
-            organizationUID: delegate.organizationUID,
-            companyUID: delegate.companyUID,
-          ).ignore();
-
-          emit(AuthAuthenticated(delegate: delegate));
-        } else {
-          // Truly multiple organizations: show selection with 1 distinct entry per organization
-          final distinctDelegates = uniqueOrgs.values.map((orgDelegates) {
-            return orgDelegates.firstWhere(
-              (d) => d.status == DelegateStatus.approved || d.status == DelegateStatus.active,
-              orElse: () => orgDelegates.first,
-            );
-          }).toList();
-
           emit(
-            AuthOrganizationSelectionRequired(
-              delegates: distinctDelegates,
+            AuthPhoneOtpRequired(
+              delegates: delegates,
               rememberMe: event.rememberMe,
+              e164Phone: e164,
             ),
           );
+          return;
         }
+
+        await _continueAfterCredentials(
+          delegates: delegates,
+          rememberMe: event.rememberMe,
+          emit: emit,
+        );
       },
+    );
+  }
+
+  Future<void> _onPhoneOtpVerified(
+    PhoneOtpVerified event,
+    Emitter<AuthState> emit,
+  ) async {
+    final pending = state;
+    if (pending is! AuthPhoneOtpRequired) return;
+    await _continueAfterCredentials(
+      delegates: pending.delegates,
+      rememberMe: pending.rememberMe,
+      emit: emit,
+    );
+  }
+
+  Future<void> _onPhoneOtpCancelled(
+    PhoneOtpCancelled event,
+    Emitter<AuthState> emit,
+  ) async {
+    await _signOutIncompleteSession();
+    emit(const AuthUnauthenticated(fromLogout: true));
+  }
+
+  Future<void> _signOutIncompleteSession() async {
+    _explicitLogout = true;
+    try {
+      await logoutUseCase(const LogoutParams());
+    } catch (_) {}
+  }
+
+  Future<void> _continueAfterCredentials({
+    required List<Delegate> delegates,
+    required bool rememberMe,
+    required Emitter<AuthState> emit,
+  }) async {
+    final uniqueOrgs = <String, List<Delegate>>{};
+    for (final d in delegates) {
+      final orgKey = d.organizationUID.isNotEmpty
+          ? d.organizationUID
+          : d.organizationName;
+      uniqueOrgs.putIfAbsent(orgKey, () => []).add(d);
+    }
+
+    if (uniqueOrgs.length <= 1) {
+      final orgDelegates = uniqueOrgs.isNotEmpty
+          ? uniqueOrgs.values.first
+          : delegates;
+      final delegate = orgDelegates.firstWhere(
+        (d) =>
+            d.status == DelegateStatus.approved ||
+            d.status == DelegateStatus.active,
+        orElse: () => orgDelegates.first,
+      );
+
+      if (rememberMe) {
+        await cacheDelegateUseCase(delegate);
+      }
+
+      final deviceCheck = await DeviceBindingService.verifyOrBindDevice(
+        delegate: delegate,
+      );
+      if (deviceCheck.isMismatched) {
+        emit(
+          AuthDeviceMismatchState(
+            delegate: delegate,
+            boundDeviceModel: deviceCheck.boundDeviceModel,
+            currentDeviceModel: deviceCheck.currentDeviceModel,
+            message: deviceCheck.message ?? 'هذا الحساب مقترن بجهاز آخر',
+          ),
+        );
+        return;
+      }
+
+      SessionManagementService.clearReLoginFlag(
+        delegateUid: delegate.uid,
+        organizationUID: delegate.organizationUID,
+        companyUID: delegate.companyUID,
+      ).ignore();
+
+      emit(AuthAuthenticated(delegate: delegate));
+      return;
+    }
+
+    final distinctDelegates = uniqueOrgs.values.map((orgDelegates) {
+      return orgDelegates.firstWhere(
+        (d) =>
+            d.status == DelegateStatus.approved ||
+            d.status == DelegateStatus.active,
+        orElse: () => orgDelegates.first,
+      );
+    }).toList();
+
+    emit(
+      AuthOrganizationSelectionRequired(
+        delegates: distinctDelegates,
+        rememberMe: rememberMe,
+      ),
     );
   }
 
@@ -211,7 +278,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       (delegate) async {
         if (delegate != null) {
           // 1. فحص إبطال الجلسة أو الخروج الإجباري من الإدارة
-          final sessionCheck = await SessionManagementService.checkSessionStatus(delegate: delegate);
+          final sessionCheck =
+              await SessionManagementService.checkSessionStatus(
+                delegate: delegate,
+              );
           if (!sessionCheck.isValid) {
             await logoutUseCase(const LogoutParams());
             emit(AuthUnauthenticated(message: sessionCheck.reason));
@@ -219,7 +289,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           }
 
           // 2. فحص بصمة الجهاز للتسجيل التلقائي
-          final deviceCheck = await DeviceBindingService.verifyOrBindDevice(delegate: delegate);
+          final deviceCheck = await DeviceBindingService.verifyOrBindDevice(
+            delegate: delegate,
+          );
           if (deviceCheck.isMismatched) {
             await logoutUseCase(const LogoutParams());
             emit(
@@ -259,7 +331,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     final delegate = event.delegate;
     // التحقق من بصمة الجهاز عند اختيار المنظمة
-    final deviceCheck = await DeviceBindingService.verifyOrBindDevice(delegate: delegate);
+    final deviceCheck = await DeviceBindingService.verifyOrBindDevice(
+      delegate: delegate,
+    );
     if (deviceCheck.isMismatched) {
       emit(
         AuthDeviceMismatchState(
@@ -286,4 +360,3 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthAuthenticated(delegate: delegate));
   }
 }
-

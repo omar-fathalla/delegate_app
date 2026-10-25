@@ -7,6 +7,7 @@ import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
 import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_login_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -154,6 +155,9 @@ class _LoginScreenState extends State<LoginScreen>
           }
         },
         builder: (context, state) {
+          if (state is AuthPhoneOtpRequired) {
+            return DelegatePhoneOtpView(phoneE164: state.e164Phone);
+          }
           return SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {

@@ -5,6 +5,7 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -147,6 +148,9 @@ class _HrLoginScreenState extends State<HrLoginScreen>
           }
         },
         builder: (context, state) {
+          if (state is AuthPhoneOtpRequired) {
+            return DelegatePhoneOtpView(phoneE164: state.e164Phone);
+          }
           return Scaffold(
             backgroundColor: const Color(0xFF090D16),
             body: SafeArea(

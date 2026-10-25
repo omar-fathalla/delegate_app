@@ -37,6 +37,16 @@ String normalizeEgyptianPhone(String phone) {
   return normalized;
 }
 
+/// Egyptian mobile in E.164 (`+20` plus the number without the trunk 0).
+///
+/// `01211857725` becomes `+201211857725`. Returns null when [phone] is not
+/// an Egyptian mobile, so OTP is not sent to an unparsed number.
+String? egyptianPhoneToE164(String phone) {
+  final local = normalizeEgyptianPhone(phone);
+  if (!RegExp(r'^01[0125]\d{8}$').hasMatch(local)) return null;
+  return '+20${local.substring(1)}';
+}
+
 /// Variants stored on existing delegate documents for the same mobile number.
 List<String> egyptianPhoneVariants(String normalizedPhone) {
   final variants = <String>{normalizedPhone};

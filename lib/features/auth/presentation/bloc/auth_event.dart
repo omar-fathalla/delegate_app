@@ -37,6 +37,14 @@ class LogoutRequested extends AuthEvent {
   List<Object> get props => [userId ?? ''];
 }
 
+class PhoneOtpVerified extends AuthEvent {
+  const PhoneOtpVerified();
+}
+
+class PhoneOtpCancelled extends AuthEvent {
+  const PhoneOtpCancelled();
+}
+
 class OrganizationSelected extends AuthEvent {
   final Delegate delegate;
   final bool rememberMe;
