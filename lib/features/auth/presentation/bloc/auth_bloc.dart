@@ -33,6 +33,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   StreamSubscription<bool>? _anonymousAuthSub;
 
+  /// True after the user confirms logout, until the next successful sign-in.
+  /// Blocks cache restore and the anonymous-session handler from navigating
+  /// again or signing the user back in.
+  bool _explicitLogout = false;
+
   AuthBloc({
     required this.loginUseCase,
     required this.checkAutoLoginUseCase,
@@ -89,6 +94,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         );
       },
       (delegates) async {
+        _explicitLogout = false;
         // Always cache all delegates for organization switching later
         await cacheAllDelegatesUseCase(delegates);
 
@@ -158,6 +164,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AnonymousSessionDetected event,
     Emitter<AuthState> emit,
   ) async {
+    if (_explicitLogout) return;
     await _signOutAnonymousSession(emit);
   }
 
@@ -171,7 +178,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       } catch (_) {}
     }
     try {
-      await logoutUseCase(NoParams());
+      await logoutUseCase(const LogoutParams());
     } catch (_) {}
 
     final current = state;
@@ -186,6 +193,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     CheckAutoLoginRequested event,
     Emitter<AuthState> emit,
   ) async {
+    if (_explicitLogout) {
+      emit(const AuthUnauthenticated(fromLogout: true));
+      return;
+    }
     emit(AuthLoading());
     if (isAnonymousSession?.call() == true) {
       await _signOutAnonymousSession(emit);
@@ -202,7 +213,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           // 1. فحص إبطال الجلسة أو الخروج الإجباري من الإدارة
           final sessionCheck = await SessionManagementService.checkSessionStatus(delegate: delegate);
           if (!sessionCheck.isValid) {
-            await logoutUseCase(NoParams());
+            await logoutUseCase(const LogoutParams());
             emit(AuthUnauthenticated(message: sessionCheck.reason));
             return;
           }
@@ -210,7 +221,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           // 2. فحص بصمة الجهاز للتسجيل التلقائي
           final deviceCheck = await DeviceBindingService.verifyOrBindDevice(delegate: delegate);
           if (deviceCheck.isMismatched) {
-            await logoutUseCase(NoParams());
+            await logoutUseCase(const LogoutParams());
             emit(
               AuthDeviceMismatchState(
                 delegate: delegate,
@@ -234,9 +245,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     LogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
+    _explicitLogout = true;
     emit(AuthLoading());
-    await logoutUseCase(NoParams());
-    emit(const AuthUnauthenticated());
+    try {
+      await logoutUseCase(LogoutParams(userId: event.userId));
+    } catch (_) {}
+    emit(const AuthUnauthenticated(fromLogout: true));
   }
 
   Future<void> _onOrganizationSelected(

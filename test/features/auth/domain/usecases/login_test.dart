@@ -82,6 +82,11 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, void>> logout({String? userId}) async {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Either<Failure, Delegate?>> getCachedDelegate() async {
     throw UnimplementedError();
   }

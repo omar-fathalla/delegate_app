@@ -122,18 +122,33 @@ class PushNotificationService {
     debugPrint('FCM: Initialized for delegate $delegateUid');
   }
 
-  /// Removes the FCM token from Firestore. Call on logout.
+  /// Drops this user's push registration. Network steps are best-effort and
+  /// time out so logout is not stuck offline.
   Future<void> clearToken(String delegateUid) async {
     if (kIsWeb) return;
     _initializedUid = null;
     try {
       await _tokenRefreshSub?.cancel();
       _tokenRefreshSub = null;
+    } catch (_) {}
+    try {
+      await _messaging
+          .unsubscribeFromTopic('app_updates')
+          .timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('FCM: unsubscribeFromTopic error: $e');
+    }
+    try {
+      await _messaging.deleteToken().timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('FCM: deleteToken error: $e');
+    }
+    try {
       await _firestore
           .collection('fcm_tokens')
           .doc(delegateUid)
           .delete()
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 2));
       debugPrint('FCM: Token cleared for $delegateUid');
     } catch (e) {
       debugPrint('FCM: Error clearing token: $e');

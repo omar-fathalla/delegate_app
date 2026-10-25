@@ -29,6 +29,10 @@ abstract class AuthRemoteDataSource {
   /// Looks up the staff email for [phoneNumber], then verifies it with
   /// Firebase Auth. Does not compare a password stored in Firestore.
   Future<bool> verifyPhonePassword(String phoneNumber, String password);
+
+  /// Ends the Firebase Auth session. Failures are swallowed so logout can
+  /// still clear local state when the device is offline.
+  Future<void> signOut();
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -135,6 +139,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
     }
   }
+
+  @override
+  Future<void> signOut() => _signOutQuietly();
 
   Future<void> _signOutQuietly() async {
     try {

@@ -1,6 +1,5 @@
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
-import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -24,26 +23,25 @@ void main() {
     usecase = Logout(mockRepository);
   });
 
-  test('should call clearCache on the repository', () async {
-    // arrange
+  test('signs out through the repository and passes the user id', () async {
     when(
-      () => mockRepository.clearCache(),
+      () => mockRepository.logout(userId: 'uid-1'),
     ).thenAnswer((_) async => const Right(null));
-    // act
-    final result = await usecase(NoParams());
-    // assert
+
+    final result = await usecase(const LogoutParams(userId: 'uid-1'));
+
     expect(result, const Right(null));
-    verify(() => mockRepository.clearCache()).called(1);
+    verify(() => mockRepository.logout(userId: 'uid-1')).called(1);
+    verifyNever(() => mockRepository.clearCache());
   });
 
-  test('should return failure when clearCache fails', () async {
-    // arrange
+  test('returns the repository failure', () async {
     when(
-      () => mockRepository.clearCache(),
+      () => mockRepository.logout(userId: any(named: 'userId')),
     ).thenAnswer((_) async => const Left(CacheFailure('فشل مسح البيانات')));
-    // act
-    final result = await usecase(NoParams());
-    // assert
+
+    final result = await usecase(const LogoutParams());
+
     expect(result, const Left(CacheFailure('فشل مسح البيانات')));
   });
 }

@@ -44,6 +44,16 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   }) async {
     throw UnimplementedError();
   }
+
+  int signOutCount = 0;
+  Object? signOutError;
+
+  @override
+  Future<void> signOut() async {
+    signOutCount++;
+    final error = signOutError;
+    if (error != null) throw error;
+  }
 }
 
 class MockAuthLocalDataSource implements AuthLocalDataSource {
@@ -222,6 +232,51 @@ void main() {
       final result = await repository.clearCache();
       expect(result, equals(const Right(null)));
       expect(mockLocalDataSource.clearCallCount, 1);
+    });
+  });
+
+  group('logout', () {
+    test('signs out, clears push registration, and drops the cached delegate', () async {
+      mockLocalDataSource.cachedDelegate = tDelegateModel;
+      final clearedUsers = <String>[];
+      final loggingOut = AuthRepositoryImpl(
+        remoteDataSource: mockRemoteDataSource,
+        localDataSource: mockLocalDataSource,
+        clearPushRegistration: (userId) async {
+          clearedUsers.add(userId);
+        },
+      );
+
+      final result = await loggingOut.logout(userId: 'delegate-1');
+
+      expect(result, const Right(null));
+      expect(mockRemoteDataSource.signOutCount, 1);
+      expect(clearedUsers, ['delegate-1']);
+      expect(mockLocalDataSource.clearCallCount, 1);
+      expect(mockLocalDataSource.cachedDelegate, isNull);
+      expect(mockLocalDataSource.cachedAllDelegates, isEmpty);
+    });
+
+    test('still clears local state when Firebase sign-out throws', () async {
+      mockLocalDataSource.cachedDelegate = tDelegateModel;
+      mockRemoteDataSource.signOutError = Exception('offline');
+      var pushCalls = 0;
+      final loggingOut = AuthRepositoryImpl(
+        remoteDataSource: mockRemoteDataSource,
+        localDataSource: mockLocalDataSource,
+        clearPushRegistration: (_) async {
+          pushCalls++;
+          throw Exception('network');
+        },
+      );
+
+      final result = await loggingOut.logout(userId: 'delegate-1');
+
+      expect(result, const Right(null));
+      expect(mockRemoteDataSource.signOutCount, 1);
+      expect(pushCalls, 1);
+      expect(mockLocalDataSource.clearCallCount, 1);
+      expect(mockLocalDataSource.cachedDelegate, isNull);
     });
   });
 }

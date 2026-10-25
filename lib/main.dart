@@ -207,6 +207,14 @@ class _MyAppState extends State<MyApp> {
                   : child!;
               return BlocListener<AuthBloc, AuthState>(
                 listener: (context, state) {
+                  if (state is AuthUnauthenticated && state.fromLogout) {
+                    final path =
+                        appRouter.routeInformationProvider.value.uri.path;
+                    if (path != '/login' && path != '/hr/login') {
+                      appRouter.go('/login');
+                    }
+                    return;
+                  }
                   if (state is! AuthUnauthenticated ||
                       state.message != AuthBloc.freshSignInMessage) {
                     return;

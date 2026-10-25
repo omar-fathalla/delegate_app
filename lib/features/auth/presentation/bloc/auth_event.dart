@@ -28,7 +28,14 @@ class AnonymousSessionDetected extends AuthEvent {
   const AnonymousSessionDetected();
 }
 
-class LogoutRequested extends AuthEvent {}
+class LogoutRequested extends AuthEvent {
+  final String? userId;
+
+  const LogoutRequested({this.userId});
+
+  @override
+  List<Object> get props => [userId ?? ''];
+}
 
 class OrganizationSelected extends AuthEvent {
   final Delegate delegate;

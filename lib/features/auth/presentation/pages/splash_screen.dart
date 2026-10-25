@@ -102,6 +102,7 @@ class _SplashScreenState extends State<SplashScreen>
             }
           });
         } else if (state is AuthUnauthenticated) {
+          if (state.fromLogout) return;
           context.go('/login');
           if (state.message != null &&
               state.message!.isNotEmpty &&

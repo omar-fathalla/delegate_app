@@ -71,6 +71,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(FakeLoginParams());
     registerFallbackValue(FakeNoParams());
+    registerFallbackValue(const LogoutParams());
     registerFallbackValue(
       Delegate(
         uid: 'fake',
@@ -403,17 +404,64 @@ void main() {
 
   group('LogoutRequested', () {
     blocTest<AuthBloc, AuthState>(
-      'emits [AuthLoading, AuthUnauthenticated] when logout is requested',
+      'emits logged-out and passes the user id to the logout use case',
       build: () {
         when(
           () => mockLogout(any()),
         ).thenAnswer((_) async => const Right(null));
         return authBloc;
       },
-      act: (bloc) => bloc.add(LogoutRequested()),
-      expect: () => [AuthLoading(), AuthUnauthenticated()],
+      act: (bloc) => bloc.add(const LogoutRequested(userId: 'uid-1')),
+      expect: () => [
+        AuthLoading(),
+        const AuthUnauthenticated(fromLogout: true),
+      ],
+      verify: (_) {
+        final params =
+            verify(() => mockLogout(captureAny())).captured.single as LogoutParams;
+        expect(params.userId, 'uid-1');
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'still leaves the user logged out when sign-out throws',
+      build: () {
+        when(() => mockLogout(any())).thenThrow(Exception('offline'));
+        return authBloc;
+      },
+      act: (bloc) => bloc.add(const LogoutRequested(userId: 'uid-1')),
+      expect: () => [
+        AuthLoading(),
+        const AuthUnauthenticated(fromLogout: true),
+      ],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'does not restore the cached delegate or treat logout as an anonymous session',
+      build: () {
+        when(
+          () => mockLogout(any()),
+        ).thenAnswer((_) async => const Right(null));
+        when(
+          () => mockCheckAutoLogin(any()),
+        ).thenAnswer((_) async => Right(tDelegate));
+        return authBloc;
+      },
+      act: (bloc) async {
+        bloc.add(const LogoutRequested(userId: '1'));
+        await bloc.stream.firstWhere(
+          (state) => state is AuthUnauthenticated && state.fromLogout,
+        );
+        bloc.add(CheckAutoLoginRequested());
+        bloc.add(const AnonymousSessionDetected());
+      },
+      expect: () => [
+        AuthLoading(),
+        const AuthUnauthenticated(fromLogout: true),
+      ],
       verify: (_) {
         verify(() => mockLogout(any())).called(1);
+        verifyNever(() => mockCheckAutoLogin(any()));
       },
     );
   });

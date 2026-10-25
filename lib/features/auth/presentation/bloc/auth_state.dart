@@ -36,10 +36,14 @@ class AuthAuthenticated extends AuthState {
 class AuthUnauthenticated extends AuthState {
   final String? message;
 
-  const AuthUnauthenticated({this.message});
+  /// Set when the user confirmed logout. Listeners use this to go to `/login`
+  /// once, without treating it as a restored anonymous session.
+  final bool fromLogout;
+
+  const AuthUnauthenticated({this.message, this.fromLogout = false});
 
   @override
-  List<Object> get props => message != null ? [message!] : [];
+  List<Object> get props => [message ?? '', fromLogout];
 }
 
 class AuthError extends AuthState {

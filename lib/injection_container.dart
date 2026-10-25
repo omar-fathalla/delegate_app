@@ -196,7 +196,15 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   // Repository
   sl.registerLazySingleton<AuthRepository>(
-    () => AuthRepositoryImpl(remoteDataSource: sl(), localDataSource: sl()),
+    () => AuthRepositoryImpl(
+      remoteDataSource: sl(),
+      localDataSource: sl(),
+      clearPushRegistration: (userId) async {
+        if (sl.isRegistered<PushNotificationService>()) {
+          await sl<PushNotificationService>().clearToken(userId);
+        }
+      },
+    ),
   );
 
   // Data sources
