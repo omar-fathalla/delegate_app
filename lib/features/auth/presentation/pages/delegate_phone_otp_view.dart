@@ -216,12 +216,27 @@ class _DelegatePhoneOtpViewState extends State<DelegatePhoneOtpView>
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'أدخل رمز التحقق المرسل إلى ${widget.phoneE164}',
+                            'أدخل رمز التحقق المرسل إلى',
                             textAlign: TextAlign.center,
+                            textDirection: TextDirection.rtl,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.normal,
                               color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Directionality(
+                            textDirection: TextDirection.ltr,
+                            child: Text(
+                              widget.phoneE164,
+                              textAlign: TextAlign.center,
+                              textDirection: TextDirection.ltr,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.normal,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 20),
