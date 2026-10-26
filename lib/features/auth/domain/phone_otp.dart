@@ -90,6 +90,7 @@ abstract class DelegatePhoneOtpClient {
     required void Function(OtpCodeDispatch sent) onCodeSent,
     required void Function() onAutoVerified,
     required void Function(PhoneOtpLinkException error) onFailed,
+    void Function()? onAutoRetrievalTimeout,
   });
 
   Future<void> confirmCode({

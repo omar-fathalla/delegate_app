@@ -9,6 +9,9 @@ class FirebaseDelegatePhoneOtpClient implements DelegatePhoneOtpClient {
 
   FirebaseDelegatePhoneOtpClient(this.auth);
 
+  bool _linked = false;
+  Future<void>? _linking;
+
   @override
   Future<void> sendCode({
     required String e164Phone,
@@ -16,14 +19,47 @@ class FirebaseDelegatePhoneOtpClient implements DelegatePhoneOtpClient {
     required void Function(OtpCodeDispatch sent) onCodeSent,
     required void Function() onAutoVerified,
     required void Function(PhoneOtpLinkException error) onFailed,
+    void Function()? onAutoRetrievalTimeout,
   }) {
     final completer = Completer<void>();
     var manualEntryReady = false;
+    var autoVerified = false;
 
     void finish() {
       if (!completer.isCompleted) completer.complete();
     }
 
+    void showManualEntry(String verificationId, int? resendToken) {
+      if (autoVerified || manualEntryReady) return;
+      manualEntryReady = true;
+      onCodeSent(
+        OtpCodeDispatch(
+          verificationId: verificationId,
+          resendToken: resendToken,
+        ),
+      );
+      finish();
+    }
+
+    // verificationCompleted is instant verification on both platforms.
+    // The PhoneAuthCredential is linked with the same `_link` method a typed
+    // code uses (`linkWithCredential`, or `reauthenticateWithCredential` when
+    // this user already has a phone provider). It never calls
+    // `signInWithCredential`, so the delegate custom-token uid stays put.
+    //
+    // Android: Play Services instant verification, or SMS Retriever when the
+    // SMS contains this build's app hash. See SmartAuthSmsRetriever.
+    //
+    // iOS: a silent APNs push. TODO(ios-apns): this callback does not run
+    // until APNs is configured for the iOS app — upload the APNs auth key in
+    // Firebase Console → Project settings → Cloud Messaging, enable Push
+    // Notifications on the Apple target, and register the iOS app. Until
+    // then iOS falls through to `codeSent` and the QuickType one-time-code
+    // bar. Do not block the build on that setup.
+    //
+    // `codeAutoRetrievalTimeout` is not a failure. Android stops waiting for
+    // the SMS, and iOS stops waiting for the silent push. The typed / QuickType
+    // field stays available.
     auth.verifyPhoneNumber(
       phoneNumber: e164Phone,
       timeout: DelegateOtpConfig.resendCooldown,
@@ -31,6 +67,7 @@ class FirebaseDelegatePhoneOtpClient implements DelegatePhoneOtpClient {
       verificationCompleted: (credential) async {
         try {
           await _link(credential);
+          autoVerified = true;
           onAutoVerified();
         } on PhoneOtpLinkException catch (error) {
           onFailed(error);
@@ -49,25 +86,11 @@ class FirebaseDelegatePhoneOtpClient implements DelegatePhoneOtpClient {
         finish();
       },
       codeSent: (verificationId, resendToken) {
-        if (manualEntryReady) return;
-        manualEntryReady = true;
-        onCodeSent(
-          OtpCodeDispatch(
-            verificationId: verificationId,
-            resendToken: resendToken,
-          ),
-        );
-        finish();
+        showManualEntry(verificationId, resendToken);
       },
       codeAutoRetrievalTimeout: (verificationId) {
-        if (manualEntryReady) return;
-        manualEntryReady = true;
-        onCodeSent(
-          OtpCodeDispatch(
-            verificationId: verificationId,
-            resendToken: forceResendingToken,
-          ),
-        );
+        onAutoRetrievalTimeout?.call();
+        showManualEntry(verificationId, forceResendingToken);
         finish();
       },
     );
@@ -87,7 +110,30 @@ class FirebaseDelegatePhoneOtpClient implements DelegatePhoneOtpClient {
     return _link(credential);
   }
 
+  /// One link at a time. A second caller (autofill racing instant
+  /// verification) waits and does not send the credential again after the
+  /// first link is accepted.
   Future<void> _link(PhoneAuthCredential credential) async {
+    if (_linked) return;
+    final pending = _linking;
+    if (pending != null) {
+      try {
+        await pending;
+      } catch (_) {}
+      if (_linked) return;
+    }
+
+    final run = _linkOnce(credential);
+    _linking = run;
+    try {
+      await run;
+      _linked = true;
+    } finally {
+      if (identical(_linking, run)) _linking = null;
+    }
+  }
+
+  Future<void> _linkOnce(PhoneAuthCredential credential) async {
     final user = auth.currentUser;
     if (user == null) {
       throw const PhoneOtpLinkException(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pinput/pinput.dart';
 import 'package:delegate_app/features/auth/domain/phone_otp.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
@@ -9,10 +10,38 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 
 class MockAuthBloc extends Mock implements AuthBloc {}
 
+class _ScriptedSmsRetriever implements SmsRetriever {
+  _ScriptedSmsRetriever(this.codes);
+
+  final List<String?> codes;
+  int listens = 0;
+  int disposeCount = 0;
+
+  @override
+  bool get listenForMultipleSms => false;
+
+  @override
+  Future<String?> getSmsCode() async {
+    final index = listens++;
+    if (index >= codes.length) return null;
+    return codes[index];
+  }
+
+  @override
+  Future<void> dispose() async {
+    disposeCount++;
+  }
+}
+
 class _FakeOtpClient implements DelegatePhoneOtpClient {
-  _FakeOtpClient({this.autoVerify = false, this.confirmError});
+  _FakeOtpClient({
+    this.autoVerify = false,
+    this.confirmError,
+    this.signalTimeout = false,
+  });
 
   final bool autoVerify;
+  final bool signalTimeout;
   PhoneOtpLinkException? confirmError;
   int? lastResendToken;
   int sendCount = 0;
@@ -25,6 +54,7 @@ class _FakeOtpClient implements DelegatePhoneOtpClient {
     required void Function(OtpCodeDispatch sent) onCodeSent,
     required void Function() onAutoVerified,
     required void Function(PhoneOtpLinkException error) onFailed,
+    void Function()? onAutoRetrievalTimeout,
   }) async {
     sendCount += 1;
     lastResendToken = forceResendingToken;
@@ -35,6 +65,7 @@ class _FakeOtpClient implements DelegatePhoneOtpClient {
     onCodeSent(
       const OtpCodeDispatch(verificationId: 'verification-1', resendToken: 4),
     );
+    if (signalTimeout) onAutoRetrievalTimeout?.call();
   }
 
   @override
@@ -64,6 +95,7 @@ void main() {
   Widget host(
     _FakeOtpClient client, {
     Locale locale = const Locale('ar'),
+    SmsRetriever? smsRetriever,
   }) {
     return MaterialApp(
       locale: locale,
@@ -71,7 +103,11 @@ void main() {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: BlocProvider<AuthBloc>.value(
         value: bloc,
-        child: DelegatePhoneOtpView(phoneE164: '+201211857725', client: client),
+        child: DelegatePhoneOtpView(
+          phoneE164: '+201211857725',
+          client: client,
+          smsRetriever: smsRetriever ?? _ScriptedSmsRetriever(const []),
+        ),
       ),
     );
   }
@@ -85,18 +121,19 @@ void main() {
     expect(find.text('$sentence $phone'), findsNothing);
 
     final phoneDirection = tester.widget<Directionality>(
-      find.ancestor(
-        of: find.text(phone),
-        matching: find.byType(Directionality),
-      ).first,
+      find
+          .ancestor(of: find.text(phone), matching: find.byType(Directionality))
+          .first,
     );
     expect(phoneDirection.textDirection, TextDirection.ltr);
 
     final sentenceDirection = tester.widget<Directionality>(
-      find.ancestor(
-        of: find.text(sentence),
-        matching: find.byType(Directionality),
-      ).first,
+      find
+          .ancestor(
+            of: find.text(sentence),
+            matching: find.byType(Directionality),
+          )
+          .first,
     );
     expect(sentenceDirection.textDirection, TextDirection.rtl);
 
@@ -119,7 +156,7 @@ void main() {
     expect(find.text('+201211857725'), findsOneWidget);
     expect(find.textContaining('إعادة الإرسال بعد'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), '654321');
+    await tester.enterText(find.byType(EditableText), '654321');
     await tester.tap(find.text('تأكيد'));
     await tester.pump();
 
@@ -154,7 +191,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      await tester.enterText(find.byType(TextField), '000000');
+      await tester.enterText(find.byType(EditableText), '000000');
       await tester.tap(find.text('تأكيد'));
       await tester.pump();
 
@@ -175,7 +212,7 @@ void main() {
     await tester.pumpWidget(host(client));
     await tester.pump();
     await tester.pump();
-    await tester.enterText(find.byType(TextField), '111111');
+    await tester.enterText(find.byType(EditableText), '111111');
     await tester.tap(find.text('تأكيد'));
     await tester.pump();
 
@@ -218,7 +255,7 @@ void main() {
     await tester.pump();
 
     verify(() => bloc.add(const PhoneOtpVerified())).called(1);
-    expect(find.byType(TextField), findsNothing);
+    expect(client.confirmedCode, isNull);
   });
 
   testWidgets('cancel signs the incomplete session out', (tester) async {
@@ -231,5 +268,78 @@ void main() {
     await tester.pump();
 
     verify(() => bloc.add(const PhoneOtpCancelled())).called(1);
+  });
+
+  testWidgets('offers the iOS one-time-code hint and a 6-digit Pinput', (
+    tester,
+  ) async {
+    final client = _FakeOtpClient();
+    await tester.pumpWidget(host(client));
+    await tester.pump();
+
+    final pin = tester.widget<Pinput>(find.byType(Pinput));
+    expect(pin.length, 6);
+    expect(pin.autofillHints, contains(AutofillHints.oneTimeCode));
+    expect(pin.smsRetriever, isNotNull);
+  });
+
+  testWidgets(
+    'submits when the code fills the field, without tapping confirm',
+    (tester) async {
+      final client = _FakeOtpClient();
+      await tester.pumpWidget(host(client));
+      await tester.pump();
+      await tester.pump();
+
+      await tester.enterText(find.byType(EditableText), '246810');
+      await tester.pump();
+
+      expect(client.confirmedCode, '246810');
+      verify(() => bloc.add(const PhoneOtpVerified())).called(1);
+    },
+  );
+
+  testWidgets('Android SMS Retriever fills every box and verifies the code', (
+    tester,
+  ) async {
+    final client = _FakeOtpClient();
+    final retriever = _ScriptedSmsRetriever(['135790']);
+    await tester.pumpWidget(host(client, smsRetriever: retriever));
+    await tester.pump();
+    await tester.pump();
+
+    expect(retriever.listens, greaterThan(0));
+    expect(client.confirmedCode, '135790');
+    verify(() => bloc.add(const PhoneOtpVerified())).called(1);
+  });
+
+  testWidgets('cancels the SMS listener when the screen is disposed', (
+    tester,
+  ) async {
+    final retriever = _ScriptedSmsRetriever(const [null]);
+    await tester.pumpWidget(host(_FakeOtpClient(), smsRetriever: retriever));
+    await tester.pump();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    expect(retriever.disposeCount, greaterThan(0));
+  });
+
+  testWidgets('auto-retrieval timeout leaves manual entry working', (
+    tester,
+  ) async {
+    final client = _FakeOtpClient(signalTimeout: true);
+    await tester.pumpWidget(host(client));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(EditableText), findsOneWidget);
+    expect(find.text(phoneOtpSendFailedMessage), findsNothing);
+
+    await tester.enterText(find.byType(EditableText), '112233');
+    await tester.pump();
+
+    expect(client.confirmedCode, '112233');
+    verify(() => bloc.add(const PhoneOtpVerified())).called(1);
   });
 }

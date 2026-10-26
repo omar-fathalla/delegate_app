@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pinput/pinput.dart';
+import 'package:smart_auth/smart_auth.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/features/auth/data/datasources/smart_auth_sms_retriever.dart';
 import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
 import 'package:delegate_app/features/auth/domain/phone_otp.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -14,7 +17,16 @@ class DelegatePhoneOtpView extends StatefulWidget {
   final String phoneE164;
   final DelegatePhoneOtpClient? client;
 
-  const DelegatePhoneOtpView({super.key, required this.phoneE164, this.client});
+  /// Android SMS Retriever used by [Pinput]. Tests pass a fake. Production
+  /// uses [SmartAuthSmsRetriever], which Pinput disposes with the field.
+  final SmsRetriever? smsRetriever;
+
+  const DelegatePhoneOtpView({
+    super.key,
+    required this.phoneE164,
+    this.client,
+    this.smsRetriever,
+  });
 
   @override
   State<DelegatePhoneOtpView> createState() => _DelegatePhoneOtpViewState();
@@ -26,14 +38,19 @@ class _DelegatePhoneOtpViewState extends State<DelegatePhoneOtpView>
   late final AnimationController _enter;
   late final Animation<double> _fade;
 
+  static const int _codeLength = 6;
+
   DelegatePhoneOtpClient? _client;
+  late final SmsRetriever _smsRetriever;
   String? _verificationId;
   int? _resendToken;
   String? _error;
+  String? _pendingAutoCode;
   bool _sending = true;
   bool _confirming = false;
   bool _finished = false;
   int _secondsLeft = 0;
+  int _inputGeneration = 0;
   Timer? _ticker;
 
   @override
@@ -49,6 +66,8 @@ class _DelegatePhoneOtpViewState extends State<DelegatePhoneOtpView>
     );
     _enter.forward();
     _client = widget.client ?? sl<DelegatePhoneOtpClient>();
+    _smsRetriever =
+        widget.smsRetriever ?? SmartAuthSmsRetriever(SmartAuth.instance);
     WidgetsBinding.instance.addPostFrameCallback((_) => _send());
   }
 
@@ -79,6 +98,12 @@ class _DelegatePhoneOtpViewState extends State<DelegatePhoneOtpView>
     setState(() {
       _sending = true;
       _error = null;
+      if (resend) {
+        _pendingAutoCode = null;
+        _codeController.clear();
+        // A new Pinput starts a new SMS Retriever listen for the next SMS.
+        _inputGeneration++;
+      }
     });
     try {
       await client.sendCode(
@@ -93,8 +118,22 @@ class _DelegatePhoneOtpViewState extends State<DelegatePhoneOtpView>
             _secondsLeft = DelegateOtpConfig.resendCooldown.inSeconds;
           });
           _armCooldownTicker();
+          final pending = _pendingAutoCode;
+          if (pending != null && pending.length == _codeLength) {
+            _pendingAutoCode = null;
+            _codeController.text = pending;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && !_finished) _confirm();
+            });
+          }
         },
         onAutoVerified: _complete,
+        onAutoRetrievalTimeout: () {
+          // Automatic retrieval stopped. Keep the field for typing, paste,
+          // or the iOS QuickType one-time-code suggestion.
+          if (!mounted || _finished) return;
+          setState(() => _sending = false);
+        },
         onFailed: (error) {
           if (!mounted || _finished) return;
           setState(() {
@@ -118,6 +157,15 @@ class _DelegatePhoneOtpViewState extends State<DelegatePhoneOtpView>
     }
   }
 
+  void _onPinCompleted(String pin) {
+    if (pin.length != _codeLength || _finished) return;
+    if (_verificationId == null) {
+      _pendingAutoCode = pin;
+      return;
+    }
+    _confirm();
+  }
+
   Future<void> _confirm() async {
     final client = _client;
     final verificationId = _verificationId;
@@ -125,7 +173,7 @@ class _DelegatePhoneOtpViewState extends State<DelegatePhoneOtpView>
     if (client == null || verificationId == null || _finished || _confirming) {
       return;
     }
-    if (code.isEmpty) {
+    if (code.length != _codeLength) {
       setState(() => _error = 'أدخل رمز التحقق');
       return;
     }
@@ -161,6 +209,23 @@ class _DelegatePhoneOtpViewState extends State<DelegatePhoneOtpView>
     if (!mounted || _finished) return;
     _finished = true;
     context.read<AuthBloc>().add(const PhoneOtpVerified());
+  }
+
+  PinTheme _pinTheme(ColorScheme colorScheme, {Color? borderColor}) {
+    return PinTheme(
+      width: 44,
+      height: 48,
+      textStyle: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: colorScheme.onSurface,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor ?? colorScheme.outlineVariant),
+      ),
+    );
   }
 
   @override
@@ -242,60 +307,64 @@ class _DelegatePhoneOtpViewState extends State<DelegatePhoneOtpView>
                           const SizedBox(height: 20),
                           if (_sending)
                             const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                              padding: EdgeInsets.only(bottom: 12),
                               child: Center(child: CircularProgressIndicator()),
-                            )
-                          else
-                            TextField(
-                              controller: _codeController,
-                              keyboardType: TextInputType.number,
-                              textDirection: TextDirection.ltr,
-                              textAlign: TextAlign.center,
-                              autofocus: true,
-                              maxLength: 8,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 4,
-                                color: colorScheme.onSurface,
-                              ),
-                              decoration: InputDecoration(
-                                counterText: '',
-                                hintText: 'رمز التحقق',
-                                hintStyle: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.normal,
-                                  letterSpacing: 0,
-                                  color: colorScheme.onSurfaceVariant
-                                      .withValues(alpha: 0.7),
-                                ),
-                                filled: true,
-                                fillColor: colorScheme.surface,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                constraints: const BoxConstraints(
-                                  minHeight: 44,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(
-                                    color: colorScheme.outlineVariant,
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(
-                                    color: colorScheme.outlineVariant,
-                                  ),
-                                ),
-                              ),
-                              onSubmitted: (_) => _confirm(),
                             ),
+                          // iOS maps AutofillHints.oneTimeCode to
+                          // textContentType = oneTimeCode, so the code appears
+                          // on the QuickType bar. One tap fills every box and
+                          // onCompleted submits it. Android uses smsRetriever,
+                          // which is Pinput's replacement for
+                          // androidSmsAutofillMethod: smsRetrieverApi.
+                          // Pinput disposes that listener with the field.
+                          Directionality(
+                            textDirection: TextDirection.ltr,
+                            child: AutofillGroup(
+                              child: Pinput(
+                                key: ValueKey(_inputGeneration),
+                                length: _codeLength,
+                                controller: _codeController,
+                                smsRetriever: _smsRetriever,
+                                autofillHints: const [
+                                  AutofillHints.oneTimeCode,
+                                ],
+                                keyboardType: TextInputType.number,
+                                textInputAction: TextInputAction.done,
+                                autofocus: true,
+                                enabled: !_confirming,
+                                closeKeyboardWhenCompleted: true,
+                                pinAnimationType: PinAnimationType.none,
+                                isCursorAnimationEnabled: false,
+                                animationDuration: AppMotionDurations.short4,
+                                animationCurve:
+                                    AppMotionCurves.standardDecelerate,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                defaultPinTheme: _pinTheme(colorScheme),
+                                focusedPinTheme: _pinTheme(
+                                  colorScheme,
+                                  borderColor: colorScheme.primary,
+                                ),
+                                submittedPinTheme: _pinTheme(colorScheme),
+                                errorPinTheme: _pinTheme(
+                                  colorScheme,
+                                  borderColor: colorScheme.error,
+                                ),
+                                forceErrorState: _error != null,
+                                separatorBuilder: (_) =>
+                                    const SizedBox(width: 8),
+                                onChanged: (value) {
+                                  if (_error != null &&
+                                      value.length < _codeLength) {
+                                    setState(() => _error = null);
+                                  }
+                                },
+                                onCompleted: _onPinCompleted,
+                                onSubmitted: (_) => _confirm(),
+                              ),
+                            ),
+                          ),
                           if (_error != null) ...[
                             const SizedBox(height: 12),
                             Row(
