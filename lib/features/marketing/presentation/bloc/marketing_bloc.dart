@@ -8,6 +8,7 @@ import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_de
 import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
 import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
 import 'package:delegate_app/features/marketing/data/services/delegate_profile_cache.dart';
+import 'package:delegate_app/features/marketing/data/services/real_test_metrics.dart';
 
 part 'marketing_event.dart';
 part 'marketing_state.dart';
@@ -19,6 +20,8 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
   final BranchPreferenceService branchPreferenceService;
 
   List<Delegate> _allDelegates = [];
+  bool _scheduledAutoWarm = false;
+  bool _metricsLoadInFlight = false;
 
   // Pagination state
   List<Map<String, dynamic>> _allCompanies = [];
@@ -283,15 +286,40 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
   // ─── Per-Branch Attendance Cache (Cache-First / Incremental) ────────────────
   // Key: "${organizationId}_${branchName}_${date.year}_${date.month}_${date.day}"
   static final Map<String, List<Map<String, dynamic>>> _perBranchAttendanceCache = {};
+  static bool _coldClearedThisProcess = false;
   static void clearCache() {
     _perBranchAttendanceCache.clear();
     DelegateProfileCache.clearSession();
+  }
+  static void resetColdFlagForTest() {
+    _coldClearedThisProcess = false;
   }
 
   Future<void> _onLoadAllFavoriteBranchesAttendance(
     LoadAllFavoriteBranchesAttendance event,
     Emitter<MarketingState> emit,
   ) async {
+    if (RealTestMetrics.enabled) {
+      if (_metricsLoadInFlight) {
+        // ignore: avoid_print
+        print('[REAL_TEST] skip overlapping load while metrics in-flight');
+        return;
+      }
+      // REAL_TEST_COLD: first load in process is cold (caches wiped once).
+      // Later loads in same process are warm.
+      final runMode = (RealTestMetrics.clearCold && !_coldClearedThisProcess)
+          ? 'cold'
+          : 'warm';
+      if (runMode == 'cold') {
+        clearCache();
+        _coldClearedThisProcess = true;
+      }
+      _metricsLoadInFlight = true;
+      RealTestMetrics.markT0(
+        runMode: runMode,
+        branches: event.favoriteBranches.length,
+      );
+    }
     if (event.favoriteBranches.isEmpty) {
       emit(const AllBranchesAttendanceLoaded(
         data: {},
@@ -361,7 +389,7 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
         date: date,
         onFirstPaint: (partial) {
           // ignore: avoid_print
-          print('[REAL_TEST] firstPaint msSinceEpoch=${DateTime.now().millisecondsSinceEpoch}');
+          RealTestMetrics.markT2();
           // First paint: logs (+ local profile caches). May still be enriching.
           for (final entry in partial.entries) {
             final key = '${event.organizationId}_${entry.key}_$dateSuffix';
@@ -383,7 +411,22 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
       );
 
       // ignore: avoid_print
-      print('[REAL_TEST] fullyEnriched msSinceEpoch=${DateTime.now().millisecondsSinceEpoch}');
+      RealTestMetrics.markT3();
+      if (RealTestMetrics.enabled &&
+          RealTestMetrics.mode == 'cold' &&
+          !_scheduledAutoWarm) {
+        _scheduledAutoWarm = true;
+        // One warm re-fetch in-process after cold (profile cache now warm).
+        Future<void>.delayed(const Duration(milliseconds: 800), () {
+          if (isClosed) return;
+          add(LoadAllFavoriteBranchesAttendance(
+            favoriteBranches: event.favoriteBranches,
+            organizationId: event.organizationId,
+            date: date,
+            forceRefresh: true,
+          ));
+        });
+      }
 
       // Save fully enriched result to per-branch cache & merge
       for (final entry in fetchedData.entries) {
@@ -416,6 +459,10 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
         emit(AllBranchesAttendanceError(
           message: 'فشل في جلب بيانات الفروع: ${e.toString()}',
         ));
+      }
+    } finally {
+      if (RealTestMetrics.enabled) {
+        _metricsLoadInFlight = false;
       }
     }
   }

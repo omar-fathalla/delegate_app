@@ -6,6 +6,7 @@ import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/marketing/data/services/delegate_profile_cache.dart';
+import 'package:delegate_app/features/marketing/data/services/real_test_metrics.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 
 abstract class MarketingRemoteDataSource {
@@ -390,6 +391,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       const todayAttendanceQueryLimit = 2000;
 
       final List<QueryDocumentSnapshot<Map<String, dynamic>>> todayDocs = [];
+      final attSw = Stopwatch()..start();
       for (final chunk in branchChunks) {
         final snap = await firestore
             .collection(kAttendanceCollection)
@@ -400,6 +402,12 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             .limit(todayAttendanceQueryLimit)
             .getResilient(forceServer: true);
         todayDocs.addAll(snap.docs);
+      }
+      attSw.stop();
+      if (RealTestMetrics.enabled) {
+        RealTestMetrics.attendanceQueryMs = attSw.elapsedMilliseconds;
+        RealTestMetrics.attendanceDocs = todayDocs.length;
+        RealTestMetrics.attendanceChunks = branchChunks.length;
       }
 
       // Map: branchName -> Map<delegateId, record>
@@ -515,11 +523,14 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         }
       }
 
+      final coSw = Stopwatch()..start();
+      var coChunks = 0;
       if (missingCheckOutDelegateIds.isNotEmpty) {
         final uniqueMissing = missingCheckOutDelegateIds.toSet().toList();
         // org + type + delegateId + ts>= + ts< (=5) → whereIn chunk <= 20.
         const checkoutWhereInChunkSize = 15;
         for (var i = 0; i < uniqueMissing.length; i += checkoutWhereInChunkSize) {
+          coChunks++;
           final chunk = uniqueMissing.sublist(
             i,
             (i + checkoutWhereInChunkSize > uniqueMissing.length)
@@ -563,6 +574,16 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             }
           } catch (_) {}
         }
+      }
+
+      coSw.stop();
+      if (RealTestMetrics.enabled) {
+        RealTestMetrics.checkoutFallbackMs = coSw.elapsedMilliseconds;
+        RealTestMetrics.checkoutMissingDelegates =
+            missingCheckOutDelegateIds.toSet().length;
+        RealTestMetrics.checkoutChunks = coChunks;
+        RealTestMetrics.uniqueDelegates = allDelegateIds.length;
+        RealTestMetrics.markT1();
       }
 
       // ── Step 2: first paint from log fields + local caches (session + persistent) ──
@@ -742,6 +763,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       final companyIdsStillNeeded = allCompanyIdsToFetch
           .where((id) => !companyNameCache.containsKey(id) || companyNameCache[id]!.isEmpty)
           .toList();
+      final compSw = Stopwatch()..start();
       if (companyIdsStillNeeded.isNotEmpty) {
         await Future.wait(companyIdsStillNeeded.map((compId) async {
           try {
@@ -761,6 +783,12 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             companyNameCache[compId] = '';
           }
         }));
+      }
+      compSw.stop();
+      if (RealTestMetrics.enabled) {
+        RealTestMetrics.companyPrePaintMs = compSw.elapsedMilliseconds;
+        RealTestMetrics.companyPrePaintIds = companyIdsStillNeeded.length;
+        RealTestMetrics.localCacheHits = delegateLookup.length;
       }
 
       // Determine which delegates still need network profile enrichment.
@@ -787,6 +815,9 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           }
         }
       }
+      if (RealTestMetrics.enabled) {
+        RealTestMetrics.enrichMissingCount = missingIds.length;
+      }
 
       final firstPaint = buildBranchRecords(
         delegateLookup: delegateLookup,
@@ -805,9 +836,12 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       onFirstPaint?.call(copyResult(firstPaint));
 
       // ── Step 3: network enrich ONLY missing ids (parallel paths, no 3-serial) ──
+      final enSw = Stopwatch()..start();
+      var enBatches = 0;
       if (missingIds.isNotEmpty) {
         const batchSize = 25;
         for (var i = 0; i < missingIds.length; i += batchSize) {
+          enBatches++;
           final end = (i + batchSize > missingIds.length)
               ? missingIds.length
               : i + batchSize;
@@ -951,6 +985,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             extraCompanyIds.add(cid);
           }
         }
+        final comp2Sw = Stopwatch()..start();
         if (extraCompanyIds.isNotEmpty) {
           await Future.wait(extraCompanyIds.map((compId) async {
             try {
@@ -971,8 +1006,18 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             }
           }));
         }
+        comp2Sw.stop();
+        if (RealTestMetrics.enabled) {
+          RealTestMetrics.companyPostEnrichMs = comp2Sw.elapsedMilliseconds;
+          RealTestMetrics.companyPostEnrichIds = extraCompanyIds.length;
+        }
 
         unawaited(profileCache?.persist() ?? Future.value());
+      }
+      enSw.stop();
+      if (RealTestMetrics.enabled) {
+        RealTestMetrics.enrichMs = enSw.elapsedMilliseconds;
+        RealTestMetrics.enrichBatches = enBatches;
       }
 
       final result = buildBranchRecords(

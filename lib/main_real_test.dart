@@ -25,6 +25,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/features/marketing/data/services/real_test_metrics.dart';
+import 'package:delegate_app/features/marketing/data/services/delegate_profile_cache.dart';
+import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
 
 const _token = String.fromEnvironment('REAL_TEST_CUSTOM_TOKEN');
 const _uid = 'O0LHjrZU7TXG5LHi9QcqavE4i1q1';
@@ -55,9 +58,22 @@ Future<void> main() async {
   ]);
   final prefs = results[1] as SharedPreferences;
 
+  final bootStart = DateTime.now().millisecondsSinceEpoch;
+  print('[REAL_TEST] bootStart msSinceEpoch=$bootStart');
+
+  if (RealTestMetrics.clearCold) {
+    await prefs.remove('delegate_profile_cache_v1');
+    DelegateProfileCache.clearSession();
+    MarketingBloc.clearCache();
+    MarketingBloc.resetColdFlagForTest();
+    print('[REAL_TEST] cold caches cleared (prefs profile + session + branch cache)');
+  }
+
   print('[REAL_TEST] signing in with custom token…');
   final cred = await FirebaseAuth.instance.signInWithCustomToken(_token);
   print('[REAL_TEST] auth.uid=${cred.user?.uid}');
+  RealTestMetrics.markLoginDone();
+  print('[REAL_TEST] startup_login_ms=${DateTime.now().millisecondsSinceEpoch - bootStart}');
 
   // Seed on-device favorites for this uid (app storage, not Firestore).
   await prefs.setString(
@@ -127,6 +143,7 @@ Future<void> main() async {
   PaintingBinding.instance.imageCache.maximumSizeBytes = 40 * 1024 * 1024;
   PaintingBinding.instance.imageCache.maximumSize = 100;
 
-  print('[REAL_TEST] runApp');
+  RealTestMetrics.markRunApp();
+  print('[REAL_TEST] startup_to_runApp_ms=${DateTime.now().millisecondsSinceEpoch - bootStart}');
   runApp(const MyApp());
 }

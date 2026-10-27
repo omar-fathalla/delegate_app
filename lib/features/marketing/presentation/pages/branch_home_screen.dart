@@ -19,6 +19,7 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/marketing/data/models/floor_verification_model.dart';
 import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/marketing/data/services/real_test_metrics.dart';
 
 /// الشاشة الرئيسية للفروع - تعرض جميع الفروع المفضلة في نفس الصفحة
 class BranchHomeScreen extends StatelessWidget {
@@ -38,7 +39,7 @@ class BranchHomeScreen extends StatelessWidget {
         final bloc = di.sl<MarketingBloc>();
         final prefService = di.sl<BranchPreferenceService>();
         final favorites = prefService.getFavoriteBranches(marketingUser.uid);
-        if (favorites.isNotEmpty) {
+        if (favorites.isNotEmpty && !RealTestMetrics.enabled) {
           bloc.add(
             LoadAllFavoriteBranchesAttendance(
               favoriteBranches: favorites,
@@ -117,12 +118,15 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       _syncFloorVerificationsFromCloud();
 
       // Auto-refresh heartbeat every 30 seconds for live zero-drop data delivery
-      _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-        if (mounted && _favoriteBranches.isNotEmpty) {
-          _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
-          _syncFloorVerificationsFromCloud();
-        }
-      });
+      // Disabled during REAL_TEST_METRICS so cold/warm measurements are not polluted.
+      if (!RealTestMetrics.enabled) {
+        _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+          if (mounted && _favoriteBranches.isNotEmpty) {
+            _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+            _syncFloorVerificationsFromCloud();
+          }
+        });
+      }
 
       // Revalidate immediately when app resumes from background
       _lifecycleListener = AppLifecycleListener(
