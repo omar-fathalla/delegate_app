@@ -23,7 +23,6 @@ import 'package:delegate_app/config/routes/app_router.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
-import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/core/services/sync_manager.dart';
 
@@ -77,12 +76,6 @@ void main() async {
     Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
     SharedPreferences.getInstance(),
   ]);
-
-  // Remote Config must not delay the first frame or login. A failed or
-  // offline fetch leaves delegate_otp_enabled at its in-app default (false).
-  // The login path reads the flag when the session is known, so a fetch that
-  // finishes while the user types still applies.
-  unawaited(DelegateOtpConfig.refreshFromRemoteConfig());
 
   // Enable smart offline persistence and caching for Firestore
   try {
