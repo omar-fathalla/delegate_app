@@ -427,6 +427,11 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           final companyIdInLog = data['companyId'] ?? data['companyUID'];
           final phoneInLog = data['phoneNumber'] ?? data['phone'];
 
+          // Prefer denormalized checkout on the check-in doc (fix2).
+          final stampedOut = data['checkOutTime'] is Timestamp
+              ? data['checkOutTime'] as Timestamp
+              : null;
+
           final existing = checkInsByBranch[branch]![delegateId];
           if (existing == null) {
             checkInsByBranch[branch]![delegateId] = {
@@ -439,7 +444,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
               'companyIdInLog': companyIdInLog,
               'organizationIdInLog': orgIdInLog,
               'phoneInLog': phoneInLog,
-              'checkOutTime': null,
+              'checkOutTime': stampedOut,
             };
           } else {
             final existingTs = existing['checkInTime'] as Timestamp?;
@@ -451,6 +456,9 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
               if (companyIdInLog != null) existing['companyIdInLog'] = companyIdInLog;
               if (orgIdInLog != null) existing['organizationIdInLog'] = orgIdInLog;
               if (phoneInLog != null) existing['phoneInLog'] = phoneInLog;
+              if (stampedOut != null) existing['checkOutTime'] = stampedOut;
+            } else if (stampedOut != null && existing['checkOutTime'] == null) {
+              existing['checkOutTime'] = stampedOut;
             }
           }
         }

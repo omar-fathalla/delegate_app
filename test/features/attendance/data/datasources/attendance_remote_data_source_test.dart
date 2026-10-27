@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
@@ -50,7 +51,7 @@ void main() {
     expect(doc.data()['type'], 'check_in');
   });
 
-  test('checkOut should create a check-out log document', () async {
+  test('checkOut should create a check-out log and stamp checkOutTime on check-in', () async {
     // 1. Arrange - perform a check-in first
     final checkInResult = await dataSource.checkIn(
       'user1',
@@ -90,6 +91,16 @@ void main() {
     expect(doc.data()['relatedCheckInId'], checkInResult.id);
     expect(doc.data()['location']['latitude'], 11.0);
     expect(doc.data()['location']['longitude'], 21.0);
+
+    // 5. Fix2: check-in doc carries denormalized checkout fields
+    final checkInDoc = await fakeFirestore
+        .collection(kAttendanceCollection)
+        .doc(checkInResult.id)
+        .get();
+    expect(checkInDoc.data()!['checkOutTime'], isNotNull);
+    expect(checkInDoc.data()!['checkOutDocId'], doc.id);
+    expect(checkInDoc.data()!['checkOutLocation']['latitude'], 11.0);
+    expect(checkInDoc.data()!['checkOutLocation']['longitude'], 21.0);
   });
 
   test('getHistory should return merged check-in/out records', () async {
@@ -154,6 +165,28 @@ void main() {
       final active = await dataSource.findActiveAttendance('user1', 'org1');
 
       // Assert
+      expect(active, isNull);
+    },
+  );
+
+  test(
+    'findActiveAttendance returns null when check-in already has checkOutTime',
+    () async {
+      final checkIn = await dataSource.checkIn(
+        'user1',
+        10.0,
+        20.0,
+        companyId: 'company1',
+        organizationId: 'org1',
+        deviceInfo: 'device1',
+      );
+      // Simulate stamp-only close (no newer check_out log as latest).
+      await fakeFirestore.collection(kAttendanceCollection).doc(checkIn.id).update({
+        'checkOutTime': Timestamp.now(),
+        'checkOutDocId': 'out1',
+      });
+
+      final active = await dataSource.findActiveAttendance('user1', 'org1');
       expect(active, isNull);
     },
   );

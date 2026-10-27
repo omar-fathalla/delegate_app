@@ -260,14 +260,24 @@ class _HRDelegateAttendanceDetailScreenState
       inLng ??= (checkInData['longitude'] as num?)?.toDouble() ??
           (checkInData['lng'] as num?)?.toDouble();
 
-      // Check for related checkout
-      String? checkOutDocId;
+      // Check for related checkout (prefer denormalized fields on check-in — fix2)
+      String? checkOutDocId = checkInData['checkOutDocId']?.toString();
       Map<String, dynamic>? checkOutData;
 
       final relatedOut = checkOutsByRelatedId[checkInId];
       if (relatedOut != null) {
         checkOutDocId = relatedOut.key;
         checkOutData = relatedOut.value;
+      } else if (checkOutDocId != null &&
+          checkOutDocId.isNotEmpty &&
+          checkOutsByRelatedId.values.any((e) => e.key == checkOutDocId)) {
+        // rare: id known on check-in but not keyed by relatedCheckInId
+        for (final entry in checkOutsByRelatedId.values) {
+          if (entry.key == checkOutDocId) {
+            checkOutData = entry.value;
+            break;
+          }
+        }
       } else if (unassignedCheckOuts.isNotEmpty) {
         // If not linked by relatedCheckInId, match chronologically by day
         for (int i = 0; i < unassignedCheckOuts.length; i++) {
@@ -293,6 +303,17 @@ class _HRDelegateAttendanceDetailScreenState
       double? outLat;
       double? outLng;
 
+      // Denormalized checkOutTime on the check-in doc (fix2).
+      final stampedOut = checkInData['checkOutTime'];
+      if (stampedOut is Timestamp) {
+        checkOutTime = stampedOut.toDate();
+      }
+      final stampedLoc = checkInData['checkOutLocation'];
+      if (stampedLoc is Map) {
+        outLat = (stampedLoc['latitude'] as num?)?.toDouble();
+        outLng = (stampedLoc['longitude'] as num?)?.toDouble();
+      }
+
       if (checkOutData != null) {
         final outTs = checkOutData['timestamp'];
         if (outTs is Timestamp) {
@@ -317,8 +338,10 @@ class _HRDelegateAttendanceDetailScreenState
             (checkOutData['lng'] as num?)?.toDouble();
       }
 
-      bool isAutoCheckOut = checkOutData?['isAutoCheckOut'] == true;
-      String? autoCheckOutReason = checkOutData?['autoCheckOutReason']?.toString();
+      bool isAutoCheckOut = checkOutData?['isAutoCheckOut'] == true ||
+          checkInData['isAutoCheckOut'] == true;
+      String? autoCheckOutReason = checkOutData?['autoCheckOutReason']?.toString() ??
+          checkInData['autoCheckOutReason']?.toString();
 
       // قاعدة الـ 9 ساعات: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (9 ساعات) أو كان تاريخاً سابقاً
       if (checkOutTime == null) {
@@ -757,6 +780,9 @@ class _HRDelegateAttendanceDetailScreenState
       'lastAdjustedAt': FieldValue.serverTimestamp(),
       'adjustmentReason': reason,
       if (notes.isNotEmpty) 'adjustmentNotes': notes,
+      // Denormalize checkout onto check-in (fix2) when HR sets/adjusts out time.
+      if (hasCheckOut && newOutTime != null) 'checkOutTime': Timestamp.fromDate(newOutTime),
+      if (!hasCheckOut) 'checkOutTime': FieldValue.delete(),
     });
 
     // 2. Handle Check-Out Doc in attendance_logs
@@ -805,6 +831,11 @@ class _HRDelegateAttendanceDetailScreenState
           if (notes.isNotEmpty) 'adjustmentNotes': notes,
         });
       }
+    }
+
+    // Keep checkOutDocId denormalized on the check-in for marketing/HR (fix2).
+    if (hasCheckOut && newOutTime != null && checkOutDocId.isNotEmpty) {
+      batch.update(checkInRef, {'checkOutDocId': checkOutDocId});
     }
 
     // 3. Create Audit Record in attendance_adjustment_logs

@@ -744,12 +744,10 @@ service cloud.firestore {
     }
 
     function canUpdateAttendance() {
-      return canReadAttendance() && (
-        isGlobalStaff() || isCompanyScopedStaff() || isOrgScopedStaff()
-        || ownsDelegateId(resource.data.delegateId)
-        || ownsDelegateId(resource.data.userId)
-        || delegateOwns(resource.data.delegateId)
-      );
+      // Same principals as read. Avoid nesting an extra AND of staff/owner
+      // checks (duplicate of canReadAttendance) so checkout denormalize updates
+      // stay under the Firestore rules expression budget.
+      return canReadAttendance();
     }
 
     match /attendance_logs/{logId} {

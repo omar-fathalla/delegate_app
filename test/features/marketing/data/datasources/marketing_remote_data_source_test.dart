@@ -187,5 +187,35 @@ void main() {
       );
       expect(result, isEmpty);
     });
+
+    test('uses denormalized checkOutTime on check-in without needing follow-up logs', () async {
+      final today = dayStart();
+      await seedDelegate('d4');
+
+      await fakeFirestore.collection(kAttendanceCollection).doc('in_d4').set({
+        'type': 'check_in',
+        'branchName': branch,
+        'delegateId': 'd4',
+        'timestamp': Timestamp.fromDate(today.add(const Duration(hours: 9))),
+        'organizationId': orgId,
+        'companyId': companyId,
+        'companyName': 'Test Co',
+        'delegateName': 'Delegate d4',
+        'phoneNumber': '01000000000',
+        'checkOutTime': Timestamp.fromDate(today.add(const Duration(hours: 14))),
+        'checkOutDocId': 'out_d4_missing', // no separate check_out doc
+        'checkOutLocation': {'latitude': 1.0, 'longitude': 2.0},
+      });
+
+      final result = await dataSource.getTodayAttendanceForBranches(
+        branchNames: [branch],
+        organizationId: orgId,
+        date: today,
+      );
+
+      expect(result[branch]!.length, 1);
+      expect(result[branch]!.first['delegateId'], 'd4');
+      expect(result[branch]!.first['checkOutTime'], isNotNull);
+    });
   });
 }

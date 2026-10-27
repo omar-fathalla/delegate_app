@@ -223,19 +223,29 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final userId = lastData['delegateId'] ?? lastData['userId'];
       final companyId = lastData['companyId'];
 
-      await _attendanceCollection(organizationId)
-          .add({
-            'delegateId': userId,
-            'userId': userId,
-            'companyId': companyId,
-            'organizationId': organizationId,
-            'timestamp': FieldValue.serverTimestamp(),
-            'type': 'check_out',
-            'location': {'latitude': lat, 'longitude': long},
-            'relatedCheckInId': attendanceId,
-            if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
-          })
-          .timeout(const Duration(seconds: 15));
+      // Keep a separate check_out log for history/HR, and denormalize
+      // checkOutTime onto the check-in doc so marketing today-views skip
+      // the historical follow-up query.
+      final outRef = _attendanceCollection(organizationId).doc();
+      final checkInRef = _attendanceCollection(organizationId).doc(attendanceId);
+      final batch = firestore.batch();
+      batch.set(outRef, {
+        'delegateId': userId,
+        'userId': userId,
+        'companyId': companyId,
+        'organizationId': organizationId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'check_out',
+        'location': {'latitude': lat, 'longitude': long},
+        'relatedCheckInId': attendanceId,
+        if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
+      });
+      batch.update(checkInRef, {
+        'checkOutTime': FieldValue.serverTimestamp(),
+        'checkOutLocation': {'latitude': lat, 'longitude': long},
+        'checkOutDocId': outRef.id,
+      });
+      await batch.commit().timeout(const Duration(seconds: 15));
 
       // Auto-resolve any orphaned unclosed check-in for the same user and branch today
       try {
@@ -256,7 +266,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
                 .timeout(const Duration(seconds: 3));
 
             if (outSnap.docs.isEmpty) {
-              await _attendanceCollection(organizationId).add({
+              final orphanOutRef = _attendanceCollection(organizationId).doc();
+              final orphanBatch = firestore.batch();
+              orphanBatch.set(orphanOutRef, {
                 'delegateId': userId,
                 'userId': userId,
                 'companyId': companyId,
@@ -268,6 +280,13 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
                 if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
                 'autoClosedDuplicate': true,
               });
+              orphanBatch.update(doc.reference, {
+                'checkOutTime': FieldValue.serverTimestamp(),
+                'checkOutLocation': {'latitude': lat, 'longitude': long},
+                'checkOutDocId': orphanOutRef.id,
+                'autoClosedDuplicate': true,
+              });
+              await orphanBatch.commit();
             }
           }
         }
@@ -566,19 +585,30 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final branchName = data['branchName'];
       final targetOrgId = docOrg.isNotEmpty ? docOrg : organizationId;
 
-      if (checkOuts.containsKey(checkInId)) {
+      // Prefer denormalized checkOutTime on the check-in doc (fix2),
+      // fall back to paired check_out log for older records.
+      DateTime? resolvedOut;
+      var isAuto = data['isAutoCheckOut'] == true;
+      String? autoReason = data['autoCheckOutReason'] as String?;
+      if (data['checkOutTime'] is Timestamp) {
+        resolvedOut = (data['checkOutTime'] as Timestamp).toDate();
+      } else if (checkOuts.containsKey(checkInId)) {
         final outData = checkOuts[checkInId]!;
-        final isAuto = outData['isAutoCheckOut'] == true;
-        final autoReason = outData['autoCheckOutReason'] as String?;
+        isAuto = outData['isAutoCheckOut'] == true || isAuto;
+        autoReason = (outData['autoCheckOutReason'] as String?) ?? autoReason;
+        resolvedOut = outData['timestamp'] != null
+            ? (outData['timestamp'] as Timestamp).toDate()
+            : DateTime.now();
+      }
+
+      if (resolvedOut != null) {
         history.add(
           AttendanceModel(
             id: checkInId,
             userId: userId,
             organizationId: targetOrgId,
             checkInTime: checkInTime,
-            checkOutTime: outData['timestamp'] != null
-                ? (outData['timestamp'] as Timestamp).toDate()
-                : DateTime.now(),
+            checkOutTime: resolvedOut,
             latitude: lat,
             longitude: lng,
             branchName: branchName,
@@ -645,6 +675,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final data = doc.data();
 
       if (data['type'] == 'check_in') {
+        // Denormalized checkout on the check-in doc (fix2) means session is closed.
+        if (data['checkOutTime'] != null) {
+          return null;
+        }
+
         final checkInTime = data['timestamp'] != null
             ? (data['timestamp'] as Timestamp).toDate()
             : DateTime.now();
@@ -703,7 +738,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0;
       final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0;
 
-      await _attendanceCollection(organizationId).add({
+      final autoOutRef = _attendanceCollection(organizationId).doc();
+      final autoBatch = firestore.batch();
+      autoBatch.set(autoOutRef, {
         'delegateId': userId,
         'userId': userId,
         'companyId': companyId,
@@ -716,6 +753,14 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'autoCheckOutReason': 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
         'branchName': ?branchName,
       });
+      autoBatch.update(checkInDoc.reference, {
+        'checkOutTime': Timestamp.fromDate(autoCheckOutTime),
+        'checkOutLocation': {'latitude': lat, 'longitude': lng},
+        'checkOutDocId': autoOutRef.id,
+        'isAutoCheckOut': true,
+        'autoCheckOutReason': 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+      });
+      await autoBatch.commit();
 
       unawaited(
         _syncDelegateTrackingCheckOut(userId: userId),
@@ -740,6 +785,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           final doc = snapshot.docs.first;
           final data = doc.data();
           if (data['type'] == 'check_in') {
+            if (data['checkOutTime'] != null) {
+              return null;
+            }
             return AttendanceModel(
               id: doc.id,
               userId: data['delegateId'] ?? data['userId'] ?? '',
@@ -785,6 +833,21 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         }
 
         batch.set(newDocRef, data);
+
+        // Denormalize checkout onto the related check-in (fix2).
+        if (action['type'] == 'check_out' &&
+            action['relatedCheckInId'] is String &&
+            (action['relatedCheckInId'] as String).isNotEmpty) {
+          final relatedId = action['relatedCheckInId'] as String;
+          batch.update(
+            _attendanceCollection(organizationId).doc(relatedId),
+            {
+              'checkOutTime': FieldValue.serverTimestamp(),
+              'checkOutDocId': newDocRef.id,
+              if (action['location'] != null) 'checkOutLocation': action['location'],
+            },
+          );
+        }
       }
 
       await batch.commit().timeout(const Duration(seconds: 20));

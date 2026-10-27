@@ -367,6 +367,20 @@ describe("firestore tightened rules", () => {
     await assertSucceeds(dbFor("super").doc("mail/existing").get());
   });
 
+  test("delegate can stamp checkOutTime on own check-in (fix2 denormalize)", async () => {
+    const delegate = dbFor("del-1", DELEGATE);
+    // a1 is seeded as del-1's own check-in in beforeEach
+    await assertSucceeds(delegate.doc("attendance_logs/a1").update({
+      checkOutTime: new Date(),
+      checkOutDocId: "own-out",
+      checkOutLocation: { latitude: 1, longitude: 2 },
+    }));
+    // a2 belongs to another delegate/org
+    await assertFails(delegate.doc("attendance_logs/a2").update({
+      checkOutTime: new Date(),
+    }));
+  });
+
   test("attendance creates are limited to the delegate's own org profile", async () => {
     const delegate = dbFor("del-1", DELEGATE);
     await assertSucceeds(delegate.collection("attendance_logs").add({
