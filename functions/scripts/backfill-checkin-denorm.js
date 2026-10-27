@@ -56,8 +56,15 @@ function parseArgs(argv) {
 
 function parseDay(s, endExclusive) {
   if (!s) return null;
+  // Full ISO (with offset or Z), e.g. 2026-10-21T00:00:00+03:00
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    const dt = new Date(s);
+    if (Number.isNaN(dt.getTime())) throw new Error(`Bad ISO datetime ${s}`);
+    return admin.firestore.Timestamp.fromDate(dt);
+  }
+  // YYYY-MM-DD interpreted as UTC midnight; endExclusive → next UTC day
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  if (!m) throw new Error(`Bad date ${s}; expected YYYY-MM-DD`);
+  if (!m) throw new Error(`Bad date ${s}; expected YYYY-MM-DD or ISO datetime`);
   const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
   if (endExclusive) dt.setUTCDate(dt.getUTCDate() + 1);
   return admin.firestore.Timestamp.fromDate(dt);
@@ -178,6 +185,39 @@ async function* streamByType(db, collection, type, pageSize, orgFilter) {
   }
 }
 
+/**
+ * Stream docs in a timestamp window (single-field index). Filter type in memory.
+ * Much faster for day-sized backfill batches.
+ */
+async function* streamByTimestampRange(db, collection, fromTs, toTs, pageSize, orgFilter) {
+  let query = db.collection(collection)
+    .where("timestamp", ">=", fromTs)
+    .where("timestamp", "<", toTs)
+    .orderBy("timestamp", "asc");
+  if (orgFilter) query = query.where("organizationId", "==", orgFilter);
+  query = query.limit(pageSize);
+  let lastDoc = null;
+  let pages = 0;
+  for (;;) {
+    const pageQuery = lastDoc ? query.startAfter(lastDoc) : query;
+    let snap;
+    try {
+      snap = await pageQuery.get();
+    } catch (err) {
+      console.error("timestamp-range query failed, caller should fall back:", err.message);
+      throw err;
+    }
+    pages += 1;
+    if (snap.empty) return;
+    for (const doc of snap.docs) yield doc;
+    lastDoc = snap.docs[snap.docs.length - 1];
+    if (pages % 10 === 0) {
+      console.error(`stream ts-range pages=${pages} last=${lastDoc.id}`);
+    }
+    if (snap.size < pageSize) return;
+  }
+}
+
 function inDateRange(data, fromTs, toTs) {
   if (!fromTs && !toTs) return true;
   const ts = data.timestamp;
@@ -196,8 +236,29 @@ async function loadCheckoutIndexes(db, collection, pageSize, orgFilter, fromTs, 
   const byRelatedId = new Map();
   const byDelegate = new Map();
   let scanned = 0;
-  for await (const doc of streamByType(db, collection, "check_out", pageSize, orgFilter)) {
+
+  async function* checkoutSource() {
+    if (fromTs && toTs) {
+      const toExpanded = admin.firestore.Timestamp.fromMillis(toTs.toMillis() + 36 * 3600 * 1000);
+      try {
+        for await (const doc of streamByTimestampRange(
+          db, collection, fromTs, toExpanded, pageSize, orgFilter,
+        )) {
+          yield doc;
+        }
+        return;
+      } catch (err) {
+        console.error("checkout ts-range fallback to type stream:", err.message);
+      }
+    }
+    for await (const doc of streamByType(db, collection, "check_out", pageSize, orgFilter)) {
+      yield doc;
+    }
+  }
+
+  for await (const doc of checkoutSource()) {
     const d = doc.data() || {};
+    if (str(d.type) && str(d.type) !== "check_out") continue;
     if (fromTs || toTs) {
       const toExpanded = toTs
         ? admin.firestore.Timestamp.fromMillis(toTs.toMillis() + 36 * 3600 * 1000)
@@ -287,11 +348,16 @@ async function main() {
   const db = admin.firestore();
   db.settings({ignoreUndefinedProperties: true});
 
+  const fromIsDateOnly = opts.from && /^\d{4}-\d{2}-\d{2}$/.test(opts.from);
+  const toIsDateOnly = opts.to && /^\d{4}-\d{2}-\d{2}$/.test(opts.to);
   const fromTs = parseDay(opts.from, false);
-  const toTs = parseDay(opts.to, true);
+  // Date-only --to is exclusive end-of-day (next UTC midnight).
+  // ISO --to is an exclusive upper bound as given (e.g. "now").
+  const toTs = parseDay(opts.to, !!toIsDateOnly);
   if ((opts.from && !opts.to) || (!opts.from && opts.to)) {
     throw new Error("Provide both --from and --to, or neither.");
   }
+  void fromIsDateOnly;
 
   const report = {
     startedAt: new Date().toISOString(),
@@ -354,7 +420,25 @@ async function main() {
   }
 
   console.error("Scanning check_in docs…");
-  for await (const doc of streamByType(db, opts.collection, "check_in", opts.pageSize, opts.org)) {
+  async function* checkInSource() {
+    if (fromTs && toTs) {
+      try {
+        for await (const doc of streamByTimestampRange(
+          db, opts.collection, fromTs, toTs, opts.pageSize, opts.org,
+        )) {
+          yield doc;
+        }
+        return;
+      } catch (err) {
+        console.error("check_in ts-range fallback to type stream:", err.message);
+      }
+    }
+    for await (const doc of streamByType(db, opts.collection, "check_in", opts.pageSize, opts.org)) {
+      yield doc;
+    }
+  }
+
+  for await (const doc of checkInSource()) {
     report.scanned += 1;
     const data = doc.data() || {};
     if (data.type !== "check_in") continue;
