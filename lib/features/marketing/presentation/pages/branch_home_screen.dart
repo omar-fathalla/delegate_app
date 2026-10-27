@@ -713,6 +713,32 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       },
       child: CustomScrollView(
         slivers: [
+          if (state.isEnriching)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'جاري استكمال الأسماء والصور…',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // ─── تاريخ اليوم ──────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
@@ -1724,7 +1750,11 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     ColorScheme colorScheme, [
     String? branchName,
   ]) {
-    final String fullName = record['fullName'] as String? ?? 'مندوب';
+    final String rawName = (record['fullName'] as String?)?.trim() ?? '';
+    final bool incomplete = record['profileIncomplete'] == true;
+    final String fullName = rawName.isNotEmpty
+        ? rawName
+        : (incomplete ? '…' : 'مندوب');
     final String companyName = record['companyName'] as String? ?? '';
     final String? imageUrl = record['personalPhotoURL'] as String? ??
         record['imageUrl'] as String?;
@@ -2826,6 +2856,26 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   }) async {
     final colorScheme = Theme.of(context).colorScheme;
     final isDesktop = MediaQuery.sizeOf(context).width > 768;
+
+    // CSV/search must use enriched data — wait briefly if first-paint still enriching.
+    if (_lastLoadedState?.isEnriching == true) {
+      final bloc = context.read<MarketingBloc>();
+      final completer = Completer<void>();
+      late final StreamSubscription sub;
+      sub = bloc.stream.listen((s) {
+        if (s is AllBranchesAttendanceLoaded && !s.isEnriching) {
+          _lastLoadedState = s;
+          if (!completer.isCompleted) completer.complete();
+          sub.cancel();
+        }
+      });
+      try {
+        await completer.future.timeout(const Duration(seconds: 8));
+      } catch (_) {
+        await sub.cancel();
+      }
+      if (!context.mounted) return;
+    }
 
     final targetBranchRecords = branchRecords ?? (_lastLoadedState?.data ?? {});
     final branches = preselectedBranch != null

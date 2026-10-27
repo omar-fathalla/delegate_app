@@ -7,6 +7,7 @@ import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_co
 import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_delegates.dart';
 import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
 import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
+import 'package:delegate_app/features/marketing/data/services/delegate_profile_cache.dart';
 
 part 'marketing_event.dart';
 part 'marketing_state.dart';
@@ -282,7 +283,10 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
   // ─── Per-Branch Attendance Cache (Cache-First / Incremental) ────────────────
   // Key: "${organizationId}_${branchName}_${date.year}_${date.month}_${date.day}"
   static final Map<String, List<Map<String, dynamic>>> _perBranchAttendanceCache = {};
-  static void clearCache() => _perBranchAttendanceCache.clear();
+  static void clearCache() {
+    _perBranchAttendanceCache.clear();
+    DelegateProfileCache.clearSession();
+  }
 
   Future<void> _onLoadAllFavoriteBranchesAttendance(
     LoadAllFavoriteBranchesAttendance event,
@@ -355,9 +359,28 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
         branchNames: branchesToQuery,
         organizationId: event.organizationId,
         date: date,
+        onFirstPaint: (partial) {
+          // First paint: logs (+ local profile caches). May still be enriching.
+          for (final entry in partial.entries) {
+            final key = '${event.organizationId}_${entry.key}_$dateSuffix';
+            _perBranchAttendanceCache[key] = entry.value;
+            branchData[entry.key] = entry.value;
+          }
+          for (final b in event.favoriteBranches) {
+            branchData.putIfAbsent(b, () => []);
+          }
+          if (!isClosed) {
+            emit(AllBranchesAttendanceLoaded(
+              data: Map.from(branchData),
+              favoriteBranches: event.favoriteBranches,
+              loadingBranches: const {},
+              isEnriching: true,
+            ));
+          }
+        },
       );
 
-      // Save to per-branch cache & merge
+      // Save fully enriched result to per-branch cache & merge
       for (final entry in fetchedData.entries) {
         final key = '${event.organizationId}_${entry.key}_$dateSuffix';
         _perBranchAttendanceCache[key] = entry.value;
@@ -373,6 +396,7 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
         data: Map.from(branchData),
         favoriteBranches: event.favoriteBranches,
         loadingBranches: const {},
+        isEnriching: false,
       ));
     } catch (e) {
       // If we already showed cached data, keep it! Do not break the UI with error screen.
@@ -381,6 +405,7 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
           data: Map.from(branchData),
           favoriteBranches: event.favoriteBranches,
           loadingBranches: const {},
+          isEnriching: false,
         ));
       } else {
         emit(AllBranchesAttendanceError(

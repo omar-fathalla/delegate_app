@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
+import 'package:delegate_app/features/marketing/data/services/delegate_profile_cache.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 
 abstract class MarketingRemoteDataSource {
@@ -41,17 +44,26 @@ abstract class MarketingRemoteDataSource {
 
   /// Fetch today's attendance records for multiple branches in a single optimized query,
   /// enriched with delegate info (fullName, phoneNumber, personalPhotoURL).
+  ///
+  /// [onFirstPaint] is invoked once attendance logs (+ local profile caches) are ready,
+  /// before any network profile enrichment. The returned Future completes with the
+  /// fully enriched map (or the first-paint map if nothing was missing).
   Future<Map<String, List<Map<String, dynamic>>>> getTodayAttendanceForBranches({
     required List<String> branchNames,
     required String organizationId,
     DateTime? date,
+    void Function(Map<String, List<Map<String, dynamic>>> partial)? onFirstPaint,
   });
 }
 
 class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
   final FirebaseFirestore firestore;
+  final DelegateProfileCache? profileCache;
 
-  MarketingRemoteDataSourceImpl({required this.firestore});
+  MarketingRemoteDataSourceImpl({
+    required this.firestore,
+    this.profileCache,
+  });
 
   /// التطبيع الموحد لأسماء الفروع لمنع أي فقدان في السجلات بسبب الهمزات والمسافات
   static String normalizeBranchName(String name) {
@@ -316,6 +328,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
     required List<String> branchNames,
     required String organizationId,
     DateTime? date,
+    void Function(Map<String, List<Map<String, dynamic>>> partial)? onFirstPaint,
   }) async {
     if (branchNames.isEmpty) return {};
 
@@ -389,11 +402,6 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         todayDocs.addAll(snap.docs);
       }
 
-      // خريطة فرز الحضور حسب الفرع
-      final Map<String, List<Map<String, dynamic>>> result = {
-        for (final b in branchNames) b: [],
-      };
-
       // Map: branchName -> Map<delegateId, record>
       final Map<String, Map<String, Map<String, dynamic>>> checkInsByBranch = {
         for (final b in branchNames) b: {},
@@ -426,6 +434,10 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           final companyNameInLog = data['companyName'];
           final companyIdInLog = data['companyId'] ?? data['companyUID'];
           final phoneInLog = data['phoneNumber'] ?? data['phone'];
+          final photoInLog = data['personalPhotoURL'] ??
+              data['personalPhotoUrl'] ??
+              data['photoURL'] ??
+              data['imageUrl'];
 
           // Prefer denormalized checkout on the check-in doc (fix2).
           final stampedOut = data['checkOutTime'] is Timestamp
@@ -444,6 +456,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
               'companyIdInLog': companyIdInLog,
               'organizationIdInLog': orgIdInLog,
               'phoneInLog': phoneInLog,
+              'photoInLog': photoInLog,
               'checkOutTime': stampedOut,
             };
           } else {
@@ -456,6 +469,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
               if (companyIdInLog != null) existing['companyIdInLog'] = companyIdInLog;
               if (orgIdInLog != null) existing['organizationIdInLog'] = orgIdInLog;
               if (phoneInLog != null) existing['phoneInLog'] = phoneInLog;
+              if (photoInLog != null) existing['photoInLog'] = photoInLog;
               if (stampedOut != null) existing['checkOutTime'] = stampedOut;
             } else if (stampedOut != null && existing['checkOutTime'] == null) {
               existing['checkOutTime'] = stampedOut;
@@ -551,119 +565,185 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         }
       }
 
-      // ── Step 2: تحديد المنظمة وجلب بيانات وصور المناديب بالتوازي ──
+      // ── Step 2: first paint from log fields + local caches (session + persistent) ──
       final String defaultOrgId = queryOrgId;
-
-      final delegateLookup = <String, Map<String, dynamic>>{};
       final companyNameCache = <String, String>{};
 
-      if (allDelegateIds.isNotEmpty) {
-        final delegateIdsList = allDelegateIds.toList();
-        const batchSize = 25;
-        for (var i = 0; i < delegateIdsList.length; i += batchSize) {
-          final end = (i + batchSize > delegateIdsList.length)
-              ? delegateIdsList.length
-              : i + batchSize;
-          final batch = delegateIdsList.sublist(i, end);
-
-          await Future.wait(batch.map((delegateId) async {
-            try {
-              String? companyId;
-              String? orgId;
-
-              for (final branch in branchNames) {
-                final rec = checkInsByBranch[branch]?[delegateId];
-                if (rec != null) {
-                  final c = rec['companyIdInLog'] as String?;
-                  if (c != null && c.isNotEmpty) companyId = c;
-                  final o = rec['organizationIdInLog'] as String?;
-                  if (o != null && o.isNotEmpty) orgId = o;
-                  if (companyId != null && orgId != null) break;
-                }
-              }
-
-              final effectiveOrgId = (orgId != null && orgId.isNotEmpty)
-                  ? orgId
-                  : defaultOrgId;
-
-              // 1. المسار المباشر في الشركة
-              if (companyId != null && companyId.isNotEmpty && effectiveOrgId.isNotEmpty) {
-                final directDoc = await firestore
-                    .collection('organizations')
-                    .doc(effectiveOrgId)
-                    .collection('companies')
-                    .doc(companyId)
-                    .collection('delegates')
-                    .doc(delegateId)
-                    .get();
-
-                if (directDoc.exists && directDoc.data() != null) {
-                  final dData = Map<String, dynamic>.from(directDoc.data()!);
-                  dData['uid'] = directDoc.id;
-                  dData['companyUID'] = companyId;
-                  dData['organizationUID'] = effectiveOrgId;
-                  delegateLookup[delegateId] = dData;
-                  return;
-                }
-              }
-
-              // 2. البحث في مجموعة users
-              final userDoc = await firestore.collection('users').doc(delegateId).get();
-              if (userDoc.exists && userDoc.data() != null) {
-                final uData = userDoc.data()!;
-                final userCompId = uData['companyUID'] as String? ?? uData['companyId'] as String?;
-                final userOrgId = uData['organizationUID'] as String? ??
-                    uData['orgUID'] as String? ??
-                    effectiveOrgId;
-
-                if (userCompId != null && userCompId.isNotEmpty && userOrgId.isNotEmpty) {
-                  final directDoc = await firestore
-                      .collection('organizations')
-                      .doc(userOrgId)
-                      .collection('companies')
-                      .doc(userCompId)
-                      .collection('delegates')
-                      .doc(delegateId)
-                      .get();
-
-                  if (directDoc.exists && directDoc.data() != null) {
-                    final dData = Map<String, dynamic>.from(directDoc.data()!);
-                    dData['uid'] = directDoc.id;
-                    dData['companyUID'] = userCompId;
-                    dData['organizationUID'] = userOrgId;
-                    delegateLookup[delegateId] = dData;
-                    return;
-                  }
-                }
-                delegateLookup[delegateId] = {'uid': userDoc.id, ...uData};
-                return;
-              }
-
-              // 3. مجموعة delegates الجذرية
-              final rootDoc = await firestore.collection('delegates').doc(delegateId).get();
-              if (rootDoc.exists && rootDoc.data() != null) {
-                delegateLookup[delegateId] = {'uid': rootDoc.id, ...rootDoc.data()!};
-                return;
-              }
-            } catch (_) {}
-          }));
-        }
-
-        // جلب أسماء الشركات لكافة سجلات الحضور والمناديب بالتوازي
-        final allCompanyIdsToFetch = <String>{};
-        for (final branch in branchNames) {
-          for (final entry in checkInsByBranch[branch]!.values) {
-            final cid = entry['companyIdInLog'] as String?;
-            if (cid != null && cid.isNotEmpty) allCompanyIdsToFetch.add(cid);
-          }
-        }
-        for (final dData in delegateLookup.values) {
-          final cid = dData['companyUID'] as String?;
+      // Warm company name cache for ids present on logs (kept from fix2/3).
+      final allCompanyIdsToFetch = <String>{};
+      for (final branch in branchNames) {
+        for (final entry in checkInsByBranch[branch]!.values) {
+          final cid = entry['companyIdInLog'] as String?;
           if (cid != null && cid.isNotEmpty) allCompanyIdsToFetch.add(cid);
         }
+      }
 
-        await Future.wait(allCompanyIdsToFetch.map((compId) async {
-          if (companyNameCache.containsKey(compId)) return;
+      Map<String, List<Map<String, dynamic>>> buildBranchRecords({
+        required Map<String, Map<String, dynamic>> delegateLookup,
+        required bool enrichmentPending,
+      }) {
+        final out = <String, List<Map<String, dynamic>>>{
+          for (final b in branchNames) b: <Map<String, dynamic>>[],
+        };
+        for (final branch in branchNames) {
+          final recordsMap = checkInsByBranch[branch] ?? {};
+          final branchRecords = <Map<String, dynamic>>[];
+          for (final entry in recordsMap.entries) {
+            final delegateId = entry.key;
+            final rawCheckIn = entry.value;
+            final record = Map<String, dynamic>.from(rawCheckIn);
+            var delegateData = delegateLookup[delegateId];
+
+            final logName = (rawCheckIn['delegateNameInLog'] as String?)?.trim();
+            final logCompany = (rawCheckIn['companyNameInLog'] as String?)?.trim();
+            final logCompanyId = rawCheckIn['companyIdInLog'] as String?;
+            final logPhone = (rawCheckIn['phoneInLog'] as String?)?.trim();
+            final logPhoto = rawCheckIn['photoInLog'];
+
+            String? resolvedFullName;
+            if (delegateData != null) {
+              final fn = delegateData['fullName'] as String?;
+              final n = delegateData['name'] as String?;
+              final first = delegateData['firstName'] as String? ?? '';
+              final middle = delegateData['middleName'] as String? ?? '';
+              final last = delegateData['lastName'] as String? ?? '';
+              final combined =
+                  '$first $middle $last'.replaceAll(RegExp(r'\s+'), ' ').trim();
+              if (fn != null && fn.trim().isNotEmpty) {
+                resolvedFullName = fn.trim();
+              } else if (combined.isNotEmpty) {
+                resolvedFullName = combined;
+              } else if (n != null && n.trim().isNotEmpty) {
+                resolvedFullName = n.trim();
+              }
+            }
+            if ((resolvedFullName == null || resolvedFullName.isEmpty) &&
+                logName != null &&
+                logName.isNotEmpty) {
+              resolvedFullName = logName;
+            }
+
+            String resolvedCompanyName = '';
+            final profileCompany = (delegateData?['companyName'] as String?)?.trim();
+            if (profileCompany != null && profileCompany.isNotEmpty) {
+              resolvedCompanyName = profileCompany;
+            } else if (logCompanyId != null &&
+                (companyNameCache[logCompanyId]?.isNotEmpty ?? false)) {
+              resolvedCompanyName = companyNameCache[logCompanyId]!;
+            } else {
+              final profileCompanyUid = delegateData?['companyUID'] as String?;
+              if (profileCompanyUid != null &&
+                  (companyNameCache[profileCompanyUid]?.isNotEmpty ?? false)) {
+                resolvedCompanyName = companyNameCache[profileCompanyUid]!;
+              } else if (logCompany != null && logCompany.isNotEmpty) {
+                resolvedCompanyName = logCompany;
+              }
+            }
+
+            final photoUrl = _extractPersonalPhoto(delegateData) ??
+                (logPhoto is String && logPhoto.trim().isNotEmpty
+                    ? logPhoto.trim()
+                    : null) ??
+                _extractPersonalPhoto({
+                  'personalPhotoURL': logPhoto,
+                });
+
+            final effectiveRecordOrg = delegateData?['organizationUID'] ??
+                rawCheckIn['organizationIdInLog'] ??
+                defaultOrgId;
+
+            final profilePhone = (delegateData?['phoneNumber'] as String?)?.trim();
+            final phone = (profilePhone != null && profilePhone.isNotEmpty)
+                ? profilePhone
+                : (logPhone ?? '');
+
+            final hasName =
+                resolvedFullName != null && resolvedFullName.isNotEmpty;
+            // HARD: never show generic «مندوب» while enrichment may still fill a real name.
+            final displayName = hasName
+                ? resolvedFullName
+                : (enrichmentPending ? '' : 'مندوب');
+
+            delegateData ??= {
+              'uid': delegateId,
+              'fullName': displayName.isNotEmpty ? displayName : (logName ?? ''),
+              'phoneNumber': phone,
+              'companyName': resolvedCompanyName,
+              'companyUID': logCompanyId ?? '',
+              'organizationUID': effectiveRecordOrg,
+              'personalPhotoURL': photoUrl,
+              'status': 'Active',
+              'role': 'delegate',
+            };
+
+            record['fullName'] = displayName;
+            record['phoneNumber'] = phone;
+            record['companyName'] = resolvedCompanyName;
+            record['companyUID'] =
+                delegateData['companyUID'] ?? logCompanyId ?? '';
+            record['organizationId'] = effectiveRecordOrg;
+            record['imageUrl'] = photoUrl;
+            record['personalPhotoURL'] = photoUrl;
+            record['supervisorPhone'] =
+                delegateData['supervisorPhone'] ?? rawCheckIn['supervisorPhone'];
+            record['supervisorName'] =
+                delegateData['supervisorName'] ?? rawCheckIn['supervisorName'];
+            record['createdBy'] =
+                delegateData['createdBy'] ?? rawCheckIn['createdBy'];
+            record['delegateData'] = delegateData;
+            record['profileIncomplete'] = !hasName ||
+                phone.isEmpty ||
+                photoUrl == null ||
+                resolvedCompanyName.isEmpty;
+            branchRecords.add(record);
+          }
+
+          branchRecords.sort((a, b) {
+            final at = a['checkInTime'] as Timestamp?;
+            final bt = b['checkInTime'] as Timestamp?;
+            if (at == null && bt == null) return 0;
+            if (at == null) return 1;
+            if (bt == null) return -1;
+            return bt.compareTo(at);
+          });
+          out[branch] = branchRecords;
+        }
+        return out;
+      }
+
+      // Apply session + persistent profile cache before first paint.
+      final delegateLookup = <String, Map<String, dynamic>>{};
+      final localProfileCache = profileCache;
+      if (allDelegateIds.isNotEmpty && localProfileCache != null) {
+        final cached = localProfileCache.getMany(allDelegateIds);
+        for (final e in cached.entries) {
+          final p = e.value;
+          delegateLookup[e.key] = {
+            'uid': e.key,
+            'fullName': p.fullName,
+            'phoneNumber': p.phoneNumber,
+            'personalPhotoURL': p.personalPhotoURL,
+            'companyName': p.effectiveCompanyName,
+            'companyUID': p.companyUID ?? '',
+            'organizationUID': p.organizationUID ?? defaultOrgId,
+            'status': 'Active',
+            'role': 'delegate',
+            '_fromLocalCache': true,
+          };
+          if (p.companyUID != null &&
+              p.companyUID!.isNotEmpty &&
+              p.effectiveCompanyName.isNotEmpty) {
+            companyNameCache[p.companyUID!] = p.effectiveCompanyName;
+          }
+        }
+      }
+
+      // Fetch company names for ids not yet cached (parallel, cheap).
+      final companyIdsStillNeeded = allCompanyIdsToFetch
+          .where((id) => !companyNameCache.containsKey(id) || companyNameCache[id]!.isEmpty)
+          .toList();
+      if (companyIdsStillNeeded.isNotEmpty) {
+        await Future.wait(companyIdsStillNeeded.map((compId) async {
           try {
             final compDoc = await firestore
                 .collection('organizations')
@@ -683,96 +763,222 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         }));
       }
 
-      // ── Step 3: بناء القائمة النهائية لكل فرع ──
+      // Determine which delegates still need network profile enrichment.
+      bool needsNetwork(String delegateId, Map<String, dynamic> raw) {
+        final cached = delegateLookup[delegateId];
+        final logName = (raw['delegateNameInLog'] as String?)?.trim() ?? '';
+        final logPhone = (raw['phoneInLog'] as String?)?.trim() ?? '';
+        final logPhoto = raw['photoInLog'];
+        final hasName = (cached?['fullName'] as String?)?.trim().isNotEmpty == true ||
+            logName.isNotEmpty;
+        final hasPhone = (cached?['phoneNumber'] as String?)?.trim().isNotEmpty == true ||
+            logPhone.isNotEmpty;
+        final hasPhoto = _extractPersonalPhoto(cached) != null ||
+            (logPhoto is String && logPhoto.trim().isNotEmpty);
+        // Enrich if name/phone/photo missing. Company often filled via companyId cache.
+        return !hasName || !hasPhone || !hasPhoto;
+      }
+
+      final missingIds = <String>[];
       for (final branch in branchNames) {
-        final recordsMap = checkInsByBranch[branch] ?? {};
-        final branchRecords = <Map<String, dynamic>>[];
-
-        for (final entry in recordsMap.entries) {
-          final delegateId = entry.key;
-          final rawCheckIn = entry.value;
-          final record = Map<String, dynamic>.from(rawCheckIn);
-          var delegateData = delegateLookup[delegateId];
-
-          final logName = rawCheckIn['delegateNameInLog'] as String?;
-          final logCompany = rawCheckIn['companyNameInLog'] as String?;
-          final logCompanyId = rawCheckIn['companyIdInLog'] as String?;
-          final logPhone = rawCheckIn['phoneInLog'] as String?;
-
-          String? resolvedFullName;
-          if (delegateData != null) {
-            final fn = delegateData['fullName'] as String?;
-            final n = delegateData['name'] as String?;
-            final first = delegateData['firstName'] as String? ?? '';
-            final middle = delegateData['middleName'] as String? ?? '';
-            final last = delegateData['lastName'] as String? ?? '';
-            final combined = '$first $middle $last'.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-            if (fn != null && fn.trim().isNotEmpty) {
-              resolvedFullName = fn.trim();
-            } else if (combined.isNotEmpty) {
-              resolvedFullName = combined;
-            } else if (n != null && n.trim().isNotEmpty) {
-              resolvedFullName = n.trim();
-            }
+        for (final e in checkInsByBranch[branch]!.entries) {
+          if (needsNetwork(e.key, e.value) && !missingIds.contains(e.key)) {
+            missingIds.add(e.key);
           }
+        }
+      }
 
-          final resolvedCompanyName = delegateData?['companyName'] as String? ??
-              (logCompanyId != null ? companyNameCache[logCompanyId] : null) ??
-              (delegateData?['companyUID'] != null ? companyNameCache[delegateData!['companyUID']] : null) ??
-              logCompany ??
-              '';
+      final firstPaint = buildBranchRecords(
+        delegateLookup: delegateLookup,
+        enrichmentPending: missingIds.isNotEmpty,
+      );
+      // Deep-ish copy for callback so later mutations don't race the UI.
+      Map<String, List<Map<String, dynamic>>> copyResult(
+        Map<String, List<Map<String, dynamic>>> src,
+      ) {
+        return {
+          for (final e in src.entries)
+            e.key: e.value.map((r) => Map<String, dynamic>.from(r)).toList(),
+        };
+      }
 
-          // جلب الصورة الشخصية من كافة المسارات المحتملة بما فيها قائمة documents
-          final photoUrl = _extractPersonalPhoto(delegateData) ??
-              _extractPersonalPhoto(rawCheckIn);
+      onFirstPaint?.call(copyResult(firstPaint));
 
-          final effectiveRecordOrg = delegateData?['organizationUID'] ??
-              rawCheckIn['organizationIdInLog'] ??
-              defaultOrgId;
+      // ── Step 3: network enrich ONLY missing ids (parallel paths, no 3-serial) ──
+      if (missingIds.isNotEmpty) {
+        const batchSize = 25;
+        for (var i = 0; i < missingIds.length; i += batchSize) {
+          final end = (i + batchSize > missingIds.length)
+              ? missingIds.length
+              : i + batchSize;
+          final batch = missingIds.sublist(i, end);
 
-          delegateData ??= {
-            'uid': delegateId,
-            'fullName': (resolvedFullName != null && resolvedFullName.isNotEmpty)
-                ? resolvedFullName
-                : (logName != null && logName.isNotEmpty ? logName : 'مندوب'),
-            'phoneNumber': logPhone ?? '',
-            'companyName': resolvedCompanyName,
-            'companyUID': logCompanyId ?? '',
-            'organizationUID': effectiveRecordOrg,
-            'personalPhotoURL': photoUrl,
-            'status': 'Active',
-            'role': 'delegate',
-          };
+          await Future.wait(batch.map((delegateId) async {
+            try {
+              String? companyId;
+              String? orgId;
+              for (final branch in branchNames) {
+                final rec = checkInsByBranch[branch]?[delegateId];
+                if (rec != null) {
+                  final c = rec['companyIdInLog'] as String?;
+                  if (c != null && c.isNotEmpty) companyId = c;
+                  final o = rec['organizationIdInLog'] as String?;
+                  if (o != null && o.isNotEmpty) orgId = o;
+                  if (companyId != null && orgId != null) break;
+                }
+              }
+              final effectiveOrgId =
+                  (orgId != null && orgId.isNotEmpty) ? orgId : defaultOrgId;
 
-          record['fullName'] = (resolvedFullName != null && resolvedFullName.isNotEmpty)
-              ? resolvedFullName
-              : (delegateData['fullName'] ?? (logName != null && logName.isNotEmpty ? logName : 'مندوب'));
-          record['phoneNumber'] = delegateData['phoneNumber'] ?? logPhone ?? '';
-          record['companyName'] = resolvedCompanyName;
-          record['companyUID'] = delegateData['companyUID'] ?? logCompanyId ?? '';
-          record['organizationId'] = effectiveRecordOrg;
-          record['imageUrl'] = photoUrl;
-          record['personalPhotoURL'] = photoUrl;
-          record['supervisorPhone'] = delegateData['supervisorPhone'] ?? rawCheckIn['supervisorPhone'];
-          record['supervisorName'] = delegateData['supervisorName'] ?? rawCheckIn['supervisorName'];
-          record['createdBy'] = delegateData['createdBy'] ?? rawCheckIn['createdBy'];
-          record['delegateData'] = delegateData;
-          branchRecords.add(record);
+              Map<String, dynamic>? resolved;
+
+              // Fire candidate paths in PARALLEL (not serial 1→2→3).
+              final futures = <Future<DocumentSnapshot<Map<String, dynamic>>>>[];
+              DocumentReference<Map<String, dynamic>>? companyRef;
+              if (companyId != null &&
+                  companyId.isNotEmpty &&
+                  effectiveOrgId.isNotEmpty) {
+                companyRef = firestore
+                    .collection('organizations')
+                    .doc(effectiveOrgId)
+                    .collection('companies')
+                    .doc(companyId)
+                    .collection('delegates')
+                    .doc(delegateId);
+                futures.add(companyRef.get());
+              }
+              futures.add(firestore.collection('users').doc(delegateId).get());
+              futures.add(
+                firestore.collection('delegates').doc(delegateId).get(),
+              );
+
+              final snaps = await Future.wait(futures);
+              DocumentSnapshot<Map<String, dynamic>>? companySnap;
+              DocumentSnapshot<Map<String, dynamic>>? userSnap;
+              DocumentSnapshot<Map<String, dynamic>>? rootSnap;
+              var idx = 0;
+              if (companyRef != null) {
+                companySnap = snaps[idx++];
+              }
+              userSnap = snaps[idx++];
+              rootSnap = snaps[idx++];
+
+              if (companySnap != null &&
+                  companySnap.exists &&
+                  companySnap.data() != null) {
+                final dData = Map<String, dynamic>.from(companySnap.data()!);
+                dData['uid'] = companySnap.id;
+                dData['companyUID'] = companyId;
+                dData['organizationUID'] = effectiveOrgId;
+                resolved = dData;
+              } else if (userSnap.exists && userSnap.data() != null) {
+                final uData = Map<String, dynamic>.from(userSnap.data()!);
+                final userCompId = uData['companyUID'] as String? ??
+                    uData['companyId'] as String?;
+                final userOrgId = uData['organizationUID'] as String? ??
+                    uData['orgUID'] as String? ??
+                    effectiveOrgId;
+                // If users doc points at a company path we have not tried, fetch once.
+                if (userCompId != null &&
+                    userCompId.isNotEmpty &&
+                    userOrgId.isNotEmpty &&
+                    userCompId != companyId) {
+                  try {
+                    final nested = await firestore
+                        .collection('organizations')
+                        .doc(userOrgId)
+                        .collection('companies')
+                        .doc(userCompId)
+                        .collection('delegates')
+                        .doc(delegateId)
+                        .get();
+                    if (nested.exists && nested.data() != null) {
+                      final dData = Map<String, dynamic>.from(nested.data()!);
+                      dData['uid'] = nested.id;
+                      dData['companyUID'] = userCompId;
+                      dData['organizationUID'] = userOrgId;
+                      resolved = dData;
+                    }
+                  } catch (_) {}
+                }
+                resolved ??= {'uid': userSnap.id, ...uData};
+              } else if (rootSnap.exists && rootSnap.data() != null) {
+                resolved = {'uid': rootSnap.id, ...rootSnap.data()!};
+              }
+
+              if (resolved != null) {
+                delegateLookup[delegateId] = resolved;
+                // Persist immutable display fields (+ company with TTL).
+                final fn = resolved['fullName'] as String? ??
+                    resolved['name'] as String?;
+                final first = resolved['firstName'] as String? ?? '';
+                final middle = resolved['middleName'] as String? ?? '';
+                final last = resolved['lastName'] as String? ?? '';
+                final combined =
+                    '$first $middle $last'.replaceAll(RegExp(r'\s+'), ' ').trim();
+                final name = (fn != null && fn.trim().isNotEmpty)
+                    ? fn.trim()
+                    : combined;
+                final phone = (resolved['phoneNumber'] as String?) ??
+                    (resolved['phone'] as String?) ??
+                    '';
+                final photo = _extractPersonalPhoto(resolved);
+                final cName = (resolved['companyName'] as String?) ??
+                    companyNameCache[resolved['companyUID']] ??
+                    '';
+                profileCache?.putFromMaps(
+                  delegateId: delegateId,
+                  fullName: name,
+                  phoneNumber: phone,
+                  personalPhotoURL: photo,
+                  companyName: cName,
+                  companyUID: resolved['companyUID'] as String? ?? companyId,
+                  organizationUID:
+                      resolved['organizationUID'] as String? ?? effectiveOrgId,
+                );
+              }
+            } catch (_) {}
+          }));
         }
 
-        // ترتيب: الأحدث check_in أولاً
-        branchRecords.sort((a, b) {
-          final at = a['checkInTime'] as Timestamp?;
-          final bt = b['checkInTime'] as Timestamp?;
-          if (at == null && bt == null) return 0;
-          if (at == null) return 1;
-          if (bt == null) return -1;
-          return bt.compareTo(at);
-        });
+        // Refresh company names for any newly discovered company UIDs.
+        final extraCompanyIds = <String>{};
+        for (final dData in delegateLookup.values) {
+          final cid = dData['companyUID'] as String?;
+          if (cid != null &&
+              cid.isNotEmpty &&
+              (companyNameCache[cid] == null || companyNameCache[cid]!.isEmpty)) {
+            extraCompanyIds.add(cid);
+          }
+        }
+        if (extraCompanyIds.isNotEmpty) {
+          await Future.wait(extraCompanyIds.map((compId) async {
+            try {
+              final compDoc = await firestore
+                  .collection('organizations')
+                  .doc(defaultOrgId)
+                  .collection('companies')
+                  .doc(compId)
+                  .get();
+              if (compDoc.exists && compDoc.data() != null) {
+                companyNameCache[compId] =
+                    compDoc.data()!['name'] as String? ?? '';
+              } else {
+                companyNameCache[compId] = '';
+              }
+            } catch (_) {
+              companyNameCache[compId] = '';
+            }
+          }));
+        }
 
-        result[branch] = branchRecords;
+        unawaited(profileCache?.persist() ?? Future.value());
       }
+
+      final result = buildBranchRecords(
+        delegateLookup: delegateLookup,
+        enrichmentPending: false,
+      );
 
       return result;
     } on FirebaseException catch (e) {

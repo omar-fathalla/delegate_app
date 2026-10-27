@@ -106,6 +106,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         long: event.long,
         branchName: event.branchName,
         currentHistory: currentHistory,
+        delegateName: event.delegateName,
+        phoneNumber: event.phoneNumber,
+        companyName: event.companyName,
+        personalPhotoURL: event.personalPhotoURL,
       ),
     );
     result.fold(
@@ -308,6 +312,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
             long: event.long,
             branchName: event.branchName,
             currentHistory: currentHistory,
+            delegateName: event.delegateName,
+            phoneNumber: event.phoneNumber,
+            companyName: event.companyName,
+            personalPhotoURL: event.personalPhotoURL,
           ),
         );
 

@@ -51,6 +51,32 @@ void main() {
     expect(doc.data()['type'], 'check_in');
   });
 
+  test('checkIn denormalizes delegateName phone companyName personalPhotoURL', () async {
+    final result = await dataSource.checkIn(
+      'user_denorm',
+      10.0,
+      20.0,
+      companyId: 'company1',
+      organizationId: 'org1',
+      deviceInfo: 'device1',
+      branchName: 'branchA',
+      delegateName: 'أحمد محمد',
+      phoneNumber: '01012345678',
+      companyName: 'شركة الاختبار',
+      personalPhotoURL: 'https://example.com/photo.jpg',
+    );
+    expect(result.userId, 'user_denorm');
+    final doc = await fakeFirestore
+        .collection(kAttendanceCollection)
+        .doc(result.id)
+        .get();
+    expect(doc.data()!['delegateName'], 'أحمد محمد');
+    expect(doc.data()!['phoneNumber'], '01012345678');
+    expect(doc.data()!['companyName'], 'شركة الاختبار');
+    expect(doc.data()!['personalPhotoURL'], 'https://example.com/photo.jpg');
+  });
+
+
   test('checkOut should create a check-out log and stamp checkOutTime on check-in', () async {
     // 1. Arrange - perform a check-in first
     final checkInResult = await dataSource.checkIn(

@@ -773,6 +773,11 @@ class _HRDelegateAttendanceDetailScreenState
         .collection(kAttendanceCollection)
         .doc(session.id);
 
+    final String delegateDisplayName = widget.delegate.fullName.trim();
+    final String delegatePhone = widget.delegate.phoneNumber.trim();
+    final String delegateCompany = widget.delegate.companyName.trim();
+    final String? delegatePhoto = widget.delegate.personalPhotoUrl;
+
     batch.update(checkInRef, {
       'timestamp': Timestamp.fromDate(newInTime),
       'isManuallyAdjusted': true,
@@ -783,6 +788,12 @@ class _HRDelegateAttendanceDetailScreenState
       // Denormalize checkout onto check-in (fix2) when HR sets/adjusts out time.
       if (hasCheckOut && newOutTime != null) 'checkOutTime': Timestamp.fromDate(newOutTime),
       if (!hasCheckOut) 'checkOutTime': FieldValue.delete(),
+      // Fix3: backfill display fields from HR-known delegate profile when possible.
+      if (delegateDisplayName.isNotEmpty) 'delegateName': delegateDisplayName,
+      if (delegatePhone.isNotEmpty) 'phoneNumber': delegatePhone,
+      if (delegateCompany.isNotEmpty) 'companyName': delegateCompany,
+      if (delegatePhoto != null && delegatePhoto.trim().isNotEmpty)
+        'personalPhotoURL': delegatePhoto.trim(),
     });
 
     // 2. Handle Check-Out Doc in attendance_logs

@@ -19,6 +19,10 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? delegateName,
+    String? phoneNumber,
+    String? companyName,
+    String? personalPhotoURL,
   })?
   checkInStub;
   Future<AttendanceModel> Function(String, String, double, double)?
@@ -54,6 +58,10 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? delegateName,
+    String? phoneNumber,
+    String? companyName,
+    String? personalPhotoURL,
   }) {
     if (checkInStub != null) {
       return checkInStub!(
@@ -64,6 +72,10 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
         organizationId: organizationId,
         deviceInfo: deviceInfo,
         branchName: branchName,
+        delegateName: delegateName,
+        phoneNumber: phoneNumber,
+        companyName: companyName,
+        personalPhotoURL: personalPhotoURL,
       );
     }
     throw UnimplementedError();

@@ -66,6 +66,10 @@ class CheckIn implements UseCase<Attendance, CheckInParams> {
       organizationId: params.organizationId,
       deviceInfo: params.deviceInfo,
       branchName: params.branchName,
+      delegateName: params.delegateName,
+      phoneNumber: params.phoneNumber,
+      companyName: params.companyName,
+      personalPhotoURL: params.personalPhotoURL,
     );
   }
 }
@@ -79,6 +83,10 @@ class CheckInParams extends Equatable {
   final double long;
   final String? branchName;
   final List<Attendance>? currentHistory;
+  final String? delegateName;
+  final String? phoneNumber;
+  final String? companyName;
+  final String? personalPhotoURL;
 
   const CheckInParams({
     required this.userId,
@@ -89,6 +97,10 @@ class CheckInParams extends Equatable {
     required this.long,
     this.branchName,
     this.currentHistory,
+    this.delegateName,
+    this.phoneNumber,
+    this.companyName,
+    this.personalPhotoURL,
   });
 
   @override
@@ -101,5 +113,9 @@ class CheckInParams extends Equatable {
     long,
     branchName,
     currentHistory,
+    delegateName,
+    phoneNumber,
+    companyName,
+    personalPhotoURL,
   ];
 }

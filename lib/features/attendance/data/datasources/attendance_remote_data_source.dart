@@ -22,6 +22,10 @@ abstract class AttendanceRemoteDataSource {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? delegateName,
+    String? phoneNumber,
+    String? companyName,
+    String? personalPhotoURL,
   });
   Future<AttendanceModel> checkOut(
     String attendanceId,
@@ -101,6 +105,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? delegateName,
+    String? phoneNumber,
+    String? companyName,
+    String? personalPhotoURL,
   }) async {
     try {
       // Guard against duplicate active check-in in Firestore
@@ -140,8 +148,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         debugPrint('Active check-in verification warning: $e');
       }
 
-      final docRef = await _attendanceCollection(organizationId)
-          .add({
+      final Map<String, dynamic> checkInPayload = {
             'delegateId': userId,
             'userId': userId,
             'companyId': companyId,
@@ -151,7 +158,27 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             'location': {'latitude': lat, 'longitude': long},
             'deviceInfo': deviceInfo,
             'branchName': branchName,
-          })
+          };
+      // Fix3: denormalize display fields so marketing cards skip N+1 profile reads.
+      final trimmedName = delegateName?.trim();
+      if (trimmedName != null && trimmedName.isNotEmpty) {
+        checkInPayload['delegateName'] = trimmedName;
+      }
+      final trimmedPhone = phoneNumber?.trim();
+      if (trimmedPhone != null && trimmedPhone.isNotEmpty) {
+        checkInPayload['phoneNumber'] = trimmedPhone;
+      }
+      final trimmedCompany = companyName?.trim();
+      if (trimmedCompany != null && trimmedCompany.isNotEmpty) {
+        checkInPayload['companyName'] = trimmedCompany;
+      }
+      final trimmedPhoto = personalPhotoURL?.trim();
+      if (trimmedPhoto != null && trimmedPhoto.isNotEmpty) {
+        checkInPayload['personalPhotoURL'] = trimmedPhoto;
+      }
+
+      final docRef = await _attendanceCollection(organizationId)
+          .add(checkInPayload)
           .timeout(const Duration(seconds: 15));
 
       DateTime currentTime;
@@ -830,6 +857,18 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         }
         if (action['relatedCheckInId'] != null) {
           data['relatedCheckInId'] = action['relatedCheckInId'];
+        }
+        // Fix3: pass through denormalized display fields when queued offline.
+        for (final key in [
+          'delegateName',
+          'phoneNumber',
+          'companyName',
+          'personalPhotoURL',
+        ]) {
+          final v = action[key];
+          if (v is String && v.trim().isNotEmpty) {
+            data[key] = v.trim();
+          }
         }
 
         batch.set(newDocRef, data);

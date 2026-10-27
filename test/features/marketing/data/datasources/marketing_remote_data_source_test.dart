@@ -3,6 +3,8 @@ import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/features/marketing/data/services/delegate_profile_cache.dart';
 
 void main() {
   group('MarketingRemoteDataSourceImpl.normalizeBranchName', () {
@@ -96,9 +98,15 @@ void main() {
       });
     }
 
-    setUp(() {
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      DelegateProfileCache.clearSession();
       fakeFirestore = FakeFirebaseFirestore();
-      dataSource = MarketingRemoteDataSourceImpl(firestore: fakeFirestore);
+      dataSource = MarketingRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        profileCache: DelegateProfileCache(prefs: prefs),
+      );
     });
 
     test('returns only today check-ins for the org and ignores history + other orgs',
@@ -217,5 +225,122 @@ void main() {
       expect(result[branch]!.first['delegateId'], 'd4');
       expect(result[branch]!.first['checkOutTime'], isNotNull);
     });
+
+    test('first paint from denormalized log fields needs no profile get', () async {
+      final today = dayStart();
+      // No seedDelegate — only log fields
+      await fakeFirestore.collection(kAttendanceCollection).doc('denorm1').set({
+        'type': 'check_in',
+        'branchName': branch,
+        'delegateId': 'd_denorm',
+        'timestamp': Timestamp.fromDate(today.add(const Duration(hours: 9))),
+        'organizationId': orgId,
+        'companyId': companyId,
+        'companyName': 'Denorm Co',
+        'delegateName': 'Denorm Name',
+        'phoneNumber': '01111111111',
+        'personalPhotoURL': 'https://example.com/p.jpg',
+      });
+      await fakeFirestore
+          .collection('organizations')
+          .doc(orgId)
+          .collection('companies')
+          .doc(companyId)
+          .set({'name': 'Denorm Co'});
+
+      Map<String, List<Map<String, dynamic>>>? firstPaint;
+      final result = await dataSource.getTodayAttendanceForBranches(
+        branchNames: [branch],
+        organizationId: orgId,
+        date: today,
+        onFirstPaint: (p) => firstPaint = p,
+      );
+
+      expect(firstPaint, isNotNull);
+      expect(firstPaint![branch]!.first['fullName'], 'Denorm Name');
+      expect(firstPaint![branch]!.first['phoneNumber'], '01111111111');
+      expect(firstPaint![branch]!.first['companyName'], 'Denorm Co');
+      expect(firstPaint![branch]!.first['personalPhotoURL'], 'https://example.com/p.jpg');
+      expect(result[branch]!.first['fullName'], 'Denorm Name');
+    });
+
+    test('legacy log without denorm enriches from profile and never shows مندوب while pending', () async {
+      final today = dayStart();
+      await seedDelegate('d_legacy');
+      await fakeFirestore.collection(kAttendanceCollection).doc('legacy1').set({
+        'type': 'check_in',
+        'branchName': branch,
+        'delegateId': 'd_legacy',
+        'timestamp': Timestamp.fromDate(today.add(const Duration(hours: 9))),
+        'organizationId': orgId,
+        'companyId': companyId,
+        // no delegateName / phone / photo
+      });
+
+      Map<String, List<Map<String, dynamic>>>? firstPaint;
+      final result = await dataSource.getTodayAttendanceForBranches(
+        branchNames: [branch],
+        organizationId: orgId,
+        date: today,
+        onFirstPaint: (p) => firstPaint = p,
+      );
+
+      expect(firstPaint, isNotNull);
+      // While enriching pending, empty name — not the generic مندوب
+      expect(firstPaint![branch]!.first['fullName'], isNot(equals('مندوب')));
+      expect(result[branch]!.first['fullName'], 'Delegate d_legacy');
+      expect(result[branch]!.first['phoneNumber'], '01000000000');
+    });
+
+    test('persistent profile cache fills first paint for legacy docs', () async {
+      final today = dayStart();
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final cache = DelegateProfileCache(prefs: prefs);
+      cache.putFromMaps(
+        delegateId: 'd_cached',
+        fullName: 'Cached Name',
+        phoneNumber: '01222222222',
+        personalPhotoURL: 'https://example.com/c.jpg',
+        companyName: 'Cached Co',
+        companyUID: companyId,
+        organizationUID: orgId,
+      );
+      await cache.persist();
+      DelegateProfileCache.clearSession();
+
+      dataSource = MarketingRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        profileCache: DelegateProfileCache(prefs: prefs),
+      );
+
+      await fakeFirestore.collection(kAttendanceCollection).doc('cached1').set({
+        'type': 'check_in',
+        'branchName': branch,
+        'delegateId': 'd_cached',
+        'timestamp': Timestamp.fromDate(today.add(const Duration(hours: 9))),
+        'organizationId': orgId,
+        'companyId': companyId,
+      });
+      await fakeFirestore
+          .collection('organizations')
+          .doc(orgId)
+          .collection('companies')
+          .doc(companyId)
+          .set({'name': 'Test Co'});
+
+      Map<String, List<Map<String, dynamic>>>? firstPaint;
+      await dataSource.getTodayAttendanceForBranches(
+        branchNames: [branch],
+        organizationId: orgId,
+        date: today,
+        onFirstPaint: (p) => firstPaint = p,
+      );
+
+      expect(firstPaint![branch]!.first['fullName'], 'Cached Name');
+      expect(firstPaint![branch]!.first['phoneNumber'], '01222222222');
+      expect(firstPaint![branch]!.first['personalPhotoURL'], 'https://example.com/c.jpg');
+    });
+
   });
 }

@@ -84,6 +84,10 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? delegateName,
+    String? phoneNumber,
+    String? companyName,
+    String? personalPhotoURL,
   }) async {
     try {
       if (!await _hasConnection()) {
@@ -110,6 +114,10 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         organizationId: organizationId,
         deviceInfo: deviceInfo,
         branchName: branchName,
+        delegateName: delegateName,
+        phoneNumber: phoneNumber,
+        companyName: companyName,
+        personalPhotoURL: personalPhotoURL,
       );
       // Always cache attendance after successful remote write
       await localDataSource.cacheAttendance(result, organizationId, userId);

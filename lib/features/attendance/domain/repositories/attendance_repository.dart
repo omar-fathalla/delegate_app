@@ -12,6 +12,10 @@ abstract class AttendanceRepository {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? delegateName,
+    String? phoneNumber,
+    String? companyName,
+    String? personalPhotoURL,
   });
   Future<Either<Failure, Attendance>> checkOut(
     String attendanceId,

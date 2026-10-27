@@ -2481,6 +2481,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         lat: position.latitude,
         long: position.longitude,
         branchName: branchName,
+        delegateName: widget.delegate.fullName.isNotEmpty
+            ? widget.delegate.fullName
+            : null,
+        phoneNumber: widget.delegate.phoneNumber.isNotEmpty
+            ? widget.delegate.phoneNumber
+            : null,
+        companyName: widget.delegate.companyName.isNotEmpty
+            ? widget.delegate.companyName
+            : null,
+        personalPhotoURL: widget.delegate.personalPhotoUrl,
       ),
     );
   }
@@ -2650,6 +2660,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     lat: position.latitude,
                     long: position.longitude,
                     branchName: newBranch,
+                    delegateName: widget.delegate.fullName.isNotEmpty
+                        ? widget.delegate.fullName
+                        : null,
+                    phoneNumber: widget.delegate.phoneNumber.isNotEmpty
+                        ? widget.delegate.phoneNumber
+                        : null,
+                    companyName: widget.delegate.companyName.isNotEmpty
+                        ? widget.delegate.companyName
+                        : null,
+                    personalPhotoURL: widget.delegate.personalPhotoUrl,
                   ),
                 );
               },
@@ -2696,6 +2716,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     lat: position.latitude,
                     long: position.longitude,
                     branchName: newBranch,
+                    delegateName: widget.delegate.fullName.isNotEmpty
+                        ? widget.delegate.fullName
+                        : null,
+                    phoneNumber: widget.delegate.phoneNumber.isNotEmpty
+                        ? widget.delegate.phoneNumber
+                        : null,
+                    companyName: widget.delegate.companyName.isNotEmpty
+                        ? widget.delegate.companyName
+                        : null,
+                    personalPhotoURL: widget.delegate.personalPhotoUrl,
                   ),
                 );
               },

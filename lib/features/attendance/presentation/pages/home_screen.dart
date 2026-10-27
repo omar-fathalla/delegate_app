@@ -122,6 +122,16 @@ class _HomeScreenState extends State<HomeScreen> {
                               lat: position.latitude,
                               long: position.longitude,
                               branchName: 'الفرع الرئيسي',
+                              delegateName: widget.delegate.fullName.isNotEmpty
+                                  ? widget.delegate.fullName
+                                  : null,
+                              phoneNumber: widget.delegate.phoneNumber.isNotEmpty
+                                  ? widget.delegate.phoneNumber
+                                  : null,
+                              companyName: widget.delegate.companyName.isNotEmpty
+                                  ? widget.delegate.companyName
+                                  : null,
+                              personalPhotoURL: widget.delegate.personalPhotoUrl,
                             ),
                           );
                         }

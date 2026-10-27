@@ -15,6 +15,10 @@ class MockAttendanceRepository implements AttendanceRepository {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? delegateName,
+    String? phoneNumber,
+    String? companyName,
+    String? personalPhotoURL,
   })?
   checkInStub;
 
@@ -27,6 +31,10 @@ class MockAttendanceRepository implements AttendanceRepository {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? delegateName,
+    String? phoneNumber,
+    String? companyName,
+    String? personalPhotoURL,
   }) async {
     if (checkInStub != null) {
       return checkInStub!(
@@ -37,6 +45,10 @@ class MockAttendanceRepository implements AttendanceRepository {
         organizationId: organizationId,
         deviceInfo: deviceInfo,
         branchName: branchName,
+        delegateName: delegateName,
+        phoneNumber: phoneNumber,
+        companyName: companyName,
+        personalPhotoURL: personalPhotoURL,
       );
     }
     throw UnimplementedError();
@@ -137,6 +149,10 @@ void main() {
           required organizationId,
           required deviceInfo,
           branchName,
+          delegateName,
+          phoneNumber,
+          companyName,
+          personalPhotoURL,
         }) async {
           if (userId == tUserId &&
               lat == tLat &&
@@ -179,6 +195,10 @@ void main() {
           required organizationId,
           required deviceInfo,
           branchName,
+          delegateName,
+          phoneNumber,
+          companyName,
+          personalPhotoURL,
         }) async {
           return const Left(tFailure);
         };

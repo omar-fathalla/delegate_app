@@ -15,6 +15,10 @@ class CheckInRequested extends AttendanceEvent {
   final double lat;
   final double long;
   final String? branchName;
+  final String? delegateName;
+  final String? phoneNumber;
+  final String? companyName;
+  final String? personalPhotoURL;
 
   const CheckInRequested({
     required this.userId,
@@ -24,6 +28,10 @@ class CheckInRequested extends AttendanceEvent {
     required this.lat,
     required this.long,
     this.branchName,
+    this.delegateName,
+    this.phoneNumber,
+    this.companyName,
+    this.personalPhotoURL,
   });
 
   @override
@@ -35,6 +43,10 @@ class CheckInRequested extends AttendanceEvent {
     lat,
     long,
     branchName,
+    delegateName,
+    phoneNumber,
+    companyName,
+    personalPhotoURL,
   ];
 }
 
@@ -114,6 +126,10 @@ class CheckOutAndCheckInRequested extends AttendanceEvent {
   final double lat;
   final double long;
   final String? branchName;
+  final String? delegateName;
+  final String? phoneNumber;
+  final String? companyName;
+  final String? personalPhotoURL;
 
   const CheckOutAndCheckInRequested({
     required this.oldAttendanceId,
@@ -124,6 +140,10 @@ class CheckOutAndCheckInRequested extends AttendanceEvent {
     required this.lat,
     required this.long,
     this.branchName,
+    this.delegateName,
+    this.phoneNumber,
+    this.companyName,
+    this.personalPhotoURL,
   });
 
   @override
@@ -136,5 +156,9 @@ class CheckOutAndCheckInRequested extends AttendanceEvent {
     lat,
     long,
     branchName,
+    delegateName,
+    phoneNumber,
+    companyName,
+    personalPhotoURL,
   ];
 }

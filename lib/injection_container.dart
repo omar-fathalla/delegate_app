@@ -40,6 +40,7 @@ import 'package:delegate_app/features/attendance/data/datasources/attendance_rem
 import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
 import 'package:delegate_app/features/marketing/data/repositories/marketing_repository_impl.dart';
 import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
+import 'package:delegate_app/features/marketing/data/services/delegate_profile_cache.dart';
 import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
 import 'package:delegate_app/features/marketing/domain/repositories/marketing_repository.dart';
 import 'package:delegate_app/features/marketing/domain/usecases/get_marketing_companies.dart';
@@ -505,6 +506,9 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(
     () => FloorVerificationService(prefs: sl(), firestore: sl()),
   );
+  sl.registerLazySingleton(
+    () => DelegateProfileCache(prefs: sl()),
+  );
   sl.registerFactory(
     () => MarketingBloc(
       getCompanies: sl(),
@@ -519,7 +523,10 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
     () => MarketingRepositoryImpl(remoteDataSource: sl()),
   );
   sl.registerLazySingleton<MarketingRemoteDataSource>(
-    () => MarketingRemoteDataSourceImpl(firestore: sl()),
+    () => MarketingRemoteDataSourceImpl(
+      firestore: sl(),
+      profileCache: sl(),
+    ),
   );
 
   // ! Features - Marketing Search

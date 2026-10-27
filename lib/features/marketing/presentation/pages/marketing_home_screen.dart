@@ -108,6 +108,18 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
         branchNames: _favoriteBranches,
         organizationId: orgId,
         date: today,
+        onFirstPaint: (partial) {
+          final early = <Map<String, dynamic>>[];
+          for (final list in partial.values) {
+            early.addAll(list);
+          }
+          if (mounted) {
+            setState(() {
+              _todayRecords = early;
+              _isLoadingAttendance = false;
+            });
+          }
+        },
       );
 
       final allRecs = <Map<String, dynamic>>[];

@@ -14,6 +14,8 @@ class MockGetMarketingDelegates extends Mock implements GetMarketingDelegates {}
 class MockMarketingRemoteDataSource extends Mock implements MarketingRemoteDataSource {}
 class MockBranchPreferenceService extends Mock implements BranchPreferenceService {}
 
+void _dummyOnFirstPaint(Map<String, List<Map<String, dynamic>>> _) {}
+
 void main() {
   late MarketingBloc bloc;
   late MockGetMarketingCompanies mockGetCompanies;
@@ -23,6 +25,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(GetMarketingDelegatesParams(organizationUID: 'test'));
+    registerFallbackValue(_dummyOnFirstPaint);
   });
 
   setUp(() {
@@ -110,10 +113,11 @@ void main() {
       'should emit [Loading, Loaded] when no cache exists and fetch succeeds',
       build: () {
         when(() => mockRemoteDataSource.getTodayAttendanceForBranches(
-          branchNames: any(named: 'branchNames'),
-          organizationId: any(named: 'organizationId'),
-          date: any(named: 'date'),
-        )).thenAnswer((_) async => tAttendanceData);
+        branchNames: any(named: 'branchNames'),
+        organizationId: any(named: 'organizationId'),
+        date: any(named: 'date'),
+        onFirstPaint: any(named: 'onFirstPaint'),
+      )).thenAnswer((_) async => tAttendanceData);
         return bloc;
       },
       act: (bloc) => bloc.add(LoadAllFavoriteBranchesAttendance(
@@ -136,6 +140,7 @@ void main() {
         branchNames: any(named: 'branchNames'),
         organizationId: any(named: 'organizationId'),
         date: any(named: 'date'),
+        onFirstPaint: any(named: 'onFirstPaint'),
       )).thenAnswer((_) async => tAttendanceData);
 
       // 1. Initial fetch populates cache
@@ -167,6 +172,7 @@ void main() {
         branchNames: any(named: 'branchNames'),
         organizationId: any(named: 'organizationId'),
         date: any(named: 'date'),
+        onFirstPaint: any(named: 'onFirstPaint'),
       )).thenAnswer((_) async => tUpdatedAttendanceData);
 
       // SWR: Triggering load when cache is present
@@ -201,6 +207,7 @@ void main() {
         branchNames: any(named: 'branchNames'),
         organizationId: any(named: 'organizationId'),
         date: any(named: 'date'),
+        onFirstPaint: any(named: 'onFirstPaint'),
       )).thenAnswer((_) async => tAttendanceData);
 
       // Populate cache
@@ -226,6 +233,7 @@ void main() {
         branchNames: any(named: 'branchNames'),
         organizationId: any(named: 'organizationId'),
         date: any(named: 'date'),
+        onFirstPaint: any(named: 'onFirstPaint'),
       )).thenThrow(Exception('Network timeout'));
 
       bloc.add(LoadAllFavoriteBranchesAttendance(

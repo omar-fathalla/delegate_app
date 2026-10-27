@@ -139,11 +139,14 @@ class AllBranchesAttendanceLoaded extends MarketingState {
   final Map<String, List<Map<String, dynamic>>> data;
   final List<String> favoriteBranches;
   final Set<String> loadingBranches;
+  /// True while profile enrichment is still in flight after first paint.
+  final bool isEnriching;
 
   const AllBranchesAttendanceLoaded({
     required this.data,
     required this.favoriteBranches,
     this.loadingBranches = const {},
+    this.isEnriching = false,
   });
 
   bool isBranchLoading(String branch) => loadingBranches.contains(branch);
@@ -152,11 +155,13 @@ class AllBranchesAttendanceLoaded extends MarketingState {
     Map<String, List<Map<String, dynamic>>>? data,
     List<String>? favoriteBranches,
     Set<String>? loadingBranches,
+    bool? isEnriching,
   }) {
     return AllBranchesAttendanceLoaded(
       data: data ?? this.data,
       favoriteBranches: favoriteBranches ?? this.favoriteBranches,
       loadingBranches: loadingBranches ?? this.loadingBranches,
+      isEnriching: isEnriching ?? this.isEnriching,
     );
   }
 
@@ -166,17 +171,19 @@ class AllBranchesAttendanceLoaded extends MarketingState {
     return other is AllBranchesAttendanceLoaded &&
         const DeepCollectionEquality().equals(data, other.data) &&
         const ListEquality().equals(favoriteBranches, other.favoriteBranches) &&
-        const SetEquality().equals(loadingBranches, other.loadingBranches);
+        const SetEquality().equals(loadingBranches, other.loadingBranches) &&
+        isEnriching == other.isEnriching;
   }
 
   @override
   int get hashCode =>
       const DeepCollectionEquality().hash(data) ^
       const ListEquality().hash(favoriteBranches) ^
-      const SetEquality().hash(loadingBranches);
+      const SetEquality().hash(loadingBranches) ^
+      isEnriching.hashCode;
 
   @override
-  List<Object?> get props => [data, favoriteBranches, loadingBranches];
+  List<Object?> get props => [data, favoriteBranches, loadingBranches, isEnriching];
 }
 
 class AllBranchesAttendanceError extends MarketingState {
