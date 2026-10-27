@@ -299,6 +299,88 @@ export function buildCustomClaimsForProfiles(
   return claims;
 }
 
+/** Firestore doc that turns server-side OTP enforcement on. Default off. */
+export const OTP_ENFORCEMENT_DOC = "config/delegate_auth";
+export const OTP_ENFORCEMENT_FIELD = "otpEnforcementEnabled";
+
+/** True only for an explicit boolean true. Missing/invalid => false. */
+export function parseOtpEnforcementEnabled(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  const value = (data as Record<string, unknown>)[OTP_ENFORCEMENT_FIELD];
+  return value === true;
+}
+
+/**
+ * When enforcement is on, the login token carries otp_required=true and
+ * otp_verified=false. Rules ignore otp_verified unless otp_required is true,
+ * so existing tokens and enforcement-off logins keep working.
+ */
+export function applyOtpEnforcementClaims(
+  claims: Record<string, unknown>,
+  enforcementEnabled: boolean,
+): Record<string, unknown> {
+  const next = { ...claims };
+  if (enforcementEnabled) {
+    next.otp_required = true;
+    next.otp_verified = false;
+  } else {
+    delete next.otp_required;
+    delete next.otp_verified;
+  }
+  return next;
+}
+
+/** Auth phoneNumber is E.164; delegate claims.phones use local/intl variants. */
+export function phoneMatchesDelegateClaims(
+  authPhoneE164: string,
+  claimPhones: unknown,
+): boolean {
+  if (typeof authPhoneE164 !== "string" || !authPhoneE164.trim()) return false;
+  if (!Array.isArray(claimPhones) || claimPhones.length === 0) return false;
+  const authNormalized = normalizePhone(authPhoneE164);
+  if (!authNormalized) return false;
+  const authVariants = new Set(phoneQueryVariants(authNormalized));
+  authVariants.add(authPhoneE164.trim());
+  for (const raw of claimPhones) {
+    if (typeof raw !== "string" || !raw.trim()) continue;
+    const stored = normalizePhone(raw);
+    if (stored && (authVariants.has(stored) || authVariants.has(raw.trim()))) {
+      return true;
+    }
+    for (const variant of phoneQueryVariants(stored)) {
+      if (authVariants.has(variant)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Pure decision for confirmDelegateOtp. Caller supplies Auth user phone and
+ * existing custom claims. Does not talk to Admin SDK.
+ */
+export type ConfirmDelegateOtpDecision =
+  | { ok: true; nextClaims: Record<string, unknown> }
+  | { ok: false; reason: "not_signed_in" | "not_delegate" | "phone_not_linked" | "phone_mismatch" };
+
+export function decideConfirmDelegateOtp(input: {
+  authPhone: string | null | undefined;
+  claims: Record<string, unknown> | null | undefined;
+}): ConfirmDelegateOtpDecision {
+  const claims = input.claims && typeof input.claims === "object" ? { ...input.claims } : {};
+  if (claims.role !== "delegate") {
+    return { ok: false, reason: "not_delegate" };
+  }
+  const authPhone = typeof input.authPhone === "string" ? input.authPhone.trim() : "";
+  if (!authPhone) {
+    return { ok: false, reason: "phone_not_linked" };
+  }
+  if (!phoneMatchesDelegateClaims(authPhone, claims.phones)) {
+    return { ok: false, reason: "phone_mismatch" };
+  }
+  claims.otp_verified = true;
+  return { ok: true, nextClaims: claims };
+}
+
 export function lockStatus(
   state: RateLimitState | null,
   now: number,

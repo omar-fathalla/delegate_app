@@ -205,3 +205,72 @@ class FirebaseDelegateLoginApi implements DelegateLoginApi {
     }
   }
 }
+
+/// Confirms that the signed-in custom-token user linked a matching phone.
+abstract class ConfirmDelegateOtpApi {
+  Future<void> confirm();
+}
+
+class ConfirmDelegateOtpException implements Exception {
+  final String reason;
+
+  const ConfirmDelegateOtpException(this.reason);
+
+  @override
+  String toString() => 'ConfirmDelegateOtpException($reason)';
+}
+
+class FirebaseConfirmDelegateOtpApi implements ConfirmDelegateOtpApi {
+  final FirebaseFunctions functions;
+
+  FirebaseConfirmDelegateOtpApi(this.functions);
+
+  @override
+  Future<void> confirm() async {
+    try {
+      final callable = functions.httpsCallable('confirmDelegateOtp');
+      final result = await callable.call(<String, dynamic>{});
+      final raw = result.data;
+      if (raw is! Map) {
+        throw const ConfirmDelegateOtpException('unavailable');
+      }
+      final data = Map<String, dynamic>.from(raw);
+      if (data['ok'] != true) {
+        throw const ConfirmDelegateOtpException('unavailable');
+      }
+    } on FirebaseFunctionsException catch (error) {
+      throw ConfirmDelegateOtpException(_reasonFor(error));
+    }
+  }
+
+  String _reasonFor(FirebaseFunctionsException error) {
+    final details = error.details;
+    final detailed = details is Map ? details['reason'] : null;
+    if (detailed is String && detailed.isNotEmpty) {
+      switch (detailed) {
+        case 'phone_not_linked':
+        case 'phone_mismatch':
+        case 'not_delegate':
+        case 'not_signed_in':
+          return detailed;
+        default:
+          break;
+      }
+    }
+    switch (error.code) {
+      case 'unauthenticated':
+        return 'not_signed_in';
+      case 'failed-precondition':
+        return 'phone_not_linked';
+      case 'permission-denied':
+        return 'phone_mismatch';
+      case 'not-found':
+      case 'unimplemented':
+      case 'unavailable':
+      case 'internal':
+        return 'unavailable';
+      default:
+        return 'unavailable';
+    }
+  }
+}

@@ -223,6 +223,11 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       FirebaseFunctions.instanceFor(region: 'us-central1'),
     ),
   );
+  sl.registerLazySingleton<ConfirmDelegateOtpApi>(
+    () => FirebaseConfirmDelegateOtpApi(
+      FirebaseFunctions.instanceFor(region: 'us-central1'),
+    ),
+  );
   sl.registerLazySingleton<AuthRemoteDataSource>(
     () => AuthRemoteDataSourceImpl(
       firestore: sl(),
@@ -651,7 +656,10 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => FirebaseFirestore.instance);
   sl.registerLazySingleton(() => FirebaseAuth.instance);
   sl.registerLazySingleton<DelegatePhoneOtpClient>(
-    () => FirebaseDelegatePhoneOtpClient(sl<FirebaseAuth>()),
+    () => FirebaseDelegatePhoneOtpClient(
+      sl<FirebaseAuth>(),
+      confirmOtpApi: sl<ConfirmDelegateOtpApi>(),
+    ),
   );
   sl.registerLazySingleton(() => FirebaseStorage.instance);
 }

@@ -1,13 +1,15 @@
 import 'dart:async';
 
+import 'package:delegate_app/features/auth/data/datasources/delegate_login_api.dart';
 import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
 import 'package:delegate_app/features/auth/domain/phone_otp.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class FirebaseDelegatePhoneOtpClient implements DelegatePhoneOtpClient {
   final FirebaseAuth auth;
+  final ConfirmDelegateOtpApi? confirmOtpApi;
 
-  FirebaseDelegatePhoneOtpClient(this.auth);
+  FirebaseDelegatePhoneOtpClient(this.auth, {this.confirmOtpApi});
 
   bool _linked = false;
   Future<void>? _linking;
@@ -148,12 +150,74 @@ class FirebaseDelegatePhoneOtpClient implements DelegatePhoneOtpClient {
       if (actionForLinkError(error.code) == PhoneOtpLinkAction.reauthenticate) {
         try {
           await user.reauthenticateWithCredential(credential);
-          return;
         } on FirebaseAuthException catch (again) {
           throw phoneOtpExceptionForCode(again.code);
         }
+      } else {
+        throw phoneOtpExceptionForCode(error.code);
       }
-      throw phoneOtpExceptionForCode(error.code);
     }
+
+    await _confirmServerPossession();
+  }
+
+  /// Asks Cloud Functions to set otp_verified after a real phone link, then
+  /// refreshes the ID token so Firestore rules see the claim. When the server
+  /// is not enforcing OTP (no otp_required claim) a missing callable is
+  /// ignored so local OTP UI still works before deploy.
+  Future<void> _confirmServerPossession() async {
+    final user = auth.currentUser;
+    if (user == null) {
+      throw const PhoneOtpLinkException(
+        PhoneOtpLinkFailure.notSignedIn,
+        phoneOtpNotSignedInMessage,
+      );
+    }
+
+    final api = confirmOtpApi;
+    if (api == null) {
+      await user.getIdToken(true);
+      return;
+    }
+
+    IdTokenResult token;
+    try {
+      token = await user.getIdTokenResult();
+    } catch (_) {
+      token = await user.getIdTokenResult(true);
+    }
+    final otpRequired = token.claims?['otp_required'] == true;
+
+    try {
+      await api.confirm();
+      await user.getIdToken(true);
+    } on ConfirmDelegateOtpException catch (error) {
+      if (!otpRequired && error.reason == 'unavailable') {
+        return;
+      }
+      throw PhoneOtpLinkException(
+        PhoneOtpLinkFailure.other,
+        _messageForConfirmReason(error.reason),
+      );
+    } catch (_) {
+      if (!otpRequired) return;
+      throw const PhoneOtpLinkException(
+        PhoneOtpLinkFailure.other,
+        phoneOtpGenericMessage,
+      );
+    }
+  }
+}
+
+String _messageForConfirmReason(String reason) {
+  switch (reason) {
+    case 'phone_mismatch':
+      return phoneOtpAlreadyInUseMessage;
+    case 'not_signed_in':
+      return phoneOtpNotSignedInMessage;
+    case 'phone_not_linked':
+      return phoneOtpGenericMessage;
+    default:
+      return phoneOtpGenericMessage;
   }
 }

@@ -483,4 +483,64 @@ describe("firestore tightened rules", () => {
     await assertFails(db.doc("staff_login_rate_limits/secret").get());
     await assertFails(guestDb().doc("delegate_login_rate_limits/secret").get());
   });
+
+  test("otp-pending delegate can read own profile but not create attendance", async () => {
+    const pending = {
+      ...DELEGATE,
+      otp_required: true,
+      otp_verified: false,
+    };
+    const db = dbFor("del-1", pending);
+    await assertSucceeds(db.doc("organizations/o1/companies/c1/delegates/del-1").get());
+    await assertSucceeds(
+      db.collectionGroup("delegates").where("phoneNumber", "==", "01011111111").get(),
+    );
+    await assertFails(db.collection("attendance_logs").add({
+      delegateId: "del-1",
+      userId: "del-1",
+      organizationId: "o1",
+      companyId: "c1",
+    }));
+    await assertFails(db.doc("attendance_logs/a1").get());
+    await assertFails(db.doc("notifications/n1").get());
+    await assertFails(db.doc("config/delegate_auth").get());
+    await assertFails(db.doc("config/delegate_auth").set({otpEnforcementEnabled: false}));
+  });
+
+  test("otp-verified delegate regains attendance access under enforcement", async () => {
+    const verified = {
+      ...DELEGATE,
+      otp_required: true,
+      otp_verified: true,
+    };
+    const db = dbFor("del-1", verified);
+    await assertSucceeds(db.doc("organizations/o1/companies/c1/delegates/del-1").get());
+    await assertSucceeds(db.doc("attendance_logs/a1").get());
+    await assertSucceeds(db.collection("attendance_logs").add({
+      delegateId: "del-1",
+      userId: "del-1",
+      organizationId: "o1",
+      companyId: "c1",
+    }));
+    await assertSucceeds(db.doc("notifications/n1").get());
+  });
+
+  test("delegate token without otp_required keeps working (enforcement off)", async () => {
+    const db = dbFor("del-1", DELEGATE);
+    await assertSucceeds(db.doc("organizations/o1/companies/c1/delegates/del-1").get());
+    await assertSucceeds(db.doc("attendance_logs/a1").get());
+    await assertSucceeds(db.collection("attendance_logs").add({
+      delegateId: "del-1",
+      userId: "del-1",
+      organizationId: "o1",
+      companyId: "c1",
+    }));
+  });
+
+  test("staff access is unchanged when a delegate token is otp-pending", async () => {
+    const db = dbFor("comp");
+    await assertSucceeds(db.doc("organizations/o1/companies/c1/delegates/del-1").get());
+    await assertSucceeds(db.collection("attendance_logs").where("companyId", "==", "c1").get());
+  });
+
 });

@@ -2,6 +2,8 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {
   DelegateCandidate,
+  OTP_ENFORCEMENT_DOC,
+  applyOtpEnforcementClaims,
   buildCustomClaimsForProfiles,
   clearedRateLimit,
   createdAtMillis,
@@ -14,6 +16,7 @@ import {
   nationalIdsMatch,
   normalizePhone,
   optionalDeviceLabel,
+  parseOtpEnforcementEnabled,
   phoneQueryVariants,
   rateLimitDocId,
   readString,
@@ -67,7 +70,7 @@ export const delegateLoginV2 = functions
     }
   });
 
-async function handleDelegateLogin(data: unknown): Promise<{ token: string; delegateIds: string[] }> {
+async function handleDelegateLogin(data: unknown): Promise<{ token: string; delegateIds: string[]; otpRequired: boolean }> {
   const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
   const phoneRaw = payload.phone ?? payload.phoneNumber;
   const nationalIdRaw = payload.nationalId ?? payload.nationalityID ?? payload.nationalityId;
@@ -148,12 +151,14 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
     );
   }
 
-  const claims = buildCustomClaimsForProfiles(
+  const baseClaims = buildCustomClaimsForProfiles(
     profiles,
     decision.primary,
     decision.ids,
     deviceDecision.deviceId,
   );
+  const otpEnforcement = await readOtpEnforcementEnabled();
+  const claims = applyOtpEnforcementClaims(baseClaims, otpEnforcement);
 
   try {
     await admin.auth().setCustomUserClaims(uid, claims);
@@ -166,12 +171,25 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
   console.log("delegateLoginV2 success", {
     delegateId: decision.primary.id,
     profiles: decision.ids.length,
+    otpRequired: otpEnforcement,
   });
 
   return {
     token,
     delegateIds: decision.ids,
+    otpRequired: otpEnforcement,
   };
+}
+
+/** Server switch. Missing doc / read error => false so login stays open. */
+async function readOtpEnforcementEnabled(): Promise<boolean> {
+  try {
+    const snap = await admin.firestore().doc(OTP_ENFORCEMENT_DOC).get();
+    return parseOtpEnforcementEnabled(snap.exists ? snap.data() : null);
+  } catch (error) {
+    console.error("delegateLoginV2 otp enforcement read failed");
+    return false;
+  }
 }
 
 async function readLock(phoneKey: string): Promise<{ locked: boolean; retryAfterSeconds: number }> {

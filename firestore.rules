@@ -19,10 +19,14 @@ service cloud.firestore {
     //
     // Delegate custom tokens (delegateLoginV2) carry role "delegate",
     // delegateId, delegateIds, orgId, companyId, optional orgIds/companyIds,
-    // and phones. Staff authority comes from users/{auth.uid}.role, never
-    // from a custom claim. Legacy role spellings are accepted on read until
-    // migrate-super-admin-role.js runs. New role writes must be canonical,
-    // and super-admin can only be written by an existing super-admin.
+    // and phones. When config/delegate_auth.otpEnforcementEnabled is true the
+    // token also carries otp_required=true and otp_verified=false until
+    // confirmDelegateOtp sets otp_verified=true. Rules require otp_verified
+    // only when otp_required is true, so existing tokens and enforcement-off
+    // logins keep working. Staff authority comes from users/{auth.uid}.role,
+    // never from a custom claim. Legacy role spellings are accepted on read
+    // until migrate-super-admin-role.js runs. New role writes must be
+    // canonical, and super-admin can only be written by an existing super-admin.
     // =====================================================================
 
     // ==================== HELPERS ====================
@@ -137,8 +141,27 @@ service cloud.firestore {
         && value in request.auth.token[key];
     }
 
+    // otp_required is only present when config/delegate_auth.otpEnforcementEnabled
+    // was on at login. Tokens without it (legacy / enforcement off) keep working.
+    // Inlined to stay under Firestore's 1000-expression evaluation budget.
+    function delegateOtpOk() {
+      return !(request.auth.token.keys().hasAll(['otp_required'])
+          && request.auth.token.otp_required == true)
+        || (request.auth.token.keys().hasAll(['otp_verified'])
+          && request.auth.token.otp_verified == true);
+    }
+
     function isDelegate() {
-      return claimString('role') == 'delegate';
+      return claimString('role') == 'delegate' && delegateOtpOk();
+    }
+
+    // Own-id paths that skip isDelegate() (attendance / leave by uid).
+    function ownsDelegateId(id) {
+      return signedIn() && delegateOtpOk() && (
+        id == request.auth.uid ||
+        claimString('delegateId') == id ||
+        claimListHas('delegateIds', id)
+      );
     }
 
     function callerOrg() {
@@ -288,6 +311,9 @@ service cloud.firestore {
         : '';
     }
 
+    // Own delegate profile reads do not require otp_verified so login can
+    // load profiles before confirmDelegateOtp. Sensitive paths use isDelegate
+    // / ownsDelegateId and stay blocked while otp_required is unset-verified.
     function canReadDelegate() {
       return signedIn() && (
         (request.auth.token.keys().hasAll(['phones'])
@@ -333,7 +359,8 @@ service cloud.firestore {
         || (request.auth.token.keys().hasAll(['delegateIds'])
           && request.auth.token.delegateIds is list
           && delegateId in request.auth.token.delegateIds)
-        || (request.auth.token.keys().hasAll(['orgId'])
+        || (delegateOtpOk()
+          && request.auth.token.keys().hasAll(['orgId'])
           && request.auth.token.orgId == orgId
           && request.auth.token.keys().hasAll(['companyId'])
           && request.auth.token.companyId == compId)
@@ -538,12 +565,12 @@ service cloud.firestore {
           || (isOrgScopedStaff() && callerOrg() == orgId)
           || (isCompanyScopedStaff() && callerOrg() == orgId && companyScoped())
           || (delegateInOrg(orgId) && (
-            resource.data.assignedTo == request.auth.uid
+            ownsDelegateId(resource.data.assignedTo)
             || delegateOwns(resource.data.assignedTo)
             || resource.data.assignedTo == 'all'
             || resource.data.assignedTo == 'all_marketing_promotion'
             || resource.data.assignedTo == 'all_branch_marketing'
-            || resource.data.createdBy == request.auth.uid
+            || ownsDelegateId(resource.data.createdBy)
           ));
       }
 
@@ -692,8 +719,8 @@ service cloud.firestore {
         isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
         || (isOrgScopedStaff() && orgScoped())
-        || resource.data.delegateId == request.auth.uid
-        || resource.data.userId == request.auth.uid
+        || ownsDelegateId(resource.data.delegateId)
+        || ownsDelegateId(resource.data.userId)
         || delegateOwns(resource.data.delegateId)
         || delegateOwns(resource.data.userId)
       );
@@ -705,8 +732,8 @@ service cloud.firestore {
         || (isCompanyScopedStaff() && incomingCompanyScoped())
         || (isOrgScopedStaff() && incomingOrgScoped())
         || (
-          (request.resource.data.delegateId == request.auth.uid
-            || request.resource.data.userId == request.auth.uid
+          (ownsDelegateId(request.resource.data.delegateId)
+            || ownsDelegateId(request.resource.data.userId)
             || delegateOwns(request.resource.data.delegateId)
             || delegateOwns(request.resource.data.userId))
           && (delegateInOrg(request.resource.data.organizationId)
@@ -719,8 +746,8 @@ service cloud.firestore {
     function canUpdateAttendance() {
       return canReadAttendance() && (
         isGlobalStaff() || isCompanyScopedStaff() || isOrgScopedStaff()
-        || resource.data.delegateId == request.auth.uid
-        || resource.data.userId == request.auth.uid
+        || ownsDelegateId(resource.data.delegateId)
+        || ownsDelegateId(resource.data.userId)
         || delegateOwns(resource.data.delegateId)
       );
     }
@@ -772,8 +799,8 @@ service cloud.firestore {
     function canReadNotification() {
       return signedIn() && (
         isGlobalStaff()
-        || resource.data.delegateUid == request.auth.uid
-        || resource.data.userId == request.auth.uid
+        || ownsDelegateId(resource.data.delegateUid)
+        || ownsDelegateId(resource.data.userId)
         || delegateOwns(resource.data.delegateUid)
         || resource.data.delegateUid == 'all'
         || resource.data.delegateUid == 'delegates'
@@ -829,10 +856,10 @@ service cloud.firestore {
 
     match /fcm_tokens/{tokenId} {
       allow read: if signedIn() && (
-        tokenId == request.auth.uid || delegateOwns(tokenId) || isGlobalStaff()
+        ownsDelegateId(tokenId) || delegateOwns(tokenId) || isGlobalStaff()
       );
       allow create, update, delete: if signedIn() && (
-        tokenId == request.auth.uid || delegateOwns(tokenId)
+        ownsDelegateId(tokenId) || delegateOwns(tokenId)
       );
     }
 
@@ -1017,23 +1044,23 @@ service cloud.firestore {
         isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
         || (isOrgScopedStaff() && orgScoped())
-        || (companyScoped() && (resource.data.delegateUid == request.auth.uid || delegateOwns(resource.data.delegateUid)))
-        || resource.data.delegateUid == request.auth.uid
+        || (companyScoped() && (ownsDelegateId(resource.data.delegateUid) || delegateOwns(resource.data.delegateUid)))
+        || ownsDelegateId(resource.data.delegateUid)
         || delegateOwns(resource.data.delegateUid)
       );
       allow create: if signedIn() && (
-        request.resource.data.delegateUid == request.auth.uid
+        ownsDelegateId(request.resource.data.delegateUid)
         || delegateOwns(request.resource.data.delegateUid)
         || (isCompanyScopedStaff() && incomingCompanyScoped())
         || isGlobalStaff()
       );
       allow update: if isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
-        || (resource.data.delegateUid == request.auth.uid && resource.data.status == 'pending')
+        || (ownsDelegateId(resource.data.delegateUid) && resource.data.status == 'pending')
         || (delegateOwns(resource.data.delegateUid) && resource.data.status == 'pending');
       allow delete: if isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
-        || (resource.data.delegateUid == request.auth.uid && resource.data.status == 'pending')
+        || (ownsDelegateId(resource.data.delegateUid) && resource.data.status == 'pending')
         || (delegateOwns(resource.data.delegateUid) && resource.data.status == 'pending');
     }
 
@@ -1055,6 +1082,12 @@ service cloud.firestore {
     // Server-only device binding written by delegateLoginV2. Clients read the
     // mirrored boundDeviceId on the delegate document, which they cannot write.
     match /deviceBindings/{bindingId} {
+      allow read, write: if false;
+    }
+
+    // Server-only OTP enforcement switch read by Cloud Functions
+    // (config/delegate_auth.otpEnforcementEnabled). Clients cannot touch it.
+    match /config/{docId} {
       allow read, write: if false;
     }
 
