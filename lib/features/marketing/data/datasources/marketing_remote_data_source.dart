@@ -529,17 +529,22 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         final uniqueMissing = missingCheckOutDelegateIds.toSet().toList();
         // org + type + delegateId + ts>= + ts< (=5) → whereIn chunk <= 20.
         const checkoutWhereInChunkSize = 15;
+        const checkoutConcurrency = 4;
+        final checkoutChunks = <List<String>>[];
         for (var i = 0; i < uniqueMissing.length; i += checkoutWhereInChunkSize) {
-          coChunks++;
-          final chunk = uniqueMissing.sublist(
-            i,
-            (i + checkoutWhereInChunkSize > uniqueMissing.length)
-                ? uniqueMissing.length
-                : i + checkoutWhereInChunkSize,
+          checkoutChunks.add(
+            uniqueMissing.sublist(
+              i,
+              (i + checkoutWhereInChunkSize > uniqueMissing.length)
+                  ? uniqueMissing.length
+                  : i + checkoutWhereInChunkSize,
+            ),
           );
+        }
+        coChunks = checkoutChunks.length;
+
+        Future<void> fetchCheckoutChunk(List<String> chunk) async {
           try {
-            // Same day/org bound as the main query so missing-branchName
-            // check-outs do not pull the full historical collection.
             final outSnap = await firestore
                 .collection(kAttendanceCollection)
                 .where('organizationId', isEqualTo: queryOrgId)
@@ -573,6 +578,15 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
               }
             }
           } catch (_) {}
+        }
+
+        for (var i = 0; i < checkoutChunks.length; i += checkoutConcurrency) {
+          final end = (i + checkoutConcurrency > checkoutChunks.length)
+              ? checkoutChunks.length
+              : i + checkoutConcurrency;
+          await Future.wait(
+            checkoutChunks.sublist(i, end).map(fetchCheckoutChunk),
+          );
         }
       }
 
@@ -764,26 +778,11 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           .where((id) => !companyNameCache.containsKey(id) || companyNameCache[id]!.isEmpty)
           .toList();
       final compSw = Stopwatch()..start();
-      if (companyIdsStillNeeded.isNotEmpty) {
-        await Future.wait(companyIdsStillNeeded.map((compId) async {
-          try {
-            final compDoc = await firestore
-                .collection('organizations')
-                .doc(defaultOrgId)
-                .collection('companies')
-                .doc(compId)
-                .get();
-            if (compDoc.exists && compDoc.data() != null) {
-              companyNameCache[compId] =
-                  compDoc.data()!['name'] as String? ?? '';
-            } else {
-              companyNameCache[compId] = '';
-            }
-          } catch (_) {
-            companyNameCache[compId] = '';
-          }
-        }));
-      }
+      await _fillCompanyNameCache(
+        organizationId: defaultOrgId,
+        companyIds: companyIdsStillNeeded,
+        companyNameCache: companyNameCache,
+      );
       compSw.stop();
       if (RealTestMetrics.enabled) {
         RealTestMetrics.companyPrePaintMs = compSw.elapsedMilliseconds;
@@ -986,26 +985,11 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           }
         }
         final comp2Sw = Stopwatch()..start();
-        if (extraCompanyIds.isNotEmpty) {
-          await Future.wait(extraCompanyIds.map((compId) async {
-            try {
-              final compDoc = await firestore
-                  .collection('organizations')
-                  .doc(defaultOrgId)
-                  .collection('companies')
-                  .doc(compId)
-                  .get();
-              if (compDoc.exists && compDoc.data() != null) {
-                companyNameCache[compId] =
-                    compDoc.data()!['name'] as String? ?? '';
-              } else {
-                companyNameCache[compId] = '';
-              }
-            } catch (_) {
-              companyNameCache[compId] = '';
-            }
-          }));
-        }
+        await _fillCompanyNameCache(
+          organizationId: defaultOrgId,
+          companyIds: extraCompanyIds,
+          companyNameCache: companyNameCache,
+        );
         comp2Sw.stop();
         if (RealTestMetrics.enabled) {
           RealTestMetrics.companyPostEnrichMs = comp2Sw.elapsedMilliseconds;
@@ -1033,6 +1017,76 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       );
     } catch (e, st) {
       throw ServerFailure('خطأ غير متوقع: $e\n$st');
+    }
+  }
+
+
+  /// Batch-fetch company display names with whereIn(documentId) chunks + in-memory cache.
+  Future<void> _fillCompanyNameCache({
+    required String organizationId,
+    required Iterable<String> companyIds,
+    required Map<String, String> companyNameCache,
+  }) async {
+    final needed = companyIds
+        .where((id) =>
+            id.isNotEmpty &&
+            (!companyNameCache.containsKey(id) || companyNameCache[id]!.isEmpty))
+        .toSet()
+        .toList();
+    if (needed.isEmpty) return;
+
+    const whereInSize = 10; // keep well under Firestore whereIn cap
+    const concurrency = 4;
+    final chunks = <List<String>>[];
+    for (var i = 0; i < needed.length; i += whereInSize) {
+      chunks.add(
+        needed.sublist(
+          i,
+          (i + whereInSize > needed.length) ? needed.length : i + whereInSize,
+        ),
+      );
+    }
+
+    Future<void> fetchChunk(List<String> chunk) async {
+      try {
+        final snap = await firestore
+            .collection('organizations')
+            .doc(organizationId)
+            .collection('companies')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+        final found = <String>{};
+        for (final doc in snap.docs) {
+          found.add(doc.id);
+          companyNameCache[doc.id] = doc.data()['name'] as String? ?? '';
+        }
+        for (final id in chunk) {
+          if (!found.contains(id)) {
+            companyNameCache[id] = '';
+          }
+        }
+      } catch (_) {
+        // Fallback: individual gets if whereIn unsupported/fails.
+        await Future.wait(chunk.map((compId) async {
+          try {
+            final compDoc = await firestore
+                .collection('organizations')
+                .doc(organizationId)
+                .collection('companies')
+                .doc(compId)
+                .get();
+            companyNameCache[compId] = (compDoc.data()?['name'] as String?) ?? '';
+          } catch (_) {
+            companyNameCache[compId] = '';
+          }
+        }));
+      }
+    }
+
+    for (var i = 0; i < chunks.length; i += concurrency) {
+      final end =
+          (i + concurrency > chunks.length) ? chunks.length : i + concurrency;
+      await Future.wait(chunks.sublist(i, end).map(fetchChunk));
     }
   }
 

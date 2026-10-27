@@ -111,10 +111,14 @@ class AppAvatar extends StatelessWidget {
         },
       );
     } else {
+      final pixelRatio = MediaQuery.maybeOf(context)?.devicePixelRatio ?? 2.0;
+      final cachePx = (size * pixelRatio).round().clamp(32, 256);
       avatarContent = CachedNetworkImage(
         imageUrl: cleanUrl,
         width: size,
         height: size,
+        memCacheWidth: cachePx,
+        memCacheHeight: cachePx,
         fit: BoxFit.cover,
         fadeInDuration: const Duration(milliseconds: 150),
         fadeOutDuration: const Duration(milliseconds: 100),

@@ -78,3 +78,9 @@ Certificates_modern.p12
 
 # Local real-test screenshots (may contain PII)
 docs/real_test_shots/
+
+# Backfill dry-run reports (local)
+functions/backfill-report*.json
+
+# Local perf probe artifacts (screenshots may contain PII)
+real_test/

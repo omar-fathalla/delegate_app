@@ -37,19 +37,8 @@ class BranchHomeScreen extends StatelessWidget {
     return BlocProvider(
       create: (_) {
         final bloc = di.sl<MarketingBloc>();
-        final prefService = di.sl<BranchPreferenceService>();
-        final favorites = prefService.getFavoriteBranches(marketingUser.uid);
-        if (favorites.isNotEmpty && !RealTestMetrics.enabled) {
-          bloc.add(
-            LoadAllFavoriteBranchesAttendance(
-              favoriteBranches: favorites,
-              organizationId: marketingUser.organizationUID.isNotEmpty
-                  ? marketingUser.organizationUID
-                  : 'PiioBFgxaHAeuRdjlDgj',
-              date: DateTime.now(),
-            ),
-          );
-        }
+        // Single fetch path: preferences listener loads attendance once.
+        // Favorites collapse defaults are applied in the view when prefs load.
         bloc.add(LoadBranchPreferences(userId: marketingUser.uid));
         return bloc;
       },
@@ -81,8 +70,10 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  /// Set of collapsed branch names. By default, branches are expanded.
+  /// Set of collapsed branch names. When favorites >= 5, all but the active
+  /// (or first) branch start collapsed; expand on tap (lazy card build).
   final Set<String> _collapsedBranches = {};
+  bool _didApplyDefaultCollapse = false;
 
   /// Cache of last loaded state to prevent full-screen blinking during incremental loads
   AllBranchesAttendanceLoaded? _lastLoadedState;
@@ -114,6 +105,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       final favorites = prefService.getFavoriteBranches(widget.marketingUser.uid);
       _favoriteBranches = favorites;
       _prefsLoaded = true;
+      _applyDefaultCollapseIfNeeded(favorites);
       _floorVerifications = _floorService.getLocalVerifications(_selectedDate);
       _syncFloorVerificationsFromCloud();
 
@@ -415,6 +407,23 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     );
   }
 
+  void _applyDefaultCollapseIfNeeded(List<String> favorites) {
+    if (_didApplyDefaultCollapse) return;
+    if (favorites.length < 5) return;
+    _didApplyDefaultCollapse = true;
+    final active = di
+        .sl<BranchPreferenceService>()
+        .getActiveBranch(widget.marketingUser.uid);
+    final keepOpen = (active != null &&
+            active.isNotEmpty &&
+            favorites.contains(active))
+        ? active
+        : favorites.first;
+    _collapsedBranches
+      ..clear()
+      ..addAll(favorites.where((b) => b != keepOpen));
+  }
+
   void _toggleBranchExpansion(String branchName) {
     HapticFeedback.selectionClick();
     setState(() {
@@ -496,6 +505,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           setState(() {
             _favoriteBranches = favorites;
             _prefsLoaded = true;
+            _applyDefaultCollapseIfNeeded(favorites);
           });
           if (favorites.isEmpty) {
             // لا توجد فروع → افتح المنتقي
@@ -978,9 +988,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               ),
             ),
 
-          // ─── قسم لكل فرع ──────────────────────────────────────────────
+          // ─── قسم لكل فرع (header sliver + virtualized rows when expanded) ──
           for (final branchName in state.favoriteBranches)
-            _buildBranchSection(
+            ..._buildBranchSlivers(
               context,
               branchName,
               state.data[branchName] ?? [],
@@ -995,8 +1005,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     );
   }
 
-  // ─── Branch Section (Header + Delegate Cards) ─────────────────────────────
-  Widget _buildBranchSection(
+  // ─── Branch Section (Header + virtualized Delegate Cards) ─────────────────
+  List<Widget> _buildBranchSlivers(
     BuildContext context,
     String branchName,
     List<Map<String, dynamic>> records,
@@ -1042,221 +1052,272 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       return true;
     }).toList();
 
-    return SliverToBoxAdapter(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── Branch Header (Tappable for Collapse / Expand) ──
-          AnimatedContainer(
-            duration: AppMotionDurations.short4,
-            curve: AppMotionCurves.emphasized,
-            margin: EdgeInsets.fromLTRB(16, 12, 16, isExpanded ? 0 : 8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.primaryContainer,
-                  colorScheme.secondaryContainer,
-                ],
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-              ),
-              borderRadius: isExpanded
-                  ? const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                      bottom: Radius.circular(4),
-                    )
-                  : BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+
+    final slivers = <Widget>[];
+
+    Widget branchHeader() {
+      return AnimatedContainer(
+        duration: AppMotionDurations.short4,
+        curve: AppMotionCurves.emphasized,
+        margin: EdgeInsets.fromLTRB(16, 12, 16, isExpanded ? 0 : 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.primaryContainer,
+              colorScheme.secondaryContainer,
+            ],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+          borderRadius: isExpanded
+              ? const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                  bottom: Radius.circular(4),
+                )
+              : BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: isExpanded
-                    ? const BorderRadius.vertical(
-                        top: Radius.circular(16),
-                        bottom: Radius.circular(4),
-                      )
-                    : BorderRadius.circular(16),
-                onTap: () => _toggleBranchExpansion(branchName),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: isExpanded
+                ? const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                    bottom: Radius.circular(4),
+                  )
+                : BorderRadius.circular(16),
+            onTap: () => _toggleBranchExpansion(branchName),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surface.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.location_on_rounded,
-                              color: colorScheme.primary,
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              branchName,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: colorScheme.onPrimaryContainer,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (isBranchLoading) ...[
-                            SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          // Badge عدد المندوبين
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              query.isEmpty
-                                  ? (currentFilter == 'all'
-                                      ? '$totalCount مندوب'
-                                      : '${displayRecords.length} من $totalCount')
-                                  : '${displayRecords.length} من $totalCount',
-                              style: TextStyle(
-                                color: colorScheme.onPrimary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          // زر تصدير Excel للفرع
-                          IconButton(
-                            icon: const Icon(
-                              Icons.table_chart_rounded,
-                              color: Color(0xFF2E7D32),
-                              size: 20,
-                            ),
-                            tooltip: 'تصدير كشف الفرع إلى Excel',
-                            style: IconButton.styleFrom(
-                              backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
-                              padding: const EdgeInsets.all(6),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            onPressed: () => _showExportExcelModal(
-                              context,
-                              preselectedBranch: branchName,
-                              branchRecords: {branchName: records},
-                              initialOnlyNotCheckedOut: currentFilter == 'not_checked_out',
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          // زر حذف الفرع المباشر
-                          IconButton(
-                            icon: Icon(
-                              Icons.delete_outline_rounded,
-                              color: colorScheme.error,
-                              size: 20,
-                            ),
-                            tooltip: 'إزالة الفرع من القائمة',
-                            style: IconButton.styleFrom(
-                              backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
-                              padding: const EdgeInsets.all(6),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            onPressed: () => _confirmRemoveBranch(context, branchName),
-                          ),
-                          const SizedBox(width: 4),
-                          // سهم الطي والانكماش Animated Chevron
-                          AnimatedRotation(
-                            turns: isExpanded ? 0.5 : 0.0,
-                            duration: AppMotionDurations.short4,
-                            curve: AppMotionCurves.emphasized,
-                            child: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: colorScheme.onPrimaryContainer,
-                              size: 22,
-                            ),
-                          ),
-                        ],
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.storefront_rounded,
+                          size: 20,
+                          color: colorScheme.primary,
+                        ),
                       ),
-                      if (totalCount > 0) ...[
-                        const SizedBox(height: 6),
-                        Padding(
-                          padding: const EdgeInsetsDirectional.only(start: 44),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          branchName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                      if (totalCount > 0)
+                        Container(
+                          margin: const EdgeInsetsDirectional.only(end: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           child: Text(
-                            '$presentCount حاضر • $checkedOutCount منصرف • تم فحص $verifiedCount من $totalCount',
+                            '$totalCount مندوب',
                             style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w500,
-                              color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
                             ),
                           ),
                         ),
-                      ],
+                      IconButton(
+                        icon: Icon(
+                          Icons.delete_outline_rounded,
+                          color: colorScheme.error,
+                          size: 20,
+                        ),
+                        tooltip: 'إزالة الفرع من القائمة',
+                        style: IconButton.styleFrom(
+                          backgroundColor:
+                              colorScheme.surface.withValues(alpha: 0.8),
+                          padding: const EdgeInsets.all(6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () =>
+                            _confirmRemoveBranch(context, branchName),
+                      ),
+                      const SizedBox(width: 4),
+                      AnimatedRotation(
+                        turns: isExpanded ? 0.5 : 0.0,
+                        duration: AppMotionDurations.short4,
+                        curve: AppMotionCurves.emphasized,
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: colorScheme.onPrimaryContainer,
+                          size: 22,
+                        ),
+                      ),
                     ],
                   ),
-                ),
+                  if (totalCount > 0) ...[
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 44),
+                      child: Text(
+                        '$presentCount حاضر • $checkedOutCount منصرف • تم فحص $verifiedCount من $totalCount',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: colorScheme.onPrimaryContainer
+                              .withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
+        ),
+      );
+    }
 
-          // ── Animated Expand / Collapse Content ──
-          ClipRect(
-            child: AnimatedSize(
-              duration: AppMotionDurations.medium2,
-              reverseDuration: AppMotionDurations.short4,
-              curve: AppMotionCurves.emphasized,
-              alignment: Alignment.topCenter,
-              child: isExpanded
-                  ? (isBranchLoading && records.isEmpty
-                      ? _buildBranchLoadingCard(colorScheme)
-                      : (records.isEmpty
-                          ? _buildEmptyBranchPlaceholder(query, colorScheme)
-                          : _buildDelegatesContainer(
-                              context,
-                              branchName,
-                              records,
-                              displayRecords,
-                              colorScheme,
-                              verifiedCount: verifiedCount,
-                              missingCount: missingCount,
-                              remainingCount: remainingCount,
-                              presentCount: presentCount,
-                              checkedOutCount: checkedOutCount,
-                              currentFilter: currentFilter,
-                            )))
-                  : const SizedBox.shrink(),
+    slivers.add(SliverToBoxAdapter(child: branchHeader()));
+
+    if (!isExpanded) {
+      return slivers;
+    }
+
+    if (isBranchLoading && records.isEmpty) {
+      slivers.add(SliverToBoxAdapter(child: _buildBranchLoadingCard(colorScheme)));
+      return slivers;
+    }
+    if (records.isEmpty) {
+      slivers.add(SliverToBoxAdapter(
+        child: _buildEmptyBranchPlaceholder(query, colorScheme),
+      ));
+      return slivers;
+    }
+
+    // Filter/progress chrome (not virtualized — small).
+    slivers.add(SliverToBoxAdapter(
+      child: _buildDelegatesContainer(
+        context,
+        branchName,
+        records,
+        displayRecords,
+        colorScheme,
+        verifiedCount: verifiedCount,
+        missingCount: missingCount,
+        remainingCount: remainingCount,
+        presentCount: presentCount,
+        checkedOutCount: checkedOutCount,
+        currentFilter: currentFilter,
+        rowsOnly: false,
+        chromeOnly: true,
+      ),
+    ));
+
+    if (displayRecords.isEmpty) {
+      slivers.add(SliverToBoxAdapter(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerLow,
+            border: Border(
+              left: BorderSide(color: colorScheme.outlineVariant),
+              right: BorderSide(color: colorScheme.outlineVariant),
+              bottom: BorderSide(color: colorScheme.outlineVariant),
             ),
+            borderRadius:
+                const BorderRadius.vertical(bottom: Radius.circular(16)),
           ),
-        ],
+          child: _buildEmptyFilterPlaceholder(
+            context,
+            branchName,
+            currentFilter,
+            verifiedCount,
+            missingCount,
+            totalCount,
+            colorScheme,
+          ),
+        ),
+      ));
+      return slivers;
+    }
+
+    slivers.add(
+      SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final record = displayRecords[index];
+            final isLast = index == displayRecords.length - 1;
+            final delegateId = record['delegateId'] as String? ?? '$index';
+            return KeyedSubtree(
+              key: ValueKey('delegate_${branchName}_$delegateId'),
+              child: Container(
+                margin: EdgeInsets.fromLTRB(16, 0, 16, isLast ? 8 : 0),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerLow,
+                  border: Border(
+                    left: BorderSide(color: colorScheme.outlineVariant),
+                    right: BorderSide(color: colorScheme.outlineVariant),
+                    bottom: isLast
+                        ? BorderSide(color: colorScheme.outlineVariant)
+                        : BorderSide.none,
+                  ),
+                  borderRadius: isLast
+                      ? const BorderRadius.vertical(
+                          bottom: Radius.circular(16),
+                        )
+                      : BorderRadius.zero,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildDelegateRow(
+                      context,
+                      record,
+                      colorScheme,
+                      branchName,
+                    ),
+                    if (!isLast)
+                      Divider(
+                        height: 1,
+                        color:
+                            colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        indent: 68,
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+          childCount: displayRecords.length,
+          addAutomaticKeepAlives: false,
+          addRepaintBoundaries: true,
+        ),
       ),
     );
+    return slivers;
   }
 
   Widget _buildBranchLoadingCard(ColorScheme colorScheme) {
@@ -1344,18 +1405,20 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     required int presentCount,
     required int checkedOutCount,
     required String currentFilter,
+    bool chromeOnly = false,
+    bool rowsOnly = false,
   }) {
     final totalCount = allRecords.length;
     final verifiedPercent = totalCount > 0 ? (verifiedCount / totalCount) : 0.0;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      margin: EdgeInsets.fromLTRB(16, 0, 16, chromeOnly ? 0 : 8),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         border: Border.all(color: colorScheme.outlineVariant),
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(4),
-          bottom: Radius.circular(16),
+        borderRadius: BorderRadius.vertical(
+          top: const Radius.circular(4),
+          bottom: Radius.circular(chromeOnly ? 0 : 16),
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -1534,32 +1597,40 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               ),
             ),
 
-          // ─── قائمة المناديب أو شاشة الاكتمال ───
-          if (displayRecords.isEmpty)
-            _buildEmptyFilterPlaceholder(
-              context,
-              branchName,
-              currentFilter,
-              verifiedCount,
-              missingCount,
-              totalCount,
-              colorScheme,
-            )
-          else
-            ...displayRecords.asMap().entries.map((entry) {
-              final isLast = entry.key == displayRecords.length - 1;
-              return Column(
-                children: [
-                  _buildDelegateRow(context, entry.value, colorScheme, branchName),
-                  if (!isLast)
-                    Divider(
-                      height: 1,
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                      indent: 68,
+          // Rows are virtualized via SliverList in _buildBranchSlivers when
+          // chromeOnly is true (default for the >=5 favorites collapse path).
+          if (!chromeOnly) ...[
+            if (displayRecords.isEmpty)
+              _buildEmptyFilterPlaceholder(
+                context,
+                branchName,
+                currentFilter,
+                verifiedCount,
+                missingCount,
+                totalCount,
+                colorScheme,
+              )
+            else
+              ...displayRecords.asMap().entries.map((entry) {
+                final isLast = entry.key == displayRecords.length - 1;
+                return Column(
+                  children: [
+                    _buildDelegateRow(
+                      context,
+                      entry.value,
+                      colorScheme,
+                      branchName,
                     ),
-                ],
-              );
-            }),
+                    if (!isLast)
+                      Divider(
+                        height: 1,
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        indent: 68,
+                      ),
+                  ],
+                );
+              }),
+          ],
         ],
       ),
     );

@@ -65,6 +65,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       ? 2
       : 0;
   late final List<Widget> _screens;
+  Widget? _branchHomeCache;
   @override
   void initState() {
     super.initState();
@@ -137,7 +138,8 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           create: (_) => di.sl<PhotoPermissionBloc>(),
           child: MarketingPermissionsScreen(marketingDelegate: delegate),
         ),
-        BranchHomeScreen(marketingUser: delegate),
+        // Placeholder; real BranchHome is injected in build via _branchHomeSlot
+        const SizedBox.shrink(key: ValueKey('branch_home_slot')),
         BlocProvider(
           create: (_) => di.sl<PenaltyBloc>(),
           child: CompanyPenaltiesSettingsPage(delegate: delegate),
@@ -181,6 +183,24 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
   void dispose() {
     super.dispose();
   }
+
+  List<Widget> get _indexedScreens {
+    if (!isBranchesMarketingManager) return _screens;
+    // Lazily mount BranchHomeScreen the first time tab index 2 is selected
+    // (or when REAL_TEST starts on that tab).
+    if (_currentIndex == 2) {
+      _branchHomeCache ??=
+          BranchHomeScreen(marketingUser: widget.delegate);
+    }
+    return [
+      for (var i = 0; i < _screens.length; i++)
+        if (i == 2)
+          (_branchHomeCache ?? const SizedBox.shrink())
+        else
+          _screens[i],
+    ];
+  }
+
 
   void _onMenuSelected(String value) {
     switch (value) {
@@ -882,7 +902,10 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         ],
         onMenuSelected: _onMenuSelected,
       ),
-      body: M3FadeThroughIndexedStack(index: _currentIndex, children: _screens),
+      body: M3FadeThroughIndexedStack(
+        index: _currentIndex,
+        children: _indexedScreens,
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainer,
