@@ -1,37 +1,14 @@
 /**
  * Backfill denormalized fields onto attendance_logs check_in docs.
  *
- * Stamps (idempotent — skips fields already present):
+ * Stamps (idempotent — skips fields already present; never overwrites):
  *   delegateName, phoneNumber, companyName, personalPhotoURL
  *   checkOutTime, checkOutDocId, checkOutLocation  (from matching check_out)
  *
- * Default is DRY-RUN (no writes). Never point at production unless an operator
- * explicitly passes --apply after reviewing the report. Emulator-first.
+ * Default is DRY-RUN. Only attendance_logs (never _testing).
  *
- * Usage (from functions/):
- *   # Emulator (required for tests):
- *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
- *     node scripts/backfill-checkin-denorm.js \
- *       --org PiioBFgxaHAeuRdjlDgj \
- *       --from 2026-10-01 --to 2026-10-28
- *
- *   # Apply on emulator only:
- *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
- *     node scripts/backfill-checkin-denorm.js --apply --org ... --from ... --to ...
- *
- * Flags:
- *   --apply              Commit writes (default: dry-run)
- *   --org <id>           Restrict to organizationId
- *   --from YYYY-MM-DD    Inclusive start (UTC day)
- *   --to YYYY-MM-DD      Exclusive end (UTC day) — required with --from
- *   --collection <name>  Default attendance_logs
- *   --batch-size <n>     Writes per commit (default 200)
- *   --rate-ms <n>        Sleep between batches (default 250)
- *   --report <path>      Write JSON report (default stdout + ./backfill-report.json)
- *   --page-size <n>      Query page size (default 400)
- *
- * Safety: refuses --apply when FIRESTORE_EMULATOR_HOST is unset unless
- * --i-understand-prod is also passed (still not used by our workflow).
+ *   node scripts/backfill-checkin-denorm.js --backup ~/Documents/...json
+ *   node scripts/backfill-checkin-denorm.js --apply --i-understand-prod --backup ...
  */
 
 "use strict";
@@ -50,8 +27,10 @@ function parseArgs(argv) {
     batchSize: 200,
     rateMs: 250,
     report: path.join(process.cwd(), "backfill-report.json"),
-    pageSize: 400,
+    pageSize: 500,
     allowProd: false,
+    backup: null,
+    maxUpdates: 20000,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -65,6 +44,8 @@ function parseArgs(argv) {
     else if (a === "--rate-ms") out.rateMs = Number(argv[++i]);
     else if (a === "--report") out.report = argv[++i];
     else if (a === "--page-size") out.pageSize = Number(argv[++i]);
+    else if (a === "--backup") out.backup = argv[++i];
+    else if (a === "--max-updates") out.maxUpdates = Number(argv[++i]);
     else if (a === "--help" || a === "-h") {
       console.log("See file header for usage.");
       process.exit(0);
@@ -77,10 +58,7 @@ function parseDay(s, endExclusive) {
   if (!s) return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   if (!m) throw new Error(`Bad date ${s}; expected YYYY-MM-DD`);
-  const y = Number(m[1]);
-  const mo = Number(m[2]) - 1;
-  const d = Number(m[3]);
-  const dt = new Date(Date.UTC(y, mo, d));
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
   if (endExclusive) dt.setUTCDate(dt.getUTCDate() + 1);
   return admin.firestore.Timestamp.fromDate(dt);
 }
@@ -90,203 +68,199 @@ function sleep(ms) {
 }
 
 function str(v) {
-  if (typeof v !== "string") return "";
-  return v.trim();
+  return typeof v === "string" ? v.trim() : "";
 }
 
 function isNonEmpty(v) {
   return str(v).length > 0;
 }
 
-/**
- * Resolve profile fields for a delegate. Cached per process.
- */
 function makeProfileResolver(db) {
-  const cache = new Map(); // delegateId -> {name, phone, companyName, photo, companyId}
+  const cache = new Map();
 
   async function load(delegateId, orgId, companyIdHint) {
     const key = `${orgId || ""}|${delegateId}`;
     if (cache.has(key)) return cache.get(key);
-
-    const empty = {
-      name: "",
-      phone: "",
-      companyName: "",
-      photo: "",
-      companyId: companyIdHint || "",
-    };
+    const empty = {name: "", phone: "", companyName: "", photo: "", companyId: companyIdHint || ""};
     if (!delegateId) {
       cache.set(key, empty);
       return empty;
     }
-
     const picks = [];
     if (orgId && companyIdHint) {
       picks.push(
-        db
-          .collection("organizations")
-          .doc(orgId)
-          .collection("companies")
-          .doc(companyIdHint)
-          .collection("delegates")
-          .doc(delegateId)
-          .get(),
+        db.collection("organizations").doc(orgId)
+          .collection("companies").doc(companyIdHint)
+          .collection("delegates").doc(delegateId).get(),
       );
     }
     picks.push(db.collection("users").doc(delegateId).get());
     picks.push(db.collection("delegates").doc(delegateId).get());
-
     const snaps = await Promise.all(picks);
     let data = null;
     let companyId = companyIdHint || "";
     for (const snap of snaps) {
       if (snap.exists) {
         data = snap.data() || {};
-        companyId =
-          companyId ||
-          str(data.companyUID) ||
-          str(data.companyId) ||
-          str(data.company_uid) ||
-          "";
+        companyId = companyId || str(data.companyUID) || str(data.companyId) || "";
         break;
       }
     }
-
     if (!data) {
       cache.set(key, empty);
       return empty;
     }
-
     let companyName = str(data.companyName) || str(data.company_name);
     if (!companyName && orgId && companyId) {
       try {
-        const cSnap = await db
-          .collection("organizations")
-          .doc(orgId)
-          .collection("companies")
-          .doc(companyId)
-          .get();
+        const cSnap = await db.collection("organizations").doc(orgId)
+          .collection("companies").doc(companyId).get();
         if (cSnap.exists) {
           const c = cSnap.data() || {};
           companyName = str(c.name) || str(c.companyName) || str(c.title);
         }
-      } catch (_) {
-        /* ignore */
-      }
+      } catch (_) {/* ignore */}
     }
-
     const resolved = {
-      name:
-        str(data.fullName) ||
-        str(data.delegateName) ||
-        str(data.userName) ||
+      name: str(data.fullName) || str(data.delegateName) || str(data.userName) ||
         [str(data.firstName), str(data.lastName)].filter(Boolean).join(" "),
       phone: str(data.phoneNumber) || str(data.phone) || str(data.mobile),
       companyName,
-      photo:
-        str(data.personalPhotoURL) ||
-        str(data.personalPhotoUrl) ||
-        str(data.photoURL) ||
-        str(data.imageUrl),
+      photo: str(data.personalPhotoURL) || str(data.personalPhotoUrl) ||
+        str(data.photoURL) || str(data.imageUrl),
       companyId,
     };
     cache.set(key, resolved);
     return resolved;
   }
-
   return {load, cache};
-}
-
-/**
- * Find the best matching check_out for a check_in.
- * Prefer relatedCheckInId reverse lookup via querying outs for the delegate
- * in a window after check-in.
- */
-async function findMatchingCheckOut(db, collection, checkIn) {
-  const data = checkIn.data() || {};
-  const delegateId = str(data.delegateId) || str(data.userId);
-  const orgId = str(data.organizationId) || str(data.organizationUID);
-  const inTs = data.timestamp;
-  if (!delegateId || !inTs) return null;
-
-  // Window: from check-in to +36h (covers overnight shifts)
-  const start = inTs;
-  const endDate = inTs.toDate();
-  endDate.setHours(endDate.getHours() + 36);
-  const end = admin.firestore.Timestamp.fromDate(endDate);
-
-  let q = db
-    .collection(collection)
-    .where("type", "==", "check_out")
-    .where("delegateId", "==", delegateId)
-    .where("timestamp", ">=", start)
-    .where("timestamp", "<", end)
-    .orderBy("timestamp", "asc")
-    .limit(10);
-
-  if (orgId) q = q.where("organizationId", "==", orgId);
-
-  let snap;
-  try {
-    snap = await q.get();
-  } catch (err) {
-    // Fallback without orderBy if composite index missing on emulator
-    let q2 = db
-      .collection(collection)
-      .where("type", "==", "check_out")
-      .where("delegateId", "==", delegateId)
-      .limit(25);
-    if (orgId) q2 = q2.where("organizationId", "==", orgId);
-    snap = await q2.get();
-  }
-
-  const branch = str(data.branchName);
-  let best = null;
-  for (const doc of snap.docs) {
-    const d = doc.data() || {};
-    const ts = d.timestamp;
-    if (!ts || ts.toMillis() < inTs.toMillis() || ts.toMillis() >= end.toMillis()) {
-      continue;
-    }
-    if (str(d.relatedCheckInId) === checkIn.id) {
-      return doc;
-    }
-    if (branch && str(d.branchName) && str(d.branchName) !== branch) continue;
-    if (!best) best = doc;
-  }
-  return best;
 }
 
 function neededProfilePatch(data, profile) {
   const patch = {};
-  if (!isNonEmpty(data.delegateName) && isNonEmpty(profile.name)) {
-    patch.delegateName = profile.name;
-  }
-  if (!isNonEmpty(data.phoneNumber) && isNonEmpty(profile.phone)) {
-    patch.phoneNumber = profile.phone;
-  }
-  if (!isNonEmpty(data.companyName) && isNonEmpty(profile.companyName)) {
-    patch.companyName = profile.companyName;
-  }
-  if (!isNonEmpty(data.personalPhotoURL) && isNonEmpty(profile.photo)) {
-    patch.personalPhotoURL = profile.photo;
-  }
+  if (!isNonEmpty(data.delegateName) && isNonEmpty(profile.name)) patch.delegateName = profile.name;
+  if (!isNonEmpty(data.phoneNumber) && isNonEmpty(profile.phone)) patch.phoneNumber = profile.phone;
+  if (!isNonEmpty(data.companyName) && isNonEmpty(profile.companyName)) patch.companyName = profile.companyName;
+  if (!isNonEmpty(data.personalPhotoURL) && isNonEmpty(profile.photo)) patch.personalPhotoURL = profile.photo;
   return patch;
 }
 
-function neededCheckoutPatch(data, outDoc) {
-  if (!outDoc) return {};
-  const out = outDoc.data() || {};
+function stripOverwrite(data, patch) {
+  const out = {...patch};
+  for (const k of Object.keys(out)) {
+    const cur = data[k];
+    if (k === "checkOutTime" && cur instanceof admin.firestore.Timestamp) delete out[k];
+    else if (k === "checkOutLocation" && cur) delete out[k];
+    else if (typeof cur === "string" && cur.trim().length > 0) delete out[k];
+    else if (isNonEmpty(cur) && k === "checkOutDocId") delete out[k];
+  }
+  return out;
+}
+
+/** Stream all docs of a type with equality-only pagination. */
+async function* streamByType(db, collection, type, pageSize, orgFilter) {
+  let query = db.collection(collection).where("type", "==", type);
+  if (orgFilter) query = query.where("organizationId", "==", orgFilter);
+  query = query.limit(pageSize);
+  let lastDoc = null;
+  let pages = 0;
+  for (;;) {
+    const pageQuery = lastDoc ? query.startAfter(lastDoc) : query;
+    const snap = await pageQuery.get();
+    pages += 1;
+    if (snap.empty) return;
+    for (const doc of snap.docs) yield doc;
+    lastDoc = snap.docs[snap.docs.length - 1];
+    if (pages % 20 === 0) {
+      console.error(`stream type=${type} pages=${pages} last=${lastDoc.id}`);
+    }
+    if (snap.size < pageSize) return;
+  }
+}
+
+function inDateRange(data, fromTs, toTs) {
+  if (!fromTs && !toTs) return true;
+  const ts = data.timestamp;
+  if (!ts || !ts.toMillis) return false;
+  if (fromTs && ts.toMillis() < fromTs.toMillis()) return false;
+  if (toTs && ts.toMillis() >= toTs.toMillis()) return false;
+  return true;
+}
+
+/**
+ * Build checkout lookup maps for the whole collection (one pass).
+ * byRelatedId: relatedCheckInId -> {id, timestamp, location}
+ * byDelegate: delegateId -> array of outs (sorted by ts)
+ */
+async function loadCheckoutIndexes(db, collection, pageSize, orgFilter, fromTs, toTs) {
+  const byRelatedId = new Map();
+  const byDelegate = new Map();
+  let scanned = 0;
+  for await (const doc of streamByType(db, collection, "check_out", pageSize, orgFilter)) {
+    const d = doc.data() || {};
+    if (fromTs || toTs) {
+      const toExpanded = toTs
+        ? admin.firestore.Timestamp.fromMillis(toTs.toMillis() + 36 * 3600 * 1000)
+        : null;
+      if (!inDateRange(d, fromTs, toExpanded)) continue;
+    }
+    scanned += 1;
+    const delegateId = str(d.delegateId) || str(d.userId);
+    const related = str(d.relatedCheckInId);
+    const entry = {
+      id: doc.id,
+      timestamp: d.timestamp || null,
+      location: d.location || null,
+      branchName: str(d.branchName),
+      organizationId: str(d.organizationId),
+    };
+    if (related) byRelatedId.set(related, entry);
+    if (delegateId) {
+      if (!byDelegate.has(delegateId)) byDelegate.set(delegateId, []);
+      byDelegate.get(delegateId).push(entry);
+    }
+  }
+  for (const arr of byDelegate.values()) {
+    arr.sort((a, b) => {
+      const am = a.timestamp ? a.timestamp.toMillis() : 0;
+      const bm = b.timestamp ? b.timestamp.toMillis() : 0;
+      return am - bm;
+    });
+  }
+  console.error(`checkout index: scanned=${scanned} related=${byRelatedId.size} delegates=${byDelegate.size}`);
+  return {byRelatedId, byDelegate, scanned};
+}
+
+function findCheckout(checkInId, data, indexes) {
+  const related = indexes.byRelatedId.get(checkInId);
+  if (related) return related;
+  const delegateId = str(data.delegateId) || str(data.userId);
+  const inTs = data.timestamp;
+  if (!delegateId || !inTs) return null;
+  const outs = indexes.byDelegate.get(delegateId) || [];
+  const start = inTs.toMillis();
+  const end = start + 36 * 3600 * 1000;
+  const branch = str(data.branchName);
+  let best = null;
+  for (const o of outs) {
+    if (!o.timestamp) continue;
+    const m = o.timestamp.toMillis();
+    if (m < start || m >= end) continue;
+    if (branch && o.branchName && o.branchName !== branch) continue;
+    best = o;
+    break; // earliest after check-in
+  }
+  return best;
+}
+
+function neededCheckoutPatch(data, out) {
+  if (!out) return {};
   const patch = {};
   if (!(data.checkOutTime instanceof admin.firestore.Timestamp) && out.timestamp) {
     patch.checkOutTime = out.timestamp;
   }
-  if (!isNonEmpty(data.checkOutDocId)) {
-    patch.checkOutDocId = outDoc.id;
-  }
-  if (!data.checkOutLocation && out.location) {
-    patch.checkOutLocation = out.location;
-  }
+  if (!isNonEmpty(data.checkOutDocId)) patch.checkOutDocId = out.id;
+  if (!data.checkOutLocation && out.location) patch.checkOutLocation = out.location;
   return patch;
 }
 
@@ -294,11 +268,16 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const emulator = process.env.FIRESTORE_EMULATOR_HOST || "";
 
+  if (opts.collection !== "attendance_logs") {
+    console.error(`Refusing collection=${opts.collection} — only attendance_logs allowed.`);
+    process.exit(2);
+  }
   if (opts.apply && !emulator && !opts.allowProd) {
-    console.error(
-      "Refusing --apply without FIRESTORE_EMULATOR_HOST. " +
-        "Pass --i-understand-prod only for an intentional production run.",
-    );
+    console.error("Refusing --apply without emulator unless --i-understand-prod.");
+    process.exit(2);
+  }
+  if (emulator && opts.allowProd) {
+    console.error("Conflicting: emulator + --i-understand-prod.");
     process.exit(2);
   }
 
@@ -309,7 +288,7 @@ async function main() {
   db.settings({ignoreUndefinedProperties: true});
 
   const fromTs = parseDay(opts.from, false);
-  const toTs = parseDay(opts.to, true); // exclusive end of --to day
+  const toTs = parseDay(opts.to, true);
   if ((opts.from && !opts.to) || (!opts.from && opts.to)) {
     throw new Error("Provide both --from and --to, or neither.");
   }
@@ -318,32 +297,44 @@ async function main() {
     startedAt: new Date().toISOString(),
     mode: opts.apply ? "apply" : "dry-run",
     emulator: emulator || null,
+    projectId: process.env.GCLOUD_PROJECT || "practice-firebase-72df1",
     org: opts.org,
     from: opts.from,
     to: opts.to,
     collection: opts.collection,
     scanned: 0,
     checkIns: 0,
+    checkOutsIndexed: 0,
     wouldUpdate: 0,
     updated: 0,
     skippedComplete: 0,
     profileFieldsStamped: 0,
     checkoutFieldsStamped: 0,
+    fieldCounts: {
+      delegateName: 0, phoneNumber: 0, companyName: 0, personalPhotoURL: 0,
+      checkOutTime: 0, checkOutDocId: 0, checkOutLocation: 0,
+    },
+    orgs: {},
+    minTimestamp: null,
+    maxTimestamp: null,
+    abortedOverLimit: false,
     errors: [],
     sampleUpdates: [],
     estimatedWrites: 0,
     estimatedCostUsd: 0,
+    backupPath: opts.backup || null,
+    backupDocs: 0,
   };
 
+  console.error("Indexing check_out docs (read-only)…");
+  const indexes = await loadCheckoutIndexes(
+    db, opts.collection, opts.pageSize, opts.org, fromTs, toTs,
+  );
+  report.checkOutsIndexed = indexes.scanned;
+
   const resolver = makeProfileResolver(db);
-
-  let query = db.collection(opts.collection).where("type", "==", "check_in");
-  if (opts.org) query = query.where("organizationId", "==", opts.org);
-  if (fromTs) query = query.where("timestamp", ">=", fromTs);
-  if (toTs) query = query.where("timestamp", "<", toTs);
-  query = query.orderBy("timestamp", "asc").limit(opts.pageSize);
-
-  let lastDoc = null;
+  const backupDocs = [];
+  let aborted = false;
   let batch = db.batch();
   let pending = 0;
   let writesCommitted = 0;
@@ -356,102 +347,137 @@ async function main() {
     }
     await batch.commit();
     writesCommitted += pending;
+    console.error(`committed batch writes=${pending} total=${writesCommitted}`);
     pending = 0;
     batch = db.batch();
     if (opts.rateMs > 0) await sleep(opts.rateMs);
   }
 
-  for (;;) {
-    let pageQuery = query;
-    if (lastDoc) pageQuery = query.startAfter(lastDoc);
-    let snap;
+  console.error("Scanning check_in docs…");
+  for await (const doc of streamByType(db, opts.collection, "check_in", opts.pageSize, opts.org)) {
+    report.scanned += 1;
+    const data = doc.data() || {};
+    if (data.type !== "check_in") continue;
+    if (!inDateRange(data, fromTs, toTs)) continue;
+    report.checkIns += 1;
+
+    const orgId = str(data.organizationId) || str(data.organizationUID) || opts.org || "";
+    const companyId = str(data.companyId) || str(data.companyUID);
+    const delegateId = str(data.delegateId) || str(data.userId);
+
+    let profilePatch = {};
     try {
-      snap = await pageQuery.get();
+      const profile = await resolver.load(delegateId, orgId, companyId);
+      profilePatch = neededProfilePatch(data, profile);
     } catch (err) {
-      // Emulator / missing composite: fall back to broader scan + filter
-      console.warn("Paged query failed, falling back:", err.message);
-      let fallback = db.collection(opts.collection).where("type", "==", "check_in");
-      if (opts.org) fallback = fallback.where("organizationId", "==", opts.org);
-      snap = await fallback.limit(opts.pageSize).get();
-      // one-shot fallback
-      lastDoc = "DONE";
+      report.errors.push({id: doc.id, stage: "profile", message: String(err.message || err)});
     }
 
-    if (snap.empty) break;
-
-    for (const doc of snap.docs) {
-      report.scanned += 1;
-      const data = doc.data() || {};
-      if (data.type !== "check_in") continue;
-      if (fromTs && data.timestamp && data.timestamp.toMillis() < fromTs.toMillis()) continue;
-      if (toTs && data.timestamp && data.timestamp.toMillis() >= toTs.toMillis()) continue;
-      report.checkIns += 1;
-
-      const orgId = str(data.organizationId) || str(data.organizationUID) || opts.org || "";
-      const companyId = str(data.companyId) || str(data.companyUID);
-      const delegateId = str(data.delegateId) || str(data.userId);
-
-      let profilePatch = {};
+    let checkoutPatch = {};
+    const needsCheckout =
+      !(data.checkOutTime instanceof admin.firestore.Timestamp) ||
+      !isNonEmpty(data.checkOutDocId) ||
+      !data.checkOutLocation;
+    if (needsCheckout) {
       try {
-        const profile = await resolver.load(delegateId, orgId, companyId);
-        profilePatch = neededProfilePatch(data, profile);
+        const out = findCheckout(doc.id, data, indexes);
+        checkoutPatch = neededCheckoutPatch(data, out);
       } catch (err) {
-        report.errors.push({id: doc.id, stage: "profile", message: String(err.message || err)});
-      }
-
-      let checkoutPatch = {};
-      const needsCheckout =
-        !(data.checkOutTime instanceof admin.firestore.Timestamp) ||
-        !isNonEmpty(data.checkOutDocId) ||
-        !data.checkOutLocation;
-      if (needsCheckout) {
-        try {
-          const outDoc = await findMatchingCheckOut(db, opts.collection, doc);
-          checkoutPatch = neededCheckoutPatch(data, outDoc);
-        } catch (err) {
-          report.errors.push({id: doc.id, stage: "checkout", message: String(err.message || err)});
-        }
-      }
-
-      const patch = {...profilePatch, ...checkoutPatch};
-      if (Object.keys(patch).length === 0) {
-        report.skippedComplete += 1;
-        continue;
-      }
-
-      report.wouldUpdate += 1;
-      report.profileFieldsStamped += Object.keys(profilePatch).length;
-      report.checkoutFieldsStamped += Object.keys(checkoutPatch).length;
-      if (report.sampleUpdates.length < 25) {
-        report.sampleUpdates.push({id: doc.id, fields: Object.keys(patch)});
-      }
-
-      if (opts.apply) {
-        batch.update(doc.ref, patch);
-        pending += 1;
-        report.updated += 1;
-        if (pending >= opts.batchSize) await flush();
+        report.errors.push({id: doc.id, stage: "checkout", message: String(err.message || err)});
       }
     }
 
-    if (lastDoc === "DONE") break;
-    lastDoc = snap.docs[snap.docs.length - 1];
-    if (snap.size < opts.pageSize) break;
+    let patch = stripOverwrite(data, {...profilePatch, ...checkoutPatch});
+    if (Object.keys(patch).length === 0) {
+      report.skippedComplete += 1;
+      continue;
+    }
+
+    report.wouldUpdate += 1;
+    report.profileFieldsStamped += Object.keys(profilePatch).length;
+    report.checkoutFieldsStamped += Object.keys(checkoutPatch).length;
+    for (const k of Object.keys(patch)) {
+      if (report.fieldCounts[k] != null) report.fieldCounts[k] += 1;
+    }
+    if (orgId) report.orgs[orgId] = (report.orgs[orgId] || 0) + 1;
+    if (data.timestamp && data.timestamp.toDate) {
+      const iso = data.timestamp.toDate().toISOString();
+      if (!report.minTimestamp || iso < report.minTimestamp) report.minTimestamp = iso;
+      if (!report.maxTimestamp || iso > report.maxTimestamp) report.maxTimestamp = iso;
+    }
+    if (report.sampleUpdates.length < 25) {
+      report.sampleUpdates.push({id: doc.id, fields: Object.keys(patch), orgId});
+    }
+    if (opts.backup) {
+      // Serialize Timestamps for JSON backup
+      const before = JSON.parse(JSON.stringify(data, (k, v) => {
+        if (v && typeof v === "object" && typeof v.toDate === "function") {
+          return {__timestamp: v.toDate().toISOString()};
+        }
+        return v;
+      }));
+      const wouldPatch = JSON.parse(JSON.stringify(patch, (k, v) => {
+        if (v && typeof v === "object" && typeof v.toDate === "function") {
+          return {__timestamp: v.toDate().toISOString()};
+        }
+        return v;
+      }));
+      backupDocs.push({id: doc.id, path: doc.ref.path, before, wouldPatch});
+    }
+
+    if (report.wouldUpdate > opts.maxUpdates) {
+      report.abortedOverLimit = true;
+      aborted = true;
+      console.error(`ABORT: wouldUpdate > max-updates=${opts.maxUpdates}`);
+      break;
+    }
+
+    if (opts.apply) {
+      batch.update(doc.ref, patch);
+      pending += 1;
+      report.updated += 1;
+      if (pending >= opts.batchSize) await flush();
+    }
+
+    if (report.checkIns % 1000 === 0) {
+      console.error(
+        `progress checkIns=${report.checkIns} wouldUpdate=${report.wouldUpdate} skipped=${report.skippedComplete}`,
+      );
+    }
   }
 
-  await flush();
+  if (!aborted) await flush();
+  else if (opts.apply && pending > 0) {
+    console.error(`Discarding uncommitted batch after abort (${pending}).`);
+    pending = 0;
+  }
 
-  // Cost estimate: Firestore billed writes ~$0.18 / 100k (approx; us-central1)
+  if (opts.backup) {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      collection: opts.collection,
+      mode: report.mode,
+      count: backupDocs.length,
+      docs: backupDocs,
+    };
+    fs.mkdirSync(path.dirname(opts.backup), {recursive: true});
+    fs.writeFileSync(opts.backup, JSON.stringify(payload));
+    report.backupDocs = backupDocs.length;
+    console.error(`Backup written: ${opts.backup} (${backupDocs.length} docs)`);
+  }
+
   report.estimatedWrites = report.wouldUpdate;
   report.estimatedCostUsd = Number(((report.wouldUpdate / 100000) * 0.18).toFixed(6));
   report.writesCommitted = writesCommitted;
   report.finishedAt = new Date().toISOString();
   report.profilesCached = resolver.cache.size;
+  report.orgCount = Object.keys(report.orgs).length;
 
   const json = JSON.stringify(report, null, 2);
   fs.writeFileSync(opts.report, json);
   console.log(json);
   console.log(`\nReport written to ${opts.report}`);
+  if (report.abortedOverLimit) process.exit(3);
 }
 
 if (require.main === module) {
@@ -465,6 +491,6 @@ module.exports = {
   parseArgs,
   neededProfilePatch,
   neededCheckoutPatch,
+  stripOverwrite,
   makeProfileResolver,
-  findMatchingCheckOut,
 };
