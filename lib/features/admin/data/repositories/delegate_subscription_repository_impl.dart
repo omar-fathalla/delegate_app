@@ -7,6 +7,7 @@ import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
+import 'package:flutter/foundation.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionRepository {
@@ -224,6 +225,22 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       // 7. Create pending delegate placeholder if permissions permit
       try {
+        String? existingPid;
+        try {
+          final existingByNat = await _firestore
+              .collectionGroup('delegates')
+              .where('nationalId', isEqualTo: cleanNationalId)
+              .limit(1)
+              .get();
+          if (existingByNat.docs.isNotEmpty) {
+            existingPid = existingByNat.docs.first.data()['delegatePublicId'] as String?;
+          }
+        } catch (_) {}
+
+        final city = _extractCityFromNationalId(cleanNationalId);
+        final birthDate = _extractBirthDateFromNationalId(cleanNationalId);
+        final gender = _extractGenderFromNationalId(cleanNationalId);
+
         await _firestore
             .collection('organizations')
             .doc(organizationUID)
@@ -233,6 +250,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             .doc(requestId)
             .set({
           'uid': requestId,
+          if (existingPid != null && existingPid.trim().isNotEmpty)
+            'delegatePublicId': existingPid.trim(),
           'firstName': firstName,
           'secondName': secondName,
           'thirdName': thirdName,
@@ -240,6 +259,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           'phoneNumber': phoneNumber,
           'nationalId': nationalId,
           'nationalityID': nationalId,
+          if (city.isNotEmpty) 'city': city,
+          if (birthDate != null) 'birthDate': Timestamp.fromDate(birthDate),
+          if (gender != null && gender.isNotEmpty) 'gender': gender,
           'organizationUID': organizationUID,
           'organizationName': organizationName,
           'companyUID': companyUID,
@@ -271,8 +293,11 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
               },
           ],
           'status': 'pending',
-          'position': 'promoter',
+          'position': 'Promoter',
           'role': 'delegate',
+          'registeredVia': 'mobile_app',
+          'originOrganizationUID': organizationUID,
+          'originOrganizationName': organizationName,
           'isDeductedFromCompany':
               paymentMethod == SubscriptionPaymentMethod.companyDeduction,
           'receiptCode': receiptCode,
@@ -777,9 +802,19 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         return const Right(null);
       }
 
+      final delegatePublicId = await _resolveOrAllocateDelegatePublicId(
+        delegateUid: targetDelegateUid,
+        nationalId: request.nationalId,
+      );
+
+      final city = _extractCityFromNationalId(request.nationalId);
+      final birthDate = _extractBirthDateFromNationalId(request.nationalId);
+      final gender = _extractGenderFromNationalId(request.nationalId);
+
       // 2. Update delegate record to active in company branch
       final delegateData = {
         'uid': targetDelegateUid,
+        if (delegatePublicId.isNotEmpty) 'delegatePublicId': delegatePublicId,
         'firstName': request.firstName,
         'secondName': request.secondName,
         'thirdName': request.thirdName,
@@ -787,6 +822,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'phoneNumber': request.phoneNumber,
         'nationalId': request.nationalId,
         'nationalityID': request.nationalId,
+        if (city.isNotEmpty) 'city': city,
+        if (birthDate != null) 'birthDate': Timestamp.fromDate(birthDate),
+        if (gender != null && gender.isNotEmpty) 'gender': gender,
         'organizationUID': request.organizationUID,
         'organizationName': request.organizationName,
         'companyUID': request.companyUID,
@@ -822,7 +860,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             },
         ],
         'status': 'active',
-        'position': 'promoter',
+        'position': 'Promoter',
         'role': 'delegate',
         'isDeductedFromCompany':
             request.paymentMethod == SubscriptionPaymentMethod.companyDeduction,
@@ -890,7 +928,24 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           request.currentOrganizationName!.trim(),
       }.where((s) => s.isNotEmpty).toList();
 
+      final originOrgName = (request.currentOrganizationName != null &&
+              request.currentOrganizationName!.trim().isNotEmpty)
+          ? request.currentOrganizationName!.trim()
+          : request.organizationName.trim();
+
+      final smartPosition = formatSmartPosition(
+        allOrgs: allKnownOrgs,
+        currentOrgName: request.organizationName,
+        originOrgName: originOrgName,
+      );
+
+      final isExternal = originOrgName.toLowerCase() != request.organizationName.toLowerCase();
+
       final targetDelegateData = Map<String, dynamic>.from(delegateData);
+      targetDelegateData['position'] = smartPosition;
+      targetDelegateData['originOrganizationName'] = originOrgName;
+      targetDelegateData['isExternal'] = isExternal;
+      targetDelegateData['registeredVia'] = 'mobile_app';
       if (allKnownOrgs.length > 1) {
         targetDelegateData['allOrganizationNames'] = allKnownOrgs;
       }
@@ -909,7 +964,13 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         try {
           final supDoc = await _firestore.collection('users').doc(request.supervisorUid).get();
           final supOrg = supDoc.data()?['organizationUID'] as String?;
+          final supOrgName = supDoc.data()?['organizationName'] as String? ?? '';
           if (supOrg != null && supOrg.isNotEmpty && supOrg != request.organizationUID) {
+            final origSmartPos = formatSmartPosition(
+              allOrgs: allKnownOrgs,
+              currentOrgName: supOrgName.isNotEmpty ? supOrgName : request.currentOrganizationName,
+              originOrgName: originOrgName,
+            );
             await _firestore
                 .collection('organizations')
                 .doc(supOrg)
@@ -918,6 +979,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
                 .collection('delegates')
                 .doc(targetDelegateUid)
                 .update({
+              'position': origSmartPos,
               'allOrganizationNames': FieldValue.arrayUnion([request.organizationName]),
               'updatedAt': FieldValue.serverTimestamp(),
             });
@@ -935,6 +997,18 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             if (supOrgName.isNotEmpty) {
               supDelegateData['organizationName'] = supOrgName;
             }
+            final supSmartPos = formatSmartPosition(
+              allOrgs: allKnownOrgs,
+              currentOrgName: supOrgName,
+              originOrgName: originOrgName,
+            );
+            supDelegateData['position'] = supSmartPos;
+            supDelegateData['originOrganizationName'] = originOrgName;
+            supDelegateData['isExternal'] = originOrgName.toLowerCase() != supOrgName.toLowerCase();
+            supDelegateData['registeredVia'] = 'mobile_app';
+            if (allKnownOrgs.length > 1) {
+              supDelegateData['allOrganizationNames'] = allKnownOrgs;
+            }
             await _firestore
                 .collection('organizations')
                 .doc(supOrg)
@@ -950,6 +1024,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // 3. Also ensure user record exists for mobile login with all organization names
       await _firestore.collection('users').doc(targetDelegateUid).set({
         'uid': targetDelegateUid,
+        if (delegatePublicId.isNotEmpty) 'delegatePublicId': delegatePublicId,
         'fullName': request.fullName,
         'phoneNumber': request.phoneNumber,
         'phone': request.phoneNumber,
@@ -960,6 +1035,25 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'status': 'active',
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+
+      // 3a. Sync delegatePublicId to any existing delegate records across other organizations
+      if (delegatePublicId.isNotEmpty) {
+        try {
+          final groupQuery = await _firestore
+              .collectionGroup('delegates')
+              .where('uid', isEqualTo: targetDelegateUid)
+              .get();
+          for (final doc in groupQuery.docs) {
+            final existingPid = doc.data()['delegatePublicId']?.toString().trim();
+            if (existingPid == null || existingPid.isEmpty) {
+              await doc.reference.set({
+                'delegatePublicId': delegatePublicId,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+            }
+          }
+        } catch (_) {}
+      }
 
       // 3b. Update used_receipt_codes if branch receipt
       if (request.receiptCode != null && request.receiptCode!.trim().isNotEmpty) {
@@ -1079,6 +1173,186 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       return const Right(null);
     } catch (e) {
       return Left(ServerFailure('فشل رفض الطلب: $e'));
+    }
+  }
+
+  /// Resolve an existing delegatePublicId across chains or allocate a new atomic sequence from /counters/delegates
+  Future<String> _resolveOrAllocateDelegatePublicId({
+    required String delegateUid,
+    required String nationalId,
+  }) async {
+    final cleanNat = nationalId.trim();
+    final cleanUid = delegateUid.trim();
+
+    // 1. Check if delegate already has a delegatePublicId in any organization by UID
+    if (cleanUid.isNotEmpty) {
+      try {
+        final uidSnap = await _firestore
+            .collectionGroup('delegates')
+            .where('uid', isEqualTo: cleanUid)
+            .get();
+        for (final doc in uidSnap.docs) {
+          final pid = doc.data()['delegatePublicId']?.toString().trim();
+          if (pid != null && pid.isNotEmpty) {
+            return pid;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Check if delegate already has a delegatePublicId by national ID
+    if (cleanNat.isNotEmpty) {
+      try {
+        final natSnap = await _firestore
+            .collectionGroup('delegates')
+            .where('nationalId', isEqualTo: cleanNat)
+            .limit(5)
+            .get();
+        for (final doc in natSnap.docs) {
+          final pid = doc.data()['delegatePublicId']?.toString().trim();
+          if (pid != null && pid.isNotEmpty) {
+            return pid;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Atomically allocate next counter from /counters/delegates
+    try {
+      final allocated = await _firestore.runTransaction<String>((transaction) async {
+        final counterRef = _firestore.collection('counters').doc('delegates');
+        final counterSnap = await transaction.get(counterRef);
+        int currentCount = 6232;
+        if (counterSnap.exists && counterSnap.data() != null) {
+          currentCount = (counterSnap.data()!['count'] as num?)?.toInt() ?? 6232;
+        }
+        final nextCount = currentCount + 1;
+        transaction.set(counterRef, {'count': nextCount}, SetOptions(merge: true));
+        return 'DEL-$nextCount';
+      });
+      return allocated;
+    } catch (e) {
+      debugPrint('Error allocating delegatePublicId: $e');
+      return '';
+    }
+  }
+
+  static String _extractCityFromNationalId(String nationalId) {
+    final clean = nationalId.trim();
+    if (clean.length == 14 && RegExp(r'^\d+$').hasMatch(clean)) {
+      final code = clean.substring(7, 9);
+      const govMap = {
+        '01': 'القاهرة',
+        '02': 'الإسكندرية',
+        '03': 'بورسعيد',
+        '04': 'السويس',
+        '11': 'دمياط',
+        '12': 'الدقهلية',
+        '13': 'الشرقية',
+        '14': 'القليوبية',
+        '15': 'كفر الشيخ',
+        '16': 'الغربية',
+        '17': 'المنوفية',
+        '18': 'البحيرة',
+        '19': 'الإسماعيلية',
+        '21': 'الجيزة',
+        '22': 'بني سويف',
+        '23': 'الفيوم',
+        '24': 'المنيا',
+        '25': 'أسيوط',
+        '26': 'سوهاج',
+        '27': 'قنا',
+        '28': 'أسوان',
+        '29': 'الأقصر',
+        '31': 'البحر الأحمر',
+        '32': 'الوادي الجديد',
+        '33': 'مطروح',
+        '34': 'شمال سيناء',
+        '35': 'جنوب سيناء',
+        '88': 'خارج الجمهورية',
+      };
+      return govMap[code] ?? '';
+    }
+    return '';
+  }
+
+  static DateTime? _extractBirthDateFromNationalId(String nationalId) {
+    final clean = nationalId.trim();
+    if (clean.length == 14 && RegExp(r'^\d+$').hasMatch(clean)) {
+      final century = clean[0] == '2' ? 1900 : (clean[0] == '3' ? 2000 : null);
+      if (century != null) {
+        final year = century + int.parse(clean.substring(1, 3));
+        final month = int.parse(clean.substring(3, 5));
+        final day = int.parse(clean.substring(5, 7));
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+          return DateTime(year, month, day);
+        }
+      }
+    }
+    return null;
+  }
+
+  static String? _extractGenderFromNationalId(String nationalId) {
+    final clean = nationalId.trim();
+    if (clean.length == 14 && RegExp(r'^\d+$').hasMatch(clean)) {
+      final digit = int.tryParse(clean[12]);
+      if (digit != null) {
+        return digit % 2 == 0 ? 'female' : 'male';
+      }
+    }
+    return null;
+  }
+
+  /// Generates a clean, concise, single-line position label for web and mobile tables
+  /// dynamically indicating secondary chains or count of other chains without cluttering
+  static String formatSmartPosition({
+    required List<String> allOrgs,
+    String? currentOrgName,
+    String? originOrgName,
+    String basePosition = 'Promoter',
+  }) {
+    if (allOrgs.isEmpty) return basePosition;
+
+    final uniqueOrgs = allOrgs
+        .map((o) => o.trim())
+        .where((o) => o.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (uniqueOrgs.isEmpty) return basePosition;
+
+    final cur = currentOrgName?.trim().toLowerCase();
+    final origin = (originOrgName != null && originOrgName.trim().isNotEmpty)
+        ? originOrgName.trim()
+        : uniqueOrgs.first;
+    final originLower = origin.toLowerCase();
+
+    // 1. Only 1 organization
+    if (uniqueOrgs.length == 1) {
+      if (cur != null && cur.isNotEmpty && uniqueOrgs.first.toLowerCase() != cur) {
+        return '$basePosition (${uniqueOrgs.first})';
+      }
+      return basePosition;
+    }
+
+    // 2. Exactly 2 organizations
+    if (uniqueOrgs.length == 2) {
+      if (cur != null && cur.isNotEmpty) {
+        final otherOrg = uniqueOrgs.firstWhere(
+          (o) => o.toLowerCase() != cur,
+          orElse: () => uniqueOrgs.first,
+        );
+        return '$basePosition ($otherOrg)';
+      }
+      return '$basePosition (${uniqueOrgs[0]}، ${uniqueOrgs[1]})';
+    }
+
+    // 3. 3 or more organizations (e.g. 5 or 6 chains)
+    if (cur != null && cur.isNotEmpty && cur == originLower) {
+      return '$basePosition (مشترك - ${uniqueOrgs.length} سلاسل)';
+    } else {
+      final otherCount = uniqueOrgs.length - 1;
+      return '$basePosition ($origin + $otherCount سلاسل)';
     }
   }
 }

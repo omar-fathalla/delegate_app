@@ -180,26 +180,46 @@ class MockAttendanceLocalDataSource implements AttendanceLocalDataSource {
   int overwriteCallCount = 0;
 
   @override
-  Future<void> cacheAttendance(AttendanceModel attendanceToCache, [String? organizationId]) async {
+  Future<void> cacheAttendance(
+    AttendanceModel attendanceToCache, [
+    String? organizationId,
+    String? userId,
+  ]) async {
     cacheCallCount++;
     history.add(attendanceToCache);
   }
 
   @override
-  Future<List<AttendanceModel>> getLastAttendanceHistory([String? organizationId]) async {
+  Future<List<AttendanceModel>> getLastAttendanceHistory([
+    String? organizationId,
+    String? userId,
+  ]) async {
     return history;
   }
 
   @override
-  Future<void> updateAttendance(AttendanceModel attendanceToUpdate, [String? organizationId]) async {
+  Future<void> updateAttendance(
+    AttendanceModel attendanceToUpdate, [
+    String? organizationId,
+    String? userId,
+  ]) async {
     final index = history.indexWhere((e) => e.id == attendanceToUpdate.id);
     if (index != -1) history[index] = attendanceToUpdate;
   }
 
   @override
-  Future<void> overwriteHistory(List<AttendanceModel> newHistory, [String? organizationId]) async {
+  Future<void> overwriteHistory(
+    List<AttendanceModel> newHistory, [
+    String? organizationId,
+    String? userId,
+  ]) async {
     overwriteCallCount++;
     history = List.from(newHistory);
+  }
+
+  @override
+  Future<void> clearAttendanceCache([String? userId]) async {
+    history.clear();
   }
 }
 

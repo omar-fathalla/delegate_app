@@ -48,6 +48,10 @@ class DelegateModel extends Delegate {
     super.supervisorPhone,
     super.supervisorUid,
     super.allOrganizationNames = const [],
+    super.originOrganizationName,
+    super.originOrganizationUID,
+    super.isExternal = false,
+    super.registeredVia,
     super.isAnnualLeaveEnabled = false,
     super.annualLeaveQuota = 21,
   });
@@ -416,6 +420,10 @@ class DelegateModel extends Delegate {
         if (single != null && single.isNotEmpty) return [single];
         return const <String>[];
       }(),
+      originOrganizationName: (json['originOrganizationName'] as String?)?.trim(),
+      originOrganizationUID: (json['originOrganizationUID'] as String?)?.trim(),
+      isExternal: parseBool(json['isExternal'], false),
+      registeredVia: (json['registeredVia'] as String?)?.trim(),
       isAnnualLeaveEnabled: parseBool(json['isAnnualLeaveEnabled'], false),
       annualLeaveQuota: (json['annualLeaveQuota'] is num)
           ? (json['annualLeaveQuota'] as num).toInt()
@@ -522,6 +530,12 @@ class DelegateModel extends Delegate {
       if (supervisorUid != null) 'supervisorUid': supervisorUid,
       if (allOrganizationNames.isNotEmpty)
         'allOrganizationNames': allOrganizationNames,
+      if (originOrganizationName != null)
+        'originOrganizationName': originOrganizationName,
+      if (originOrganizationUID != null)
+        'originOrganizationUID': originOrganizationUID,
+      'isExternal': isExternal,
+      if (registeredVia != null) 'registeredVia': registeredVia,
       'isAnnualLeaveEnabled': isAnnualLeaveEnabled,
       'annualLeaveQuota': annualLeaveQuota,
     };
@@ -602,6 +616,12 @@ class DelegateModel extends Delegate {
       if (supervisorUid != null) 'supervisorUid': supervisorUid,
       if (allOrganizationNames.isNotEmpty)
         'allOrganizationNames': allOrganizationNames,
+      if (originOrganizationName != null)
+        'originOrganizationName': originOrganizationName,
+      if (originOrganizationUID != null)
+        'originOrganizationUID': originOrganizationUID,
+      'isExternal': isExternal,
+      if (registeredVia != null) 'registeredVia': registeredVia,
       'isAnnualLeaveEnabled': isAnnualLeaveEnabled,
       'annualLeaveQuota': annualLeaveQuota,
     };

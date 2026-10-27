@@ -108,4 +108,52 @@ void main() {
       expect(result.first.id, 'a1');
     });
   });
+
+  group('user-scoped isolation and clearAttendanceCache', () {
+    test('should isolate attendance cache per userId and organizationId', () async {
+      final tAttendanceUser2 = AttendanceModel(
+        id: 'a3',
+        userId: 'u2',
+        organizationId: 'org1',
+        checkInTime: tCheckInTime,
+        latitude: 30.0444,
+        longitude: 31.2357,
+        branchName: 'الفرع الرئيسي',
+      );
+
+      // Cache for user 1
+      await dataSource.cacheAttendance(tAttendance1, 'org1', 'u1');
+      // Cache for user 2
+      await dataSource.cacheAttendance(tAttendanceUser2, 'org1', 'u2');
+
+      // Retrieve for user 1
+      final historyU1 = await dataSource.getLastAttendanceHistory('org1', 'u1');
+      expect(historyU1.length, 1);
+      expect(historyU1.first.id, 'a1');
+      expect(historyU1.first.userId, 'u1');
+
+      // Retrieve for user 2 - should never see user 1's records
+      final historyU2 = await dataSource.getLastAttendanceHistory('org1', 'u2');
+      expect(historyU2.length, 1);
+      expect(historyU2.first.id, 'a3');
+      expect(historyU2.first.userId, 'u2');
+    });
+
+    test('clearAttendanceCache should clear scoped cache for user', () async {
+      await dataSource.cacheAttendance(tAttendance1, 'org1', 'u1');
+      expect(await dataSource.getLastAttendanceHistory('org1', 'u1'), isNotEmpty);
+
+      await dataSource.clearAttendanceCache('u1');
+      expect(await dataSource.getLastAttendanceHistory('org1', 'u1'), isEmpty);
+    });
+
+    test('clearAttendanceCache with null userId should clear all attendance caches', () async {
+      await dataSource.cacheAttendance(tAttendance1, 'org1', 'u1');
+      await dataSource.cacheAttendance(tAttendance2, 'org2', 'u2');
+
+      await dataSource.clearAttendanceCache();
+      expect(await dataSource.getLastAttendanceHistory('org1', 'u1'), isEmpty);
+      expect(await dataSource.getLastAttendanceHistory('org2', 'u2'), isEmpty);
+    });
+  });
 }

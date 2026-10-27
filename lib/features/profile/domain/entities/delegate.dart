@@ -76,6 +76,10 @@ class Delegate extends Equatable {
   final String? supervisorPhone;
   final String? supervisorUid;
   final List<String> allOrganizationNames;
+  final String? originOrganizationName;
+  final String? originOrganizationUID;
+  final bool isExternal;
+  final String? registeredVia;
   final bool isAnnualLeaveEnabled;
   final int annualLeaveQuota;
 
@@ -124,6 +128,10 @@ class Delegate extends Equatable {
     this.supervisorPhone,
     this.supervisorUid,
     this.allOrganizationNames = const [],
+    this.originOrganizationName,
+    this.originOrganizationUID,
+    this.isExternal = false,
+    this.registeredVia,
     this.isAnnualLeaveEnabled = false,
     this.annualLeaveQuota = 21,
   });
@@ -174,6 +182,10 @@ class Delegate extends Equatable {
     supervisorPhone,
     supervisorUid,
     allOrganizationNames,
+    originOrganizationName,
+    originOrganizationUID,
+    isExternal,
+    registeredVia,
     isAnnualLeaveEnabled,
     annualLeaveQuota,
   ];

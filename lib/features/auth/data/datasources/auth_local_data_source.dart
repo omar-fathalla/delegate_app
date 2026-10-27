@@ -84,7 +84,58 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
 
   @override
   Future<void> clearCachedData() async {
+    // 1. مسح المفاتيح الأساسية لبيانات المندوب والمنظمات
     await sharedPreferences.remove(cachedDelegateKey);
     await sharedPreferences.remove(cachedAllDelegatesKey);
+
+    // 2. مسح شامل لكافة الكاشات والبيانات المرتبطة بالمستخدم والجلسة السابقة
+    // مع الإبقاء الصارم على معرّف الجهاز الثابت (persistent_app_device_uuid)
+    // وإعدادات التطبيق العامة (الثيم، اللغة، إصدار سجل التغييرات)
+    final allKeys = sharedPreferences.getKeys();
+    final keysToRemove = <String>[];
+
+    for (final key in allKeys) {
+      if (key == cachedDelegateKey || key == cachedAllDelegatesKey) continue;
+
+      // الحفاظ على معرّف البصمة الرقمية للهاتف وإعدادات واجهة المستخدم العامة
+      if (key == 'persistent_app_device_uuid' ||
+          key == 'app_theme_mode' ||
+          key == 'locale_code' ||
+          key == 'last_seen_changelog_build' ||
+          key.startsWith('review_service_')) {
+        continue;
+      }
+
+      // مسح كافة كاشات الحضور والانصراف، الإشعارات، الجزاءات، الأذونات، الفروع، والسلاسل
+      if (key.startsWith('cachedAttendance') ||
+          key.startsWith('cached_attendance') ||
+          key.startsWith('activeAttendance') ||
+          key.startsWith('cachedOfflineQueue') ||
+          key.startsWith('cached_penalties') ||
+          key.startsWith('cached_leaves') ||
+          key.startsWith('cached_recent_photos') ||
+          key.startsWith('marketing_recent_photos') ||
+          key.startsWith('photo_permission') ||
+          key.startsWith('photo_permissions') ||
+          key.startsWith('cached_notifications') ||
+          key.startsWith('user_notifications') ||
+          key.startsWith('supervisor_orgs_') ||
+          key.startsWith('offline_actions_') ||
+          key.startsWith('user_session_') ||
+          key.startsWith('cached_device_') ||
+          key.startsWith('fav_branches_') ||
+          key.startsWith('active_branch_') ||
+          key.startsWith('cached_due_receipts_') ||
+          key.startsWith('billing_') ||
+          key.startsWith('company_penalties_') ||
+          key.startsWith('pinned_violation_') ||
+          key.startsWith('selected_departments_')) {
+        keysToRemove.add(key);
+      }
+    }
+
+    for (final key in keysToRemove) {
+      await sharedPreferences.remove(key);
+    }
   }
 }

@@ -112,7 +112,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         branchName: branchName,
       );
       // Always cache attendance after successful remote write
-      await localDataSource.cacheAttendance(result, organizationId);
+      await localDataSource.cacheAttendance(result, organizationId, userId);
       return Right(result);
     } on Failure catch (e) {
       return Left(e);
@@ -161,7 +161,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         lat,
         long,
       );
-      await localDataSource.updateAttendance(result, organizationId);
+      await localDataSource.updateAttendance(result, organizationId, userId);
       return Right(result);
     } catch (e) {
       if (e is Failure) return Left(e);
@@ -191,13 +191,13 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       );
 
       try {
-        await localDataSource.overwriteHistory(remoteHistory, organizationId);
+        await localDataSource.overwriteHistory(remoteHistory, organizationId, userId);
       } catch (_) {}
 
       return Right(remoteHistory);
     } on Failure catch (e) {
       try {
-        final localHistory = await localDataSource.getLastAttendanceHistory(organizationId);
+        final localHistory = await localDataSource.getLastAttendanceHistory(organizationId, userId);
         final filtered = localHistory.where((a) => a.userId == userId).toList();
         if (filtered.isNotEmpty) {
           return Right(filtered);
@@ -220,7 +220,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       if (!await _hasConnection()) {
         // Fallback to local history for the first page if offline
         if (lastDoc == null) {
-          final localHistory = await localDataSource.getLastAttendanceHistory(organizationId);
+          final localHistory = await localDataSource.getLastAttendanceHistory(organizationId, userId);
           final filtered = localHistory
               .where((a) => a.userId == userId)
               .toList();
@@ -249,7 +249,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       // Cache the first page locally
       if (lastDoc == null && response.items.isNotEmpty) {
         try {
-          await localDataSource.overwriteHistory(response.items, organizationId);
+          await localDataSource.overwriteHistory(response.items, organizationId, userId);
         } catch (_) {}
       }
 

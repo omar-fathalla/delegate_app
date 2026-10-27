@@ -7,6 +7,11 @@ import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
 import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tracking/data/services/delegate_tracking_engine.dart';
+import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
+import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_bloc.dart';
+import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
 
 /// نافذة تسجيل الخروج الموحدة المتوافقة مع معايير Material Design 3
@@ -99,13 +104,20 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
         debugPrint('Logout: Error signing out FirebaseAuth: $e');
       }
 
-      // 4. مسح الكاش المحلي لبيانات الجلسة والمندوب
+      // 4. مسح الكاش المحلي لبيانات الجلسة والمندوب وجميع البيانات المتبقية
       try {
         if (sl.isRegistered<AuthRepository>()) {
           await sl<AuthRepository>().clearCache();
         }
+        if (sl.isRegistered<AttendanceLocalDataSource>()) {
+          await sl<AttendanceLocalDataSource>().clearAttendanceCache();
+        }
+        AttendanceBloc.clearCache();
+        AdminDelegatesBloc.clearCache();
+        AdminDashboardBloc.clearCache();
+        MarketingBloc.clearCache();
       } catch (e) {
-        debugPrint('Logout: Error clearing auth cache: $e');
+        debugPrint('Logout: Error clearing auth and attendance cache: $e');
       }
 
       if (!mounted) return;

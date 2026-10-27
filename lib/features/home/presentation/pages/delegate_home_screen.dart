@@ -1154,7 +1154,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     try {
       if (sl.isRegistered<AttendanceLocalDataSource>()) {
         final localDataSource = sl<AttendanceLocalDataSource>();
-        final cached = await localDataSource.getLastAttendanceHistory();
+        final cached = await localDataSource.getLastAttendanceHistory(
+          null,
+          widget.delegate.uid,
+        );
         if (cached.isNotEmpty) {
           _computeStats(cached);
         }

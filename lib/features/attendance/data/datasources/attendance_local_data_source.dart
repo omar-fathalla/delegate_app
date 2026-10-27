@@ -3,10 +3,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/attendance_model.dart';
 
 abstract class AttendanceLocalDataSource {
-  Future<void> cacheAttendance(AttendanceModel attendanceToCache, [String? organizationId]);
-  Future<List<AttendanceModel>> getLastAttendanceHistory([String? organizationId]);
-  Future<void> updateAttendance(AttendanceModel attendanceToUpdate, [String? organizationId]);
-  Future<void> overwriteHistory(List<AttendanceModel> history, [String? organizationId]);
+  Future<void> cacheAttendance(
+    AttendanceModel attendanceToCache, [
+    String? organizationId,
+    String? userId,
+  ]);
+  Future<List<AttendanceModel>> getLastAttendanceHistory([
+    String? organizationId,
+    String? userId,
+  ]);
+  Future<void> updateAttendance(
+    AttendanceModel attendanceToUpdate, [
+    String? organizationId,
+    String? userId,
+  ]);
+  Future<void> overwriteHistory(
+    List<AttendanceModel> history, [
+    String? organizationId,
+    String? userId,
+  ]);
+  Future<void> clearAttendanceCache([String? userId]);
 }
 
 const cachedAttendance = 'cachedAttendance';
@@ -16,26 +32,40 @@ class AttendanceLocalDataSourceImpl implements AttendanceLocalDataSource {
 
   AttendanceLocalDataSourceImpl({required this.sharedPreferences});
 
-  String _getKey(String? organizationId) {
-    if (organizationId != null && organizationId.trim().isNotEmpty) {
-      return 'cachedAttendance_${organizationId.trim()}';
+  String _getKey(String? organizationId, [String? userId]) {
+    final effectiveUser = (userId != null && userId.trim().isNotEmpty) ? userId.trim() : null;
+    final effectiveOrg = (organizationId != null && organizationId.trim().isNotEmpty) ? organizationId.trim() : null;
+
+    if (effectiveUser != null && effectiveOrg != null) {
+      return 'cachedAttendance_${effectiveUser}_$effectiveOrg';
+    } else if (effectiveUser != null) {
+      return 'cachedAttendance_$effectiveUser';
+    } else if (effectiveOrg != null) {
+      return 'cachedAttendance_$effectiveOrg';
     }
     return cachedAttendance;
   }
 
   @override
-  Future<void> cacheAttendance(AttendanceModel attendanceToCache, [String? organizationId]) async {
-    final history = await getLastAttendanceHistory(organizationId);
+  Future<void> cacheAttendance(
+    AttendanceModel attendanceToCache, [
+    String? organizationId,
+    String? userId,
+  ]) async {
+    final history = await getLastAttendanceHistory(organizationId, userId);
     history.add(attendanceToCache);
     final jsonList = history.map((e) => json.encode(e.toJson())).toList();
-    await sharedPreferences.setStringList(_getKey(organizationId), jsonList);
+    await sharedPreferences.setStringList(_getKey(organizationId, userId), jsonList);
   }
 
   @override
-  Future<List<AttendanceModel>> getLastAttendanceHistory([String? organizationId]) async {
-    final jsonList = sharedPreferences.getStringList(_getKey(organizationId));
+  Future<List<AttendanceModel>> getLastAttendanceHistory([
+    String? organizationId,
+    String? userId,
+  ]) async {
+    final jsonList = sharedPreferences.getStringList(_getKey(organizationId, userId));
     if (jsonList != null && jsonList.isNotEmpty) {
-      return jsonList
+      final items = jsonList
           .map(
             (jsonStr) => AttendanceModel.fromJson(
               json.decode(jsonStr),
@@ -43,25 +73,50 @@ class AttendanceLocalDataSourceImpl implements AttendanceLocalDataSource {
             ),
           )
           .toList();
+      if (userId != null && userId.trim().isNotEmpty) {
+        return items.where((e) => e.userId.isEmpty || e.userId == userId.trim()).toList();
+      }
+      return items;
     } else {
       return [];
     }
   }
 
   @override
-  Future<void> updateAttendance(AttendanceModel attendanceToUpdate, [String? organizationId]) async {
-    final history = await getLastAttendanceHistory(organizationId);
+  Future<void> updateAttendance(
+    AttendanceModel attendanceToUpdate, [
+    String? organizationId,
+    String? userId,
+  ]) async {
+    final history = await getLastAttendanceHistory(organizationId, userId);
     final index = history.indexWhere((e) => e.id == attendanceToUpdate.id);
     if (index != -1) {
       history[index] = attendanceToUpdate;
       final jsonList = history.map((e) => json.encode(e.toJson())).toList();
-      await sharedPreferences.setStringList(_getKey(organizationId), jsonList);
+      await sharedPreferences.setStringList(_getKey(organizationId, userId), jsonList);
     }
   }
 
   @override
-  Future<void> overwriteHistory(List<AttendanceModel> history, [String? organizationId]) async {
+  Future<void> overwriteHistory(
+    List<AttendanceModel> history, [
+    String? organizationId,
+    String? userId,
+  ]) async {
     final jsonList = history.map((e) => json.encode(e.toJson())).toList();
-    await sharedPreferences.setStringList(_getKey(organizationId), jsonList);
+    await sharedPreferences.setStringList(_getKey(organizationId, userId), jsonList);
+  }
+
+  @override
+  Future<void> clearAttendanceCache([String? userId]) async {
+    final allKeys = sharedPreferences.getKeys();
+    final prefix = (userId != null && userId.trim().isNotEmpty)
+        ? 'cachedAttendance_${userId.trim()}'
+        : 'cachedAttendance';
+    for (final key in allKeys) {
+      if (key == cachedAttendance || key.startsWith(prefix)) {
+        await sharedPreferences.remove(key);
+      }
+    }
   }
 }
