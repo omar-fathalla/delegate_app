@@ -348,34 +348,46 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       }
 
       final queryBranchList = queryBranchTerms.toList();
+      // Firestore caps (filter clauses * whereIn size) at 100. With
+      // organizationId + branchName + timestamp>= + timestamp< (=4), max whereIn is 25.
+      const branchWhereInChunkSize = 20;
       final branchChunks = <List<String>>[];
-      for (var i = 0; i < queryBranchList.length; i += 30) {
+      for (var i = 0; i < queryBranchList.length; i += branchWhereInChunkSize) {
         branchChunks.add(
           queryBranchList.sublist(
             i,
-            (i + 30 > queryBranchList.length) ? queryBranchList.length : i + 30,
+            (i + branchWhereInChunkSize > queryBranchList.length)
+                ? queryBranchList.length
+                : i + branchWhereInChunkSize,
           ),
         );
       }
 
-      final List<QueryDocumentSnapshot<Map<String, dynamic>>> branchLogsDocs = [];
+      // attendance_logs writes use `organizationId` (see AttendanceRemoteDataSource).
+      // Bound the query by org + branchName variants + today's local calendar day
+      // (device TZ; production users are Africa/Cairo) + a hard limit so we never
+      // download the full historical collection.
+      String queryOrgId = organizationId.trim();
+      if (queryOrgId.isEmpty) {
+        queryOrgId = 'PiioBFgxaHAeuRdjlDgj'; // Fathalla Market default
+      }
+      final todayStartTs = Timestamp.fromDate(todayStart);
+      final todayEndTs = Timestamp.fromDate(todayEnd);
+      // Favorites UIs are typically << this; guards runaway orgs / bad data.
+      const todayAttendanceQueryLimit = 2000;
+
+      final List<QueryDocumentSnapshot<Map<String, dynamic>>> todayDocs = [];
       for (final chunk in branchChunks) {
         final snap = await firestore
             .collection(kAttendanceCollection)
+            .where('organizationId', isEqualTo: queryOrgId)
             .where('branchName', whereIn: chunk)
+            .where('timestamp', isGreaterThanOrEqualTo: todayStartTs)
+            .where('timestamp', isLessThan: todayEndTs)
+            .limit(todayAttendanceQueryLimit)
             .getResilient(forceServer: true);
-        branchLogsDocs.addAll(snap.docs);
+        todayDocs.addAll(snap.docs);
       }
-
-      // تصفية سجلات اليوم حسب النطاق الزمني مع معالجة السجلات الفورية (hasPendingWrites)
-      final todayDocs = branchLogsDocs.where((doc) {
-        final data = doc.data();
-        final ts = data['timestamp'] as Timestamp?;
-        final effectiveDate = ts?.toDate() ?? (doc.metadata.hasPendingWrites ? DateTime.now() : null);
-        if (effectiveDate == null) return false;
-        return effectiveDate.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
-            effectiveDate.isBefore(todayEnd);
-      }).toList();
 
       // خريطة فرز الحضور حسب الفرع
       final Map<String, List<Map<String, dynamic>>> result = {
@@ -483,16 +495,26 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
 
       if (missingCheckOutDelegateIds.isNotEmpty) {
         final uniqueMissing = missingCheckOutDelegateIds.toSet().toList();
-        for (var i = 0; i < uniqueMissing.length; i += 30) {
+        // org + type + delegateId + ts>= + ts< (=5) → whereIn chunk <= 20.
+        const checkoutWhereInChunkSize = 15;
+        for (var i = 0; i < uniqueMissing.length; i += checkoutWhereInChunkSize) {
           final chunk = uniqueMissing.sublist(
             i,
-            (i + 30 > uniqueMissing.length) ? uniqueMissing.length : i + 30,
+            (i + checkoutWhereInChunkSize > uniqueMissing.length)
+                ? uniqueMissing.length
+                : i + checkoutWhereInChunkSize,
           );
           try {
+            // Same day/org bound as the main query so missing-branchName
+            // check-outs do not pull the full historical collection.
             final outSnap = await firestore
                 .collection(kAttendanceCollection)
-                .where('delegateId', whereIn: chunk)
+                .where('organizationId', isEqualTo: queryOrgId)
                 .where('type', isEqualTo: 'check_out')
+                .where('delegateId', whereIn: chunk)
+                .where('timestamp', isGreaterThanOrEqualTo: todayStartTs)
+                .where('timestamp', isLessThan: todayEndTs)
+                .limit(todayAttendanceQueryLimit)
                 .getResilient(forceServer: true);
 
             for (final doc in outSnap.docs) {
@@ -500,7 +522,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
               final ts = data['timestamp'] as Timestamp?;
               if (ts == null) continue;
               final d = ts.toDate();
-              if (d.isBefore(todayStart) || d.isAfter(todayEnd)) continue;
+              if (d.isBefore(todayStart) || !d.isBefore(todayEnd)) continue;
 
               final delegateId = data['delegateId'] as String? ?? '';
               final relatedId = data['relatedCheckInId'] as String?;
@@ -522,22 +544,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       }
 
       // ── Step 2: تحديد المنظمة وجلب بيانات وصور المناديب بالتوازي ──
-      String defaultOrgId = organizationId.trim();
-      if (defaultOrgId.isEmpty) {
-        for (final doc in todayDocs) {
-          final o = doc.data()['organizationId'] as String? ??
-              doc.data()['organizationUID'] as String? ??
-              doc.data()['orgId'] as String? ??
-              doc.data()['orgUID'] as String?;
-          if (o != null && o.trim().isNotEmpty) {
-            defaultOrgId = o.trim();
-            break;
-          }
-        }
-      }
-      if (defaultOrgId.isEmpty) {
-        defaultOrgId = 'PiioBFgxaHAeuRdjlDgj'; // Fathalla Market default
-      }
+      final String defaultOrgId = queryOrgId;
 
       final delegateLookup = <String, Map<String, dynamic>>{};
       final companyNameCache = <String, String>{};
