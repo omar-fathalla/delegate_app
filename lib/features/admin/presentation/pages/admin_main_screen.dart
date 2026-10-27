@@ -61,7 +61,9 @@ class AdminMainScreen extends StatefulWidget {
 }
 
 class _AdminMainScreenState extends State<AdminMainScreen> {
-  int _currentIndex = 0;
+  int _currentIndex = const bool.fromEnvironment('REAL_TEST_START_BRANCH_TAB')
+      ? 2
+      : 0;
   late final List<Widget> _screens;
   @override
   void initState() {

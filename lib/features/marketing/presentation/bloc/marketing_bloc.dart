@@ -360,6 +360,8 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
         organizationId: event.organizationId,
         date: date,
         onFirstPaint: (partial) {
+          // ignore: avoid_print
+          print('[REAL_TEST] firstPaint msSinceEpoch=${DateTime.now().millisecondsSinceEpoch}');
           // First paint: logs (+ local profile caches). May still be enriching.
           for (final entry in partial.entries) {
             final key = '${event.organizationId}_${entry.key}_$dateSuffix';
@@ -379,6 +381,9 @@ class MarketingBloc extends Bloc<MarketingEvent, MarketingState> {
           }
         },
       );
+
+      // ignore: avoid_print
+      print('[REAL_TEST] fullyEnriched msSinceEpoch=${DateTime.now().millisecondsSinceEpoch}');
 
       // Save fully enriched result to per-branch cache & merge
       for (final entry in fetchedData.entries) {
