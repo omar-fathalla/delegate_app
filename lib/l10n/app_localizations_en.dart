@@ -399,6 +399,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get branches => 'Branches';
 
   @override
+  String get roleBranchMarketing => 'Branch Marketing';
+
+  @override
+  String get roleBranchesMarketingManager => 'Branches Marketing Manager';
+
+  @override
+  String get roleBranchesMarketingMgrShort => 'Branches Marketing Mgr';
+
+  @override
+  String get roleMarketingPromotion => 'Marketing Promotion';
+
+  @override
+  String get branchMarketingFollowUp => 'Branch Marketing Follow-up';
+
+  @override
+  String get branchMarketingCoordination => 'Branch Marketing Coordination';
+
+  @override
   String get admin => 'Admin';
 
   @override

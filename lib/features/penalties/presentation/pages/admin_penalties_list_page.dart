@@ -1385,7 +1385,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                       orElse: () => {'name': branchId},
                     );
                     return Padding(
-                      padding: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsetsDirectional.only(start: 6),
                       child: Chip(
                         avatar: Icon(Icons.location_on_rounded, size: 14, color: colorScheme.primary),
                         label: Text(
@@ -1410,7 +1410,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                     );
                   }),
                   Padding(
-                    padding: const EdgeInsets.only(left: 6),
+                    padding: const EdgeInsetsDirectional.only(start: 6),
                     child: ActionChip(
                       label: const Text('عرض الكل', style: TextStyle(fontSize: 11)),
                       visualDensity: VisualDensity.compact,

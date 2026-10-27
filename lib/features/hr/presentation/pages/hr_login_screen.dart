@@ -349,6 +349,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                 enableSuggestions: false,
                 autofillHints: const [AutofillHints.telephoneNumber],
                 textDirection: TextDirection.ltr,
+                textAlign: TextAlign.end,
                 style: const TextStyle(fontSize: 15, color: Colors.white),
                 decoration: _darkInputDecoration(
                   hintText: l10n.mobileNumber,
@@ -373,6 +374,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                 autofillHints: const [AutofillHints.password],
                 onFieldSubmitted: (_) => _submitLogin(context),
                 textDirection: TextDirection.ltr,
+                textAlign: TextAlign.end,
                 obscureText: _obscurePassword,
                 style: const TextStyle(fontSize: 15, color: Colors.white),
                 decoration: _darkInputDecoration(

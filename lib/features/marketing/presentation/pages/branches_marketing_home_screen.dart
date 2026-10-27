@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -171,6 +172,7 @@ class _BranchesMarketingHomeScreenState
     ColorScheme colorScheme,
     bool isArabic,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
     final displayName = delegate.fullName.isNotEmpty
         ? delegate.fullName
@@ -269,9 +271,7 @@ class _BranchesMarketingHomeScreenState
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            isArabic
-                                ? 'مدير تسويق الفروع'
-                                : 'Branches Marketing Manager',
+                            l10n.roleBranchesMarketingManager,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -535,6 +535,7 @@ class _BranchesMarketingHomeScreenState
     ColorScheme colorScheme,
     bool isArabic,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         // ── المهمة 1: الموافقة على أذونات التصوير ──
@@ -561,9 +562,7 @@ class _BranchesMarketingHomeScreenState
           icon: Icons.storefront_rounded,
           iconColor: colorScheme.primary,
           badgeText: isArabic ? 'ميداني' : 'Field Operations',
-          title: isArabic
-              ? 'متابعة تسويق الفروع'
-              : 'Branch Marketing Follow-up',
+          title: l10n.branchMarketingFollowUp,
           description: isArabic
               ? 'متابعة الفروع والعروض الترويجية، فحص تواجد مناديب الشركات، ومطابقة تسجيل الحضور الميداني بالفرع.'
               : 'Monitor branch promotion activities, vendor delegates presence, and verify on-ground attendance.',

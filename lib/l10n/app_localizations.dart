@@ -812,6 +812,42 @@ abstract class AppLocalizations {
   /// **'Branches'**
   String get branches;
 
+  /// Role title for branch marketing staff
+  ///
+  /// In en, this message translates to:
+  /// **'Branch Marketing'**
+  String get roleBranchMarketing;
+
+  /// Role title for branches marketing manager
+  ///
+  /// In en, this message translates to:
+  /// **'Branches Marketing Manager'**
+  String get roleBranchesMarketingManager;
+
+  /// Short label for branches marketing manager
+  ///
+  /// In en, this message translates to:
+  /// **'Branches Marketing Mgr'**
+  String get roleBranchesMarketingMgrShort;
+
+  /// Role title for marketing promotion staff
+  ///
+  /// In en, this message translates to:
+  /// **'Marketing Promotion'**
+  String get roleMarketingPromotion;
+
+  /// Subtitle for branch marketing follow-up
+  ///
+  /// In en, this message translates to:
+  /// **'Branch Marketing Follow-up'**
+  String get branchMarketingFollowUp;
+
+  /// Subtitle for branch marketing coordination
+  ///
+  /// In en, this message translates to:
+  /// **'Branch Marketing Coordination'**
+  String get branchMarketingCoordination;
+
   /// Label for the admin dashboard title.
   ///
   /// In en, this message translates to:

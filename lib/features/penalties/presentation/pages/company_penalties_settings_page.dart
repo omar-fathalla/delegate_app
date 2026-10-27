@@ -975,7 +975,7 @@ class _CompanyPenaltiesSettingsPageState
                                       orElse: () => {'name': branchId},
                                     );
                                     return Padding(
-                                      padding: const EdgeInsets.only(left: 6),
+                                      padding: const EdgeInsetsDirectional.only(start: 6),
                                       child: Chip(
                                         avatar: Icon(Icons.location_on_rounded,
                                             size: 13, color: colorScheme.primary),
@@ -998,7 +998,7 @@ class _CompanyPenaltiesSettingsPageState
                                     );
                                   }),
                                   Padding(
-                                    padding: const EdgeInsets.only(left: 6),
+                                    padding: const EdgeInsetsDirectional.only(start: 6),
                                     child: ActionChip(
                                       label: const Text('عرض الكل', style: TextStyle(fontSize: 11)),
                                       visualDensity: VisualDensity.compact,
