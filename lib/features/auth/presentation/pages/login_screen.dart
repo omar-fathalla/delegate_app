@@ -4,7 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
+import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
+import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_login_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -90,16 +93,26 @@ class _LoginScreenState extends State<LoginScreen>
               delegate: state.delegate,
             );
           } else if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: colorScheme.error,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            if (state.code == 'device_mismatch') {
+              DeviceLockDialog.show(context, requestAlreadyFiled: true);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    localizedAuthError(
+                      l10n,
+                      message: state.message,
+                      code: state.code,
+                    ),
+                  ),
+                  backgroundColor: colorScheme.error,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           } else if (state is AuthOrganizationSelectionRequired) {
             _showOrganizationSelector(
               context,
@@ -146,6 +159,9 @@ class _LoginScreenState extends State<LoginScreen>
           }
         },
         builder: (context, state) {
+          if (state is AuthPhoneOtpRequired) {
+            return DelegatePhoneOtpView(phoneE164: state.e164Phone);
+          }
           return SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -348,17 +364,17 @@ class _LoginScreenState extends State<LoginScreen>
                                               Icons.phone_android_rounded,
                                           colorScheme: colorScheme,
                                         ),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return l10n.enterMobileNumber;
-                                          }
-                                          return null;
-                                        },
+                                        validator: (value) => validateLoginPhone(
+                                          value,
+                                          emptyMessage: l10n.enterMobileNumber,
+                                          invalidMessage: l10n.invalidMobileNumber,
+                                        ),
                                       ),
 
                                       const SizedBox(height: 16),
 
-                                      // Password field
+                                      // National ID for delegates. Staff passwords
+                                      // that contain letters are still accepted.
                                       TextFormField(
                                         controller: _passwordController,
                                         keyboardType:
@@ -378,8 +394,8 @@ class _LoginScreenState extends State<LoginScreen>
                                           color: colorScheme.onSurface,
                                         ),
                                         decoration: _inputDecoration(
-                                          hintText: l10n.password,
-                                          prefixIcon: Icons.lock_rounded,
+                                          hintText: l10n.nationalIdNumber,
+                                          prefixIcon: Icons.badge_rounded,
                                           colorScheme: colorScheme,
                                           suffixIcon: IconButton(
                                             icon: Icon(
@@ -400,12 +416,20 @@ class _LoginScreenState extends State<LoginScreen>
                                             },
                                           ),
                                         ),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return l10n.enterPassword;
-                                          }
-                                          return null;
-                                        },
+                                        validator: (value) => validateLoginSecret(
+                                          value,
+                                          emptyMessage: l10n.enterNationalId,
+                                          invalidMessage: l10n.invalidNationalId,
+                                        ),
+                                      ),
+
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        l10n.loginNationalIdHelp,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
                                       ),
 
                                       const SizedBox(height: 16),

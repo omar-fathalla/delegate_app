@@ -183,6 +183,7 @@ class DelegateModel extends Delegate {
 
     UserRole parseRole(String? role) {
       switch (role?.trim().toLowerCase()) {
+        case 'super-admin':
         case 'super_admin':
         case 'superadmin':
           return UserRole.superAdmin;
@@ -434,7 +435,7 @@ class DelegateModel extends Delegate {
   static String roleToString(UserRole role) {
     switch (role) {
       case UserRole.superAdmin:
-        return 'super_admin';
+        return 'super-admin';
       case UserRole.organizationAdmin:
         return 'organization-admin';
       case UserRole.admin:

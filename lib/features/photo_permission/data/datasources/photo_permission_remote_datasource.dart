@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/error/failures.dart';
@@ -125,26 +124,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required this.storage,
   });
 
-  Future<void> _ensureAuth() async {
-    final auth = FirebaseAuth.instance;
-    if (auth.currentUser == null) {
-      try {
-        await auth.signInAnonymously().timeout(const Duration(seconds: 5));
-      } catch (_) {}
-    } else {
-      try {
-        await auth.currentUser!.getIdToken(false).timeout(const Duration(seconds: 3));
-      } catch (_) {
-        if (auth.currentUser?.isAnonymous == true) {
-          try {
-            await auth.signOut().timeout(const Duration(seconds: 3));
-            await auth.signInAnonymously().timeout(const Duration(seconds: 5));
-          } catch (_) {}
-        }
-      }
-    }
-  }
-
   @override
   Future<PhotoPermissionModel> requestPermission({
     required String organizationUID,
@@ -159,8 +138,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     String? department,
   }) async {
     try {
-      await _ensureAuth();
-
       // التحقق من عدم وجود إذن فعال أو معلق قيد المراجعة لنفس الشركة
       final existingDocs = await firestore
           .collection('organizations')
@@ -227,7 +204,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required String approvedBy,
   }) async {
     try {
-      await _ensureAuth();
       final docRef = firestore
           .collection('organizations')
           .doc(organizationUID)
@@ -257,7 +233,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required bool isEnabled,
   }) async {
     try {
-      await _ensureAuth();
       final docRef = firestore
           .collection('organizations')
           .doc(organizationUID)
@@ -320,7 +295,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required String companyUID,
   }) async {
     try {
-      await _ensureAuth();
       if (companyUID.isEmpty) {
         // Marketing user fetching for all companies across organizations
         // We limit to the latest 100 to prevent Out Of Memory crashes on Android
@@ -364,7 +338,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required String organizationUID,
   }) async {
     try {
-      await _ensureAuth();
       Query query = firestore.collectionGroup('photo_permissions');
           
       if (organizationUID.isNotEmpty) {
@@ -408,7 +381,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required double longitude,
   }) async {
     try {
-      await _ensureAuth();
       final fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = storage.ref().child(
           'organizations/$organizationUID/companies/$companyUID/permissions/$permissionId/$fileName');
@@ -458,7 +430,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required String permissionId,
   }) async {
     try {
-      await _ensureAuth();
       final snapshot = await firestore
           .collection('organizations')
           .doc(organizationUID)
@@ -486,7 +457,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required String delegateUID,
   }) async {
     try {
-      await _ensureAuth();
       try {
         final snapshot = await firestore
             .collectionGroup('captured_photos')
@@ -532,7 +502,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     int? limit,
   }) async {
     try {
-      await _ensureAuth();
       try {
         Query query = firestore.collectionGroup('captured_photos');
         if (companyUID.isNotEmpty) {
@@ -599,8 +568,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required String photoUrl,
   }) async {
     try {
-      await _ensureAuth();
-
       // 1. Delete image from Storage if URL is available
       if (photoUrl.isNotEmpty) {
         try {
@@ -700,8 +667,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required String permissionId,
   }) async {
     try {
-      await _ensureAuth();
-
       // 1. Delete all captured photos under this permission from Storage and Firestore
       QuerySnapshot<Map<String, dynamic>> photosSnapshot;
       if (organizationUID.isNotEmpty && companyUID.isNotEmpty) {
@@ -771,7 +736,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required List<String> branchNames,
   }) async {
     try {
-      await _ensureAuth();
       final docRef = firestore
           .collection('organizations')
           .doc(organizationUID)
@@ -802,7 +766,6 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required DateTime endDate,
   }) async {
     try {
-      await _ensureAuth();
       if (organizationUID.isNotEmpty && companyUID.isNotEmpty) {
         final docRef = firestore
             .collection('organizations')

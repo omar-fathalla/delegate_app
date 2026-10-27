@@ -223,6 +223,7 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
               'organization-admin',
               'Supervisor',
               'super-admin',
+              'super_admin',
               'marketing',
               'marketing_promotion',
               'technical_support',

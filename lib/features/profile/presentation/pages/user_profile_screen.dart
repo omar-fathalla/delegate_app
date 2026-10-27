@@ -114,14 +114,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         }
       }
 
-      // If still not found and phone is 01508899965, fetch direct super admin doc
-      if (docSnap == null && (targetPhone?.contains('01508899965') == true || targetEmail?.contains('omar.fathalla80800') == true)) {
-        final directDoc = await firestore.collection('users').doc('Cq7Xa6OEwEOlRPlS41vohtfBXke2').get();
-        if (directDoc.exists && directDoc.data() != null) {
-          docSnap = directDoc;
-        }
-      }
-
       if (docSnap != null && docSnap.exists && docSnap.data() != null && mounted) {
         final data = docSnap.data()!;
         setState(() {
@@ -258,9 +250,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
       final file = File(picked.path);
       final uid = _delegate?.uid ?? delegate?.uid ?? _firestoreUserData?['uid'] ?? _currentUser?.uid;
-      final effectiveUid = (uid != null && uid.isNotEmpty && uid != 'super-admin-login')
-          ? uid
-          : 'Cq7Xa6OEwEOlRPlS41vohtfBXke2';
+      if (uid == null || uid.isEmpty || uid == 'super-admin-login') {
+        if (mounted) {
+          AppSnackBar.showError(context, 'تعذر تحديد الحساب');
+        }
+        return;
+      }
+      final effectiveUid = uid;
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final storageRef = FirebaseStorage.instance.ref(
@@ -385,9 +381,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     try {
       setState(() => _isUploadingPhoto = true);
       final uid = _delegate?.uid ?? delegate?.uid ?? _firestoreUserData?['uid'] ?? _currentUser?.uid;
-      final effectiveUid = (uid != null && uid.isNotEmpty && uid != 'super-admin-login')
-          ? uid
-          : 'Cq7Xa6OEwEOlRPlS41vohtfBXke2';
+      if (uid == null || uid.isEmpty || uid == 'super-admin-login') {
+        if (mounted) {
+          AppSnackBar.showError(context, 'تعذر تحديد الحساب');
+        }
+        return;
+      }
+      final effectiveUid = uid;
 
       final firestore = FirebaseFirestore.instance;
       // 1. حذف الصورة من وثيقة المستخدم المحددة فقط في users
@@ -574,13 +574,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         delegate?.fullName ??
         _currentUser?.displayName ??
         '';
-    final displayName = rawName.isNotEmpty && rawName != 'مستخدم' ? rawName : 'Omar Fathalla';
+    final displayName = rawName.isNotEmpty ? rawName : 'مستخدم';
 
     final rawEmail = _firestoreUserData?['email'] ??
         delegate?.email ??
         _currentUser?.email ??
         '';
-    final email = rawEmail.isNotEmpty ? rawEmail : 'omar.fathalla80800@icloud.com';
+    final email = rawEmail;
 
     final photoUrl = _firestoreUserData?['photoURL'] ??
         _firestoreUserData?['profileImageUrl'] ??
@@ -769,19 +769,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         delegate?.fullName ??
         _currentUser?.displayName ??
         '';
-    final displayName = rawName.isNotEmpty && rawName != 'مستخدم' ? rawName : 'Omar Fathalla';
+    final displayName = rawName.isNotEmpty ? rawName : 'مستخدم';
 
     final rawEmail = _firestoreUserData?['email'] ??
         delegate?.email ??
         _currentUser?.email ??
         '';
-    final email = rawEmail.isNotEmpty ? rawEmail : 'omar.fathalla80800@icloud.com';
+    final email = rawEmail;
 
     final rawPhone = _firestoreUserData?['phoneNumber'] ??
         delegate?.phoneNumber ??
         _currentUser?.phoneNumber ??
         '';
-    final phone = rawPhone.isNotEmpty ? rawPhone : '01508899965';
+    final phone = rawPhone;
 
     return Card(
       elevation: 0,
@@ -1056,7 +1056,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               } else if (fType == 'phone') {
                 json['phoneNumber'] = nVal;
               }
-              final uid = _delegate?.uid ?? _firestoreUserData?['uid'] ?? 'Cq7Xa6OEwEOlRPlS41vohtfBXke2';
+              final uid = _delegate?.uid ?? _firestoreUserData?['uid'] ?? _currentUser?.uid ?? '';
               final updated = DelegateModel.fromJson(json, uid);
               _delegate = updated;
               di.sl<AuthLocalDataSource>().cacheDelegateData(updated).ignore();
@@ -1143,13 +1143,6 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
 
       // Determine effective user doc id
       String? effectiveDocId = widget.firestoreData?['uid'] ?? widget.delegate?.uid;
-      if (effectiveDocId == 'super-admin-login' || effectiveDocId == null || effectiveDocId.isEmpty) {
-        final phone = widget.firestoreData?['phoneNumber'] ?? widget.delegate?.phoneNumber;
-        final email = widget.firestoreData?['email'] ?? widget.delegate?.email;
-        if (phone == '01508899965' || email?.contains('omar.fathalla80800') == true) {
-          effectiveDocId = 'Cq7Xa6OEwEOlRPlS41vohtfBXke2';
-        }
-      }
 
       // 1. Update direct doc in users if known
       if (effectiveDocId != null && effectiveDocId.isNotEmpty && effectiveDocId != 'super-admin-login') {
@@ -1477,78 +1470,38 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
       final String currentPass = _currentPasswordController.text.trim();
       final String newPass = _newPasswordController.text.trim();
 
-      bool passwordUpdated = false;
-
-      // 1. Try Firebase Auth (if user exists and has email)
       final fbUser = FirebaseAuth.instance.currentUser;
-      if (fbUser != null && fbUser.email != null) {
-        try {
-          final credential = EmailAuthProvider.credential(
-            email: fbUser.email!,
-            password: currentPass,
-          );
-          await fbUser.reauthenticateWithCredential(credential);
-          await fbUser.updatePassword(newPass);
-          passwordUpdated = true;
-        } catch (e) {
-          // Might fail if they log in via anonymous/phone, proceed to Firestore as fallback.
+      final email = (fbUser?.email ??
+              widget.firestoreData?['email'] ??
+              widget.delegate?.email ??
+              '')
+          .toString()
+          .trim();
+      if (email.isEmpty) {
+        throw Exception('لا يوجد بريد إلكتروني مرتبط بهذا الحساب');
+      }
+
+      User user;
+      if (fbUser != null && fbUser.email == email) {
+        user = fbUser;
+      } else {
+        final signedIn = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: currentPass,
+        );
+        final signedInUser = signedIn.user;
+        if (signedInUser == null) {
+          throw Exception('كلمة المرور الحالية غير صحيحة');
         }
+        user = signedInUser;
       }
 
-      // 2. Try Firestore 'users' collection
-      final db = FirebaseFirestore.instance;
-      String? effectiveDocId = widget.firestoreData?['uid'] ?? widget.delegate?.uid;
-      final phone = widget.firestoreData?['phoneNumber'] ?? widget.delegate?.phoneNumber;
-      final email = widget.firestoreData?['email'] ?? widget.delegate?.email;
-
-      if (effectiveDocId == 'super-admin-login' || effectiveDocId == null || effectiveDocId.isEmpty) {
-        if (phone == '01508899965' || email?.contains('omar.fathalla80800') == true) {
-          effectiveDocId = 'Cq7Xa6OEwEOlRPlS41vohtfBXke2';
-        }
-      }
-
-      if (effectiveDocId != null && effectiveDocId.isNotEmpty && effectiveDocId != 'super-admin-login') {
-        final docRef = db.collection('users').doc(effectiveDocId);
-        final doc = await docRef.get();
-        if (doc.exists && doc.data() != null) {
-          final data = doc.data()!;
-          final storedPass = data['password'] ?? data['temporaryPassword'] ?? data['tempPassword'];
-
-          if (storedPass == currentPass || currentPass == '01508899965000' || currentPass == '481636100Aa!') {
-            await docRef.set({
-              'password': newPass,
-              'temporaryPassword': FieldValue.delete(),
-              'tempPassword': FieldValue.delete(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-            passwordUpdated = true;
-          } else {
-            throw Exception('كلمة المرور الحالية غير صحيحة');
-          }
-        }
-      }
-
-      // Query by phone or email if not updated yet
-      if (!passwordUpdated && phone != null && phone.isNotEmpty) {
-        final q = await db.collection('users').where('phoneNumber', isEqualTo: phone).get();
-        for (final doc in q.docs) {
-          final data = doc.data();
-          final storedPass = data['password'] ?? data['temporaryPassword'] ?? data['tempPassword'];
-          if (storedPass == currentPass || currentPass == '01508899965000' || currentPass == '481636100Aa!') {
-            await doc.reference.set({
-              'password': newPass,
-              'temporaryPassword': FieldValue.delete(),
-              'tempPassword': FieldValue.delete(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-            passwordUpdated = true;
-          }
-        }
-      }
-
-      if (!passwordUpdated) {
-        throw Exception('كلمة المرور الحالية غير صحيحة أو الحساب غير موجود');
-      }
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: currentPass,
+      );
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPass);
 
       widget.onPasswordChanged?.call(newPass);
 

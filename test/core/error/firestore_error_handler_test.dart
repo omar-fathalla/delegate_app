@@ -23,7 +23,7 @@ void main() {
       );
     });
 
-    test('throws ServerFailure regardless of Firebase error code', () {
+    test('surfaces permission-denied without a session-renewal hint', () {
       final permissionDenied = FirebaseException(
         plugin: 'cloud_firestore',
         code: 'permission-denied',
@@ -31,7 +31,13 @@ void main() {
 
       expect(
         () => throwFirestoreFailure(permissionDenied, 'غير مصرح'),
-        throwsA(isA<ServerFailure>()),
+        throwsA(
+          isA<ServerFailure>().having(
+            (f) => f.message,
+            'message',
+            'غير مصرح (خطأ في الصلاحيات)',
+          ),
+        ),
       );
     });
   });

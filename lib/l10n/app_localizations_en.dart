@@ -45,6 +45,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get enterPassword => 'Please enter password';
 
   @override
+  String get nationalIdNumber => 'National ID number';
+
+  @override
+  String get enterNationalId => 'Please enter the national ID number';
+
+  @override
+  String get invalidNationalId => 'National ID must be 14 digits';
+
+  @override
+  String get invalidMobileNumber => 'Enter a valid mobile number';
+
+  @override
+  String get loginNationalIdHelp =>
+      'Delegates sign in with their national ID. Other roles use their password.';
+
+  @override
+  String get invalidLoginCredentials =>
+      'The phone number, national ID, or password is incorrect.';
+
+  @override
+  String get delegateAccountInactive =>
+      'This account is pending or suspended. Contact your company admin.';
+
+  @override
+  String get tooManyLoginAttempts =>
+      'Too many attempts. Please try again later.';
+
+  @override
+  String get loginTemporarilyUnavailable =>
+      'Sign-in is temporarily unavailable. Please try again.';
+
+  @override
   String get rememberMe => 'Remember Me';
 
   @override

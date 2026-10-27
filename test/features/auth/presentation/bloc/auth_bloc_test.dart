@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
+import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
@@ -69,6 +72,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(FakeLoginParams());
     registerFallbackValue(FakeNoParams());
+    registerFallbackValue(const LogoutParams());
     registerFallbackValue(
       Delegate(
         uid: 'fake',
@@ -105,6 +109,7 @@ void main() {
   });
 
   setUp(() {
+    DelegateOtpConfig.enabled = false;
     mockLogin = MockLogin();
     mockCheckAutoLogin = MockCheckAutoLogin();
     mockLogout = MockLogout();
@@ -129,6 +134,7 @@ void main() {
   });
 
   tearDown(() {
+    DelegateOtpConfig.enabled = false;
     authBloc.close();
   });
 
@@ -244,19 +250,17 @@ void main() {
         return authBloc;
       },
       act: (bloc) => bloc.add(
-        const LoginRequested(phoneNumber: '01234567890', password: 'testPass', rememberMe: true),
+        const LoginRequested(
+          phoneNumber: '01234567890',
+          password: 'testPass',
+          rememberMe: true,
+        ),
       ),
       expect: () => [
         AuthLoading(),
-        isA<AuthOrganizationSelectionRequired>().having(
-          (s) => s.delegates.length,
-          'distinct delegates length',
-          2,
-        ).having(
-          (s) => s.rememberMe,
-          'rememberMe',
-          true,
-        ),
+        isA<AuthOrganizationSelectionRequired>()
+            .having((s) => s.delegates.length, 'distinct delegates length', 2)
+            .having((s) => s.rememberMe, 'rememberMe', true),
       ],
       verify: (_) {
         verify(() => mockLogin(any())).called(1);
@@ -294,6 +298,146 @@ void main() {
       expect: () => [
         AuthLoading(),
         const AuthError(message: 'كلمة المرور غير صحيحة'),
+      ],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'asks for a phone code after delegate login when otp is enabled',
+      build: () {
+        DelegateOtpConfig.enabled = true;
+        when(
+          () => mockLogin(any()),
+        ).thenAnswer((_) async => Right([tDelegate]));
+        return authBloc;
+      },
+      act: (bloc) => bloc.add(
+        const LoginRequested(
+          phoneNumber: '01211857725',
+          password: '29712200201981',
+          rememberMe: true,
+        ),
+      ),
+      expect: () => [
+        AuthLoading(),
+        AuthPhoneOtpRequired(
+          delegates: [tDelegate],
+          rememberMe: true,
+          e164Phone: '+201211857725',
+        ),
+      ],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'continues the delegate session only after the phone code is confirmed',
+      build: () {
+        DelegateOtpConfig.enabled = true;
+        when(
+          () => mockLogin(any()),
+        ).thenAnswer((_) async => Right([tDelegate]));
+        return authBloc;
+      },
+      act: (bloc) async {
+        bloc.add(
+          const LoginRequested(
+            phoneNumber: '01234567890',
+            password: 'testPass',
+          ),
+        );
+        await bloc.stream.firstWhere((state) => state is AuthPhoneOtpRequired);
+        bloc.add(const PhoneOtpVerified());
+      },
+      expect: () => [
+        AuthLoading(),
+        isA<AuthPhoneOtpRequired>().having(
+          (state) => state.e164Phone,
+          'e164',
+          '+201234567890',
+        ),
+        AuthAuthenticated(delegate: tDelegate),
+      ],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'signs out the custom token when the phone step is cancelled',
+      build: () {
+        DelegateOtpConfig.enabled = true;
+        when(
+          () => mockLogin(any()),
+        ).thenAnswer((_) async => Right([tDelegate]));
+        when(
+          () => mockLogout(any()),
+        ).thenAnswer((_) async => const Right(null));
+        return authBloc;
+      },
+      act: (bloc) async {
+        bloc.add(
+          const LoginRequested(
+            phoneNumber: '01234567890',
+            password: 'testPass',
+          ),
+        );
+        await bloc.stream.firstWhere((state) => state is AuthPhoneOtpRequired);
+        bloc.add(const PhoneOtpCancelled());
+      },
+      expect: () => [
+        AuthLoading(),
+        isA<AuthPhoneOtpRequired>(),
+        const AuthUnauthenticated(fromLogout: true),
+      ],
+      verify: (_) {
+        verify(() => mockLogout(any())).called(1);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'does not ask staff or super-admin password logins for a phone code',
+      build: () {
+        DelegateOtpConfig.enabled = true;
+        final staff = Delegate(
+          uid: 'staff',
+          firstName: 'Omar',
+          middleName: '',
+          lastName: 'Fathalla',
+          fullName: 'Omar Fathalla',
+          nationalityID: '__firebase_auth__:omar@example.com',
+          motherName: '',
+          city: '',
+          phoneNumber: '01508899965',
+          gender: DelegateGender.male,
+          position: DelegatePosition.supervisor,
+          birthDate: DateTime(1990, 1, 1),
+          organizationUID: '',
+          organizationName: '',
+          companyUID: '',
+          companyName: '',
+          status: DelegateStatus.approved,
+          delegatePublicId: '',
+          allReceiptCodes: const [],
+          createdAt: DateTime(2024, 1, 1),
+          createdBy: 'system_admin',
+          hasPendingUpdate: false,
+          isDeductedFromCompany: false,
+          isPrinted: false,
+          isProfileComplete: true,
+          numberOfDocuments: 0,
+          paymentAmount: 0,
+          version: 1,
+          documents: const [],
+          role: UserRole.superAdmin,
+        );
+        when(() => mockLogin(any())).thenAnswer((_) async => Right([staff]));
+        return authBloc;
+      },
+      act: (bloc) => bloc.add(
+        const LoginRequested(phoneNumber: '01508899965', password: 'secret'),
+      ),
+      expect: () => [
+        AuthLoading(),
+        isA<AuthAuthenticated>().having(
+          (state) => state.delegate.role,
+          'role',
+          UserRole.superAdmin,
+        ),
       ],
     );
   });
@@ -334,21 +478,132 @@ void main() {
       act: (bloc) => bloc.add(CheckAutoLoginRequested()),
       expect: () => [AuthLoading(), AuthUnauthenticated()],
     );
+
+    blocTest<AuthBloc, AuthState>(
+      'signs out an anonymous session, clears remember-me, and asks for a fresh sign-in',
+      build: () {
+        when(
+          () => mockLogout(any()),
+        ).thenAnswer((_) async => const Right(null));
+        var anonymous = true;
+        return AuthBloc(
+          loginUseCase: mockLogin,
+          checkAutoLoginUseCase: mockCheckAutoLogin,
+          logoutUseCase: mockLogout,
+          cacheDelegateUseCase: mockCacheDelegate,
+          cacheAllDelegatesUseCase: mockCacheAllDelegates,
+          isAnonymousSession: () => anonymous,
+          signOutAuth: () async {
+            anonymous = false;
+          },
+        );
+      },
+      act: (bloc) => bloc.add(CheckAutoLoginRequested()),
+      expect: () => [
+        AuthLoading(),
+        const AuthUnauthenticated(message: AuthBloc.freshSignInMessage),
+      ],
+      verify: (_) {
+        verify(() => mockLogout(any())).called(1);
+        verifyNever(() => mockCheckAutoLogin(any()));
+      },
+    );
+
+    late StreamController<bool> restoredAnonymous;
+    blocTest<AuthBloc, AuthState>(
+      'signs out when auth state restores an anonymous user',
+      build: () {
+        when(
+          () => mockLogout(any()),
+        ).thenAnswer((_) async => const Right(null));
+        var anonymous = true;
+        restoredAnonymous = StreamController<bool>();
+        return AuthBloc(
+          loginUseCase: mockLogin,
+          checkAutoLoginUseCase: mockCheckAutoLogin,
+          logoutUseCase: mockLogout,
+          cacheDelegateUseCase: mockCacheDelegate,
+          cacheAllDelegatesUseCase: mockCacheAllDelegates,
+          isAnonymousSession: () => anonymous,
+          signOutAuth: () async {
+            anonymous = false;
+          },
+          anonymousSessionRestored: restoredAnonymous.stream,
+        );
+      },
+      act: (bloc) => restoredAnonymous.add(true),
+      tearDown: () => restoredAnonymous.close(),
+      expect: () => [
+        const AuthUnauthenticated(message: AuthBloc.freshSignInMessage),
+      ],
+      verify: (_) {
+        verify(() => mockLogout(any())).called(1);
+        verifyNever(() => mockCheckAutoLogin(any()));
+      },
+    );
   });
 
   group('LogoutRequested', () {
     blocTest<AuthBloc, AuthState>(
-      'emits [AuthLoading, AuthUnauthenticated] when logout is requested',
+      'emits logged-out and passes the user id to the logout use case',
       build: () {
         when(
           () => mockLogout(any()),
         ).thenAnswer((_) async => const Right(null));
         return authBloc;
       },
-      act: (bloc) => bloc.add(LogoutRequested()),
-      expect: () => [AuthLoading(), AuthUnauthenticated()],
+      act: (bloc) => bloc.add(const LogoutRequested(userId: 'uid-1')),
+      expect: () => [
+        AuthLoading(),
+        const AuthUnauthenticated(fromLogout: true),
+      ],
+      verify: (_) {
+        final params =
+            verify(() => mockLogout(captureAny())).captured.single
+                as LogoutParams;
+        expect(params.userId, 'uid-1');
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'still leaves the user logged out when sign-out throws',
+      build: () {
+        when(() => mockLogout(any())).thenThrow(Exception('offline'));
+        return authBloc;
+      },
+      act: (bloc) => bloc.add(const LogoutRequested(userId: 'uid-1')),
+      expect: () => [
+        AuthLoading(),
+        const AuthUnauthenticated(fromLogout: true),
+      ],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'does not restore the cached delegate or treat logout as an anonymous session',
+      build: () {
+        when(
+          () => mockLogout(any()),
+        ).thenAnswer((_) async => const Right(null));
+        when(
+          () => mockCheckAutoLogin(any()),
+        ).thenAnswer((_) async => Right(tDelegate));
+        return authBloc;
+      },
+      act: (bloc) async {
+        bloc.add(const LogoutRequested(userId: '1'));
+        await bloc.stream.firstWhere(
+          (state) => state is AuthUnauthenticated && state.fromLogout,
+        );
+        bloc.add(CheckAutoLoginRequested());
+        bloc.add(const AnonymousSessionDetected());
+      },
+      expect: () => [
+        AuthLoading(),
+        const AuthUnauthenticated(fromLogout: true),
+      ],
       verify: (_) {
         verify(() => mockLogout(any())).called(1);
+        verifyNever(() => mockCheckAutoLogin(any()));
       },
     );
   });

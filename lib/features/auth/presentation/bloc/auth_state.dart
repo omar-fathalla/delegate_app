@@ -11,6 +11,21 @@ class AuthInitial extends AuthState {}
 
 class AuthLoading extends AuthState {}
 
+class AuthPhoneOtpRequired extends AuthState {
+  final List<Delegate> delegates;
+  final bool rememberMe;
+  final String e164Phone;
+
+  const AuthPhoneOtpRequired({
+    required this.delegates,
+    required this.rememberMe,
+    required this.e164Phone,
+  });
+
+  @override
+  List<Object> get props => [delegates, rememberMe, e164Phone];
+}
+
 class AuthOrganizationSelectionRequired extends AuthState {
   final List<Delegate> delegates;
   final bool rememberMe;
@@ -36,19 +51,24 @@ class AuthAuthenticated extends AuthState {
 class AuthUnauthenticated extends AuthState {
   final String? message;
 
-  const AuthUnauthenticated({this.message});
+  /// Set when the user confirmed logout. Listeners use this to go to `/login`
+  /// once, without treating it as a restored anonymous session.
+  final bool fromLogout;
+
+  const AuthUnauthenticated({this.message, this.fromLogout = false});
 
   @override
-  List<Object> get props => message != null ? [message!] : [];
+  List<Object> get props => [message ?? '', fromLogout];
 }
 
 class AuthError extends AuthState {
   final String message;
+  final String? code;
 
-  const AuthError({required this.message});
+  const AuthError({required this.message, this.code});
 
   @override
-  List<Object> get props => [message];
+  List<Object> get props => [message, code ?? ''];
 }
 
 class AuthDeviceMismatchState extends AuthState {
@@ -72,4 +92,3 @@ class AuthDeviceMismatchState extends AuthState {
     message,
   ];
 }
-

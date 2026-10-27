@@ -128,5 +128,25 @@ void main() {
       expect(result['jobTitle'], 'HR Specialist');
       expect(result['role'], 'hr');
     });
+
+    test('writes the super admin role as super-admin', () {
+      AdminUserModel withRole(String role) {
+        return AdminUserModel(
+          uid: 'sa',
+          phoneNumber: '01000000000',
+          email: 'sa@test.com',
+          displayName: 'Super',
+          role: role,
+          createdAt: tDateTime,
+          createdBy: 'admin1',
+          temporaryPassword: 'temp',
+        );
+      }
+
+      expect(withRole('super_admin').toMap()['role'], 'super-admin');
+      expect(withRole('super-admin').toMap()['role'], 'super-admin');
+      expect(withRole('superAdmin').toMap()['role'], 'super-admin');
+      expect(withRole('company-admin').toMap()['role'], 'company-admin');
+    });
   });
 }

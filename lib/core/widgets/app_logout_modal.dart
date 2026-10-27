@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
-import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
-import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
+import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tracking/data/services/delegate_tracking_engine.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
@@ -22,7 +20,9 @@ import 'package:delegate_app/injection_container.dart';
 /// 3. حواف دائرية علوية (28px).
 /// 4. مجموعة أزرار مدمجة ومتصلة بحاوية موحدة (Connected Action Button Group: height 48, radius 24, vertical divider).
 /// 5. تكيف متجاوب للشاشات العريضة (Desktop Dialog).
-/// 6. إنهاء نظيف وآمن للجلسة (إيقاف محرك التتبع، مسح توكن الإشعارات، تسجيل الخروج من فيربيز، ومسح الكاش المحلي).
+/// 6. Confirming logout dispatches [LogoutRequested]. AuthBloc signs out of
+///    Firebase, clears the remember-me cache, and the app listener replaces
+///    the stack with `/login`.
 class AppLogoutModal {
   static Future<void> show(
     BuildContext context, {
@@ -81,34 +81,23 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
     });
 
     try {
-      // 1. إيقاف جلسة التتبع الميداني فوراً لتفريغ الذاكرة وإيقاف استهلاك المعالج
       try {
         DelegateTrackingEngine().stopTrackingSession();
       } catch (e) {
         debugPrint('Logout: Error stopping tracking engine: $e');
       }
 
-      // 2. مسح توكن إشعارات FCM الخاص بالمستخدم
+      final bloc = context.read<AuthBloc>();
+      final loggedOut = bloc.stream.firstWhere(
+        (state) => state is AuthUnauthenticated && state.fromLogout,
+      );
+      bloc.add(LogoutRequested(userId: widget.delegate.uid));
       try {
-        if (sl.isRegistered<PushNotificationService>()) {
-          await sl<PushNotificationService>().clearToken(widget.delegate.uid);
-        }
-      } catch (e) {
-        debugPrint('Logout: Error clearing FCM token: $e');
-      }
+        await loggedOut.timeout(const Duration(seconds: 6));
+      } catch (_) {}
 
-      // 3. تسجيل الخروج من Firebase Authentication
+      // مسح الكاش المحلي للحضور والـ blocs (تغييرات محلية)
       try {
-        await FirebaseAuth.instance.signOut();
-      } catch (e) {
-        debugPrint('Logout: Error signing out FirebaseAuth: $e');
-      }
-
-      // 4. مسح الكاش المحلي لبيانات الجلسة والمندوب وجميع البيانات المتبقية
-      try {
-        if (sl.isRegistered<AuthRepository>()) {
-          await sl<AuthRepository>().clearCache();
-        }
         if (sl.isRegistered<AttendanceLocalDataSource>()) {
           await sl<AttendanceLocalDataSource>().clearAttendanceCache();
         }
@@ -117,20 +106,12 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
         AdminDashboardBloc.clearCache();
         MarketingBloc.clearCache();
       } catch (e) {
-        debugPrint('Logout: Error clearing auth and attendance cache: $e');
+        debugPrint('Logout: Error clearing attendance cache: $e');
       }
 
       if (!mounted) return;
-
-      // إغلاق النافذة
       Navigator.of(context).pop();
-
-      // استدعاء رد النداء الخاص إن وجد أو الانتقال لصفحة تسجيل الدخول
-      if (widget.onLoggedOut != null) {
-        widget.onLoggedOut!();
-      } else {
-        context.go('/login');
-      }
+      widget.onLoggedOut?.call();
     } catch (e) {
       debugPrint('Logout: Unexpected error: $e');
       if (mounted) {

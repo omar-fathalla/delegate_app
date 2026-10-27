@@ -129,6 +129,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(FakeLoginParams());
     registerFallbackValue(FakeNoParams());
+    registerFallbackValue(const LogoutParams());
     registerFallbackValue(FakeCheckInParams());
     registerFallbackValue(FakeCheckOutParams());
     registerFallbackValue(FakeGetHistoryParams());

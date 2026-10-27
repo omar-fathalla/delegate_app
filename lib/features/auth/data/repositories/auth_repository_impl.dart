@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
@@ -10,17 +12,54 @@ class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
   final AuthLocalDataSource localDataSource;
 
+  /// Best-effort FCM token and topic cleanup. Must not throw.
+  final Future<void> Function(String userId)? clearPushRegistration;
+
   AuthRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
+    this.clearPushRegistration,
   });
+
+  @override
+  Future<Either<Failure, List<Delegate>>> loginDelegate({
+    required String phoneNumber,
+    required String nationalId,
+  }) async {
+    try {
+      final delegates = await remoteDataSource.loginDelegate(
+        phoneNumber: phoneNumber,
+        nationalId: nationalId,
+      );
+      final validDelegates = delegates
+          .where(
+            (delegate) =>
+                delegate.status != DelegateStatus.suspended &&
+                delegate.status != DelegateStatus.rejected,
+          )
+          .toList();
+
+      if (validDelegates.isEmpty) {
+        return const Left(
+          DelegateAccountInactiveFailure(
+            'تم تجميد هذا الحساب من قبل الإدارة. يرجى التواصل مع مسؤول المنظمة.',
+          ),
+        );
+      }
+
+      return Right(validDelegates);
+    } on Failure catch (failure) {
+      return Left(failure);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 
   @override
   Future<Either<Failure, List<Delegate>>> getDelegatesByPhone(
     String phoneNumber,
   ) async {
     try {
-      // Fetch the delegate data (will handle authentication internally)
       final delegates = await remoteDataSource.getDelegatesByPhone(phoneNumber);
       if (delegates.isEmpty) {
         return const Left(AuthFailure('رقم الهاتف غير مسجل في النظام. يرجى مراجعة مشرف شركتك أو الدعم الفني.'));
@@ -109,6 +148,24 @@ class AuthRepositoryImpl implements AuthRepository {
     } catch (e) {
       return Left(CacheFailure(e.toString()));
     }
+  }
+
+  @override
+  Future<Either<Failure, void>> logout({String? userId}) async {
+    final uid = userId?.trim() ?? '';
+    final cleanup = clearPushRegistration;
+    try {
+      await Future.wait<void>([
+        remoteDataSource.signOut(),
+        if (uid.isNotEmpty && cleanup != null) cleanup(uid),
+      ]).timeout(const Duration(seconds: 2));
+    } catch (_) {
+      // Offline sign-out or a slow token delete must not keep the session.
+    }
+    try {
+      await localDataSource.clearCachedData();
+    } catch (_) {}
+    return const Right(null);
   }
 
   @override

@@ -24,7 +24,26 @@ class LoginRequested extends AuthEvent {
 
 class CheckAutoLoginRequested extends AuthEvent {}
 
-class LogoutRequested extends AuthEvent {}
+class AnonymousSessionDetected extends AuthEvent {
+  const AnonymousSessionDetected();
+}
+
+class LogoutRequested extends AuthEvent {
+  final String? userId;
+
+  const LogoutRequested({this.userId});
+
+  @override
+  List<Object> get props => [userId ?? ''];
+}
+
+class PhoneOtpVerified extends AuthEvent {
+  const PhoneOtpVerified();
+}
+
+class PhoneOtpCancelled extends AuthEvent {
+  const PhoneOtpCancelled();
+}
 
 class OrganizationSelected extends AuthEvent {
   final Delegate delegate;

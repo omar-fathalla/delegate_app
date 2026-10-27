@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:delegate_app/features/auth/data/datasources/firebase_phone_otp.dart';
+import 'package:delegate_app/features/auth/domain/phone_otp.dart';
 import 'package:delegate_app/features/admin/data/datasources/admin_remote_data_source.dart';
 import 'package:delegate_app/features/admin/data/datasources/manage_marketing_remote_datasource.dart';
 import 'package:delegate_app/features/admin/data/repositories/admin_repository_impl.dart';
@@ -51,6 +54,7 @@ import 'package:delegate_app/features/marketing_search/domain/usecases/search_de
 import 'package:delegate_app/features/marketing_search/presentation/bloc/marketing_search_bloc.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
+import 'package:delegate_app/features/auth/data/datasources/delegate_login_api.dart';
 import 'package:delegate_app/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
@@ -176,6 +180,12 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       logoutUseCase: sl(),
       cacheDelegateUseCase: sl(),
       cacheAllDelegatesUseCase: sl(),
+      isAnonymousSession: () =>
+          sl<FirebaseAuth>().currentUser?.isAnonymous == true,
+      signOutAuth: () => sl<FirebaseAuth>().signOut(),
+      anonymousSessionRestored: sl<FirebaseAuth>().authStateChanges().map(
+        (user) => user?.isAnonymous == true,
+      ),
     ),
   );
 
@@ -188,15 +198,38 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   // Repository
   sl.registerLazySingleton<AuthRepository>(
-    () => AuthRepositoryImpl(remoteDataSource: sl(), localDataSource: sl()),
+    () => AuthRepositoryImpl(
+      remoteDataSource: sl(),
+      localDataSource: sl(),
+      clearPushRegistration: (userId) async {
+        if (sl.isRegistered<PushNotificationService>()) {
+          await sl<PushNotificationService>().clearToken(userId);
+        }
+      },
+    ),
   );
 
   // Data sources
   sl.registerLazySingleton<AuthLocalDataSource>(
     () => AuthLocalDataSourceImpl(sharedPreferences: sl()),
   );
+  sl.registerLazySingleton<DelegateLoginApi>(
+    () => FirebaseDelegateLoginApi(
+      FirebaseFunctions.instanceFor(region: 'us-central1'),
+    ),
+  );
+  sl.registerLazySingleton<StaffPhoneLookupApi>(
+    () => FirebaseStaffPhoneLookupApi(
+      FirebaseFunctions.instanceFor(region: 'us-central1'),
+    ),
+  );
   sl.registerLazySingleton<AuthRemoteDataSource>(
-    () => AuthRemoteDataSourceImpl(firestore: sl(), firebaseAuth: sl()),
+    () => AuthRemoteDataSourceImpl(
+      firestore: sl(),
+      firebaseAuth: sl(),
+      delegateLoginApi: sl(),
+      staffPhoneLookupApi: sl(),
+    ),
   );
 
   // ! Features - Profile
@@ -617,6 +650,9 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   sl.registerLazySingleton(() => FirebaseFirestore.instance);
   sl.registerLazySingleton(() => FirebaseAuth.instance);
+  sl.registerLazySingleton<DelegatePhoneOtpClient>(
+    () => FirebaseDelegatePhoneOtpClient(sl<FirebaseAuth>()),
+  );
   sl.registerLazySingleton(() => FirebaseStorage.instance);
 }
 

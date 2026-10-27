@@ -3,7 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
+import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -83,16 +85,26 @@ class _HrLoginScreenState extends State<HrLoginScreen>
               delegate: state.delegate,
             );
           } else if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: colorScheme.error,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            if (state.code == 'device_mismatch') {
+              DeviceLockDialog.show(context, requestAlreadyFiled: true);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    localizedAuthError(
+                      l10n,
+                      message: state.message,
+                      code: state.code,
+                    ),
+                  ),
+                  backgroundColor: colorScheme.error,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           } else if (state is AuthOrganizationSelectionRequired) {
             _showOrganizationSelector(
               context,
@@ -140,6 +152,9 @@ class _HrLoginScreenState extends State<HrLoginScreen>
           }
         },
         builder: (context, state) {
+          if (state is AuthPhoneOtpRequired) {
+            return DelegatePhoneOtpView(phoneE164: state.e164Phone);
+          }
           return Scaffold(
             backgroundColor: const Color(0xFF090D16),
             body: SafeArea(

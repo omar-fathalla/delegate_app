@@ -11,7 +11,6 @@ import 'package:delegate_app/features/private_label/domain/entities/private_labe
 import 'package:delegate_app/features/private_label/domain/entities/private_label_dates.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_day.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_product.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -122,26 +121,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     // Empty organizationUID falls back to defaultOrganizationUID via _resolveOrg.
   }
 
-  Future<void> _ensureAuth() async {
-    final auth = FirebaseAuth.instance;
-    if (auth.currentUser == null) {
-      try {
-        await auth.signInAnonymously().timeout(const Duration(seconds: 5));
-      } catch (_) {}
-    } else {
-      try {
-        await auth.currentUser!.getIdToken(false).timeout(const Duration(seconds: 3));
-      } catch (_) {
-        if (auth.currentUser?.isAnonymous == true) {
-          try {
-            await auth.signOut().timeout(const Duration(seconds: 3));
-            await auth.signInAnonymously().timeout(const Duration(seconds: 5));
-          } catch (_) {}
-        }
-      }
-    }
-  }
-
   // ─────────────────────────── Month / KPI ───────────────────────────
 
   @override
@@ -151,7 +130,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     required String monthKey,
   }) async {
     _requireOrg(organizationUID);
-    await _ensureAuth();
     try {
       // Two equality filters → served by single-field index merging (no composite index).
       final snap = await _days(organizationUID)
@@ -178,7 +156,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     String? companyUID,
   }) async {
     _requireOrg(organizationUID);
-    await _ensureAuth();
     try {
       final snap = await _days(organizationUID)
           .where('month', isEqualTo: monthKey)
@@ -200,7 +177,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
   @override
   Future<int> getRestAllowance(String organizationUID) async {
     _requireOrg(organizationUID);
-    await _ensureAuth();
     try {
       final doc = await _org(organizationUID).get().timeout(_timeout);
       final value = doc.data()?[restAllowanceField];
@@ -220,7 +196,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     required String localPath,
     required String kind,
   }) async {
-    await _ensureAuth();
     final bytes = await XFile(localPath).readAsBytes();
     final ref = storage.ref().child(
           'organizations/${draft.organizationUID}/private_label/'
@@ -233,7 +208,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
   @override
   Future<void> syncAudit(PrivateLabelAuditDraft draft) async {
     _requireOrg(draft.organizationUID);
-    await _ensureAuth();
     final auditRef = _audits(draft.organizationUID).doc(draft.id);
     final dayRef = _days(draft.organizationUID).doc(
       PrivateLabelDates.dayDocId(draft.delegateUid, draft.auditDate),
@@ -313,7 +287,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     String? companyUID,
   }) async {
     _requireOrg(organizationUID);
-    await _ensureAuth();
     try {
       Query<Map<String, dynamic>> query = _audits(organizationUID);
       if (date != null && date.isNotEmpty) {
@@ -362,7 +335,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     String? notes,
   }) async {
     _requireOrg(organizationUID);
-    await _ensureAuth();
     final auditRef = _audits(organizationUID).doc(auditId);
     try {
       final updated = await firestore.runTransaction((tx) async {
@@ -444,7 +416,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     required String date,
   }) async {
     _requireOrg(organizationUID);
-    await _ensureAuth();
     try {
       final auditRef = _audits(organizationUID).doc(auditId);
       final dayRef = _days(organizationUID).doc('${delegateUid}_$date');
@@ -490,7 +461,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     String? notes,
   }) async {
     _requireOrg(organizationUID);
-    await _ensureAuth();
     try {
       final ref = _audits(organizationUID).doc(auditId);
       final hasMismatch = referencePrice != null &&
@@ -529,7 +499,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     required int restAllowance,
   }) async {
     _requireOrg(organizationUID);
-    await _ensureAuth();
     final monthKey = PrivateLabelDates.monthKeyOfDay(date);
     final dayRef = _days(organizationUID).doc(PrivateLabelDates.dayDocId(delegateUid, date));
 
@@ -586,7 +555,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
     required String date,
   }) async {
     _requireOrg(organizationUID);
-    await _ensureAuth();
     final dayRef = _days(organizationUID).doc(PrivateLabelDates.dayDocId(delegateUid, date));
     try {
       await firestore.runTransaction((tx) async {
@@ -610,7 +578,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
   @override
   Future<List<PrivateLabelProductModel>> getProducts(String organizationUID) async {
     _requireOrg(organizationUID);
-    await _ensureAuth();
     try {
       final snap = await _products(organizationUID).get().timeout(_timeout);
       final rawDocs = <String, Map<String, dynamic>>{
@@ -704,7 +671,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
   @override
   Future<PrivateLabelProductModel> saveProduct(PrivateLabelProductModel product) async {
     _requireOrg(product.organizationUID);
-    await _ensureAuth();
     try {
       final ref = product.id.isEmpty
           ? _products(product.organizationUID).doc()
@@ -747,7 +713,6 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
 
   @override
   Future<List<String>> getBranches(String organizationUID) async {
-    await _ensureAuth();
     try {
       final snap = await firestore.collection('branches').get().timeout(_timeout);
       final all = <String>{};

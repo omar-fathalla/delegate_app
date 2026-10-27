@@ -102,8 +102,11 @@ class _SplashScreenState extends State<SplashScreen>
             }
           });
         } else if (state is AuthUnauthenticated) {
+          if (state.fromLogout) return;
           context.go('/login');
-          if (state.message != null && state.message!.isNotEmpty) {
+          if (state.message != null &&
+              state.message!.isNotEmpty &&
+              state.message != AuthBloc.freshSignInMessage) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(

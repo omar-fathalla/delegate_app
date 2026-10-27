@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/exceptions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 
 abstract class ProfileRemoteDataSource {
@@ -82,24 +81,9 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     } catch (e) {
       if (e is ServerException) rethrow;
       if (e is FirebaseException && e.code == 'permission-denied') {
-        _healAnonymousSession();
-        throw ServerException(
-          'ليس لديك صلاحية الوصول (تم تجديد الجلسة، يرجى المحاولة مرة أخرى)',
-        );
+        throw ServerException('ليس لديك صلاحية الوصول');
       }
       throw ServerException(e.toString());
     }
-  }
-
-  Future<void> _healAnonymousSession() async {
-    try {
-      final auth = FirebaseAuth.instance;
-      if (auth.currentUser?.isAnonymous == true) {
-        await auth.signOut();
-        await auth.signInAnonymously();
-      } else if (auth.currentUser == null) {
-        await auth.signInAnonymously();
-      }
-    } catch (_) {}
   }
 }

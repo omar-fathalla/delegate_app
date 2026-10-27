@@ -23,6 +23,7 @@ import 'package:delegate_app/config/routes/app_router.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/core/services/sync_manager.dart';
 
@@ -76,6 +77,12 @@ void main() async {
     Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
     SharedPreferences.getInstance(),
   ]);
+
+  // Remote Config must not delay the first frame or login. A failed or
+  // offline fetch leaves delegate_otp_enabled at its in-app default (false).
+  // The login path reads the flag when the session is known, so a fetch that
+  // finishes while the user types still applies.
+  unawaited(DelegateOtpConfig.refreshFromRemoteConfig());
 
   // Enable smart offline persistence and caching for Firestore
   try {
@@ -197,15 +204,49 @@ class _MyAppState extends State<MyApp> {
             routerConfig: appRouter,
             debugShowCheckedModeBanner: false,
             builder: (context, child) {
-              if (!isProduction) {
-                return Banner(
-                  message: 'TEST ENV',
-                  location: BannerLocation.topStart,
-                  color: Theme.of(context).colorScheme.error,
-                  child: child!,
-                );
-              }
-              return child!;
+              final content = !isProduction
+                  ? Banner(
+                      message: 'TEST ENV',
+                      location: BannerLocation.topStart,
+                      color: Theme.of(context).colorScheme.error,
+                      child: child!,
+                    )
+                  : child!;
+              return BlocListener<AuthBloc, AuthState>(
+                listener: (context, state) {
+                  if (state is AuthUnauthenticated && state.fromLogout) {
+                    final path =
+                        appRouter.routeInformationProvider.value.uri.path;
+                    if (path != '/login' && path != '/hr/login') {
+                      appRouter.go('/login');
+                    }
+                    return;
+                  }
+                  if (state is! AuthUnauthenticated ||
+                      state.message != AuthBloc.freshSignInMessage) {
+                    return;
+                  }
+                  final path =
+                      appRouter.routeInformationProvider.value.uri.path;
+                  if (path != '/login' && path != '/hr/login') {
+                    appRouter.go('/login');
+                  }
+                  final message = state.message!;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    final navContext =
+                        appRouter.routerDelegate.navigatorKey.currentContext;
+                    if (navContext == null || !navContext.mounted) return;
+                    ScaffoldMessenger.of(navContext).showSnackBar(
+                      SnackBar(
+                        content: Text(message),
+                        duration: const Duration(seconds: 5),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  });
+                },
+                child: content,
+              );
             },
             locale: localeProvider.locale,
             supportedLocales: const [Locale('ar'), Locale('en')],

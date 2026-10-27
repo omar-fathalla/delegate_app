@@ -170,6 +170,60 @@ abstract class AppLocalizations {
   /// **'Please enter password'**
   String get enterPassword;
 
+  /// Delegate login national ID field label
+  ///
+  /// In en, this message translates to:
+  /// **'National ID number'**
+  String get nationalIdNumber;
+
+  /// Empty national ID validation error
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the national ID number'**
+  String get enterNationalId;
+
+  /// National ID format validation error
+  ///
+  /// In en, this message translates to:
+  /// **'National ID must be 14 digits'**
+  String get invalidNationalId;
+
+  /// Mobile number format validation error
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid mobile number'**
+  String get invalidMobileNumber;
+
+  /// Helper under the delegate login secret field
+  ///
+  /// In en, this message translates to:
+  /// **'Delegates sign in with their national ID. Other roles use their password.'**
+  String get loginNationalIdHelp;
+
+  /// Delegate credential mismatch
+  ///
+  /// In en, this message translates to:
+  /// **'The phone number, national ID, or password is incorrect.'**
+  String get invalidLoginCredentials;
+
+  /// Pending or blocked delegate login error
+  ///
+  /// In en, this message translates to:
+  /// **'This account is pending or suspended. Contact your company admin.'**
+  String get delegateAccountInactive;
+
+  /// Delegate login lockout message
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Please try again later.'**
+  String get tooManyLoginAttempts;
+
+  /// Delegate login service unavailable
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in is temporarily unavailable. Please try again.'**
+  String get loginTemporarilyUnavailable;
+
   /// Remember me checkbox label
   ///
   /// In en, this message translates to:

@@ -84,7 +84,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
         try {
           final adminDocs = await firestore
               .collection('users')
-              .where('role', isEqualTo: 'super-admin')
+              .where('role', whereIn: ['super-admin', 'super_admin'])
               .get();
           final adminQueries = <Future<QuerySnapshot>>[];
           for (final doc in adminDocs.docs) {
@@ -193,7 +193,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       if (normalizedRole.contains('super') ||
           delegateUid == 'super-admin-login' ||
           delegateUid.toLowerCase().contains('super')) {
-        for (final r in ['super-admin', 'superAdmin', 'role_super_admin']) {
+        for (final r in ['super-admin', 'super_admin', 'superAdmin', 'role_super_admin']) {
           roleQueries.add(_collection.where('delegateUid', isEqualTo: r).limit(30).get());
         }
       }

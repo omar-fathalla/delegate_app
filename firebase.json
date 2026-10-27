@@ -57,7 +57,15 @@
     {
       "codebase": "tashil-mobile-notifications",
       "source": "functions",
-      "runtime": "nodejs20"
+      "runtime": "nodejs22"
     }
-  ]
+  ],
+  "emulators": {
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": false
+    }
+  }
 }
