@@ -57,6 +57,19 @@ abstract class MarketingRemoteDataSource {
   });
 }
 
+
+/// Whether a delegate still needs a network profile fetch after denorm/cache.
+///
+/// Name + phone from the attendance log (or local cache) are enough.
+/// Missing photo is a **known empty** — most delegates have no personal photo
+/// on the check-in doc; requiring a photo forced ~N profile reads every cold load.
+bool marketingNeedsNetworkEnrichment({
+  required bool hasName,
+  required bool hasPhone,
+}) =>
+    !hasName || !hasPhone;
+
+
 class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
   final FirebaseFirestore firestore;
   final DelegateProfileCache? profileCache;
@@ -726,9 +739,9 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
             record['createdBy'] =
                 delegateData['createdBy'] ?? rawCheckIn['createdBy'];
             record['delegateData'] = delegateData;
+            // Photo optional — incomplete only when name/phone/company missing.
             record['profileIncomplete'] = !hasName ||
                 phone.isEmpty ||
-                photoUrl == null ||
                 resolvedCompanyName.isEmpty;
             branchRecords.add(record);
           }
@@ -795,15 +808,15 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         final cached = delegateLookup[delegateId];
         final logName = (raw['delegateNameInLog'] as String?)?.trim() ?? '';
         final logPhone = (raw['phoneInLog'] as String?)?.trim() ?? '';
-        final logPhoto = raw['photoInLog'];
         final hasName = (cached?['fullName'] as String?)?.trim().isNotEmpty == true ||
             logName.isNotEmpty;
         final hasPhone = (cached?['phoneNumber'] as String?)?.trim().isNotEmpty == true ||
             logPhone.isNotEmpty;
-        final hasPhoto = _extractPersonalPhoto(cached) != null ||
-            (logPhoto is String && logPhoto.trim().isNotEmpty);
-        // Enrich if name/phone/photo missing. Company often filled via companyId cache.
-        return !hasName || !hasPhone || !hasPhoto;
+        // Photo is optional: absence is known-empty, not a reason to hit the network.
+        return marketingNeedsNetworkEnrichment(
+          hasName: hasName,
+          hasPhone: hasPhone,
+        );
       }
 
       final missingIds = <String>[];
