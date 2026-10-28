@@ -59,11 +59,11 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
       case UserRole.technicalSupport:
         return 'دعم فني';
       case UserRole.marketingPromotion:
-        return 'ترويج تسويقي';
+        return l10n?.roleMarketingPromotion ?? 'تسويق العروض';
       case UserRole.marketing:
         return 'تسويق';
       case UserRole.branchesMarketingManager:
-        return 'مدير فروع التسويق';
+        return l10n?.roleBranchesMarketingManager ?? 'مدير تسويق الفروع';
       case UserRole.hr:
         return 'موارد بشرية (HR)';
       case UserRole.delegate:
