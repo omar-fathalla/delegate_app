@@ -496,7 +496,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
   Widget _buildSectionHeader(ThemeData theme, String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
       child: Text(
         title,
         style: theme.textTheme.labelLarge?.copyWith(

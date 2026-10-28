@@ -398,6 +398,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get branches => 'الفروع';
 
   @override
+  String get roleBranchMarketing => 'تسويق الفروع';
+
+  @override
+  String get roleBranchesMarketingManager => 'مدير تسويق الفروع';
+
+  @override
+  String get roleBranchesMarketingMgrShort => 'مدير تسويق فروع';
+
+  @override
+  String get roleMarketingPromotion => 'تسويق العروض';
+
+  @override
+  String get branchMarketingFollowUp => 'متابعة تسويق الفروع';
+
+  @override
+  String get branchMarketingCoordination => 'تنسيق تسويق الفروع';
+
+  @override
   String get admin => 'المدير';
 
   @override

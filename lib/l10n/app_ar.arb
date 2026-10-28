@@ -552,7 +552,31 @@
         "description": "Search bar hint"
     },
     "branches": "الفروع",
-    "@branches": {
+
+    "roleBranchMarketing": "تسويق الفروع",
+    "@roleBranchMarketing": {
+        "description": "Role title for branch marketing staff"
+    },
+    "roleBranchesMarketingManager": "مدير تسويق الفروع",
+    "@roleBranchesMarketingManager": {
+        "description": "Role title for branches marketing manager"
+    },
+    "roleBranchesMarketingMgrShort": "مدير تسويق فروع",
+    "@roleBranchesMarketingMgrShort": {
+        "description": "Short label for branches marketing manager"
+    },
+    "roleMarketingPromotion": "تسويق العروض",
+    "@roleMarketingPromotion": {
+        "description": "Role title for marketing promotion staff"
+    },
+    "branchMarketingFollowUp": "متابعة تسويق الفروع",
+    "@branchMarketingFollowUp": {
+        "description": "Subtitle for branch marketing follow-up"
+    },
+    "branchMarketingCoordination": "تنسيق تسويق الفروع",
+    "@branchMarketingCoordination": {
+        "description": "Subtitle for branch marketing coordination"
+    },    "@branches": {
         "description": "Label for the branches tab in the admin dashboard navigation."
     },
     "admin": "المدير",

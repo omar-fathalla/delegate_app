@@ -544,7 +544,31 @@
         "description": "Search bar hint"
     },
     "branches": "Branches",
-    "@branches": {
+
+    "roleBranchMarketing": "Branch Marketing",
+    "@roleBranchMarketing": {
+        "description": "Role title for branch marketing staff"
+    },
+    "roleBranchesMarketingManager": "Branches Marketing Manager",
+    "@roleBranchesMarketingManager": {
+        "description": "Role title for branches marketing manager"
+    },
+    "roleBranchesMarketingMgrShort": "Branches Marketing Mgr",
+    "@roleBranchesMarketingMgrShort": {
+        "description": "Short label for branches marketing manager"
+    },
+    "roleMarketingPromotion": "Marketing Promotion",
+    "@roleMarketingPromotion": {
+        "description": "Role title for marketing promotion staff"
+    },
+    "branchMarketingFollowUp": "Branch Marketing Follow-up",
+    "@branchMarketingFollowUp": {
+        "description": "Subtitle for branch marketing follow-up"
+    },
+    "branchMarketingCoordination": "Branch Marketing Coordination",
+    "@branchMarketingCoordination": {
+        "description": "Subtitle for branch marketing coordination"
+    },    "@branches": {
         "description": "Label for the branches tab in the admin dashboard navigation."
     },
     "admin": "Admin",

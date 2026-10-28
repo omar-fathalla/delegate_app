@@ -428,7 +428,7 @@ _RoleInfo _getRoleInfo(BuildContext context, String role) {
   }
   if (norm.contains('branches')) {
     return _RoleInfo(
-      label: isArabic ? 'مدير تسويق فروع' : 'Branches Marketing Mgr',
+      label: AppLocalizations.of(context)!.roleBranchesMarketingMgrShort,
       icon: Icons.storefront_rounded,
       bg: colorScheme.tertiaryContainer,
       fg: colorScheme.onTertiaryContainer,
@@ -452,7 +452,7 @@ _RoleInfo _getRoleInfo(BuildContext context, String role) {
   }
   if (norm.contains('marketing')) {
     return _RoleInfo(
-      label: isArabic ? 'تسويق فروع' : 'Branch Marketing',
+      label: AppLocalizations.of(context)!.roleBranchMarketing,
       icon: Icons.campaign_rounded,
       bg: colorScheme.secondaryContainer,
       fg: colorScheme.onSecondaryContainer,
@@ -551,12 +551,12 @@ class _SearchFilterBar extends StatelessWidget {
       ),
       _RoleDropdownItem(
         key: 'branches_marketing',
-        label: isArabic ? 'مدير تسويق الفروع' : 'Branches Marketing Manager',
+        label: AppLocalizations.of(context)!.roleBranchesMarketingManager,
         icon: Icons.storefront_rounded,
       ),
       _RoleDropdownItem(
         key: 'marketing',
-        label: isArabic ? 'تسويق الفروع' : 'Branch Marketing',
+        label: AppLocalizations.of(context)!.roleBranchMarketing,
         icon: Icons.campaign_rounded,
       ),
       _RoleDropdownItem(

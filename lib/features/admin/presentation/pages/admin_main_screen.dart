@@ -550,7 +550,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     final headerTitle = delegate.role == UserRole.technicalSupport
         ? (isArabic ? 'الدعم الفني' : 'Technical Support')
         : isBranchesMarketingManager
-        ? (isArabic ? 'مدير تسويق الفروع' : 'Branches Marketing Manager')
+        ? l10n.roleBranchesMarketingManager
         : (isSuperAdmin ? null : delegate.companyName);
 
     final subtitle = isSuperAdmin
@@ -579,11 +579,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               : 'المخالفات والغرامات')
         : isBranchesMarketingManager
         ? (_currentIndex == 0
-              ? (isArabic ? 'الرئيسية' : 'Home')
+              ? l10n.home
               : _currentIndex == 1
               ? (isArabic ? 'أذونات التصوير' : 'Photo Permissions')
               : _currentIndex == 2
-              ? (isArabic ? 'متابعة الفروع' : 'Branch Marketing')
+              ? l10n.roleBranchMarketing
               : (isArabic ? 'المخالفات والغرامات' : 'Penalties'))
         : (_currentIndex == 0
               ? (delegate.fullName.isNotEmpty ? delegate.fullName : delegate.firstName)
@@ -1021,7 +1021,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   NavigationDestination(
                     icon: const Icon(Icons.home_rounded),
                     selectedIcon: const Icon(Icons.home_rounded),
-                    label: isArabic ? 'الرئيسية' : 'Home',
+                    label: l10n.home,
                   ),
                   const NavigationDestination(
                     icon: Icon(Icons.photo_library_rounded),
@@ -1031,7 +1031,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                   NavigationDestination(
                     icon: const Icon(Icons.store_rounded),
                     selectedIcon: const Icon(Icons.store_rounded),
-                    label: isArabic ? 'الفروع' : 'Branches',
+                    label: l10n.branches,
                   ),
                   const NavigationDestination(
                     icon: Icon(Icons.gavel_rounded),

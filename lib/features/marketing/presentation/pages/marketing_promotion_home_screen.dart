@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
@@ -284,6 +285,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
     ColorScheme colorScheme,
     bool isArabic,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
     final displayName = delegate.firstName.isNotEmpty
         ? delegate.firstName
@@ -395,9 +397,7 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
           // 2. التواصل والتنسيق مع مسؤولي تسويق الفروع عبر المهام
           _buildDutyItem(
             icon: Icons.task_alt_rounded,
-            title: isArabic
-                ? 'التواصل مع تسويق الفروع عبر المهام'
-                : 'Branch Marketing Coordination',
+            title: l10n.branchMarketingCoordination,
             subtitle: isArabic
                 ? 'إرسال وتوجيه المهام الميدانية لمسؤولي الفروع لمتابعة تجهيز العروض والالتزام بالمعايير.'
                 : 'Send & monitor operational tasks to branch marketing specialists for display readiness.',

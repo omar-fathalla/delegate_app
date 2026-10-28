@@ -475,7 +475,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                         children: [
                           _RoleTile(
                             title: 'تسويق الفروع',
-                            subtitle: 'Branch Marketing',
+                            subtitle: l10n.roleBranchMarketing,
                             icon: Icons.campaign_rounded,
                             value: 'marketing',
                             isSelected: _selectedRole == 'marketing',
@@ -489,7 +489,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                           ),
                           _RoleTile(
                             title: 'مدير تسويق الفروع',
-                            subtitle: 'Branches Marketing Manager',
+                            subtitle: l10n.roleBranchesMarketingManager,
                             icon: Icons.storefront_rounded,
                             value: 'branches_marketing',
                             isSelected: _selectedRole == 'branches_marketing',
@@ -503,7 +503,7 @@ class _CreateAdminViewState extends State<_CreateAdminView> {
                           ),
                           _RoleTile(
                             title: 'تسويق العروض',
-                            subtitle: 'Marketing Promotion',
+                            subtitle: l10n.roleMarketingPromotion,
                             icon: Icons.photo_library_rounded,
                             value: 'marketing_promotion',
                             isSelected: _selectedRole == 'marketing_promotion',

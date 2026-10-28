@@ -349,7 +349,7 @@ class _MainScreenState extends State<MainScreen> {
               destinations: [
                 NavigationDestination(
                   icon: const Icon(Icons.home_rounded),
-                  label: isArabic ? 'الرئيسية' : 'Home',
+                  label: l10n.home,
                 ),
                 NavigationDestination(
                   icon: const Icon(Icons.access_time_filled_rounded),

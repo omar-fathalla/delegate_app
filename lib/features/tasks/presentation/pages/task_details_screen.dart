@@ -566,7 +566,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 4),
+          padding: const EdgeInsetsDirectional.only(start: 4, bottom: 4),
           child: Text(
             label,
             style: theme.textTheme.labelLarge?.copyWith(

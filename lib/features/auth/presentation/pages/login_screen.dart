@@ -185,67 +185,65 @@ class _LoginScreenState extends State<LoginScreen>
                           // ---- Top Bar: Tashil Title (Left) & Language Toggle (Right) ----
                           FadeTransition(
                             opacity: _fadeAnimation,
-                            child: Directionality(
-                              textDirection: TextDirection.ltr,
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    l10n.appTitle,
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w900,
-                                      color: colorScheme.primary,
-                                      letterSpacing: 0.6,
-                                    ),
+                            child: Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  l10n.appTitle,
+                                  textAlign: TextAlign.start,
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    color: colorScheme.primary,
+                                    letterSpacing: 0.6,
                                   ),
-                                  Material(
-                                    color: colorScheme.surface.withValues(
-                                      alpha: 0,
-                                    ),
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(20),
-                                      onTap: () {
-                                        localeProvider.toggleLocale();
-                                      },
-                                      child: Container(
-                                        padding:
-                                            const EdgeInsetsDirectional.symmetric(
-                                              horizontal: 16,
-                                              vertical: 8,
-                                            ),
-                                        decoration: BoxDecoration(
-                                          color: colorScheme.primaryContainer,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
+                                ),
+                                Material(
+                                  color: colorScheme.surface.withValues(
+                                    alpha: 0,
+                                  ),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () {
+                                      localeProvider.toggleLocale();
+                                    },
+                                    child: Container(
+                                      padding:
+                                          const EdgeInsetsDirectional.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8,
                                           ),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primaryContainer,
+                                        borderRadius: BorderRadius.circular(
+                                          20,
                                         ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.language_rounded,
-                                              size: 18,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.language_rounded,
+                                            size: 18,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            isArabic ? 'English' : 'العربية',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
                                               color: colorScheme.onSurface,
                                             ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              isArabic ? 'English' : 'العربية',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                color: colorScheme.onSurface,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
 
@@ -354,6 +352,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           AutofillHints.telephoneNumber,
                                         ],
                                         textDirection: TextDirection.ltr,
+                                        textAlign: TextAlign.end,
                                         style: TextStyle(
                                           fontSize: 16,
                                           color: colorScheme.onSurface,
@@ -388,6 +387,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         onFieldSubmitted: (_) =>
                                             _submitLogin(context),
                                         textDirection: TextDirection.ltr,
+                                        textAlign: TextAlign.end,
                                         obscureText: _obscurePassword,
                                         style: TextStyle(
                                           fontSize: 16,
@@ -589,6 +589,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           color: colorScheme.primary,
                                         ),
                                         textDirection: TextDirection.ltr,
+                                        textAlign: TextAlign.end,
                                       ),
                                     ],
                                   ),

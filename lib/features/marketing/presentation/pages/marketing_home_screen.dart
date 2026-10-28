@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -250,6 +251,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
     ColorScheme colorScheme,
     bool isArabic,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
     final displayName = delegate.firstName.isNotEmpty
         ? delegate.firstName
@@ -335,7 +337,7 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            isArabic ? 'مسؤول تسويق الفروع' : 'Branch Marketing',
+                            l10n.roleBranchMarketing,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,

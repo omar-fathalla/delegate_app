@@ -1105,7 +1105,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                           );
                           final isSelected = _selectedBranchId == bId;
                           return Padding(
-                            padding: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsetsDirectional.only(start: 6),
                             child: ChoiceChip(
                               label: Text(
                                 branchObj['name'] ?? bId,
