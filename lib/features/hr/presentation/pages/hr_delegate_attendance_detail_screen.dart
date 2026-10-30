@@ -1758,7 +1758,7 @@ class _HRDelegateAttendanceDetailScreenState
 
   // Desktop & Mobile Table Column Flex Constants (Guaranteed 1:1 Header/Row Synchronization)
   static const int _colFlexDate = 15;        // التاريخ واليوم
-  static const int _colFlexBranch = 15;      // الفرع
+  static const int _colFlexBranch = 20;      // الفرع
   static const int _colFlexInTime = 14;      // تسجيل الحضور
   static const int _colFlexOutTime = 18;     // تسجيل الانصراف
   static const int _colFlexDuration = 13;    // مدة العمل
@@ -1767,6 +1767,159 @@ class _HRDelegateAttendanceDetailScreenState
 
   // Table View (Responsive on Mobile with Smooth Horizontal Scroll & Direct on Desktop)
   Widget _buildAttendanceTable(List<DelegateAttendanceSession> sessions, ColorScheme colorScheme) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 840) {
+          return _buildAttendanceDayCards(sessions, colorScheme);
+        }
+        return _buildAttendanceTableView(sessions, colorScheme);
+      },
+    );
+  }
+
+  // Compact/medium widths (<840dp): one Material 3 card per session instead of the wide table.
+  Widget _buildAttendanceDayCards(List<DelegateAttendanceSession> sessions, ColorScheme colorScheme) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      itemCount: sessions.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (ctx, index) => _buildAttendanceDayCard(sessions[index], colorScheme),
+    );
+  }
+
+  Widget _buildAttendanceDayCard(DelegateAttendanceSession s, ColorScheme colorScheme) {
+    final dateStr = DateFormat('yyyy/MM/dd', 'en').format(s.checkInTime);
+    final dayStr = DateFormat('EEEE', 'ar').format(s.checkInTime);
+    final inTimeStr = DateFormat('hh:mm a', 'ar').format(s.checkInTime);
+    final outTimeStr = s.checkOutTime != null ? DateFormat('hh:mm a', 'ar').format(s.checkOutTime!) : '-';
+    final outColor = s.isAutoCheckOut
+        ? Colors.deepPurple.shade900
+        : (s.checkOutTime != null ? Colors.indigo.shade900 : colorScheme.onSurfaceVariant);
+    final outIconColor = s.isAutoCheckOut
+        ? Colors.deepPurple.shade700
+        : (s.checkOutTime != null ? Colors.indigo.shade700 : colorScheme.error.withValues(alpha: 0.6));
+
+    Widget metric(IconData icon, Color iconColor, String label, String value, Color valueColor) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(icon, size: 15, color: iconColor),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: valueColor),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Card.outlined(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _showSessionDetailsDialog(s),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 8, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Date + weekday, status and actions
+              Row(
+                children: [
+                  Icon(Icons.calendar_today_rounded, size: 16, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(dayStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(width: 8),
+                  Text(dateStr, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                  const Spacer(),
+                  TashilIconButton(
+                    icon: Icons.edit_calendar_rounded,
+                    size: 32,
+                    iconSize: 16,
+                    tooltip: 'تعديل توقيت الجلسة',
+                    onPressed: () => _showEditAttendanceDialog(s),
+                  ),
+                  const SizedBox(width: 4),
+                  TashilIconButton(
+                    icon: Icons.info_outline_rounded,
+                    size: 32,
+                    iconSize: 16,
+                    tooltip: 'عرض تفاصيل الجلسة',
+                    onPressed: () => _showSessionDetailsDialog(s),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Branch (full name, up to 2 lines, address underneath)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(Icons.storefront_rounded, size: 16, color: colorScheme.primary),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: BranchNameLabel(
+                      branchName: s.branchName,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Align(alignment: AlignmentDirectional.centerStart, child: _buildStatusBadge(s, colorScheme)),
+              const Divider(height: 20),
+              // Check-in / check-out / duration
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    metric(Icons.login_rounded, Colors.green.shade700, 'الحضور', inTimeStr, Colors.green.shade800),
+                    metric(
+                      s.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
+                      outIconColor,
+                      s.isAutoCheckOut ? 'الانصراف (تلقائي)' : 'الانصراف',
+                      outTimeStr,
+                      outColor,
+                    ),
+                    metric(
+                      Icons.schedule_rounded,
+                      colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      'مدة العمل',
+                      s.formattedDuration,
+                      colorScheme.onSurface,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Expanded widths (>=840dp): table with flexible, wrapping branch column.
+  Widget _buildAttendanceTableView(List<DelegateAttendanceSession> sessions, ColorScheme colorScheme) {
     return Card(
       elevation: 0,
       color: colorScheme.surface,
@@ -1876,6 +2029,7 @@ class _HRDelegateAttendanceDetailScreenState
                                           child: BranchNameLabel(
                                             branchName: s.branchName,
                                             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                            maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
