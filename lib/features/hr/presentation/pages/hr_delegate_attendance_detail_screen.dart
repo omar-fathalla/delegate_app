@@ -1365,35 +1365,10 @@ class _HRDelegateAttendanceDetailScreenState
       ),
     ];
 
-    if (isWide) {
-      return Row(
-        children: kpis.map((kpi) {
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: _buildSingleKpiCard(kpi, colorScheme),
-            ),
-          );
-        }).toList(),
-      );
-    } else {
-      return Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: _buildCompactKpiCard(kpis[0], colorScheme)),
-              const SizedBox(width: 8),
-              Expanded(child: _buildCompactKpiCard(kpis[1], colorScheme)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _buildCompactKpiCard(kpis[2], colorScheme)),
-              const SizedBox(width: 8),
-              Expanded(child: _buildCompactKpiCard(kpis[3], colorScheme)),
-            ],
-          ),
+    // One compact single-line row with the four stats (phone and wide).
+    return Column(
+      children: [
+          _buildCompactStatsRow(kpis.take(4).toList(), colorScheme),
           if (_branchesInCurrentMonth.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
@@ -1424,17 +1399,17 @@ class _HRDelegateAttendanceDetailScreenState
             ),
           ],
         ],
-      );
-    }
+    );
   }
 
-  Widget _buildCompactKpiCard(_KpiItem kpi, ColorScheme colorScheme) => _buildKpiCard(kpi, colorScheme);
+  /// Shortens the existing value strings for the compact row (display only).
+  String _compactKpiValue(String v) => v
+      .replaceAll(' ساعة و ', 'س ')
+      .replaceAll(' دقيقة', 'د')
+      .replaceAll(' ساعة/يوم', ' س/يوم')
+      .replaceAll(' ساعة', 'س');
 
-  Widget _buildSingleKpiCard(_KpiItem kpi, ColorScheme colorScheme) => _buildKpiCard(kpi, colorScheme);
-
-  /// Unified M3 stat card (phone + wide): outlined card, tonal icon container,
-  /// label on top, large value, small caption.
-  Widget _buildKpiCard(_KpiItem kpi, ColorScheme colorScheme) {
+  Widget _buildCompactStatsRow(List<_KpiItem> items, ColorScheme colorScheme) {
     final textTheme = Theme.of(context).textTheme;
     return Card.outlined(
       margin: EdgeInsets.zero,
@@ -1443,50 +1418,45 @@ class _HRDelegateAttendanceDetailScreenState
         side: BorderSide(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: kpi.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+            for (int i = 0; i < items.length; i++) ...[
+              if (i > 0) SizedBox(height: 28, child: VerticalDivider(width: 8, color: colorScheme.outlineVariant)),
+              Expanded(
+                child: Tooltip(
+                  message: '${items[i].title}: ${items[i].value}',
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(items[i].icon, size: 14, color: items[i].color),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _compactKpiValue(items[i].value),
+                                maxLines: 1,
+                                style: textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        items[i].title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelSmall?.copyWith(fontSize: 9.5, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w400),
+                      ),
+                    ],
                   ),
-                  child: Icon(kpi.icon, size: 16, color: kpi.color),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    kpi.title,
-                    style: textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: AlignmentDirectional.centerStart,
-              child: Text(
-                kpi.value,
-                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface, height: 1.2),
-                maxLines: 1,
               ),
-            ),
-            Text(
-              kpi.subtitle,
-              style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w400),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            ],
           ],
         ),
       ),
