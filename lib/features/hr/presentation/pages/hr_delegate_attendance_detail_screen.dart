@@ -1137,6 +1137,15 @@ class _HRDelegateAttendanceDetailScreenState
 
   // --- 1. Delegate Profile Header ---
   Widget _buildDelegateProfileHeader(ColorScheme colorScheme, bool isWide) {
+    final textTheme = Theme.of(context).textTheme;
+    final infoLines = <Widget>[
+      _buildInfoBadge(Icons.phone_rounded, widget.delegate.phoneNumber),
+      _buildInfoBadge(Icons.badge_outlined, 'قومي: ${widget.delegate.nationalityID}'),
+      if (widget.delegate.companyName.isNotEmpty)
+        _buildInfoBadge(Icons.apartment_rounded, widget.delegate.companyName),
+      if (widget.delegate.boundDeviceModel != null && widget.delegate.boundDeviceModel!.isNotEmpty)
+        _buildInfoBadge(Icons.smartphone_rounded, widget.delegate.boundDeviceModel!),
+    ];
     return Card(
       elevation: 0,
       color: colorScheme.surface,
@@ -1149,81 +1158,77 @@ class _HRDelegateAttendanceDetailScreenState
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            AppAvatar(
-              imageUrl: widget.delegate.personalPhotoUrl,
-              fallbackText: widget.delegate.fullName,
-              radius: isWide ? 32 : 26,
-            ),
-            const SizedBox(width: 16),
+            // Start side (right in RTL): name + data lines.
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    children: [
-                      Text(
-                        widget.delegate.fullName,
-                        style: TextStyle(
-                          fontSize: isWide ? 20 : 16.5,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          widget.delegate.role == UserRole.delegate ? 'مندوب / مروج' : 'مشرف',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    widget.delegate.fullName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 4,
-                    children: [
-                      _buildInfoBadge(Icons.phone_rounded, widget.delegate.phoneNumber),
-                      _buildInfoBadge(Icons.badge_outlined, 'قومي: ${widget.delegate.nationalityID}'),
-                      if (widget.delegate.companyName.isNotEmpty)
-                        _buildInfoBadge(Icons.apartment_rounded, widget.delegate.companyName),
-                      if (widget.delegate.boundDeviceModel != null &&
-                          widget.delegate.boundDeviceModel!.isNotEmpty)
-                        _buildInfoBadge(Icons.smartphone_rounded, widget.delegate.boundDeviceModel!),
-                    ],
-                  ),
+                  if (isWide)
+                    Wrap(spacing: 16, runSpacing: 4, children: infoLines)
+                  else
+                    ...infoLines.map((w) => Padding(padding: const EdgeInsets.only(bottom: 3), child: w)),
                 ],
               ),
             ),
-            Row(
+            const SizedBox(width: 12),
+            // End side (left in RTL): avatar, then actions, then role badge.
+            Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TashilIconButton(
-                  icon: Icons.call_rounded,
-                  color: Colors.green.shade700,
-                  size: isWide ? 40 : 34,
-                  iconSize: isWide ? 20 : 17,
-                  tooltip: 'اتصال هاتفي بالمندوب',
-                  onPressed: () => _makePhoneCall(widget.delegate.phoneNumber),
+                AppAvatar(
+                  imageUrl: widget.delegate.personalPhotoUrl,
+                  fallbackText: widget.delegate.fullName,
+                  radius: isWide ? 32 : 28,
                 ),
-                const SizedBox(width: 6),
-                TashilIconButton(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  color: Colors.teal.shade700,
-                  size: isWide ? 40 : 34,
-                  iconSize: isWide ? 20 : 17,
-                  tooltip: 'مراسلة عبر واتساب',
-                  onPressed: () => _openWhatsApp(widget.delegate.phoneNumber),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TashilIconButton(
+                      icon: Icons.call_rounded,
+                      color: Colors.green.shade700,
+                      size: isWide ? 36 : 32,
+                      iconSize: isWide ? 18 : 16,
+                      tooltip: 'اتصال هاتفي بالمندوب',
+                      onPressed: () => _makePhoneCall(widget.delegate.phoneNumber),
+                    ),
+                    const SizedBox(width: 6),
+                    TashilIconButton(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      color: Colors.teal.shade700,
+                      size: isWide ? 36 : 32,
+                      iconSize: isWide ? 18 : 16,
+                      tooltip: 'مراسلة عبر واتساب',
+                      onPressed: () => _openWhatsApp(widget.delegate.phoneNumber),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    widget.delegate.role == UserRole.delegate ? 'مندوب / مروج' : 'مشرف',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1240,7 +1245,9 @@ class _HRDelegateAttendanceDetailScreenState
       children: [
         Icon(icon, size: 14, color: colorScheme.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(text, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+        Flexible(
+          child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+        ),
       ],
     );
   }
