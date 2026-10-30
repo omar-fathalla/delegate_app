@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -233,7 +234,7 @@ class DelegateTrackingService {
         await _sendGeofenceNotification(
           title: '🚨 تحذير أمني: رصد موقع وهمي (Mock Location)',
           body:
-              'تم رصد استخدام برنامج تزييف موقع (Fake GPS) بواسطة المندوب ${session.delegateName} في فرع (${session.branchName}).',
+              'تم رصد استخدام برنامج تزييف موقع (Fake GPS) بواسطة المندوب ${session.delegateName} في فرع (${BranchDisplayCache.instance.displayName(session.branchName)}).',
           type: 'mock_location_alert',
           session: session,
           breachDistance: 0,
@@ -314,7 +315,7 @@ class DelegateTrackingService {
           await _sendGeofenceNotification(
             title: '⚠️ تنبيه خروج مؤكد عن نطاق الفرع',
             body:
-                'المندوب ${session.delegateName} تجاوز نطاق فرع (${session.branchName}) بـ $breachMeters متر ومستمر خارج النطاق منذ $timeStr.',
+                'المندوب ${session.delegateName} تجاوز نطاق فرع (${BranchDisplayCache.instance.displayName(session.branchName)}) بـ $breachMeters متر ومستمر خارج النطاق منذ $timeStr.',
             type: 'geofence_breach',
             session: session,
             breachDistance: breachMeters,
@@ -361,7 +362,7 @@ class DelegateTrackingService {
           await _sendGeofenceNotification(
             title: '🟢 عودة المندوب لنطاق الفرع',
             body:
-                'عاد المندوب ${session.delegateName} إلى داخل نطاق فرع (${session.branchName}) في تمام الساعة $timeStr.',
+                'عاد المندوب ${session.delegateName} إلى داخل نطاق فرع (${BranchDisplayCache.instance.displayName(session.branchName)}) في تمام الساعة $timeStr.',
             type: 'geofence_return',
             session: session,
             breachDistance: 0,
@@ -593,7 +594,7 @@ class DelegateTrackingService {
         await _sendGeofenceNotification(
           title: '⚠️ تنبيه خروج موثق (أثناء انقطاع الاتصال)',
           body:
-              'تم رصد مغادرة المندوب ${session.delegateName} لنطاق فرع (${session.branchName}) أثناء انقطاع النت (وقت الخروج: $breachTimeStr).',
+              'تم رصد مغادرة المندوب ${session.delegateName} لنطاق فرع (${BranchDisplayCache.instance.displayName(session.branchName)}) أثناء انقطاع النت (وقت الخروج: $breachTimeStr).',
           type: 'geofence_breach_offline_sync',
           session: session,
           breachDistance: (maxBreachDistance - session.geofenceRadius).toInt(),

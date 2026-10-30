@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -910,7 +911,7 @@ class _HRDelegateAttendanceDetailScreenState
       'organizationId': orgUID,
       'title': 'تعديل إداري في سجل الحضور والانصراف',
       'body':
-          'قامت إدارة الموارد البشرية بتعديل توقيت جلسة حضورك في فرع "${session.branchName}" بتاريخ $dateStr. السبب: $reason.',
+          'قامت إدارة الموارد البشرية بتعديل توقيت جلسة حضورك في فرع "${BranchDisplayCache.instance.displayName(session.branchName)}" بتاريخ $dateStr. السبب: $reason.',
       'type': 'attendance_adjusted',
       'isRead': false,
       'createdAt': FieldValue.serverTimestamp(),

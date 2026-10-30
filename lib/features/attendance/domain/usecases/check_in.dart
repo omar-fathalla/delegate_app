@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/core/error/failures.dart';
@@ -33,7 +34,7 @@ class CheckIn implements UseCase<Attendance, CheckInParams> {
           } else {
             return Left(
               ServerFailure(
-                'لديك تسجيل حضور نشط في فرع ${activeAttendance.branchName ?? "آخر"}. يرجى تسجيل الانصراف أولاً.',
+                'لديك تسجيل حضور نشط في فرع ${activeAttendance.branchName == null ? "آخر" : BranchDisplayCache.instance.displayName(activeAttendance.branchName!)}. يرجى تسجيل الانصراف أولاً.',
               ),
             );
           }
