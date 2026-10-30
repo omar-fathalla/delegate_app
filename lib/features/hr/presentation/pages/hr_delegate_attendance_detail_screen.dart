@@ -126,9 +126,34 @@ class _HRDelegateAttendanceDetailScreenState
   String _selectedBranchFilter = 'all';
   String _selectedStatusFilter = 'all'; // 'all', 'completed', 'incomplete'
 
+  // Layout-only: scroll state for the collapsing delegate header.
+  final ScrollController _scrollController = ScrollController();
+  bool _headerShrunk = false; // header card scaled down slightly
+  bool _showCompactHeader = false; // header scrolled away -> photo + name in AppBar
+
+  void _onScroll() {
+    final o = _scrollController.hasClients ? _scrollController.offset : 0.0;
+    final shrunk = o > 24;
+    final compact = o > 150;
+    if (shrunk != _headerShrunk || compact != _showCompactHeader) {
+      setState(() {
+        _headerShrunk = shrunk;
+        _showCompactHeader = compact;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     final init = widget.initialMonth ?? DateTime.now();
     _selectedMonth = DateTime(init.year, init.month, 1);
     if (widget.branchesByName != null) {
@@ -960,7 +985,32 @@ class _HRDelegateAttendanceDetailScreenState
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
         titleSpacing: 0,
-        title: Column(
+        title: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: _showCompactHeader
+              ? Row(
+                  key: const ValueKey('compact'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppAvatar(
+                      imageUrl: widget.delegate.personalPhotoUrl,
+                      fallbackText: widget.delegate.fullName,
+                      radius: 16,
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        widget.delegate.fullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                )
+              : KeyedSubtree(
+                  key: const ValueKey('full'),
+                  child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -986,99 +1036,21 @@ class _HRDelegateAttendanceDetailScreenState
             ),
           ],
         ),
+                ),
+        ),
         centerTitle: false,
         actions: [
-          if (isWide) ...[
-            Padding(
-              padding: const EdgeInsetsDirectional.only(end: 8),
-              child: FilledButton.tonalIcon(
-                onPressed: _navigateToAdjustments,
-                icon: const Icon(Icons.history_edu_rounded, size: 18),
-                label: const Text('سجل التعديلات الإدارية'),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsetsDirectional.only(end: 12),
-              child: FilledButton.tonalIcon(
-                onPressed: _exportMonthlyReportToCSV,
-                icon: const Icon(Icons.download_rounded, size: 18),
-                label: const Text('تصدير التقرير الشهري (CSV)'),
-              ),
-            ),
-          ] else ...[
-            Container(
-              height: 38,
-              margin: const EdgeInsetsDirectional.only(end: 12),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(19),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(19),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Tooltip(
-                      message: 'سجل التعديلات الإدارية',
-                      child: InkWell(
-                        onTap: _navigateToAdjustments,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.history_edu_rounded, size: 16, color: colorScheme.primary),
-                              const SizedBox(width: 4),
-                              Text(
-                                'التعديلات',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 18,
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                    ),
-                    Tooltip(
-                      message: 'تصدير التقرير الشهري (CSV)',
-                      child: InkWell(
-                        onTap: _exportMonthlyReportToCSV,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.download_rounded, size: 16, color: colorScheme.onSurfaceVariant),
-                              const SizedBox(width: 4),
-                              Text(
-                                'تصدير',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          IconButton(
+            tooltip: 'سجل التعديلات الإدارية',
+            onPressed: _navigateToAdjustments,
+            icon: const Icon(Icons.history_edu_rounded),
+          ),
+          IconButton(
+            tooltip: 'تصدير التقرير الشهري (CSV)',
+            onPressed: _exportMonthlyReportToCSV,
+            icon: const Icon(Icons.download_rounded),
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _isLoading
@@ -1102,6 +1074,7 @@ class _HRDelegateAttendanceDetailScreenState
               : RefreshIndicator(
                   onRefresh: _fetchDelegateLogs,
                   child: SingleChildScrollView(
+                    controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.symmetric(
                       horizontal: isWide ? 24 : 12,
@@ -1111,7 +1084,15 @@ class _HRDelegateAttendanceDetailScreenState
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // 1. Delegate Profile Card
-                        _buildDelegateProfileHeader(colorScheme, isWide),
+                        AnimatedScale(
+                          scale: _headerShrunk ? 0.96 : 1.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: AnimatedOpacity(
+                            opacity: _showCompactHeader ? 0.4 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: _buildDelegateProfileHeader(colorScheme, isWide),
+                          ),
+                        ),
                         const SizedBox(height: 16),
 
                         // 2. Month Selector Navigation Bar
@@ -1257,7 +1238,7 @@ class _HRDelegateAttendanceDetailScreenState
     final monthDisplay = DateFormat('MMMM yyyy', 'ar').format(_selectedMonth);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: EdgeInsets.symmetric(horizontal: isWide ? 16 : 8, vertical: isWide ? 10 : 6),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
@@ -1271,62 +1252,85 @@ class _HRDelegateAttendanceDetailScreenState
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Previous Month Button (> الشهر السابق)
-          FilledButton.tonalIcon(
-            onPressed: _goToPreviousMonth,
-            style: FilledButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: isWide ? 16 : 10, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            icon: const Icon(
-              Icons.chevron_right_rounded,
-              size: 18,
-              textDirection: TextDirection.ltr,
-            ),
-            label: Text(isWide ? 'الشهر السابق' : 'السابق'),
-          ),
-
-          // Current Displayed Month
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.calendar_month_rounded, color: colorScheme.primary, size: 22),
-              const SizedBox(width: 8),
-              Text(
-                monthDisplay,
-                style: TextStyle(
-                  fontSize: isWide ? 18 : 15,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
+          // Previous month (start side = right in RTL)
+          if (isWide)
+            FilledButton.tonalIcon(
+              onPressed: _goToPreviousMonth,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              if (!_isCurrentMonth) ...[
-                const SizedBox(width: 10),
-                ActionChip(
-                  visualDensity: VisualDensity.compact,
-                  label: const Text('الشهر الحالي', style: TextStyle(fontSize: 11)),
-                  onPressed: _goToCurrentMonth,
+              icon: const Icon(Icons.chevron_right_rounded, size: 18, textDirection: TextDirection.ltr),
+              label: const Text('الشهر السابق'),
+            )
+          else
+            IconButton.filledTonal(
+              tooltip: 'الشهر السابق',
+              onPressed: _goToPreviousMonth,
+              icon: const Icon(Icons.chevron_right_rounded, textDirection: TextDirection.ltr),
+            ),
+
+          // Current displayed month (+ jump to current month)
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.calendar_month_rounded, color: colorScheme.primary, size: isWide ? 22 : 20),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      monthDisplay,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: isWide ? 18 : 15,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
                 ),
+                if (!_isCurrentMonth) ...[
+                  const SizedBox(width: 4),
+                  if (isWide)
+                    ActionChip(
+                      visualDensity: VisualDensity.compact,
+                      avatar: const Icon(Icons.today_rounded, size: 16),
+                      label: const Text('الشهر الحالي', style: TextStyle(fontSize: 11)),
+                      onPressed: _goToCurrentMonth,
+                    )
+                  else
+                    IconButton(
+                      tooltip: 'الشهر الحالي',
+                      visualDensity: VisualDensity.compact,
+                      color: colorScheme.primary,
+                      onPressed: _goToCurrentMonth,
+                      icon: const Icon(Icons.today_rounded, size: 20),
+                    ),
+                ],
               ],
-            ],
+            ),
           ),
 
-          // Next Month Button (الشهر التالي <)
-          FilledButton.tonalIcon(
-            onPressed: _goToNextMonth,
-            style: FilledButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: isWide ? 16 : 10, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          // Next month (end side = left in RTL)
+          if (isWide)
+            FilledButton.tonalIcon(
+              onPressed: _goToNextMonth,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              label: const Text('الشهر التالي'),
+              icon: const Icon(Icons.chevron_left_rounded, size: 18, textDirection: TextDirection.ltr),
+            )
+          else
+            IconButton.filledTonal(
+              tooltip: 'الشهر التالي',
+              onPressed: _goToNextMonth,
+              icon: const Icon(Icons.chevron_left_rounded, textDirection: TextDirection.ltr),
             ),
-            label: Text(isWide ? 'الشهر التالي' : 'التالي'),
-            icon: const Icon(
-              Icons.chevron_left_rounded,
-              size: 18,
-              textDirection: TextDirection.ltr,
-            ),
-          ),
         ],
       ),
     );
