@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -364,8 +365,8 @@ class _DelegateTrackingCardState extends State<DelegateTrackingCard> {
                   ),
                   const SizedBox(width: 4),
                   Flexible(
-                    child: Text(
-                      session.branchName,
+                    child: BranchNameLabel(
+                      branchName: session.branchName,
                       style: textTheme.bodySmall?.copyWith(
                         fontSize: 11,
                         color: colorScheme.onSurfaceVariant,
