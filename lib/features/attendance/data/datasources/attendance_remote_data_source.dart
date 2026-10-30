@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -137,7 +138,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
               );
             } else {
               throw ServerFailure(
-                'لديك تسجيل حضور نشط في فرع ${existingActive.branchName ?? "آخر"}. يرجى تسجيل الانصراف أولاً.',
+                'لديك تسجيل حضور نشط في فرع ${existingActive.branchName == null ? "آخر" : BranchDisplayCache.instance.displayName(existingActive.branchName!)}. يرجى تسجيل الانصراف أولاً.',
               );
             }
           }

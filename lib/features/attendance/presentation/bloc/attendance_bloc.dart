@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
@@ -86,7 +87,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         } else {
           emit(AttendanceError(
             message:
-                'لديك تسجيل حضور نشط في فرع ${activeAttendance.branchName ?? "آخر"}. يرجى تسجيل الانصراف أولاً.',
+                'لديك تسجيل حضور نشط في فرع ${activeAttendance.branchName == null ? "آخر" : BranchDisplayCache.instance.displayName(activeAttendance.branchName!)}. يرجى تسجيل الانصراف أولاً.',
           ));
           if (previousLoadedState != null) emit(previousLoadedState);
           return;
