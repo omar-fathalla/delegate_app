@@ -1557,7 +1557,18 @@ class _HRDelegateAttendanceDetailScreenState
 
   Widget _buildFilterBar(ColorScheme colorScheme, bool isWide) {
     final branches = ['all', ..._branchesInCurrentMonth];
-    // One horizontally scrollable row: branch menu chip, then status chips with counts.
+    if (!isWide) {
+      // Phone: branch chip on its own line, the three status chips on a second line.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildBranchFilterControl(branches, colorScheme),
+          const SizedBox(height: 8),
+          _buildStatusFilterControl(colorScheme),
+        ],
+      );
+    }
+    // Wide: one horizontally scrollable row.
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
