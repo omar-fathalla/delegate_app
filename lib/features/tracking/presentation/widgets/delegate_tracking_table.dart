@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -593,7 +594,7 @@ class _DelegateTableRowState extends State<_DelegateTableRow> {
                   Expanded(
                     child: Text(
                       session.branchName.isNotEmpty
-                          ? session.branchName
+                          ? BranchDisplayCache.instance.displayName(session.branchName)
                           : 'غير محدد',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
