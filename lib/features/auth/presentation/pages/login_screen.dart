@@ -88,7 +88,6 @@ class _LoginScreenState extends State<LoginScreen>
       _obscurePassword = true;
       _autovalidate = AutovalidateMode.disabled;
     });
-    _formKey.currentState?.reset();
     try {
       sl<SharedPreferences>().setString(kLoginModePrefKey, mode.name);
     } catch (_) {}
