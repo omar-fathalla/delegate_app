@@ -339,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      l10n.login,
+                                      isArabic ? 'اختر نوع الحساب' : 'Choose account type',
                                       style: TextStyle(
                                         fontSize: 24,
                                         fontWeight: FontWeight.w400,
@@ -348,7 +348,9 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
-                                      l10n.loginToContinue,
+                                      isArabic
+                                          ? 'مندوب أو موظف إداري، ثم أدخل بياناتك'
+                                          : 'Delegate or admin staff, then enter your details',
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: colorScheme.onSurfaceVariant,
