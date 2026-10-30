@@ -3006,7 +3006,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     bool isFullWidth = false,
   }) {
     final isSelectedAll = _selectedBranch == 'all';
-    final displayText = isSelectedAll ? 'جميع الفروع' : _selectedBranch;
+    final displayText = isSelectedAll ? 'جميع الفروع' : BranchDisplayCache.instance.displayName(_selectedBranch);
 
     return PopupMenuButton<String>(
       tooltip: 'تصفية حسب الفرع',
