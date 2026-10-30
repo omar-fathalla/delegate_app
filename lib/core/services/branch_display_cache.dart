@@ -56,7 +56,14 @@ class BranchDisplayCache {
   /// Loads all branches once (cheap: ~170 docs). Safe to call repeatedly.
   Future<void> ensureLoaded() {
     if (_loaded) return Future.value();
-    return _loading ??= FirebaseFirestore.instance
+    final FirebaseFirestore db;
+    try {
+      db = FirebaseFirestore.instance;
+    } catch (_) {
+      // Firebase not initialised (e.g. widget tests): show raw names.
+      return Future.value();
+    }
+    return _loading ??= db
         .collection('branches')
         .get()
         .then(registerSnapshot)
@@ -86,7 +93,13 @@ class BranchDisplayCache {
   /// Loads organization names once (organizations/{id}.name). Falls back to
   /// the branch's denormalized `organizationName` if this read fails.
   Future<void> ensureOrgsLoaded() {
-    return _orgLoading ??= FirebaseFirestore.instance
+    final FirebaseFirestore db;
+    try {
+      db = FirebaseFirestore.instance;
+    } catch (_) {
+      return Future.value();
+    }
+    return _orgLoading ??= db
         .collection('organizations')
         .get()
         .then((snap) {
