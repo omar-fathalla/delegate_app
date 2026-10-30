@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -1587,7 +1588,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
                                         color: colorScheme.surfaceContainerHighest,
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: Text(name, style: const TextStyle(fontSize: 10.5)),
+                                      child: Text(BranchDisplayCache.instance.displayName(name), style: const TextStyle(fontSize: 10.5)),
                                     );
                                   }).toList(),
                                 ),
@@ -2386,7 +2387,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
               }),
             ),
             _BreadcrumbItem(
-              label: 'فرع $branchName',
+              label: 'فرع ${BranchDisplayCache.instance.displayName(branchName)}',
               icon: Icons.place_rounded,
               isActive: true,
             ),
@@ -2447,7 +2448,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'استعراض أحدث 20 صورة تم التقاطها في فرع "$branchName"',
+                        'استعراض أحدث 20 صورة تم التقاطها في فرع "${BranchDisplayCache.instance.displayName(branchName)}"',
                         style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
                       ),
                     ],
@@ -2464,7 +2465,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
         TextField(
           controller: _branchCompanySearchController,
           decoration: InputDecoration(
-            hintText: 'البحث عن شركة في فرع $branchName...',
+            hintText: 'البحث عن شركة في فرع ${BranchDisplayCache.instance.displayName(branchName)}...',
             prefixIcon: const Icon(Icons.search_rounded),
             suffixIcon: _branchCompanySearchQuery.isNotEmpty
                 ? IconButton(
@@ -2705,7 +2706,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
                             }),
                           ),
                           _BreadcrumbItem(
-                            label: branchName,
+                            label: BranchDisplayCache.instance.displayName(branchName),
                             icon: Icons.place_rounded,
                             onTap: () => setState(() {
                               _selectedCompanyDrillDown = null;
@@ -2771,7 +2772,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
                           const SizedBox(height: 12),
                           Text(
                             state.photos.isEmpty
-                                ? 'لا توجد صور ملتقطة لـ "$companyName" في فرع "$branchName".'
+                                ? 'لا توجد صور ملتقطة لـ "$companyName" في فرع "${BranchDisplayCache.instance.displayName(branchName)}".'
                                 : 'لا توجد صور مطابقة لفلاتر البحث المحددة.',
                             style: TextStyle(color: colorScheme.onSurfaceVariant),
                           ),
@@ -3161,7 +3162,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 80),
                             child: Text(
-                              photo.branchName,
+                              BranchDisplayCache.instance.displayName(photo.branchName),
                               style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -3267,7 +3268,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
                         Icon(Icons.storefront_rounded, size: 12, color: colorScheme.primary),
                         const SizedBox(width: 4),
                         Text(
-                          photo.branchName,
+                          BranchDisplayCache.instance.displayName(photo.branchName),
                           style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
                         ),
                         if (photo.companyName.isNotEmpty) ...[
@@ -3379,7 +3380,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
                             const Icon(Icons.storefront_rounded, size: 14, color: Colors.amber),
                             const SizedBox(width: 4),
                             Text(
-                              photo.branchName,
+                              BranchDisplayCache.instance.displayName(photo.branchName),
                               style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                             if (photo.companyName.isNotEmpty) ...[
@@ -3460,7 +3461,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
                             }
                             if (file != null && await file.exists()) {
                               // ignore: deprecated_member_use
-                              await Share.shareXFiles([XFile(file.path)], text: 'صورة ميدانية - ${photo.branchName}');
+                              await Share.shareXFiles([XFile(file.path)], text: 'صورة ميدانية - ${BranchDisplayCache.instance.displayName(photo.branchName)}');
                             }
                           } catch (_) {}
                         },
@@ -3555,7 +3556,7 @@ class _SuperAdminPhotosAndPermissionsScreenState
   Future<void> _confirmDeletePhoto(CapturedPhoto photo) async {
     final confirmed = await _showActionConfirmDialog(
       title: 'تأكيد حذف الصورة الميدانية',
-      content: 'هل أنت متأكد من حذف هذه الصورة الملتقطة بواسطة "${photo.delegateName}" بفرع "${photo.branchName}" نهائياً؟',
+      content: 'هل أنت متأكد من حذف هذه الصورة الملتقطة بواسطة "${photo.delegateName}" بفرع "${BranchDisplayCache.instance.displayName(photo.branchName)}" نهائياً؟',
       confirmLabel: 'حذف نهائي',
       confirmIcon: Icons.delete_forever_rounded,
       confirmColor: Colors.red.shade700,

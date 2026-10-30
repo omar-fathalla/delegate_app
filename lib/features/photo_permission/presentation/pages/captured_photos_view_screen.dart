@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
@@ -107,7 +108,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'هل أنت متأكد من حذف هذه الصورة المرسلة من المندوب "${photo.delegateName}" بفرع "${photo.branchName}"؟',
+              'هل أنت متأكد من حذف هذه الصورة المرسلة من المندوب "${photo.delegateName}" بفرع "${BranchDisplayCache.instance.displayName(photo.branchName)}"؟',
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -309,7 +310,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                 ),
                                 ...availableBranches.entries.map((e) => DropdownMenuItem<String?>(
                                       value: e.key,
-                                      child: Text(e.value, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                      child: Text(BranchDisplayCache.instance.displayName(e.value), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
                                     )),
                               ],
                               onChanged: (val) => setState(() {
@@ -440,7 +441,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                               ),
                                               padding: const EdgeInsets.all(8),
                                               child: Text(
-                                                photo.branchName,
+                                                BranchDisplayCache.instance.displayName(photo.branchName),
                                                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,

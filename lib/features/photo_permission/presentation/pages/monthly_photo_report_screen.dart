@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -178,7 +179,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             ),
             const SizedBox(height: 12),
             Text(
-              'هل أنت متأكد من حذف هذه الصورة المرسلة من "${photo.delegateName}" بفرع "${photo.branchName}"؟',
+              'هل أنت متأكد من حذف هذه الصورة المرسلة من "${photo.delegateName}" بفرع "${BranchDisplayCache.instance.displayName(photo.branchName)}"؟',
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -1296,10 +1297,10 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                           Expanded(
                             child: Text(
                               _currentGroupMode == GroupMode.byDelegate
-                                  ? photo.branchName
+                                  ? BranchDisplayCache.instance.displayName(photo.branchName)
                                   : photo.delegateName.isNotEmpty
                                       ? photo.delegateName
-                                      : photo.branchName,
+                                      : BranchDisplayCache.instance.displayName(photo.branchName),
                               style: const TextStyle(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w700,
@@ -1323,7 +1324,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       const SizedBox(height: 3),
                       Text(
                         _currentGroupMode == GroupMode.byDate
-                            ? '${photo.branchName} • $dateStr'
+                            ? '${BranchDisplayCache.instance.displayName(photo.branchName)} • $dateStr'
                             : dateStr,
                         style: TextStyle(
                           fontSize: 11,

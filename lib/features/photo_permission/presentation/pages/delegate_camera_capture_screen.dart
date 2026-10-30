@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -464,7 +465,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                           items: sortedBranches.map((entry) {
                             return DropdownMenuItem<String>(
                               value: entry.key,
-                              child: Text(entry.value),
+                              child: Text(BranchDisplayCache.instance.displayName(entry.value)),
                             );
                           }).toList(),
                           onChanged: (value) {

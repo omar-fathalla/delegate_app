@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/photo_permission/domain/entities/photo_permission.dart';
 
@@ -90,7 +91,7 @@ class _EditPermissionBranchesDialogState extends State<EditPermissionBranchesDia
                       final isSelected = _selectedBranchIds.contains(branchId);
 
                       return CheckboxListTile(
-                        title: Text(branchName),
+                        title: Text(BranchDisplayCache.instance.displayName(branchName)),
                         value: isSelected,
                         onChanged: (bool? value) {
                           setState(() {

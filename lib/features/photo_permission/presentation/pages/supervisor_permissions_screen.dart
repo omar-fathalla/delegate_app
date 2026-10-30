@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -1224,7 +1225,7 @@ class _ExpandableBranchTextState extends State<ExpandableBranchText> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final text = widget.branchNames.join('، ');
+    final text = widget.branchNames.map(BranchDisplayCache.instance.displayName).join('، ');
 
     final hasBranches = widget.branchNames.isNotEmpty;
 
