@@ -1140,7 +1140,7 @@ class _HRDelegateAttendanceDetailScreenState
     final textTheme = Theme.of(context).textTheme;
     final infoLines = <Widget>[
       _buildInfoBadge(Icons.phone_rounded, widget.delegate.phoneNumber),
-      _buildInfoBadge(Icons.badge_outlined, 'قومي: ${widget.delegate.nationalityID}'),
+      _buildInfoBadge(Icons.badge_outlined, widget.delegate.nationalityID),
       if (widget.delegate.companyName.isNotEmpty)
         _buildInfoBadge(Icons.apartment_rounded, widget.delegate.companyName),
       if (widget.delegate.boundDeviceModel != null && widget.delegate.boundDeviceModel!.isNotEmpty)
