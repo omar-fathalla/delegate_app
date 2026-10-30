@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
-import 'package:delegate_app/core/widgets/tashil_button_group.dart';
 import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
@@ -1549,36 +1548,29 @@ class _HRDelegateAttendanceDetailScreenState
   }
 
   // --- 4. Filter Bar (Single Row: Branch Dropdown + Status Button Group + Compact Count Badge) ---
+  /// Month sessions narrowed by the selected branch only (used for status counts).
+  List<DelegateAttendanceSession> get _branchFilteredMonthlySessions {
+    if (_selectedBranchFilter == 'all') return _monthlySessions;
+    final sel = _selectedBranchFilter.toLowerCase().trim();
+    return _monthlySessions.where((s) => s.branchName.toLowerCase().trim() == sel).toList();
+  }
+
   Widget _buildFilterBar(ColorScheme colorScheme, bool isWide) {
     final branches = ['all', ..._branchesInCurrentMonth];
-
-    if (isWide) {
-      return Row(
+    // One horizontally scrollable row: branch menu chip, then status chips with counts.
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
         children: [
-          _buildBranchFilterControl(branches, colorScheme),
-          const SizedBox(width: 10),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
+            child: _buildBranchFilterControl(branches, colorScheme),
+          ),
+          const SizedBox(width: 8),
           _buildStatusFilterControl(colorScheme),
-          const SizedBox(width: 10),
-          _buildRecordCountBadge(colorScheme),
         ],
-      );
-    }
-
-    return Row(
-      children: [
-        // 1. Branch Selector (Right in RTL, expands naturally)
-        Expanded(
-          child: _buildBranchFilterControl(branches, colorScheme),
-        ),
-        const SizedBox(width: 6),
-
-        // 2. Status Filter Group (Center in RTL)
-        _buildStatusFilterControl(colorScheme),
-        const SizedBox(width: 6),
-
-        // 3. Compact Count Badge (Left in RTL, shows: عدد: X)
-        _buildRecordCountBadge(colorScheme),
-      ],
+      ),
     );
   }
 
@@ -1665,48 +1657,41 @@ class _HRDelegateAttendanceDetailScreenState
   }
 
   Widget _buildStatusFilterControl(ColorScheme colorScheme) {
-    return TashilConnectedButtonGroup<String>(
-      height: 38,
-      itemPadding: const EdgeInsets.symmetric(horizontal: 7),
-      items: const [
-        TashilConnectedButtonItem(value: 'all', label: 'الكل'),
-        TashilConnectedButtonItem(value: 'completed', label: 'مكتمل'),
-        TashilConnectedButtonItem(value: 'incomplete', label: 'غير مكتمل'),
-      ],
-      selectedValue: _selectedStatusFilter,
-      onSelected: (val) {
-        setState(() => _selectedStatusFilter = val);
-      },
-    );
-  }
-
-  Widget _buildRecordCountBadge(ColorScheme colorScheme) {
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-          width: 1.0,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.receipt_long_rounded, size: 15, color: colorScheme.primary),
-          const SizedBox(width: 5),
-          Text(
-            'عدد: ${_filteredMonthlySessions.length}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
+    final base = _branchFilteredMonthlySessions;
+    final completed = base.where((s) => s.checkOutTime != null).length;
+    // Red only for truly unfinished sessions (present-now is not an error).
+    final hasAlert = base.any(_isIncompleteSession);
+    final options = <(String, String, int)>[
+      ('all', 'الكل', base.length),
+      ('completed', 'مكتمل', completed),
+      ('incomplete', 'غير مكتمل', base.length - completed),
+    ];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (value, label, count) in options) ...[
+          ChoiceChip(
+            showCheckmark: false,
+            visualDensity: VisualDensity.compact,
+            selected: _selectedStatusFilter == value,
+            onSelected: (_) => setState(() => _selectedStatusFilter = value),
+            selectedColor: value == 'incomplete' && hasAlert ? colorScheme.errorContainer : colorScheme.secondaryContainer,
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 6),
+                Badge(
+                  label: Text('$count'),
+                  backgroundColor: value == 'incomplete' && hasAlert ? colorScheme.error : colorScheme.primary,
+                  textColor: value == 'incomplete' && hasAlert ? colorScheme.onError : colorScheme.onPrimary,
+                ),
+              ],
             ),
           ),
+          const SizedBox(width: 6),
         ],
-      ),
+      ],
     );
   }
 
