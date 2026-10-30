@@ -1360,7 +1360,7 @@ class _HRDelegateAttendanceDetailScreenState
       _KpiItem(
         title: 'الفروع المزارة',
         value: '${_branchesInCurrentMonth.length} فرع',
-        subtitle: _branchesInCurrentMonth.isEmpty ? 'لا فروع' : _branchesInCurrentMonth.take(2).join(', '),
+        subtitle: _branchesInCurrentMonth.isEmpty ? 'لا فروع' : _branchesInCurrentMonth.take(2).map((b) => BranchDisplayCache.instance.displayName(b)).join(', '),
         icon: Icons.store_rounded,
         color: Colors.deepPurple,
       ),
@@ -1415,7 +1415,7 @@ class _HRDelegateAttendanceDetailScreenState
                   ),
                   Expanded(
                     child: Text(
-                      _branchesInCurrentMonth.join('، '),
+                      _branchesInCurrentMonth.map((b) => BranchDisplayCache.instance.displayName(b)).join('، '),
                       style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
                       overflow: TextOverflow.ellipsis,
                     ),
