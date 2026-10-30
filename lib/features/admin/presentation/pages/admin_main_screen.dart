@@ -658,6 +658,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       appBar: UniversalAppHeader(
         delegate: delegate,
+        showActiveOrganization: false,
         customTitle: _currentIndex == 0 ? null : subtitle,
         customSubtitle: _currentIndex == 0
             ? null

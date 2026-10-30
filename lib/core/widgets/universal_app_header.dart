@@ -26,6 +26,9 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
   final VoidCallback? onBackPressed;
   final FirebaseFirestore? firestore;
 
+  /// إظهار شريحة المنظمة النشطة بجانب الدور (تُخفى في هيدر مشرف/مسؤول الشركة).
+  final bool showActiveOrganization;
+
   const UniversalAppHeader({
     super.key,
     required this.delegate,
@@ -37,43 +40,87 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
     this.showBackButton = false,
     this.onBackPressed,
     this.firestore,
+    this.showActiveOrganization = true,
   });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
-  String _getRoleLabel(BuildContext context, Delegate del) {
+  String _getRoleLabel(
+    BuildContext context,
+    Delegate del, [
+    Map<String, dynamic>? userData,
+  ]) {
     final l10n = AppLocalizations.of(context);
-    switch (del.role) {
+    return roleLabelFor(
+      del.role,
+      position: del.position,
+      rawRole: userData?['role'] as String?,
+      accountantLabel: l10n?.accountant,
+      marketingPromotionLabel: l10n?.roleMarketingPromotion,
+      branchesMarketingManagerLabel: l10n?.roleBranchesMarketingManager,
+    );
+  }
+
+  /// يحوّل دور المستخدم إلى تسمية عربية قصيرة تظهر تحت الاسم في الهيدر.
+  /// [rawRole] هو قيمة الحقل `role` الخام من مستند المستخدم إن توفرت،
+  /// ويُستخدم للتمييز بين مشرف الشركة ومسؤول الشركة (كلاهما UserRole.admin).
+  @visibleForTesting
+  static String roleLabelFor(
+    UserRole role, {
+    DelegatePosition? position,
+    String? rawRole,
+    String? accountantLabel,
+    String? marketingPromotionLabel,
+    String? branchesMarketingManagerLabel,
+  }) {
+    final raw = (rawRole ?? '').trim().toLowerCase();
+    if (raw.contains('supervisor') || raw == 'مشرف') return 'مشرف';
+    switch (role) {
       case UserRole.accountant:
-        return l10n?.accountant ?? 'إدارة الحسابات';
+        return accountantLabel ?? 'إدارة الحسابات';
       case UserRole.superAdmin:
         return 'سوبر أدمن';
       case UserRole.organizationAdmin:
         return 'أدمن منظمة';
       case UserRole.admin:
-        if (del.position == DelegatePosition.supervisor) {
-          return 'مشرف';
-        }
+        if (position == DelegatePosition.supervisor) return 'مشرف';
         return 'مسؤول شركة';
       case UserRole.technicalSupport:
         return 'دعم فني';
       case UserRole.marketingPromotion:
-        return l10n?.roleMarketingPromotion ?? 'تسويق العروض';
+        return marketingPromotionLabel ?? 'تسويق العروض';
       case UserRole.marketing:
         return 'تسويق';
       case UserRole.branchesMarketingManager:
-        return l10n?.roleBranchesMarketingManager ?? 'مدير تسويق الفروع';
+        return branchesMarketingManagerLabel ?? 'مدير تسويق الفروع';
       case UserRole.hr:
         return 'موارد بشرية (HR)';
       case UserRole.delegate:
-        if (del.position == DelegatePosition.supervisor) {
-          return 'مشرف';
-        } else if (del.position == DelegatePosition.promoter) {
-          return 'مروج';
-        }
+        if (position == DelegatePosition.supervisor) return 'مشرف';
+        if (position == DelegatePosition.promoter) return 'مروج';
         return 'مندوب';
     }
+  }
+
+  /// اسم العرض في الهيدر بنفس ترتيب شاشة الملف الشخصي:
+  /// fullName من المستند ← اسم الجلسة ← name/displayName من المستند.
+  @visibleForTesting
+  static String resolveDisplayName(
+    Delegate del,
+    Map<String, dynamic>? userData,
+  ) {
+    String? clean(Object? v) {
+      final t = (v is String) ? v.trim() : '';
+      return t.isEmpty ? null : t;
+    }
+
+    return clean(userData?['fullName']) ??
+        clean(del.fullName) ??
+        clean(del.firstName) ??
+        clean(userData?['name']) ??
+        clean(userData?['displayName']) ??
+        'مستخدم';
   }
 
   String _formatOrgLabel(String raw) {
@@ -191,6 +238,7 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return AppBar(
       backgroundColor: colorScheme.surfaceContainer,
@@ -257,17 +305,12 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
           final photoUrl = _resolvePhotoUrl(delegate, userData);
 
           // حل الاسم
-          final rawName = userData?['fullName'] as String? ??
-              userData?['name'] as String? ??
-              userData?['displayName'] as String? ??
-              (delegate.fullName.isNotEmpty
-                  ? delegate.fullName
-                  : delegate.firstName);
-          final displayName = rawName.isNotEmpty ? rawName : 'مستخدم';
+          final displayName = resolveDisplayName(delegate, userData);
 
-          // حل الدور والمنظمة
-          final roleLabel = _getRoleLabel(context, delegate);
-          final activeOrgName = _getActiveOrganizationLabel(delegate, userData);
+          final roleLabel = _getRoleLabel(context, delegate, userData);
+          final activeOrgName = showActiveOrganization
+              ? _getActiveOrganizationLabel(delegate, userData)
+              : '';
 
           return Row(
             children: [
@@ -275,7 +318,7 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
                 onTap: () => context.push('/user-profile', extra: delegate),
                 child: AppAvatar(
                   imageUrl: photoUrl,
-                  fallbackText: displayName.isNotEmpty ? displayName[0] : 'U',
+                  fallbackText: displayName.characters.first,
                   radius: 20,
                 ),
               ),
@@ -290,31 +333,24 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
                     children: [
                       Text(
                         displayName,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                        style: textTheme.titleSmall?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
+                          Flexible(
                             child: Text(
                               roleLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onPrimaryContainer,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (activeOrgName.isNotEmpty) ...[
