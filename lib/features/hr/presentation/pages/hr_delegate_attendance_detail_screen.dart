@@ -1828,10 +1828,23 @@ class _HRDelegateAttendanceDetailScreenState
       );
     }
 
+    final bool isAlert = _isIncompleteSession(s);
     return Card.outlined(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isAlert ? colorScheme.error.withValues(alpha: 0.55) : colorScheme.outlineVariant,
+        ),
+      ),
+      child: Container(
+        decoration: isAlert
+            ? BoxDecoration(
+                border: BorderDirectional(start: BorderSide(color: colorScheme.error, width: 4)),
+              )
+            : null,
+        child: InkWell(
         onTap: () => _showSessionDetailsDialog(s),
         child: Padding(
           padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 8, 12),
@@ -1915,6 +1928,7 @@ class _HRDelegateAttendanceDetailScreenState
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -1976,10 +1990,16 @@ class _HRDelegateAttendanceDetailScreenState
                         ? DateFormat('hh:mm a', 'ar').format(s.checkOutTime!)
                         : '-';
 
+                    final bool isAlert = _isIncompleteSession(s);
                     return Material(
-                      color: isEven
-                          ? colorScheme.surface
-                          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+                      color: isAlert
+                          ? colorScheme.errorContainer.withValues(alpha: 0.18)
+                          : (isEven
+                              ? colorScheme.surface
+                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.15)),
+                      shape: isAlert
+                          ? BorderDirectional(start: BorderSide(color: colorScheme.error, width: 4))
+                          : null,
                       child: InkWell(
                         onTap: () => _showSessionDetailsDialog(s),
                         hoverColor: colorScheme.primary.withValues(alpha: 0.04),
@@ -2250,6 +2270,10 @@ class _HRDelegateAttendanceDetailScreenState
     );
   }
 
+  /// No check-out recorded and not currently checked in (unfinished session).
+  bool _isIncompleteSession(DelegateAttendanceSession s) =>
+      s.checkOutTime == null && !s.isAutoCheckOut && !s.isOngoing;
+
   Widget _buildStatusBadge(DelegateAttendanceSession s, ColorScheme colorScheme) {
     final bool isCompleted = s.checkOutTime != null;
     final bool isOngoing = s.isOngoing;
@@ -2261,9 +2285,10 @@ class _HRDelegateAttendanceDetailScreenState
     final String label;
 
     if (s.isAutoCheckOut) {
-      bgColor = Colors.deepPurple.shade50;
-      borderColor = Colors.deepPurple.shade200;
-      textColor = Colors.deepPurple.shade900;
+      // Closed by the system: counted as complete, shown neutral (not an error).
+      bgColor = colorScheme.secondaryContainer;
+      borderColor = colorScheme.outlineVariant;
+      textColor = colorScheme.onSecondaryContainer;
       icon = Icons.auto_mode_rounded;
       label = 'مكتمل (تلقائي)';
     } else if (isCompleted) {
@@ -2273,17 +2298,17 @@ class _HRDelegateAttendanceDetailScreenState
       icon = Icons.check_circle_rounded;
       label = 'مكتمل الانصراف';
     } else if (isOngoing) {
-      bgColor = Colors.blue.shade50;
-      borderColor = Colors.blue.shade200;
-      textColor = Colors.blue.shade800;
+      bgColor = colorScheme.primaryContainer;
+      borderColor = colorScheme.primary.withValues(alpha: 0.4);
+      textColor = colorScheme.onPrimaryContainer;
       icon = Icons.timelapse_rounded;
       label = 'حاضر الآن';
     } else {
-      bgColor = Colors.red.shade50;
-      borderColor = Colors.red.shade200;
-      textColor = Colors.red.shade800;
+      bgColor = colorScheme.errorContainer;
+      borderColor = colorScheme.error.withValues(alpha: 0.5);
+      textColor = colorScheme.onErrorContainer;
       icon = Icons.warning_amber_rounded;
-      label = 'لم يسجل انصراف';
+      label = 'غير مكتمل - لم يسجل انصراف';
     }
 
     final badgeWidget = Container(
