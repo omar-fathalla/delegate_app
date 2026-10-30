@@ -1408,6 +1408,7 @@ class _HRDelegateAttendanceDetailScreenState
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          _buildChainChip(_branchesInCurrentMonth.elementAt(i), colorScheme),
                         ],
                       ),
                     ),
@@ -1417,6 +1418,35 @@ class _HRDelegateAttendanceDetailScreenState
             ),
           ],
         ],
+    );
+  }
+
+  /// Small chip with the branch's chain (organization) name; hidden if unknown.
+  Widget _buildChainChip(String branchName, ColorScheme colorScheme) {
+    return ValueListenableBuilder<int>(
+      valueListenable: BranchDisplayCache.instance.version,
+      builder: (context, _, child) {
+        final chain = BranchDisplayCache.instance.organizationNameFor(branchName);
+        if (chain.isEmpty) return const SizedBox.shrink();
+        return Container(
+          margin: const EdgeInsetsDirectional.only(start: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          constraints: const BoxConstraints(maxWidth: 120),
+          decoration: BoxDecoration(
+            color: colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            chain,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSecondaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        );
+      },
     );
   }
 

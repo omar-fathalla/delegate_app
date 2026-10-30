@@ -8,7 +8,14 @@ import 'package:flutter/foundation.dart';
 class BranchDisplayInfo {
   final String displayNameAr;
   final String addressShort;
-  const BranchDisplayInfo({this.displayNameAr = '', this.addressShort = ''});
+  final String organizationUID;
+  final String organizationName;
+  const BranchDisplayInfo({
+    this.displayNameAr = '',
+    this.addressShort = '',
+    this.organizationUID = '',
+    this.organizationName = '',
+  });
 }
 
 class BranchDisplayCache {
@@ -30,6 +37,8 @@ class BranchDisplayCache {
     final info = BranchDisplayInfo(
       displayNameAr: (data['displayNameAr'] ?? '').toString().trim(),
       addressShort: (data['addressShort'] ?? '').toString().trim(),
+      organizationUID: (data['organizationUID'] ?? '').toString().trim(),
+      organizationName: (data['organizationName'] ?? '').toString().trim(),
     );
     final name = (data['branchName'] ?? '').toString();
     if (name.trim().isNotEmpty) _byName[_key(name)] = info;
@@ -69,4 +78,32 @@ class BranchDisplayCache {
 
   String addressFor(String? branchName) =>
       infoFor(branchName)?.addressShort ?? '';
+
+  // --- Chain / organization names (display only, read-only, cached) ---
+  final Map<String, String> _orgNames = {};
+  Future<void>? _orgLoading;
+
+  /// Loads organization names once (organizations/{id}.name). Falls back to
+  /// the branch's denormalized `organizationName` if this read fails.
+  Future<void> ensureOrgsLoaded() {
+    return _orgLoading ??= FirebaseFirestore.instance
+        .collection('organizations')
+        .get()
+        .then((snap) {
+      for (final d in snap.docs) {
+        final n = (d.data()['name'] ?? '').toString().trim();
+        if (n.isNotEmpty) _orgNames[d.id] = n;
+      }
+      version.value++;
+    }).catchError((_) {});
+  }
+
+  /// Chain (organization) name for a branch, or '' if unknown.
+  String organizationNameFor(String? branchName) {
+    final info = infoFor(branchName);
+    if (info == null) return '';
+    if (_orgLoading == null) ensureOrgsLoaded();
+    final fromOrg = _orgNames[info.organizationUID] ?? '';
+    return fromOrg.isNotEmpty ? fromOrg : info.organizationName;
+  }
 }
