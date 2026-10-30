@@ -1428,121 +1428,67 @@ class _HRDelegateAttendanceDetailScreenState
     }
   }
 
-  Widget _buildCompactKpiCard(_KpiItem kpi, ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  kpi.title,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: kpi.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(kpi.icon, size: 14, color: kpi.color),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            kpi.value,
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            kpi.subtitle,
-            style: TextStyle(
-              fontSize: 9.5,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildCompactKpiCard(_KpiItem kpi, ColorScheme colorScheme) => _buildKpiCard(kpi, colorScheme);
 
-  Widget _buildSingleKpiCard(_KpiItem kpi, ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+  Widget _buildSingleKpiCard(_KpiItem kpi, ColorScheme colorScheme) => _buildKpiCard(kpi, colorScheme);
+
+  /// Unified M3 stat card (phone + wide): outlined card, tonal icon container,
+  /// label on top, large value, small caption.
+  Widget _buildKpiCard(_KpiItem kpi, ColorScheme colorScheme) {
+    final textTheme = Theme.of(context).textTheme;
+    return Card.outlined(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                kpi.title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: kpi.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(kpi.icon, size: 16, color: kpi.color),
                 ),
-              ),
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: kpi.color.withValues(alpha: 0.15),
-                child: Icon(kpi.icon, size: 16, color: kpi.color),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            kpi.value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    kpi.title,
+                    style: textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            kpi.subtitle,
-            style: TextStyle(
-              fontSize: 10,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+            const SizedBox(height: 8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(
+                kpi.value,
+                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface, height: 1.2),
+                maxLines: 1,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            Text(
+              kpi.subtitle,
+              style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w400),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
