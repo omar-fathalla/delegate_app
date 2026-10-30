@@ -94,3 +94,28 @@ String? validateLoginSecret(
   if (!digitsOnly && normalized.length < 4) return invalidMessage;
   return null;
 }
+
+/// Delegate mode: the national ID must be exactly 14 digits.
+String? validateDelegateNationalId(
+  String? value, {
+  required String emptyMessage,
+  required String invalidMessage,
+}) {
+  if (value == null || value.trim().isEmpty) return emptyMessage;
+  final normalized = normalizeNationalId(value);
+  if (normalized.isEmpty) return emptyMessage;
+  if (!RegExp(r'^\d{14}$').hasMatch(normalized)) return invalidMessage;
+  return null;
+}
+
+/// Staff mode: any characters are allowed, including all-digit passwords.
+/// Firebase Auth checks the password, so only emptiness is rejected here.
+String? validateStaffPassword(
+  String? value, {
+  required String emptyMessage,
+}) {
+  if (value == null || value.isEmpty || value.trim().isEmpty) {
+    return emptyMessage;
+  }
+  return null;
+}

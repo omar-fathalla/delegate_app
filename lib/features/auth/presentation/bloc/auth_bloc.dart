@@ -82,6 +82,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         phoneNumber: event.phoneNumber,
         password: event.password,
         rememberMe: event.rememberMe,
+        mode: event.mode,
       ),
     );
 

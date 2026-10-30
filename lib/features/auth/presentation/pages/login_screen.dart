@@ -15,6 +15,14 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
+import 'package:delegate_app/features/auth/domain/usecases/login.dart';
+
+/// SharedPreferences key for the last account type picked on login.
+const kLoginModePrefKey = 'login_selected_mode';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,6 +38,8 @@ class _LoginScreenState extends State<LoginScreen>
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _rememberMe = false;
+  LoginMode _mode = LoginMode.delegate;
+  AutovalidateMode _autovalidate = AutovalidateMode.disabled;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -58,6 +68,30 @@ class _LoginScreenState extends State<LoginScreen>
         );
 
     _animationController.forward();
+    _restoreMode();
+  }
+
+  bool get _isStaff => _mode == LoginMode.staff;
+
+  void _restoreMode() {
+    try {
+      final saved = sl<SharedPreferences>().getString(kLoginModePrefKey);
+      if (saved == LoginMode.staff.name) _mode = LoginMode.staff;
+    } catch (_) {}
+  }
+
+  void _setMode(LoginMode mode) {
+    if (mode == _mode) return;
+    setState(() {
+      _mode = mode;
+      _passwordController.clear();
+      _obscurePassword = true;
+      _autovalidate = AutovalidateMode.disabled;
+    });
+    _formKey.currentState?.reset();
+    try {
+      sl<SharedPreferences>().setString(kLoginModePrefKey, mode.name);
+    } catch (_) {}
   }
 
   @override
@@ -170,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen>
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   physics: const ClampingScrollPhysics(),
                   padding: const EdgeInsetsDirectional.symmetric(
-                    horizontal: 28.0,
+                    horizontal: 16.0,
                   ),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
@@ -336,15 +370,44 @@ class _LoginScreenState extends State<LoginScreen>
                               opacity: _fadeAnimation,
                               child: Form(
                                 key: _formKey,
+                                autovalidateMode: _autovalidate,
                                 child: AutofillGroup(
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
+                                      // Account type switch (M3 SegmentedButton)
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: SegmentedButton<LoginMode>(
+                                          key: const ValueKey('login_mode_switch'),
+                                          showSelectedIcon: false,
+                                          segments: [
+                                            ButtonSegment(
+                                              value: LoginMode.delegate,
+                                              label: Text(isArabic ? 'مندوب' : 'Delegate'),
+                                              icon: const Icon(Icons.badge_outlined),
+                                            ),
+                                            ButtonSegment(
+                                              value: LoginMode.staff,
+                                              label: Text(isArabic ? 'مشرف / موظف' : 'Supervisor / Staff'),
+                                              icon: const Icon(Icons.admin_panel_settings_outlined),
+                                            ),
+                                          ],
+                                          selected: {_mode},
+                                          onSelectionChanged: state is AuthLoading
+                                              ? null
+                                              : (sel) => _setMode(sel.first),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 24),
                                       // Phone field
                                       TextFormField(
                                         controller: _phoneController,
                                         keyboardType: TextInputType.phone,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.allow(RegExp(r'[0-9٠-٩۰-۹+]')),
+                                        ],
                                         textInputAction: TextInputAction.next,
                                         autocorrect: false,
                                         enableSuggestions: false,
@@ -372,67 +435,89 @@ class _LoginScreenState extends State<LoginScreen>
 
                                       const SizedBox(height: 16),
 
-                                      // National ID for delegates. Staff passwords
-                                      // that contain letters are still accepted.
-                                      TextFormField(
-                                        controller: _passwordController,
-                                        keyboardType:
-                                            TextInputType.visiblePassword,
-                                        textInputAction: TextInputAction.done,
-                                        autocorrect: false,
-                                        enableSuggestions: false,
-                                        autofillHints: const [
-                                          AutofillHints.password,
-                                        ],
-                                        onFieldSubmitted: (_) =>
-                                            _submitLogin(context),
-                                        textDirection: TextDirection.ltr,
-                                        textAlign: TextAlign.end,
-                                        obscureText: _obscurePassword,
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: colorScheme.onSurface,
-                                        ),
-                                        decoration: _inputDecoration(
-                                          hintText: l10n.nationalIdNumber,
-                                          prefixIcon: Icons.badge_rounded,
-                                          colorScheme: colorScheme,
-                                          suffixIcon: IconButton(
-                                            icon: Icon(
-                                              _obscurePassword
-                                                  ? Icons
-                                                      .visibility_off_outlined
-                                                  : Icons
-                                                      .visibility_outlined,
-                                              color:
-                                                  colorScheme.onSurfaceVariant,
-                                              size: 22,
+                                      if (!_isStaff)
+                                        TextFormField(
+                                          key: const ValueKey('login_national_id'),
+                                          controller: _passwordController,
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter.allow(RegExp(r'[0-9٠-٩۰-۹]')),
+                                            LengthLimitingTextInputFormatter(14),
+                                          ],
+                                          maxLength: 14,
+                                          textInputAction: TextInputAction.done,
+                                          autocorrect: false,
+                                          enableSuggestions: false,
+                                          onFieldSubmitted: (_) => _submitLogin(context),
+                                          textDirection: TextDirection.ltr,
+                                          textAlign: TextAlign.end,
+                                          style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
+                                          decoration: _inputDecoration(
+                                            hintText: l10n.nationalIdNumber,
+                                            prefixIcon: Icons.badge_rounded,
+                                            colorScheme: colorScheme,
+                                          ).copyWith(counterText: ''),
+                                          validator: (value) => validateDelegateNationalId(
+                                            value,
+                                            emptyMessage: l10n.enterNationalId,
+                                            invalidMessage: l10n.invalidNationalId,
+                                          ),
+                                        )
+                                      else
+                                        TextFormField(
+                                          key: const ValueKey('login_staff_password'),
+                                          controller: _passwordController,
+                                          keyboardType: TextInputType.visiblePassword,
+                                          textInputAction: TextInputAction.done,
+                                          autocorrect: false,
+                                          enableSuggestions: false,
+                                          autofillHints: const [AutofillHints.password],
+                                          onFieldSubmitted: (_) => _submitLogin(context),
+                                          textDirection: TextDirection.ltr,
+                                          textAlign: TextAlign.end,
+                                          obscureText: _obscurePassword,
+                                          style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
+                                          decoration: _inputDecoration(
+                                            hintText: isArabic ? 'كلمة المرور' : 'Password',
+                                            prefixIcon: Icons.lock_outline_rounded,
+                                            colorScheme: colorScheme,
+                                            suffixIcon: IconButton(
+                                              tooltip: _obscurePassword
+                                                  ? (isArabic ? 'إظهار' : 'Show')
+                                                  : (isArabic ? 'إخفاء' : 'Hide'),
+                                              icon: Icon(
+                                                _obscurePassword
+                                                    ? Icons.visibility_off_outlined
+                                                    : Icons.visibility_outlined,
+                                                color: colorScheme.onSurfaceVariant,
+                                                size: 22,
+                                              ),
+                                              onPressed: () => setState(
+                                                () => _obscurePassword = !_obscurePassword,
+                                              ),
                                             ),
-                                            onPressed: () {
-                                              setState(() {
-                                                _obscurePassword =
-                                                    !_obscurePassword;
-                                              });
-                                            },
+                                          ),
+                                          validator: (value) => validateStaffPassword(
+                                            value,
+                                            emptyMessage: isArabic ? 'يرجى إدخال كلمة المرور' : 'Please enter your password',
                                           ),
                                         ),
-                                        validator: (value) => validateLoginSecret(
-                                          value,
-                                          emptyMessage: l10n.enterNationalId,
-                                          invalidMessage: l10n.invalidNationalId,
-                                        ),
-                                      ),
 
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        l10n.loginNationalIdHelp,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: colorScheme.onSurfaceVariant,
+                                      if (_isStaff) ...[
+                                        const SizedBox(height: 8),
+                                        Align(
+                                          alignment: AlignmentDirectional.centerEnd,
+                                          child: TextButton(
+                                            key: const ValueKey('login_forgot_password'),
+                                            onPressed: state is AuthLoading
+                                                ? null
+                                                : () => _forgotPassword(context, isArabic),
+                                            child: Text(isArabic ? 'نسيت كلمة المرور؟' : 'Forgot password?'),
+                                          ),
                                         ),
-                                      ),
-
-                                      const SizedBox(height: 16),
+                                        const SizedBox(height: 8),
+                                      ] else
+                                        const SizedBox(height: 16),
 
                                       // Remember Me
                                       Row(
@@ -477,7 +562,7 @@ class _LoginScreenState extends State<LoginScreen>
                                               : () => _submitLogin(context),
                                           style: FilledButton.styleFrom(
                                             minimumSize: const Size.fromHeight(
-                                              60,
+                                              48,
                                             ),
                                             padding: const EdgeInsets.symmetric(
                                               vertical: 12,
@@ -528,76 +613,16 @@ class _LoginScreenState extends State<LoginScreen>
 
                           const Spacer(),
 
-                          // ---- Contact Section ----
+                          // ---- Support: one text button, opens the dialer ----
                           FadeTransition(
                             opacity: _fadeAnimation,
-                            child: GestureDetector(
-                              onTap: () {
-                                _launchPhoneDialer(l10n.contactNumber);
-                              },
-                            child: Column(
-                              children: [
-                                Text(
-                                  l10n.noAccountTitle,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  l10n.noAccountSubtitle,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primaryContainer
-                                        .withValues(alpha: 0.3),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: colorScheme.primary.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.support_agent_rounded,
-                                        color: colorScheme.primary,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        l10n.contactNumber,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 1.2,
-                                          color: colorScheme.primary,
-                                        ),
-                                        textDirection: TextDirection.ltr,
-                                        textAlign: TextAlign.end,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            child: TextButton.icon(
+                              key: const ValueKey('login_support_button'),
+                              onPressed: () => _launchPhoneDialer(l10n.contactNumber),
+                              icon: const Icon(Icons.support_agent_rounded),
+                              label: Text(isArabic ? 'تواصل مع الدعم الفني' : 'Contact support'),
                             ),
                           ),
-                        ),
 
                         const SizedBox(height: 24),
                       ],
@@ -623,9 +648,98 @@ class _LoginScreenState extends State<LoginScreen>
           phoneNumber: _phoneController.text,
           password: _passwordController.text,
           rememberMe: _rememberMe,
+          mode: _mode,
         ),
       );
+    } else if (_autovalidate != AutovalidateMode.onUserInteraction) {
+      setState(() => _autovalidate = AutovalidateMode.onUserInteraction);
     }
+  }
+
+  // ---- Helper: Forgot password (staff only) ----
+  Future<void> _forgotPassword(BuildContext context, bool isArabic) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    String? email;
+    final phone = _phoneController.text.trim();
+    if (phone.isNotEmpty) {
+      try {
+        final ds = sl<AuthRemoteDataSource>();
+        if (ds is AuthRemoteDataSourceImpl) {
+          email = await ds.lookupStaffEmail(phone);
+        }
+      } catch (_) {}
+    }
+    if (!context.mounted) return;
+    final entered = await _askResetEmail(context, isArabic, prefill: email);
+    if (entered == null || !context.mounted) return;
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: entered);
+      messenger.showSnackBar(SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(isArabic
+            ? 'لو الإيميل مسجّل، هيوصلك رابط لتغيير كلمة المرور.'
+            : 'If this email is registered, a reset link is on its way.'),
+      ));
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: colorScheme.error,
+        content: Text(isArabic
+            ? 'تعذر إرسال رابط تغيير كلمة المرور. حاول مرة أخرى.'
+            : 'Could not send the reset link. Try again.'),
+      ));
+    }
+  }
+
+  Future<String?> _askResetEmail(
+    BuildContext context,
+    bool isArabic, {
+    String? prefill,
+  }) {
+    final controller = TextEditingController(text: prefill ?? '');
+    final key = GlobalKey<FormState>();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.lock_reset_rounded),
+        title: Text(isArabic ? 'نسيت كلمة المرور' : 'Forgot password'),
+        content: Form(
+          key: key,
+          child: TextFormField(
+            controller: controller,
+            keyboardType: TextInputType.emailAddress,
+            textDirection: TextDirection.ltr,
+            autofocus: prefill == null,
+            decoration: InputDecoration(
+              labelText: isArabic ? 'البريد الإلكتروني' : 'Email',
+              prefixIcon: const Icon(Icons.alternate_email_rounded),
+            ),
+            validator: (v) {
+              final t = (v ?? '').trim();
+              if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t)) {
+                return isArabic ? 'يرجى إدخال بريد إلكتروني صحيح' : 'Enter a valid email';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(isArabic ? 'إلغاء' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (key.currentState!.validate()) {
+                Navigator.pop(dialogContext, controller.text.trim());
+              }
+            },
+            child: Text(isArabic ? 'إرسال الرابط' : 'Send link'),
+          ),
+        ],
+      ),
+    );
   }
 
   // ---- Helper: Launch Phone Dialer ----

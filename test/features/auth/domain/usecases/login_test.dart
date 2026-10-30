@@ -413,4 +413,27 @@ void main() {
       );
     });
   });
+
+  group('LoginMode routing', () {
+    test('delegate mode never falls through to the staff path', () async {
+      mockAuthRepository.getDelegatesByPhoneStub = (_) async => Right([tDelegate]);
+      final result = await usecase(const LoginParams(
+        phoneNumber: tMobile, password: tPassword, mode: LoginMode.delegate));
+      expect(result.isLeft(), isTrue);
+      result.fold((f) => expect(f, isA<DelegateCredentialsFailure>()), (_) => fail('left'));
+      expect(mockAuthRepository.loginDelegateCallCount, 1);
+      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
+    });
+
+    test('staff mode skips delegateLoginV2 entirely', () async {
+      mockAuthRepository.getDelegatesByPhoneStub = (_) async => const Right([]);
+      final result = await usecase(const LoginParams(
+        phoneNumber: tMobile, password: 'Secret123', mode: LoginMode.staff));
+      expect(mockAuthRepository.loginDelegateCallCount, 0);
+      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
+      result.fold((f) {
+        expect((f as AuthFailure).message, 'رقم الهاتف أو كلمة المرور غير صحيحة');
+      }, (_) => fail('left'));
+    });
+  });
 }
