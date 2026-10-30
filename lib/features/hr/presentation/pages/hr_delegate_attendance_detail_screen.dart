@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
+import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -1584,7 +1586,7 @@ class _HRDelegateAttendanceDetailScreenState
     final selectedBranch = branches.contains(_selectedBranchFilter) ? _selectedBranchFilter : 'all';
     final label = selectedBranch == 'all'
         ? 'جميع الفروع (${_branchesInCurrentMonth.length})'
-        : selectedBranch;
+        : BranchDisplayCache.instance.displayName(selectedBranch);
 
     return Container(
       height: 38,
@@ -1617,7 +1619,7 @@ class _HRDelegateAttendanceDetailScreenState
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    b == 'all' ? 'جميع الفروع (${_branchesInCurrentMonth.length})' : b,
+                    b == 'all' ? 'جميع الفروع (${_branchesInCurrentMonth.length})' : BranchDisplayCache.instance.displayName(b),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
@@ -1871,8 +1873,8 @@ class _HRDelegateAttendanceDetailScreenState
                                         Icon(Icons.storefront_rounded, size: 16, color: colorScheme.primary),
                                         const SizedBox(width: 6),
                                         Flexible(
-                                          child: Text(
-                                            s.branchName,
+                                          child: BranchNameLabel(
+                                            branchName: s.branchName,
                                             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -2487,8 +2489,9 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                       Icon(Icons.storefront_rounded, size: 18, color: colorScheme.primary),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          'الفرع: ${widget.session.branchName}',
+                        child: BranchNameLabel(
+                          branchName: widget.session.branchName,
+                          prefix: 'الفرع: ',
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -3338,7 +3341,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                     ),
                   ),
                 ],
-                _buildDetailRow(context, Icons.store_rounded, 'الفرع', session.branchName),
+                _buildDetailRow(context, Icons.store_rounded, 'الفرع', BranchDisplayCache.instance.displayName(session.branchName)),
                 const Divider(height: 16),
                 _buildDetailRow(
                   context,
