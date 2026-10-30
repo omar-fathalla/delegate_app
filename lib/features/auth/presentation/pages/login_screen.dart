@@ -389,7 +389,7 @@ class _LoginScreenState extends State<LoginScreen>
                                             ),
                                             ButtonSegment(
                                               value: LoginMode.staff,
-                                              label: Text(isArabic ? 'مشرف / موظف' : 'Supervisor / Staff'),
+                                              label: Text(isArabic ? 'مشرف' : 'Supervisor'),
                                               icon: const Icon(Icons.admin_panel_settings_outlined),
                                             ),
                                           ],
