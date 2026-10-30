@@ -1422,14 +1422,18 @@ class _HRDelegateAttendanceDetailScreenState
   }
 
   /// Small chip with the branch's chain (organization) name; hidden if unknown.
-  Widget _buildChainChip(String branchName, ColorScheme colorScheme) {
+  Widget _buildChainChip(
+    String branchName,
+    ColorScheme colorScheme, {
+    EdgeInsetsGeometry margin = const EdgeInsetsDirectional.only(start: 8),
+  }) {
     return ValueListenableBuilder<int>(
       valueListenable: BranchDisplayCache.instance.version,
       builder: (context, _, child) {
         final chain = BranchDisplayCache.instance.organizationNameFor(branchName);
         if (chain.isEmpty) return const SizedBox.shrink();
         return Container(
-          margin: const EdgeInsetsDirectional.only(start: 8),
+          margin: margin,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           constraints: const BoxConstraints(maxWidth: 120),
           decoration: BoxDecoration(
@@ -1855,6 +1859,7 @@ class _HRDelegateAttendanceDetailScreenState
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  _buildChainChip(s.branchName, colorScheme),
                 ],
               ),
               const SizedBox(height: 8),
@@ -2006,11 +2011,19 @@ class _HRDelegateAttendanceDetailScreenState
                                         Icon(Icons.storefront_rounded, size: 16, color: colorScheme.primary),
                                         const SizedBox(width: 6),
                                         Flexible(
-                                          child: BranchNameLabel(
-                                            branchName: s.branchName,
-                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              _buildChainChip(s.branchName, colorScheme,
+                                                  margin: const EdgeInsets.only(bottom: 2)),
+                                              BranchNameLabel(
+                                                branchName: s.branchName,
+                                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
