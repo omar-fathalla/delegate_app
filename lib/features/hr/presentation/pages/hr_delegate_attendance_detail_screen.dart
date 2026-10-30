@@ -1371,29 +1371,47 @@ class _HRDelegateAttendanceDetailScreenState
           _buildCompactStatsRow(kpis.take(4).toList(), colorScheme),
           if (_branchesInCurrentMonth.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
+            Card.outlined(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
+                side: BorderSide(color: colorScheme.outlineVariant),
               ),
-              child: Row(
+              child: ExpansionTile(
+                initiallyExpanded: false,
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                shape: const Border(),
+                collapsedShape: const Border(),
+                leading: Icon(Icons.storefront_rounded, size: 18, color: Colors.deepPurple.shade600),
+                title: Text(
+                  'الفروع المزارة (${_branchesInCurrentMonth.length})',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                ),
                 children: [
-                  Icon(Icons.storefront_rounded, size: 15, color: Colors.deepPurple.shade600),
-                  const SizedBox(width: 6),
-                  Text(
-                    'الفروع المزارة (${_branchesInCurrentMonth.length}): ',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
-                  ),
-                  Expanded(
-                    child: Text(
-                      _branchesInCurrentMonth.map((b) => BranchDisplayCache.instance.displayName(b)).join('، '),
-                      style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
-                      overflow: TextOverflow.ellipsis,
+                  for (int i = 0; i < _branchesInCurrentMonth.length; i++) ...[
+                    if (i > 0) Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Icon(Icons.store_rounded, size: 16, color: colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: BranchNameLabel(
+                              branchName: _branchesInCurrentMonth.elementAt(i),
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
