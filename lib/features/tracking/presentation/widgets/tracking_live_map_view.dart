@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
+import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -836,7 +838,7 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
           icon: _branchMarker ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           infoWindow: InfoWindow(
-            title: 'فرع: ${s.branchName}',
+            title: 'فرع: ${BranchDisplayCache.instance.displayName(s.branchName)}',
             snippet: 'نطاق الأمان: ${s.geofenceRadius.toInt()} متر',
           ),
         ),
@@ -1311,8 +1313,8 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
                                           ),
                                           const SizedBox(width: 4),
                                           Expanded(
-                                            child: Text(
-                                              s.branchName,
+                                            child: BranchNameLabel(
+                                              branchName: s.branchName,
                                               style: textTheme.bodySmall?.copyWith(
                                                 color: colorScheme.onSurfaceVariant,
                                                 fontSize: 12,
