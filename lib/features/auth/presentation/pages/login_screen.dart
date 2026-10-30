@@ -389,7 +389,7 @@ class _LoginScreenState extends State<LoginScreen>
                                             ),
                                             ButtonSegment(
                                               value: LoginMode.staff,
-                                              label: Text(isArabic ? 'مشرف' : 'Supervisor'),
+                                              label: Text(isArabic ? 'موظف إداري' : 'Admin staff'),
                                               icon: const Icon(Icons.admin_panel_settings_outlined),
                                             ),
                                           ],
@@ -399,7 +399,17 @@ class _LoginScreenState extends State<LoginScreen>
                                               : (sel) => _setMode(sel.first),
                                         ),
                                       ),
-                                      const SizedBox(height: 24),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        key: const ValueKey('login_mode_helper'),
+                                        _isStaff
+                                            ? (isArabic ? 'الدخول بكلمة المرور' : 'Sign in with your password')
+                                            : (isArabic ? 'الدخول بالرقم القومي' : 'Sign in with your national ID'),
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: colorScheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 16),
                                       // Phone field
                                       TextFormField(
                                         controller: _phoneController,
