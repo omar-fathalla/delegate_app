@@ -61,7 +61,10 @@ void main() {
 
     test('DelegateAttendanceSession handles null checkOutTime and ongoing status', () {
       final now = DateTime.now();
-      final checkInToday = now.subtract(const Duration(hours: 2));
+      // Stay on today's date even when the test runs just after midnight.
+      final checkInToday = now.hour >= 2
+          ? now.subtract(const Duration(hours: 2))
+          : DateTime(now.year, now.month, now.day);
 
       final sessionToday = DelegateAttendanceSession(
         id: 'sess_today',
