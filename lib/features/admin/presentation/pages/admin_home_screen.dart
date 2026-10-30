@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/widgets/branch_name_label.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_event.dart';
@@ -1894,6 +1896,9 @@ class _AttendanceDetailsBottomSheetState
   @override
   void initState() {
     super.initState();
+    BranchDisplayCache.instance.ensureLoaded().then((_) {
+      if (mounted) setState(() {});
+    });
     // Default to 'checked_in' (الحاضرون اليوم) as requested
     _filter = (widget.initialFilter.isNotEmpty && widget.initialFilter != 'all')
         ? widget.initialFilter
@@ -2809,13 +2814,14 @@ class _AttendanceDetailsBottomSheetState
                                                           Icon(Icons.location_on_rounded, size: 16, color: colorScheme.primary),
                                                           const SizedBox(width: 4),
                                                           Expanded(
-                                                            child: Text(
-                                                              'الفرع: ${_cleanBranchName(visit.branchName)}',
+                                                            child: BranchNameLabel(
+                                                              branchName: visit.branchName,
+                                                              prefix: 'الفرع: ',
+                                                              transform: _cleanBranchName,
                                                               style: theme.textTheme.bodySmall?.copyWith(
                                                                 fontWeight: FontWeight.w700,
                                                                 color: colorScheme.onSurface,
                                                               ),
-                                                              overflow: TextOverflow.ellipsis,
                                                             ),
                                                           ),
                                                         ],
@@ -2868,13 +2874,14 @@ class _AttendanceDetailsBottomSheetState
                                                 Icon(Icons.location_on_rounded, size: 16, color: colorScheme.primary),
                                                 const SizedBox(width: 4),
                                                 Expanded(
-                                                  child: Text(
-                                                    'الفرع: ${_cleanBranchName(item.branchName!)}',
+                                                  child: BranchNameLabel(
+                                                    branchName: item.branchName,
+                                                    prefix: 'الفرع: ',
+                                                    transform: _cleanBranchName,
                                                     style: theme.textTheme.bodySmall?.copyWith(
                                                       fontWeight: FontWeight.w700,
                                                       color: colorScheme.onSurface,
                                                     ),
-                                                    overflow: TextOverflow.ellipsis,
                                                   ),
                                                 ),
                                               ],

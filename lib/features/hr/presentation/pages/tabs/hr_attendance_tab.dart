@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
+import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_button_group.dart';
@@ -287,6 +289,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       // 1. Load branches to calculate geofence distances accurately
       final branchesSnap =
           await FirebaseFirestore.instance.collection('branches').get();
+      BranchDisplayCache.instance.registerSnapshot(branchesSnap);
       final Map<String, Branch> branchesMap = {};
       for (final doc in branchesSnap.docs) {
         final b = BranchModel.fromFirestore(doc);
@@ -1372,7 +1375,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     value: record.distanceMeters != null
                         ? '${record.distanceMeters!.toStringAsFixed(1)} متر (${record.distanceMeters! <= 50 ? 'نطاق دقيق < 50م' : 'خارج النطاق الدقيق'})'
                         : 'غير متوفرة',
-                    subtitle: 'الفرع المستهدف: ${record.branchName ?? 'غير محدد'}',
+                    subtitle: 'الفرع المستهدف: ${BranchDisplayCache.instance.displayName(record.branchName, fallback: 'غير محدد')}',
                     theme: theme,
                     colorScheme: colorScheme,
                   ),
@@ -1732,7 +1735,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     icon: Icons.store_rounded,
                     iconColor: colorScheme.primary,
                     title: 'الفرع المستهدف',
-                    value: branchName ?? 'غير محدد',
+                    value: BranchDisplayCache.instance.displayName(branchName, fallback: 'غير محدد'),
                     subtitle: (matchedBranch != null && matchedBranch.latitude != 0.0)
                         ? 'إحداثيات الفرع: ${matchedBranch.latitude.toStringAsFixed(6)}, ${matchedBranch.longitude.toStringAsFixed(6)}\nنصف القطر المعتمد: ${matchedBranch.geofenceRadius.toInt()} متر'
                         : 'لم يتم العثور على إحداثيات مسجلة للفرع',
@@ -3069,7 +3072,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        b,
+                        BranchDisplayCache.instance.displayName(b),
                         style: TextStyle(
                           fontWeight: isSelected
                               ? FontWeight.bold
@@ -3322,13 +3325,11 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         size: 16, color: colorScheme.primary),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: Text(
-                        record.branchName!,
+                      child: BranchNameLabel(
+                        branchName: record.branchName,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -3822,14 +3823,12 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                       Expanded(
                         child: Tooltip(
                           message: record.branchName ?? 'غير محدد',
-                          child: Text(
-                            record.branchName ?? 'غير محدد',
+                          child: BranchNameLabel(
+                            branchName: record.branchName,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                               fontSize: 12.5,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),

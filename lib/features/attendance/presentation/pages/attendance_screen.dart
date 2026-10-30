@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -301,6 +302,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   @override
   void initState() {
     super.initState();
+    BranchDisplayCache.instance.ensureLoaded().then((_) {
+      if (mounted) setState(() {});
+    });
     try {
       _selectedMonth = sl.isRegistered<TrustedTimeService>()
           ? sl<TrustedTimeService>().now
@@ -837,8 +841,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       statusTitle = isArabic ? 'أنت داخل نطاق العمل' : 'Inside Work Zone';
       statusSubtitle = activeBranch != null
           ? (isArabic
-              ? 'متواجد داخل نطاق فرع ${activeBranch.branchName}'
-              : 'Within range of ${activeBranch.branchName}')
+              ? 'متواجد داخل نطاق فرع ${BranchDisplayCache.instance.displayName(activeBranch.branchName)}'
+              : 'Within range of ${BranchDisplayCache.instance.displayName(activeBranch.branchName)}')
           : (isArabic ? 'داخل النطاق المسموح' : 'Within approved range');
     } else {
       statusColor = colorScheme.error;
@@ -846,8 +850,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       statusTitle = isArabic ? 'خارج نطاق العمل' : 'Outside Work Zone';
       statusSubtitle = activeBranch != null
           ? (isArabic
-              ? 'يرجى الاقتراب من فرع ${activeBranch.branchName} لتسجيل الحضور'
-              : 'Move closer to ${activeBranch.branchName} to check in')
+              ? 'يرجى الاقتراب من فرع ${BranchDisplayCache.instance.displayName(activeBranch.branchName)} لتسجيل الحضور'
+              : 'Move closer to ${BranchDisplayCache.instance.displayName(activeBranch.branchName)} to check in')
           : (isArabic ? 'خارج نطاق الفروع المعتمدة' : 'Outside approved branches');
     }
 
@@ -2247,8 +2251,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
       if (matched != null) {
         _locationStatusMessage = isArabic
-            ? 'أنت متواجد داخل نطاق فرع ${matched.branchName}'
-            : 'You are within range of ${matched.branchName}';
+            ? 'أنت متواجد داخل نطاق فرع ${BranchDisplayCache.instance.displayName(matched.branchName)}'
+            : 'You are within range of ${BranchDisplayCache.instance.displayName(matched.branchName)}';
       } else if (closest != null && minDistance.isFinite) {
         _locationStatusMessage = isArabic
             ? 'يرجى الاقتراب من الفرع لتتمكن من تسجيل الحضور'
@@ -2264,7 +2268,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (_isInsideGeofence && matched != null) {
         AppSnackBar.showSuccess(
           context,
-          'أنت داخل نطاق فرع ${matched.branchName} (${minDistance.toInt()} متر)',
+          'أنت داخل نطاق فرع ${BranchDisplayCache.instance.displayName(matched.branchName)} (${minDistance.toInt()} متر)',
         );
       } else if (closest != null) {
         AppSnackBar.showError(
