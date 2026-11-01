@@ -8,6 +8,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/tashil_m3.dart';
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -144,6 +145,20 @@ class _SplashScreenState extends State<SplashScreen>
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                    // §39: only when start-up takes longer than 1s, show the
+                    // loading indicator below the logo (kept off-centre so the
+                    // logo stays aligned with the native splash frame).
+                    PositionedDirectional(
+                      start: 0,
+                      end: 0,
+                      bottom: 120,
+                      child: Center(
+                        child: M3DelayedLoading(
+                          delay: const Duration(seconds: 1),
+                          child: M3LoadingIndicator(color: brand.onPrimary),
+                        ),
                       ),
                     ),
                     PositionedDirectional(

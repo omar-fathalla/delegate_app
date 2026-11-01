@@ -54,14 +54,11 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/login',
-      // Splash → login: the Hero logo and the sliding sheet do the work, so the
-      // route itself has no transition (header colour == splash colour).
-      pageBuilder: (context, state) => CustomTransitionPage(
-        key: state.pageKey,
-        transitionDuration: AppMotionDurations.long2,
-        reverseTransitionDuration: AppMotionDurations.medium2,
+      // Splash → login: M3 fade-through (90ms out + 210ms in). The header
+      // colour equals the splash colour, so only the sheet content fades in.
+      pageBuilder: (context, state) => AppMotionPage.fadeThrough(
+        state: state,
         child: const LoginScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) => child,
       ),
     ),
     GoRoute(

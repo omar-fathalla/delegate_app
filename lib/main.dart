@@ -75,11 +75,17 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
 
-  // Run Firebase and SharedPreferences in parallel to reduce frame skipping
-  final results = await Future.wait([
-    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
-    SharedPreferences.getInstance(),
-  ]);
+  // Splash budget ≤ 2s: Firebase, SharedPreferences and DI registration run
+  // in parallel. DI only registers lazy factories, so it does not need
+  // Firebase to be ready; it only needs the preferences instance.
+  final firebaseReady =
+      Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  final diReady = SharedPreferences.getInstance()
+      .then((prefs) async {
+        await di.init(sharedPreferences: prefs);
+        return prefs;
+      });
+  await Future.wait([firebaseReady, diReady]);
 
   // Remote Config must not delay the first frame or login. A failed or
   // offline fetch leaves delegate_otp_enabled at its in-app default (false).
@@ -111,9 +117,6 @@ void main() async {
 
   // مراقب BLoC لتسجيل الأخطاء والانتقالات
   Bloc.observer = AppBlocObserver();
-
-  final sharedPreferences = results[1] as SharedPreferences;
-  await di.init(sharedPreferences: sharedPreferences);
 
   // Providers are now registered in DI — no duplicate SharedPreferences call
   localeProvider = di.sl<LocaleProvider>();
