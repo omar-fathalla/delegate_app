@@ -1292,5 +1292,92 @@
   "feedbackTypeBug": "Report a problem",
   "feedbackTypeQuestion": "General question",
   "feedbackTypeImprovement": "Improvement",
-  "feedbackTypeOther": "Other"
+  "feedbackTypeOther": "Other",
+  "reqTitle": "My requests",
+  "refreshAction": "Refresh",
+  "newRequest": "New request",
+  "reqEmptyAll": "No requests yet",
+  "reqEmptyFilter": "No requests with this status",
+  "reqEmptyHint": "Tap \"New request\" to send one to your supervisor",
+  "annualLeaveBalance": "Annual leave balance",
+  "weeklyOffPlan": "Weekly day-off plan",
+  "daysOffPerMonth": "4 days off/month",
+  "weeklyDayOff": "Weekly day off",
+  "oneDayEvery7": "1 day every 7 days",
+  "hourlyPermission": "Hourly permission",
+  "availableLabel": "Available",
+  "annualBalance21": "Annual balance: 21 days",
+  "onceActivated": "Once activated",
+  "filterAll": "All",
+  "statusPendingReview": "Pending",
+  "statusApprovedPl": "Approved",
+  "statusRejectedPl": "Rejected",
+  "leaveSick": "Sick leave",
+  "leaveEmergency": "Emergency leave",
+  "excuseLate": "Late arrival",
+  "excuseEarlyLeave": "Early leave",
+  "excuseAbsence": "Excused absence",
+  "leaveUnpaid": "Unpaid leave",
+  "leaveAnnual": "Annual leave",
+  "statusApproved": "Approved",
+  "statusRejected": "Rejected",
+  "statusPending": "Pending",
+  "previewAttachment": "Preview attachment",
+  "cancelRequest": "Cancel request",
+  "cancelRequestConfirm": "Cancel this request?",
+  "keepRequest": "Keep",
+  "yesCancel": "Yes, cancel",
+  "requestCancelled": "Request cancelled",
+  "requestType": "Request type",
+  "weeklyPlanAvailableInfo": "You can request: hourly permission, an excused absence, or unpaid leave.",
+  "remainingDays": "Remaining: {count} days",
+  "@remainingDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "usedDays": "Used: {count} days",
+  "@usedDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "totalQuotaDays": "Total: {count} days",
+  "@totalQuotaDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "forYear": "For {year}",
+  "@forYear": {
+    "placeholders": {
+      "year": {
+        "type": "int"
+      }
+    }
+  },
+  "reasonLabel": "Reason: {reason}",
+  "@reasonLabel": {
+    "placeholders": {
+      "reason": {}
+    }
+  },
+  "rejectReasonLabel": "Rejection reason: {reason}",
+  "@rejectReasonLabel": {
+    "placeholders": {
+      "reason": {}
+    }
+  },
+  "approvedBy": "Approved by {name}",
+  "@approvedBy": {
+    "placeholders": {
+      "name": {}
+    }
+  }
 }

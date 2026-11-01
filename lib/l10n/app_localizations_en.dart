@@ -1025,4 +1025,152 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get feedbackTypeOther => 'Other';
+
+  @override
+  String get reqTitle => 'My requests';
+
+  @override
+  String get refreshAction => 'Refresh';
+
+  @override
+  String get newRequest => 'New request';
+
+  @override
+  String get reqEmptyAll => 'No requests yet';
+
+  @override
+  String get reqEmptyFilter => 'No requests with this status';
+
+  @override
+  String get reqEmptyHint =>
+      'Tap \"New request\" to send one to your supervisor';
+
+  @override
+  String get annualLeaveBalance => 'Annual leave balance';
+
+  @override
+  String get weeklyOffPlan => 'Weekly day-off plan';
+
+  @override
+  String get daysOffPerMonth => '4 days off/month';
+
+  @override
+  String get weeklyDayOff => 'Weekly day off';
+
+  @override
+  String get oneDayEvery7 => '1 day every 7 days';
+
+  @override
+  String get hourlyPermission => 'Hourly permission';
+
+  @override
+  String get availableLabel => 'Available';
+
+  @override
+  String get annualBalance21 => 'Annual balance: 21 days';
+
+  @override
+  String get onceActivated => 'Once activated';
+
+  @override
+  String get filterAll => 'All';
+
+  @override
+  String get statusPendingReview => 'Pending';
+
+  @override
+  String get statusApprovedPl => 'Approved';
+
+  @override
+  String get statusRejectedPl => 'Rejected';
+
+  @override
+  String get leaveSick => 'Sick leave';
+
+  @override
+  String get leaveEmergency => 'Emergency leave';
+
+  @override
+  String get excuseLate => 'Late arrival';
+
+  @override
+  String get excuseEarlyLeave => 'Early leave';
+
+  @override
+  String get excuseAbsence => 'Excused absence';
+
+  @override
+  String get leaveUnpaid => 'Unpaid leave';
+
+  @override
+  String get leaveAnnual => 'Annual leave';
+
+  @override
+  String get statusApproved => 'Approved';
+
+  @override
+  String get statusRejected => 'Rejected';
+
+  @override
+  String get statusPending => 'Pending';
+
+  @override
+  String get previewAttachment => 'Preview attachment';
+
+  @override
+  String get cancelRequest => 'Cancel request';
+
+  @override
+  String get cancelRequestConfirm => 'Cancel this request?';
+
+  @override
+  String get keepRequest => 'Keep';
+
+  @override
+  String get yesCancel => 'Yes, cancel';
+
+  @override
+  String get requestCancelled => 'Request cancelled';
+
+  @override
+  String get requestType => 'Request type';
+
+  @override
+  String get weeklyPlanAvailableInfo =>
+      'You can request: hourly permission, an excused absence, or unpaid leave.';
+
+  @override
+  String remainingDays(int count) {
+    return 'Remaining: $count days';
+  }
+
+  @override
+  String usedDays(int count) {
+    return 'Used: $count days';
+  }
+
+  @override
+  String totalQuotaDays(int count) {
+    return 'Total: $count days';
+  }
+
+  @override
+  String forYear(int year) {
+    return 'For $year';
+  }
+
+  @override
+  String reasonLabel(Object reason) {
+    return 'Reason: $reason';
+  }
+
+  @override
+  String rejectReasonLabel(Object reason) {
+    return 'Rejection reason: $reason';
+  }
+
+  @override
+  String approvedBy(Object name) {
+    return 'Approved by $name';
+  }
 }

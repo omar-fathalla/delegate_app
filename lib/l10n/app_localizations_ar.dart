@@ -1022,4 +1022,151 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get feedbackTypeOther => 'أخرى';
+
+  @override
+  String get reqTitle => 'طلباتي';
+
+  @override
+  String get refreshAction => 'تحديث';
+
+  @override
+  String get newRequest => 'طلب جديد';
+
+  @override
+  String get reqEmptyAll => 'لا توجد طلبات بعد';
+
+  @override
+  String get reqEmptyFilter => 'لا توجد طلبات بهذه الحالة';
+
+  @override
+  String get reqEmptyHint => 'اضغط «طلب جديد» لإرسال طلبك إلى المشرف';
+
+  @override
+  String get annualLeaveBalance => 'رصيد الإجازات السنوي';
+
+  @override
+  String get weeklyOffPlan => 'نظام الراحة الأسبوعية';
+
+  @override
+  String get daysOffPerMonth => '4 أيام راحة شهريًا';
+
+  @override
+  String get weeklyDayOff => 'راحة أسبوعية';
+
+  @override
+  String get oneDayEvery7 => 'يوم كل 7 أيام';
+
+  @override
+  String get hourlyPermission => 'استئذان بالساعة';
+
+  @override
+  String get availableLabel => 'متاح';
+
+  @override
+  String get annualBalance21 => 'الرصيد السنوي: 21 يومًا';
+
+  @override
+  String get onceActivated => 'بعد التفعيل';
+
+  @override
+  String get filterAll => 'الكل';
+
+  @override
+  String get statusPendingReview => 'قيد المراجعة';
+
+  @override
+  String get statusApprovedPl => 'مقبولة';
+
+  @override
+  String get statusRejectedPl => 'مرفوضة';
+
+  @override
+  String get leaveSick => 'إجازة مرضية';
+
+  @override
+  String get leaveEmergency => 'إجازة عارضة';
+
+  @override
+  String get excuseLate => 'عذر تأخير';
+
+  @override
+  String get excuseEarlyLeave => 'إذن انصراف مبكر';
+
+  @override
+  String get excuseAbsence => 'غياب بعذر';
+
+  @override
+  String get leaveUnpaid => 'إجازة بدون أجر';
+
+  @override
+  String get leaveAnnual => 'إجازة اعتيادية';
+
+  @override
+  String get statusApproved => 'مقبول';
+
+  @override
+  String get statusRejected => 'مرفوض';
+
+  @override
+  String get statusPending => 'قيد المراجعة';
+
+  @override
+  String get previewAttachment => 'معاينة المرفق';
+
+  @override
+  String get cancelRequest => 'إلغاء الطلب';
+
+  @override
+  String get cancelRequestConfirm => 'هل تريد إلغاء هذا الطلب؟';
+
+  @override
+  String get keepRequest => 'تراجع';
+
+  @override
+  String get yesCancel => 'نعم، إلغاء';
+
+  @override
+  String get requestCancelled => 'تم إلغاء الطلب';
+
+  @override
+  String get requestType => 'نوع الطلب';
+
+  @override
+  String get weeklyPlanAvailableInfo =>
+      'المتاح لك حاليًا: استئذان بالساعة، أو غياب بعذر، أو إجازة بدون أجر.';
+
+  @override
+  String remainingDays(int count) {
+    return 'المتبقي: $count يوم';
+  }
+
+  @override
+  String usedDays(int count) {
+    return 'المستهلك: $count يوم';
+  }
+
+  @override
+  String totalQuotaDays(int count) {
+    return 'إجمالي الرصيد: $count يوم';
+  }
+
+  @override
+  String forYear(int year) {
+    return 'لعام $year';
+  }
+
+  @override
+  String reasonLabel(Object reason) {
+    return 'السبب: $reason';
+  }
+
+  @override
+  String rejectReasonLabel(Object reason) {
+    return 'سبب الرفض: $reason';
+  }
+
+  @override
+  String approvedBy(Object name) {
+    return 'اعتمده: $name';
+  }
 }

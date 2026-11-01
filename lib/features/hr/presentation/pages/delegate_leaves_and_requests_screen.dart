@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'dart:async';
@@ -91,8 +92,8 @@ class _DelegateLeavesAndRequestsScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'طلباتي (الإجازات والأعذار)',
+                  Text(
+                    AppLocalizations.of(context)!.reqTitle,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14.5,
@@ -117,7 +118,7 @@ class _DelegateLeavesAndRequestsScreenState
               actions: [
                 IconButton(
                   icon: const Icon(Symbols.refresh_rounded),
-                  tooltip: 'تحديث',
+                  tooltip: AppLocalizations.of(context)!.refreshAction,
                   onPressed: () => setState(() {}),
                 ),
                 const SizedBox(width: 8),
@@ -127,7 +128,7 @@ class _DelegateLeavesAndRequestsScreenState
       floatingActionButton: M3ExtendedFab(
         onPressed: () => _showCreateRequestDialog(context),
         icon: Symbols.add_rounded,
-        label: 'تسجيل إجازة / عذر',
+        label: AppLocalizations.of(context)!.newRequest,
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: query.snapshots(),
@@ -272,8 +273,8 @@ class _DelegateLeavesAndRequestsScreenState
                         const SizedBox(height: 16),
                         Text(
                           _selectedStatusFilter == 'all'
-                              ? 'لم تقم بتقديم أي طلبات إجازة أو عذر حتى الآن'
-                              : 'لا توجد طلبات في هذا التبويب',
+                              ? AppLocalizations.of(context)!.reqEmptyAll
+                              : AppLocalizations.of(context)!.reqEmptyFilter,
                           style: theme.textTheme.titleSmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w600,
@@ -281,7 +282,7 @@ class _DelegateLeavesAndRequestsScreenState
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'اضغط على زر "تسجيل إجازة / عذر" لتقديم طلبك لمشرف الشركة',
+                          AppLocalizations.of(context)!.reqEmptyHint,
                           style: TextStyle(
                             fontSize: 12,
                             color: colorScheme.outline,
@@ -360,15 +361,15 @@ class _DelegateLeavesAndRequestsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'رصيد الإجازات السنوي',
+                    Text(
+                      AppLocalizations.of(context)!.annualLeaveBalance,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
                     ),
                     Text(
-                      'للعام الحالي ${DateTime.now().year}',
+                      AppLocalizations.of(context)!.forYear(DateTime.now().year),
                       style: TextStyle(
                         fontSize: 11,
                         color: colorScheme.onSurfaceVariant,
@@ -386,7 +387,7 @@ class _DelegateLeavesAndRequestsScreenState
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'المتبقي: $remainingDays يوم',
+                  AppLocalizations.of(context)!.remainingDays(remainingDays),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -415,14 +416,14 @@ class _DelegateLeavesAndRequestsScreenState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'المستهلك: $usedDays يوم',
+                AppLocalizations.of(context)!.usedDays(usedDays),
                 style: TextStyle(
                   fontSize: 11,
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
               Text(
-                'إجمالي الرصيد: $totalQuota يوم',
+                AppLocalizations.of(context)!.totalQuotaDays(totalQuota),
                 style: TextStyle(
                   fontSize: 11,
                   color: colorScheme.onSurfaceVariant,
@@ -465,9 +466,9 @@ class _DelegateLeavesAndRequestsScreenState
                 ),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'نظام الإجازات الأسبوعية فقط',
+                  AppLocalizations.of(context)!.weeklyOffPlan,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -481,7 +482,7 @@ class _DelegateLeavesAndRequestsScreenState
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '4 أيام راحة شهرياً',
+                  AppLocalizations.of(context)!.daysOffPerMonth,
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.bold,
@@ -526,8 +527,8 @@ class _DelegateLeavesAndRequestsScreenState
               Expanded(
                 child: _buildLeaveFeaturePill(
                   icon: Symbols.calendar_today_rounded,
-                  label: 'راحة أسبوعية',
-                  sublabel: 'يوم لكل 7 أيام',
+                  label: AppLocalizations.of(context)!.weeklyDayOff,
+                  sublabel: AppLocalizations.of(context)!.oneDayEvery7,
                   colorScheme: colorScheme,
                 ),
               ),
@@ -535,8 +536,8 @@ class _DelegateLeavesAndRequestsScreenState
               Expanded(
                 child: _buildLeaveFeaturePill(
                   icon: Symbols.schedule_rounded,
-                  label: 'الأعذار الساعية',
-                  sublabel: 'متاحة للتقديم',
+                  label: AppLocalizations.of(context)!.hourlyPermission,
+                  sublabel: AppLocalizations.of(context)!.availableLabel,
                   colorScheme: colorScheme,
                 ),
               ),
@@ -544,8 +545,8 @@ class _DelegateLeavesAndRequestsScreenState
               Expanded(
                 child: _buildLeaveFeaturePill(
                   icon: Symbols.lock_clock_rounded,
-                  label: 'الرصيد السنوي (21)',
-                  sublabel: 'عند التفعيل',
+                  label: AppLocalizations.of(context)!.annualBalance21,
+                  sublabel: AppLocalizations.of(context)!.onceActivated,
                   colorScheme: colorScheme,
                   isMuted: true,
                 ),
@@ -629,7 +630,7 @@ class _DelegateLeavesAndRequestsScreenState
         children: [
           Expanded(
             child: _buildMiniKpi(
-              title: 'الإجمالي',
+              title: AppLocalizations.of(context)!.filterAll,
               value: '$totalCount',
               icon: Symbols.event_note_rounded,
               color: colorScheme.primary,
@@ -639,7 +640,7 @@ class _DelegateLeavesAndRequestsScreenState
           _buildKpiDivider(colorScheme),
           Expanded(
             child: _buildMiniKpi(
-              title: 'المراجعة',
+              title: AppLocalizations.of(context)!.statusPendingReview,
               value: '$pendingCount',
               icon: Symbols.hourglass_top_rounded,
               color: Theme.of(context).colorScheme.onTertiaryContainer,
@@ -649,7 +650,7 @@ class _DelegateLeavesAndRequestsScreenState
           _buildKpiDivider(colorScheme),
           Expanded(
             child: _buildMiniKpi(
-              title: 'المعتمدة',
+              title: AppLocalizations.of(context)!.statusApprovedPl,
               value: '$approvedCount',
               icon: Symbols.check_circle_rounded,
               color: Theme.of(context).colorScheme.primary,
@@ -659,7 +660,7 @@ class _DelegateLeavesAndRequestsScreenState
           _buildKpiDivider(colorScheme),
           Expanded(
             child: _buildMiniKpi(
-              title: 'المرفوضة',
+              title: AppLocalizations.of(context)!.statusRejectedPl,
               value: '$rejectedCount',
               icon: Symbols.cancel_rounded,
               color: colorScheme.error,
@@ -742,27 +743,27 @@ class _DelegateLeavesAndRequestsScreenState
       child: Row(
         children: [
           _buildFilterSegment(
-            label: 'الكل',
+            label: AppLocalizations.of(context)!.filterAll,
             count: totalCount,
             value: 'all',
             colorScheme: colorScheme,
           ),
           _buildFilterSegment(
-            label: 'المراجعة',
+            label: AppLocalizations.of(context)!.statusPendingReview,
             count: pendingCount,
             value: 'pending',
             activeColor: Theme.of(context).colorScheme.onTertiaryContainer,
             colorScheme: colorScheme,
           ),
           _buildFilterSegment(
-            label: 'المعتمدة',
+            label: AppLocalizations.of(context)!.statusApprovedPl,
             count: approvedCount,
             value: 'approved',
             activeColor: Theme.of(context).colorScheme.primary,
             colorScheme: colorScheme,
           ),
           _buildFilterSegment(
-            label: 'المرفوضة',
+            label: AppLocalizations.of(context)!.statusRejectedPl,
             count: rejectedCount,
             value: 'rejected',
             activeColor: colorScheme.error,
@@ -903,31 +904,31 @@ class _DelegateLeavesAndRequestsScreenState
     IconData typeIcon;
     switch (type) {
       case 'sick':
-        typeLabel = 'إجازة مرضية';
+        typeLabel = AppLocalizations.of(context)!.leaveSick;
         typeIcon = Symbols.medical_services_rounded;
         break;
       case 'emergency':
-        typeLabel = 'إجازة عارضة';
+        typeLabel = AppLocalizations.of(context)!.leaveEmergency;
         typeIcon = Symbols.warning_amber_rounded;
         break;
       case 'delay':
-        typeLabel = 'عذر تأخير';
+        typeLabel = AppLocalizations.of(context)!.excuseLate;
         typeIcon = Symbols.timer_rounded;
         break;
       case 'early_leave':
-        typeLabel = 'إذن انصراف مبكر';
+        typeLabel = AppLocalizations.of(context)!.excuseEarlyLeave;
         typeIcon = Symbols.logout_rounded;
         break;
       case 'absence':
-        typeLabel = 'عذر غياب';
+        typeLabel = AppLocalizations.of(context)!.excuseAbsence;
         typeIcon = Symbols.person_off_rounded;
         break;
       case 'unpaid':
-        typeLabel = 'إجازة بدون أجر';
+        typeLabel = AppLocalizations.of(context)!.leaveUnpaid;
         typeIcon = Symbols.money_off_rounded;
         break;
       default:
-        typeLabel = 'إجازة اعتيادية';
+        typeLabel = AppLocalizations.of(context)!.leaveAnnual;
         typeIcon = Symbols.beach_access_rounded;
         break;
     }
@@ -939,17 +940,17 @@ class _DelegateLeavesAndRequestsScreenState
     switch (status) {
       case 'approved':
         statusColor = Theme.of(context).colorScheme.primary;
-        statusLabel = 'معتمد';
+        statusLabel = AppLocalizations.of(context)!.statusApproved;
         statusIcon = Symbols.check_circle_rounded;
         break;
       case 'rejected':
         statusColor = colorScheme.error;
-        statusLabel = 'مرفوض';
+        statusLabel = AppLocalizations.of(context)!.statusRejected;
         statusIcon = Symbols.cancel_rounded;
         break;
       default:
         statusColor = Theme.of(context).colorScheme.onTertiaryContainer;
-        statusLabel = 'قيد المراجعة';
+        statusLabel = AppLocalizations.of(context)!.statusPending;
         statusIcon = Symbols.hourglass_top_rounded;
         break;
     }
@@ -1130,7 +1131,7 @@ class _DelegateLeavesAndRequestsScreenState
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          'السبب: $reason',
+                          AppLocalizations.of(context)!.reasonLabel(reason),
                           style: TextStyle(
                             fontSize: 11.5,
                             color: colorScheme.onSurfaceVariant,
@@ -1162,7 +1163,7 @@ class _DelegateLeavesAndRequestsScreenState
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'سبب الرفض: $rejectReason',
+                                AppLocalizations.of(context)!.rejectReasonLabel(rejectReason),
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: colorScheme.error,
@@ -1187,7 +1188,7 @@ class _DelegateLeavesAndRequestsScreenState
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            'تم الاعتماد بواسطة: $resolvedByName',
+                            AppLocalizations.of(context)!.approvedBy(resolvedByName),
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,
@@ -1224,8 +1225,8 @@ class _DelegateLeavesAndRequestsScreenState
                                 ),
                               ),
                               icon: const Icon(Symbols.attachment_rounded, size: 14),
-                              label: const Text(
-                                'معاينة المرفق',
+                              label: Text(
+                                AppLocalizations.of(context)!.previewAttachment,
                                 style: TextStyle(fontSize: 11),
                               ),
                               onPressed: () => _viewAttachment(context, attachmentUrl),
@@ -1243,8 +1244,8 @@ class _DelegateLeavesAndRequestsScreenState
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                               ),
                               icon: const Icon(Symbols.delete_outline_rounded, size: 15),
-                              label: const Text(
-                                'إلغاء الطلب',
+                              label: Text(
+                                AppLocalizations.of(context)!.cancelRequest,
                                 style: TextStyle(fontSize: 11),
                               ),
                               onPressed: () =>
@@ -1266,22 +1267,23 @@ class _DelegateLeavesAndRequestsScreenState
   // ── إلغاء الطلب المعلق ──
   Future<void> _cancelPendingRequest(BuildContext context, String docId) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('إلغاء الطلب'),
-        content: const Text('هل أنت متأكد من رغبتك في إلغاء هذا الطلب المعلق؟'),
+        title: Text(AppLocalizations.of(context)!.cancelRequest),
+        content: Text(AppLocalizations.of(context)!.cancelRequestConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('تراجع'),
+            child: Text(AppLocalizations.of(context)!.keepRequest),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('نعم، إلغاء'),
+            child: Text(AppLocalizations.of(context)!.yesCancel),
           ),
         ],
       ),
@@ -1296,7 +1298,7 @@ class _DelegateLeavesAndRequestsScreenState
           .delete();
 
       messenger.showSnackBar(
-        const SnackBar(content: Text('تم إلغاء طلب الإجازة بنجاح')),
+        SnackBar(content: Text(l10n.requestCancelled)),
       );
     } catch (e) {
       messenger.showSnackBar(
@@ -1429,9 +1431,9 @@ class _DelegateLeavesAndRequestsScreenState
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'تسجيل إجازة / عذر جديد',
+                            AppLocalizations.of(context)!.newRequest,
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15.5,
@@ -1489,7 +1491,7 @@ class _DelegateLeavesAndRequestsScreenState
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'تنبيه: حسابك حالياً على نظام الإجازات الأسبوعية فقط. يمكنك التقديم على أعذار ساعية، أو عذر غياب، أو إجازة بدون أجر.',
+                                      AppLocalizations.of(context)!.weeklyPlanAvailableInfo,
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: Theme.of(context).colorScheme.onTertiaryContainer,
@@ -1505,7 +1507,7 @@ class _DelegateLeavesAndRequestsScreenState
 
                           // نوع الطلب
                           Text(
-                            'نوع الطلب:',
+                            AppLocalizations.of(context)!.requestType,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
@@ -1529,10 +1531,10 @@ class _DelegateLeavesAndRequestsScreenState
                                     ? 'إجازة اعتيادية (خصم من الرصيد السنوي)'
                                     : 'إجازة اعتيادية (غير مفعلة لحسابك حالياً)',
                               ),
-                              const DropdownMenuEntry(
-                                  value: 'sick', label: 'إجازة مرضية'),
-                              const DropdownMenuEntry(
-                                  value: 'emergency', label: 'إجازة عارضة'),
+                              DropdownMenuEntry(
+                                  value: 'sick', label: AppLocalizations.of(context)!.leaveSick),
+                              DropdownMenuEntry(
+                                  value: 'emergency', label: AppLocalizations.of(context)!.leaveEmergency),
                               const DropdownMenuEntry(
                                   value: 'unpaid',
                                   label: 'إجازة بدون أجر (إجازة استثنائية)'),

@@ -2011,6 +2011,270 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other'**
   String get feedbackTypeOther;
+
+  /// No description provided for @reqTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My requests'**
+  String get reqTitle;
+
+  /// No description provided for @refreshAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get refreshAction;
+
+  /// No description provided for @newRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'New request'**
+  String get newRequest;
+
+  /// No description provided for @reqEmptyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'No requests yet'**
+  String get reqEmptyAll;
+
+  /// No description provided for @reqEmptyFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'No requests with this status'**
+  String get reqEmptyFilter;
+
+  /// No description provided for @reqEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap \"New request\" to send one to your supervisor'**
+  String get reqEmptyHint;
+
+  /// No description provided for @annualLeaveBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual leave balance'**
+  String get annualLeaveBalance;
+
+  /// No description provided for @weeklyOffPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly day-off plan'**
+  String get weeklyOffPlan;
+
+  /// No description provided for @daysOffPerMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'4 days off/month'**
+  String get daysOffPerMonth;
+
+  /// No description provided for @weeklyDayOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly day off'**
+  String get weeklyDayOff;
+
+  /// No description provided for @oneDayEvery7.
+  ///
+  /// In en, this message translates to:
+  /// **'1 day every 7 days'**
+  String get oneDayEvery7;
+
+  /// No description provided for @hourlyPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Hourly permission'**
+  String get hourlyPermission;
+
+  /// No description provided for @availableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get availableLabel;
+
+  /// No description provided for @annualBalance21.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual balance: 21 days'**
+  String get annualBalance21;
+
+  /// No description provided for @onceActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Once activated'**
+  String get onceActivated;
+
+  /// No description provided for @filterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get filterAll;
+
+  /// No description provided for @statusPendingReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get statusPendingReview;
+
+  /// No description provided for @statusApprovedPl.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get statusApprovedPl;
+
+  /// No description provided for @statusRejectedPl.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get statusRejectedPl;
+
+  /// No description provided for @leaveSick.
+  ///
+  /// In en, this message translates to:
+  /// **'Sick leave'**
+  String get leaveSick;
+
+  /// No description provided for @leaveEmergency.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency leave'**
+  String get leaveEmergency;
+
+  /// No description provided for @excuseLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Late arrival'**
+  String get excuseLate;
+
+  /// No description provided for @excuseEarlyLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Early leave'**
+  String get excuseEarlyLeave;
+
+  /// No description provided for @excuseAbsence.
+  ///
+  /// In en, this message translates to:
+  /// **'Excused absence'**
+  String get excuseAbsence;
+
+  /// No description provided for @leaveUnpaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpaid leave'**
+  String get leaveUnpaid;
+
+  /// No description provided for @leaveAnnual.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual leave'**
+  String get leaveAnnual;
+
+  /// No description provided for @statusApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get statusApproved;
+
+  /// No description provided for @statusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get statusRejected;
+
+  /// No description provided for @statusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get statusPending;
+
+  /// No description provided for @previewAttachment.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview attachment'**
+  String get previewAttachment;
+
+  /// No description provided for @cancelRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel request'**
+  String get cancelRequest;
+
+  /// No description provided for @cancelRequestConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this request?'**
+  String get cancelRequestConfirm;
+
+  /// No description provided for @keepRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get keepRequest;
+
+  /// No description provided for @yesCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, cancel'**
+  String get yesCancel;
+
+  /// No description provided for @requestCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Request cancelled'**
+  String get requestCancelled;
+
+  /// No description provided for @requestType.
+  ///
+  /// In en, this message translates to:
+  /// **'Request type'**
+  String get requestType;
+
+  /// No description provided for @weeklyPlanAvailableInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'You can request: hourly permission, an excused absence, or unpaid leave.'**
+  String get weeklyPlanAvailableInfo;
+
+  /// No description provided for @remainingDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining: {count} days'**
+  String remainingDays(int count);
+
+  /// No description provided for @usedDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Used: {count} days'**
+  String usedDays(int count);
+
+  /// No description provided for @totalQuotaDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Total: {count} days'**
+  String totalQuotaDays(int count);
+
+  /// No description provided for @forYear.
+  ///
+  /// In en, this message translates to:
+  /// **'For {year}'**
+  String forYear(int year);
+
+  /// No description provided for @reasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}'**
+  String reasonLabel(Object reason);
+
+  /// No description provided for @rejectReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejection reason: {reason}'**
+  String rejectReasonLabel(Object reason);
+
+  /// No description provided for @approvedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved by {name}'**
+  String approvedBy(Object name);
 }
 
 class _AppLocalizationsDelegate
