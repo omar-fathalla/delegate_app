@@ -327,18 +327,33 @@ class _LoginScreenState extends State<LoginScreen>
       )),
       _row(i++, Row(
         children: [
-          Expanded(
-            child: CheckboxListTile(
-              key: const ValueKey('login_remember_me'),
-              value: _rememberMe,
-              onChanged: (v) => setState(() => _rememberMe = v ?? false),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-              visualDensity: VisualDensity.standard,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              title: Text(l10n.rememberMe, style: text.bodyLarge?.copyWith(color: colorScheme.onSurface)),
+          // Compact: checkbox, 8dp, label; whole row tappable, 48dp min.
+          InkWell(
+            key: const ValueKey('login_remember_me'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => setState(() => _rememberMe = !_rememberMe),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Semantics(
+                      label: l10n.rememberMe,
+                      child: Checkbox(
+                        value: _rememberMe,
+                        onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(l10n.rememberMe, style: text.bodyLarge?.copyWith(color: colorScheme.onSurface)),
+                  ],
+                ),
+              ),
             ),
           ),
+          const Spacer(),
           if (_isStaff)
             TextButton(
               key: const ValueKey('login_forgot_password'),
