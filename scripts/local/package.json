@@ -1,0 +1,12 @@
+{
+  "name": "tashil-local-emulator-seed",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase": "^11.0.0"
+  },
+  "scripts": {
+    "smoke": "node smoke.mjs"
+  }
+}

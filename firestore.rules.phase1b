@@ -1,0 +1,799 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==================== HELPER FUNCTIONS ====================
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to get user document
+    // NOTE: Firestore rules cache get() calls within the same rule evaluation,
+    // so multiple calls to getUserDoc() in the same rule are efficient.
+    // However, we use getUserData() helper to access data more efficiently.
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Helper function to get user data (optimized to reduce redundant .data access)
+    // This helps with code readability and ensures consistent access patterns
+    function getUserData() {
+      return getUserDoc().data;
+    }
+
+    // Helper function to check if user is super admin
+    function isSuperAdmin() {
+      return isAuthenticated() &&
+             getUserData().role == 'super-admin';
+    }
+
+    // Helper function to check if user is organization admin
+    function isOrgAdmin() {
+      return isAuthenticated() &&
+             getUserData().role == 'organization-admin';
+    }
+
+    // Helper function to check if user is company admin
+    function isCompanyAdmin() {
+      return isAuthenticated() &&
+             getUserData().role == 'company-admin';
+    }
+
+    // Helper function to check if user is HR
+    function isHR() {
+      return isAuthenticated() &&
+             (getUserData().role == 'hr' || getUserData().role == 'company-hr' || getUserData().role == 'company_hr');
+    }
+
+    // Helper function to check if user is marketing
+    function isMarketing() {
+      return isAuthenticated() &&
+             (getUserData().role == 'marketing' || getUserData().role == 'marketing_promotion');
+    }
+
+    // Helper function to check if user belongs to organization
+    function belongsToOrganization(orgId) {
+      return isAuthenticated() &&
+             getUserData().organizationUID == orgId;
+    }
+
+    // Helper function to check if user belongs to company
+    function belongsToCompany(orgId, compId) {
+      return isAuthenticated() &&
+             getUserData().organizationUID == orgId &&
+             getUserData().companyUID == compId;
+    }
+
+    // Helper function to check if user can access organization (read + write)
+    function canAccessOrganization(orgId) {
+      return isSuperAdmin() ||
+             (isOrgAdmin() && belongsToOrganization(orgId));
+    }
+
+    // Helper function to check if user can READ organization (includes marketing)
+    function canReadOrganization(orgId) {
+      return isSuperAdmin() ||
+             (isOrgAdmin() && belongsToOrganization(orgId)) ||
+             (isMarketing() && belongsToOrganization(orgId));
+    }
+
+    // Helper function to check if user can access company (read + write)
+    function canAccessCompany(orgId, compId) {
+      return isSuperAdmin() ||
+             (isOrgAdmin() && belongsToOrganization(orgId)) ||
+             (isCompanyAdmin() && belongsToCompany(orgId, compId)) ||
+             (isHR() && belongsToCompany(orgId, compId));
+    }
+
+    // Helper function to check if the update is only incrementing the admin count
+    function isAdminCountIncrement() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['admins', 'updatedAt']) &&
+             request.resource.data.admins == resource.data.admins + 1;
+    }
+
+    // ==================== PHASE 1 HELPERS (company scoping) ====================
+    // Added on top of the deployed rules. Staff roles come from users/{uid}.role;
+    // delegates come from delegateLoginV2 custom claims.
+
+    function isAnon() {
+      return request.auth != null
+        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'anonymous';
+    }
+
+    function hasUserDoc() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function uRole() {
+      return hasUserDoc() ? getUserData().get('role', '') : '';
+    }
+
+    function uOrg() {
+      return !hasUserDoc() ? ''
+        : (getUserData().get('organizationUID', '') != ''
+            ? getUserData().get('organizationUID', '')
+            : getUserData().get('organizationId', ''));
+    }
+
+    function uCompany() {
+      return !hasUserDoc() ? ''
+        : (getUserData().get('companyUID', '') != ''
+            ? getUserData().get('companyUID', '')
+            : getUserData().get('companyId', ''));
+    }
+
+    function isGlobalStaffP1() {
+      return uRole() in ['super-admin', 'super_admin', 'superadmin', 'superAdmin',
+        'technical_support', 'technical-support', 'technicalSupport', 'tech_support'];
+    }
+
+    function isOrgAdminP1() {
+      return uRole() in ['organization-admin', 'organization_admin', 'organizationAdmin'];
+    }
+
+    function isOrgStaffP1() {
+      return isOrgAdminP1() || uRole() in [
+        'marketing', 'marketing_promotion', 'marketingPromotion',
+        'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+        'accountant', 'accounting', 'account_admin'];
+    }
+
+    function isCompanyStaffP1() {
+      return uRole() in ['company-admin', 'company_admin', 'companyadmin', 'admin',
+        'company_supervisor', 'supervisor',
+        'hr', 'company-hr', 'company_hr', 'human_resources'];
+    }
+
+    function isStaffP1() {
+      return request.auth != null && !isAnon()
+        && (isGlobalStaffP1() || isOrgStaffP1() || isCompanyStaffP1());
+    }
+
+    // Staff allowed to manage data of company compId inside org orgId.
+    // Company staff without a companyUID (legacy accounts) fall back to their org.
+    function staffCanCompany(orgId, compId) {
+      return request.auth != null && !isAnon() && (
+        isGlobalStaffP1()
+        || (isOrgStaffP1() && orgId != '' && uOrg() == orgId)
+        || (isCompanyStaffP1() && (
+              (compId != '' && uCompany() == compId)
+              || (uCompany() == '' && orgId != '' && uOrg() == orgId)))
+      );
+    }
+
+    function staffCanOrg(orgId) {
+      return request.auth != null && !isAnon() && (
+        isGlobalStaffP1()
+        || ((isOrgStaffP1() || isCompanyStaffP1()) && orgId != '' && uOrg() == orgId)
+      );
+    }
+
+    function isDelegateClaim() {
+      return request.auth != null && !isAnon()
+        && request.auth.token.get('role', '') == 'delegate';
+    }
+
+    function delegateInCompanyP1(compId) {
+      return isDelegateClaim() && compId != '' && (
+        request.auth.token.get('companyId', '') == compId
+        || compId in request.auth.token.get('companyIds', []));
+    }
+
+    // Scope fields may never be moved by delegates or legacy anonymous sessions.
+    function scopeUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['organizationUID', 'companyUID', 'organizationId', 'companyId']);
+    }
+
+    // PHASE 1B: who may READ a delegate doc. Every disjunct is provable from a
+    // single equality filter, so list queries work when the app adds
+    // organizationUID / companyUID (see lib/core/firestore/delegate_query_scope.dart).
+    // Anonymous sessions get nothing: this variant is for AFTER the anonymous cut-over.
+    function canReadDelegateP1b(o, c, phone, duid) {
+      return request.auth != null && !isAnon() && (
+        isGlobalStaffP1()
+        || ((isOrgStaffP1() || isCompanyStaffP1()) && uOrg() != '' && o == uOrg())
+        || (isCompanyStaffP1() && uCompany() != '' && c == uCompany())
+        || delegateInCompanyP1(c)
+        || (isDelegateClaim() && phone in request.auth.token.get('phones', []))
+        || (isDelegateClaim() && duid in request.auth.token.get('delegateIds', []))
+      );
+    }
+
+    // ==================== COLLECTION GROUP RULES ====================
+
+
+    // Requests collectionGroup (Web Dashboard queries)
+    match /{path=**}/requests/{requestId} {
+      allow read: if isAuthenticated() && canAccessCompany(resource.data.organizationUID, resource.data.companyUID);
+    }
+
+    // Delegates collectionGroup (Web Dashboard + Mobile App + Marketing Search)
+    // NOTE: Mobile app uses anonymous auth to query delegates by phone number for login.
+    // Anonymous users don't have a /users/{uid} document, so canAccessCompany() would fail.
+    // We allow authenticated reads but restrict to phone-based queries only for anonymous users.
+    // Authenticated admin users get full read access via canAccessCompany() in nested rules.
+    // Marketing users can read delegates for search purposes (read-only).
+    match /{path=**}/delegates/{delegateId} {
+      // READ stays open to any signed-in session (PHASE 1 LEGACY):
+      // app <= 1.14.1 signs delegates in anonymously, and many app queries are
+      // collectionGroup queries without a company filter. Closing reads needs
+      // app query changes + disabling anonymous auth (Phase 1b).
+      // PHASE 1B: scoped read (was: any signed-in session incl. anonymous).
+      allow get: if canReadDelegateP1b(resource.data.get('organizationUID', ''),
+        resource.data.get('companyUID', ''), resource.data.get('phoneNumber', ''), delegateId);
+      allow list: if canReadDelegateP1b(resource.data.organizationUID,
+        resource.data.companyUID, resource.data.phoneNumber, resource.data.uid);
+      // WRITE is now scoped by the doc's own org/company fields.
+      allow create: if staffCanCompany(
+        request.resource.data.get('organizationUID', ''),
+        request.resource.data.get('companyUID', ''));
+      allow update: if staffCanCompany(
+          resource.data.get('organizationUID', ''),
+          resource.data.get('companyUID', ''))
+        || (delegateInCompanyP1(resource.data.get('companyUID', '')) && scopeUnchanged())
+        ;
+      allow delete: if staffCanCompany(
+        resource.data.get('organizationUID', ''),
+        resource.data.get('companyUID', ''));
+    }
+
+    // Companies collectionGroup (Marketing Search + Delegate Supervisor Lookup)
+    match /{path=**}/companies/{companyId} {
+      // Was: read if true (public). Now: any signed-in session.
+      allow read: if isAuthenticated();
+      // Writes are handled only by the nested organizations/{org}/companies rule.
+      allow write: if false;
+    }
+
+    // Photo Permissions & Captured Photos collectionGroups
+    match /{path=**}/photo_permissions/{permissionId} {
+      allow read, delete: if isAuthenticated();
+    }
+    match /{path=**}/captured_photos/{photoId} {
+      allow read, delete: if isAuthenticated();
+    }
+
+    // ==================== PENALTIES COLLECTION ====================
+    match /penalties/{penaltyId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // ==================== DELEGATE SUBSCRIPTION REQUESTS & USED CODES ====================
+    match /delegate_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /used_receipt_codes/{code} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== INVITES COLLECTION ====================
+    match /invites/{inviteId} {
+      // Read: Allow unauthenticated reads for invite validation during signup
+      // SECURITY NOTE: This is secure because:
+      // 1. Invite IDs are generated using Firestore's doc().id which creates cryptographically random IDs
+      // 2. The inviteId itself acts as a secret token (UUID-like, unpredictable)
+      // 3. Email validation happens server-side during claimInvite
+      // 4. Enumeration attacks are impractical due to the large ID space (20 random characters)
+      // 5. Rate limiting should be implemented at the application level for additional protection
+      // Also allow authenticated admins to query invites for their organization
+      allow read: if true;
+
+      // Write: Org admins and super admins can create invites globally.
+      // Company admins can create invites scoped to their company (e.g., company-admin onboarding).
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        isOrgAdmin() ||
+        (isCompanyAdmin() &&
+          request.resource.data.organizationId != null &&
+          request.resource.data.companyId != null &&
+          belongsToCompany(request.resource.data.organizationId, request.resource.data.companyId))
+      );
+
+      // Update:
+      // - Super admins can update any invite (e.g., cancel invites)
+      // - Org admins can update invites for their organization
+      // - Company admins can update invites for their own company
+      // - Users can update their own invite when redeeming it (status to 'claimed')
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isOrgAdmin() && resource.data.organizationId != null && belongsToOrganization(resource.data.organizationId)) ||
+        (isCompanyAdmin() &&
+          resource.data.organizationId != null &&
+          resource.data.companyId != null &&
+          belongsToCompany(resource.data.organizationId, resource.data.companyId)) ||
+        (request.resource.data.status == 'claimed' && request.resource.data.claimedByUid == request.auth.uid)
+      );
+
+      // Delete: Only super admins can delete invites
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    // ==================== USERS COLLECTION ====================
+    match /users/{userId} {
+      // Was: read if true (public, and some docs still hold plaintext passwords).
+      // Now: any signed-in session. Old apps sign in (anonymously) before lookup;
+      // the new app uses the staffPhoneLookup callable.
+      allow read: if isAuthenticated();
+
+      // Create:
+      allow create: if isAuthenticated();
+
+      // Update:
+      allow update: if isAuthenticated();
+
+      // Delete:
+      allow delete: if isAuthenticated();
+    }
+
+    // ==================== ORGANIZATIONS COLLECTION ====================
+    match /organizations/{orgId} {
+      // Was: read if true. Now: any signed-in session.
+      allow read: if isAuthenticated();
+
+      // Write: Only super admins can create/delete organizations.
+      // Org admins can update their own organization (e.g. company counts).
+      allow create: if isAuthenticated() && isSuperAdmin();
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isOrgAdmin() && belongsToOrganization(orgId)) ||
+        isAdminCountIncrement()
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+
+      // Branches subcollection (Organization level)
+      match /branches/{branchId} {
+        allow read: if isAuthenticated();
+        allow write: if staffCanOrg(orgId);
+      }
+
+      // Sent Notifications subcollection (Organization level)
+      match /sent_notifications/{notificationId} {
+        // Read: Org Admins, Super Admins, and Marketing (read-only)
+        allow read: if isAuthenticated() && canReadOrganization(orgId);
+
+        // Write: Org Admins and Super Admins only (no marketing)
+        allow create: if isAuthenticated() && (
+          isSuperAdmin() ||
+          (isOrgAdmin() && belongsToOrganization(orgId))
+        );
+
+        // Update/Delete: Org Admins and Super Admins
+        allow update, delete: if isAuthenticated() && (
+          isSuperAdmin() ||
+          (isOrgAdmin() && belongsToOrganization(orgId))
+        );
+      }
+
+      // Members subcollection
+      match /members/{userId} {
+        allow read: if isAuthenticated() && (
+          request.auth.uid == userId ||
+          canReadOrganization(orgId)
+        );
+
+        allow create: if isAuthenticated() &&
+                         request.auth.uid == userId;
+
+        allow update: if isAuthenticated() &&
+                         request.auth.uid == userId;
+      }
+
+      // Admins subcollection
+      match /admins/{adminId} {
+        allow read: if isAuthenticated() && canReadOrganization(orgId);
+
+        allow create, update, delete: if isAuthenticated() && (
+          isSuperAdmin() ||
+          (isOrgAdmin() && belongsToOrganization(orgId))
+        );
+      }
+
+      // Companies subcollection
+      match /companies/{compId} {
+        // Read: was public; now any signed-in session (delegates read supervisor details).
+        allow read: if isAuthenticated();
+
+        // Write: was any signed-in session. Now scoped.
+        // isAdminCountIncrement(): Angular invite claim bumps `admins` by 1.
+        allow create: if isGlobalStaffP1() || (isOrgAdminP1() && uOrg() == orgId);
+        allow update: if staffCanCompany(orgId, compId)
+          || (isAuthenticated() && !isAnon() && isAdminCountIncrement());
+        allow delete: if isGlobalStaffP1() || (isOrgAdminP1() && uOrg() == orgId);
+
+        // Admins subcollection under company
+        match /admins/{adminId} {
+          allow read, write: if isAuthenticated();
+        }
+
+        // Members subcollection
+        match /members/{userId} {
+          allow read: if isAuthenticated() && (
+            request.auth.uid == userId ||
+            canAccessCompany(orgId, compId)
+          );
+
+          allow create: if isAuthenticated() &&
+                           request.auth.uid == userId;
+
+          allow update: if isAuthenticated() &&
+                           request.auth.uid == userId;
+
+          allow delete: if isAuthenticated() && (
+            isSuperAdmin() ||
+            (isOrgAdmin() && belongsToOrganization(orgId))
+          );
+        }
+
+        // Delegates subcollection
+        match /delegates/{delegateId} {
+          // PHASE 1B: read scoped by path (works for plain subcollection queries).
+          allow read: if staffCanCompany(orgId, compId) || delegateInCompanyP1(compId)
+            || (isDelegateClaim() && delegateId in request.auth.token.get('delegateIds', []));
+          allow create, delete: if staffCanCompany(orgId, compId);
+          allow update: if staffCanCompany(orgId, compId)
+            || (delegateInCompanyP1(compId) && scopeUnchanged())
+            ;
+        }
+
+        // Requests subcollection
+        match /requests/{requestId} {
+          allow read, write: if isAuthenticated();
+        }
+
+        // Notifications subcollection
+        match /notifications/{notificationId} {
+          allow read: if isAuthenticated();
+
+          allow create: if isAuthenticated() && (
+            isSuperAdmin() ||
+            (isOrgAdmin() && belongsToOrganization(orgId))
+          );
+
+          allow update: if isAuthenticated();
+
+          allow delete: if isAuthenticated() && (
+            isSuperAdmin() ||
+            (isOrgAdmin() && belongsToOrganization(orgId))
+          );
+        }
+
+        // Admins subcollection
+        match /admins/{adminId} {
+          allow read: if isAuthenticated();
+
+          allow create, update, delete: if isAuthenticated() && (
+            isSuperAdmin() ||
+            (isOrgAdmin() && belongsToOrganization(orgId)) ||
+            (isCompanyAdmin() && belongsToCompany(orgId, compId) && request.auth.uid == adminId)
+          );
+        }
+
+        // Photo Permissions subcollection
+        match /photo_permissions/{permissionId} {
+          allow read, create, update: if isAuthenticated();
+          allow delete: if isAuthenticated();
+
+          // Captured Photos subcollection
+          match /captured_photos/{photoId} {
+            allow read, create: if isAuthenticated();
+            allow update: if false; 
+            allow delete: if isAuthenticated(); // Allow supervisors and super admin to delete photos
+          }
+        }
+      }
+
+      // Company Requests subcollection (for organization-level company requests)
+      match /companyRequests/{requestId} {
+        allow read: if isAuthenticated();
+
+        allow create: if isAuthenticated() && (
+          canAccessOrganization(orgId) ||
+          (isCompanyAdmin() &&
+            request.resource.data.targetCompanyId != null &&
+            belongsToCompany(orgId, request.resource.data.targetCompanyId))
+        );
+        allow update: if isAuthenticated() && (
+          canAccessOrganization(orgId) ||
+          (isCompanyAdmin() &&
+            resource.data.targetCompanyId != null &&
+            belongsToCompany(orgId, resource.data.targetCompanyId))
+        );
+        allow delete: if isAuthenticated() && (
+          canAccessOrganization(orgId) ||
+          (isCompanyAdmin() &&
+            resource.data.targetCompanyId != null &&
+            belongsToCompany(orgId, resource.data.targetCompanyId))
+        );
+      }
+      
+      // ==================== TASKS COLLECTION ====================
+      // NOTE: Mobile app uses anonymous auth, so we allow any authenticated user
+      // to read/write tasks. Security is enforced by app logic (filtering by delegateId).
+      match /tasks/{taskId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isAuthenticated();
+      }
+
+      // ==================== ATTENDANCE LOGS ====================
+      // Attendance logs scoped to the organization
+      match /attendance_logs/{logId} {
+        allow read, create, update: if true;
+        // Prevent deletion of attendance logs
+        allow delete: if false;
+      }
+
+      // ==================== BRANCHES ====================
+      // Branches scoped to the organization
+      match /branches/{branchId} {
+        allow read: if isAuthenticated();
+        allow write: if staffCanOrg(orgId);
+      }
+
+      // ==================== PRIVATE LABEL (Fathalla) ====================
+      // Daily product + price-tag documentation by branch marketing and its review
+      // by marketing promotion. Mobile app uses anonymous auth, so access is
+      // enforced by app logic (org + delegateUid scoping), like tasks above.
+      match /private_label_audits/{auditId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() &&
+                         request.resource.data.organizationUID == orgId &&
+                         request.resource.data.delegateUid is string &&
+                         request.resource.data.productPhotoUrl is string &&
+                         request.resource.data.pricePhotoUrl is string;
+        allow update: if isAuthenticated();
+        // Allowed for authorized marketing promotion and admins
+        allow delete: if isAuthenticated();
+      }
+
+      // One summary doc per marketer per day ({uid}_{yyyy-MM-dd}): worked / rest.
+      match /private_label_days/{dayId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated();
+        allow delete: if isAuthenticated();
+      }
+
+      // Product catalog (reference prices) managed by marketing promotion.
+      match /private_label_products/{productId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated();
+        allow delete: if isAuthenticated();
+      }
+    }
+
+    // ==================== MAIL COLLECTION ====================
+    // Used by Firebase Extensions for sending emails
+    // Create allowed for any authenticated user (mobile app super admin uses anonymous auth to send activation emails)
+    match /mail/{mailId} {
+      allow read: if isAuthenticated() && isSuperAdmin();
+
+      allow create: if isAuthenticated();
+
+      allow update: if isAuthenticated() && isSuperAdmin();
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    // ==================== GUIDE VIDEOS COLLECTION ====================
+    match /guide_videos/{videoId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    // ==================== APP UPDATES ====================
+    match /app_updates/{updateId} {
+      // Anyone logged in can read updates
+      allow read: if isAuthenticated();
+      // Only super admin can create/edit/delete updates from dashboard
+      allow write: if isSuperAdmin();
+    }
+
+    // ==================== MOBILE APP (Tashil Delegate) ====================
+
+    // Attendance Logs (New System) - Authenticated / HR Adjustments
+    match /attendance_logs/{document=**} {
+      allow read, create, update: if true;
+      allow delete: if false;
+    }
+
+    // Attendance Logs Testing (Dev Environment)
+    match /attendance_logs_testing/{document=**} {
+      allow read, write: if true;
+    }
+
+    // Attendance (Legacy collection) - Authenticated
+    match /attendance/{attendanceId} {
+      allow read, create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // Branches (Mobile app admin feature + delegate branch geofence lookup)
+    match /branches/{branchId} {
+      // Was: read public, write any session. Now: read signed-in, write staff.
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isStaffP1();
+    }
+
+    // Counters (System collection for auto-increment IDs)
+    match /counters/{counterId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== NOTIFICATIONS COLLECTION ====================
+    // Global notifications collection for push notifications
+    // NOTE: Mobile app uses anonymous auth, so we can't match request.auth.uid to delegateUid
+    // Instead, we allow any authenticated user to read/write notifications
+    // Security is enforced by the app logic and Cloud Functions
+    match /notifications/{notificationId} {
+      // Read: Any authenticated user can read notifications
+      allow read: if isAuthenticated();
+      
+      // Create: Any authenticated user can create (Cloud Functions will create these)
+      allow create: if isAuthenticated();
+      
+      // Update: Any authenticated user can mark notifications as read
+      allow update: if isAuthenticated() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      
+      // Delete: Only super admins can delete notifications
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    // ==================== FCM TOKENS COLLECTION ====================
+    // Stores FCM tokens for push notifications
+    // NOTE: Mobile app uses anonymous auth, so we can't match request.auth.uid to delegateUid
+    // Instead, we allow any authenticated user to read/write tokens
+    // Security is enforced by the app logic
+    match /fcm_tokens/{delegateUid} {
+      // Read: Any authenticated user can read tokens
+      allow read: if isAuthenticated();
+      
+      // Write: Any authenticated user can write tokens (create/update)
+      allow create, update: if isAuthenticated();
+      
+      // Delete: Any authenticated user can delete tokens
+      allow delete: if isAuthenticated();
+    }
+
+    // ==================== FEEDBACKS COLLECTION ====================
+    // User feedbacks and suggestions system
+    // Delegates and supervisors can submit feedbacks
+    // Super Admin has full control over all feedbacks
+    match /feedbacks/{feedbackId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== PENALTIES COLLECTION ====================
+    // Penalties & Infractions system
+    // Allows read and write for penalties collection
+    match /penalties/{penaltyId} {
+      allow read, write: if true;
+    }
+    match /penalty_rules/{ruleId} {
+      allow read: if isAuthenticated();
+      allow write: if isStaffP1();
+    }
+    match /{path=**}/penalty_rules/{ruleId} {
+      allow read: if isAuthenticated();
+      allow write: if isStaffP1();
+    }
+
+    // ==================== NOTIFICATIONS COLLECTIONS ====================
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+    match /sent_notifications/{docId} {
+      allow read, write: if true;
+    }
+
+    // ==================== DELEGATE SUBSCRIPTION REQUESTS & USED CODES ====================
+    match /delegate_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /used_receipt_codes/{code} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== MONTHLY COLLECTIONS & BILLING ====================
+    // Monthly collections, deductions, and invoicing records
+    match /monthly_collections/{periodId} {
+      allow read, write: if true;
+      match /transactions/{transactionId} {
+        allow read, write: if true;
+      }
+      match /allocations/{allocationId} {
+        allow read, write: if true;
+      }
+    }
+    match /{path=**}/monthly_collections/{periodId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/transactions/{transactionId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/allocations/{allocationId} {
+      allow read, write: if true;
+    }
+
+    // ==================== USER WALLETS & ALLOCATIONS ====================
+    // User wallets and financial dues allocations
+    match /user_wallets/{userId} {
+      allow read, write: if true;
+      match /transactions/{transactionId} {
+        allow read, write: if true;
+      }
+    }
+    match /{path=**}/user_wallets/{userId} {
+      allow read, write: if true;
+    }
+
+    // ==================== PRIVATE LABEL PERMISSIONS ====================
+    match /private_label_permissions/{userId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/private_label_permissions/{userId} {
+      allow read, write: if true;
+    }
+
+    // ==================== ATTENDANCE ADJUSTMENT AUDIT LOGS ====================
+    match /attendance_adjustment_logs/{logId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/attendance_adjustment_logs/{logId} {
+      allow read, write: if true;
+    }
+    match /attendance_adjustment_logs_testing/{logId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/attendance_adjustment_logs_testing/{logId} {
+      allow read, write: if true;
+    }
+
+    // ==================== SECURITY AUDIT LOGS ====================
+    match /security_audit_logs/{logId} {
+      allow read, write: if true;
+    }
+
+    // ==================== DEVICE UNBIND REQUESTS ====================
+    match /device_unbind_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    // ==================== DELEGATE LIVE TRACKING ====================
+    match /delegate_tracking/{delegateId} {
+      allow read, write: if true;
+
+      match /breadcrumbs/{breadcrumbId} {
+        allow read, write: if true;
+      }
+    }
+
+    // ==================== LEAVE REQUESTS ====================
+    match /leave_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    // ==================== FLOOR CHECKS / VERIFICATION ====================
+    match /floor_checks/{checkId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== COMPANY PAYROLL CONFIGS ====================
+    match /company_payroll_configs/{companyId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /{path=**}/company_payroll_configs/{companyId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== DEFAULT DENY ====================
+    // Any collection not explicitly matched above will be denied
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+

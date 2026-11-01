@@ -84,3 +84,6 @@ functions/backfill-report*.json
 
 # Local perf probe artifacts (screenshots may contain PII)
 real_test/
+
+# local emulator testing
+firebase.local.gen.json

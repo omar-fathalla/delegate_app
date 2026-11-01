@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1202,7 +1203,7 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
       // 3. Update delegates collection if applicable
       if (phone != null && phone.isNotEmpty) {
         final delegateQuery = await db
-            .collectionGroup('delegates')
+            .scopedDelegatesGroup()
             .where('phoneNumber', isEqualTo: phone)
             .get();
         for (final dDoc in delegateQuery.docs) {

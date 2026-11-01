@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -83,7 +84,7 @@ class PenaltyCreatorHelper {
       // 4. Query collectionGroup('delegates') by document ID or uid
       try {
         final q = await firestore
-            .collectionGroup('delegates')
+            .scopedDelegatesGroup()
             .where(FieldPath.documentId, isEqualTo: penalty.createdById.trim())
             .limit(1)
             .get();
@@ -98,7 +99,7 @@ class PenaltyCreatorHelper {
 
       try {
         final q = await firestore
-            .collectionGroup('delegates')
+            .scopedDelegatesGroup()
             .where('uid', isEqualTo: penalty.createdById.trim())
             .limit(1)
             .get();
@@ -136,7 +137,7 @@ class PenaltyCreatorHelper {
       try {
         for (final field in ['fullName', 'name', 'firstName']) {
           final q = await firestore
-              .collectionGroup('delegates')
+              .scopedDelegatesGroup()
               .where(field, isEqualTo: name)
               .limit(1)
               .get();

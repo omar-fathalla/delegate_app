@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -424,7 +425,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         // Resolve any other delegate UIDs registered under this National ID
         try {
           final natSnap = await firestore
-              .collectionGroup('delegates')
+              .scopedDelegatesGroup()
               .where('nationalityID', isEqualTo: cleanNat)
               .limit(10)
               .getResilient(
@@ -448,7 +449,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         // Resolve any other delegate UIDs registered under this phone number
         try {
           final phoneSnap = await firestore
-              .collectionGroup('delegates')
+              .scopedDelegatesGroup()
               .where('phoneNumber', isEqualTo: normalizedPhone)
               .limit(10)
               .getResilient(

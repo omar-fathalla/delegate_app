@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/notifications/data/models/notification_model.dart';
@@ -128,7 +129,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       if (userCompanyId == null || userCreatedAt == null) {
         try {
           final delSnap = await firestore
-              .collectionGroup('delegates')
+              .scopedDelegatesGroup()
               .where('uid', isEqualTo: delegateUid)
               .limit(1)
               .get();
