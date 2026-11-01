@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/core/network/connectivity_status.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/notifications/domain/entities/notification_entity.dart';
@@ -184,7 +185,7 @@ class NotificationsPage extends StatelessWidget {
         body: BlocBuilder<NotificationBloc, NotificationState>(
           builder: (context, state) {
             if (state is NotificationLoading) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: M3DelayedLoading());
             }
 
             if (state is NotificationError) {
