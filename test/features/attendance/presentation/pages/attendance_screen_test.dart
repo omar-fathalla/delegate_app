@@ -1,3 +1,4 @@
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
@@ -208,14 +209,14 @@ void main() {
     // Verify Previous Month Button
     final prevButtonFinder = find.widgetWithIcon(
       IconButton,
-      Icons.chevron_left_rounded,
+      Symbols.chevron_left_rounded,
     );
     expect(prevButtonFinder, findsOneWidget);
 
     // Verify Next Month Button
     final nextButtonFinder = find.widgetWithIcon(
       IconButton,
-      Icons.chevron_right_rounded,
+      Symbols.chevron_right_rounded,
     );
     expect(nextButtonFinder, findsOneWidget);
   });

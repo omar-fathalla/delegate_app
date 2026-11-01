@@ -2309,6 +2309,7 @@ class _DelegateLeavesAndRequestsScreenState
                                   : () async {
                                       final reason = reasonCtrl.text.trim();
                                       final messenger = ScaffoldMessenger.of(context);
+                                      final successColor = Theme.of(context).colorScheme.primary;
                                       if (reason.isEmpty) {
                                         messenger.showSnackBar(
                                           const SnackBar(
@@ -2432,7 +2433,7 @@ class _DelegateLeavesAndRequestsScreenState
                                             content: Text(
                                               'تم إرسال طلبك بنجاح لمشرف الشركة وهو قيد المراجعة الآن.',
                                             ),
-                                            backgroundColor: Theme.of(context).colorScheme.primary,
+                                            backgroundColor: successColor,
                                           ),
                                         );
                                       } catch (e) {
