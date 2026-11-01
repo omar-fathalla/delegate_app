@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -431,7 +433,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: RefreshIndicator(
+      body: M3Refresh(
         onRefresh: () async {
           await Future.wait([
             _fetchSupervisors(forceRefresh: true),
@@ -446,18 +448,41 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SyncStatusBanner(),
-              _buildWelcomeHeroCard(context),
+              M3StaggeredItem(index: 0, child: _buildWelcomeHeroCard(context)),
               const SizedBox(height: 16),
-              _buildMonthlyAttendanceSummaryCard(context),
-              const SizedBox(height: 14),
-              _buildRecentActivityBriefCard(context),
-              const SizedBox(height: 14),
-              _buildLeavesAndRequestsCard(context),
+              M3StaggeredItem(
+                  index: 1, child: _buildMonthlyAttendanceSummaryCard(context)),
+              if (_recentSessions.isNotEmpty) const SizedBox(height: 16),
+              M3StaggeredItem(
+                  index: 2, child: _buildRecentActivityBriefCard(context)),
               const SizedBox(height: 16),
-              ..._buildSupervisorsList(context),
-              const SizedBox(height: 12),
-              _buildPhotoCaptureCard(context),
-              const SizedBox(height: 80), // Padding for bottom nav
+              M3StaggeredItem(
+                  index: 3, child: _buildLeavesAndRequestsCard(context)),
+              const SizedBox(height: 24),
+              M3StaggeredItem(
+                index: 4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
+                      child: Text(
+                        Localizations.localeOf(context).languageCode == 'ar'
+                            ? 'فريق المتابعة'
+                            : 'Your team',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ),
+                    ..._buildSupervisorsList(context),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              M3StaggeredItem(index: 4, child: _buildPhotoCaptureCard(context)),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -473,19 +498,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [colorScheme.primary, colorScheme.tertiary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(28),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -502,10 +516,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       isArabic
                           ? 'أهلاً بك، ${widget.delegate.firstName}'
                           : 'Welcome, ${widget.delegate.firstName}',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onPrimaryContainer,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -609,24 +622,14 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   return Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+
                     ),
                     child: AppAvatar(
                       imageUrl: photoUrl,
                       fallbackText: widget.delegate.firstName,
                       radius: 26,
-                      backgroundColor: Colors.white.withValues(alpha: 0.22),
-                      foregroundColor: Colors.white,
+                      backgroundColor: colorScheme.surface,
+                      foregroundColor: colorScheme.primary,
                       fallbackIcon: Symbols.person_pin_rounded,
                     ),
                   );
@@ -635,16 +638,15 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(color: Colors.white24, height: 1),
-          const SizedBox(height: 14),
+          Divider(color: colorScheme.onPrimaryContainer.withValues(alpha: 0.16), height: 1),
+          const SizedBox(height: 16),
 
           // Core Duties Summary
           Text(
             isArabic ? 'المهام الأساسية للمندوب:' : 'Core Delegate Duties:',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onPrimaryContainer,
             ),
           ),
           const SizedBox(height: 8),
@@ -681,15 +683,15 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: Colors.white.withValues(alpha: 0.9)),
+        Icon(icon, size: 18, color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
             style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.9),
-              height: 1.35,
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+              height: 1.45,
             ),
           ),
         ),
@@ -704,27 +706,24 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.3),
-        ),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Symbols.badge_rounded,
-            size: 14,
-            color: Colors.white,
+            size: 16,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 11,
+            style: TextStyle(
+              fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -744,37 +743,36 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           vertical: 3,
         ),
         decoration: BoxDecoration(
-          color: const Color(0xFFFBBF24).withValues(alpha: 0.22),
-          borderRadius: BorderRadius.circular(12),
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: const Color(0xFFFDE68A).withValues(alpha: 0.7),
-            width: 1.2,
+            color: Theme.of(context).colorScheme.outline,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Symbols.domain_rounded,
-              size: 14,
-              color: Color(0xFFFEF3C7),
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 6),
             Text(
               orgName,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFFFEF3C7),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(width: 6),
             Container(
               width: 5.5,
               height: 5.5,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFF10B981),
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ],
@@ -788,12 +786,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.35),
-          width: 1.0,
-        ),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -801,7 +795,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           Icon(
             Symbols.storefront_rounded,
             size: 14,
-            color: Colors.white.withValues(alpha: 0.85),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 6),
           Text(
@@ -809,7 +803,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withValues(alpha: 0.95),
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -819,11 +813,24 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
   List<Widget> _buildSupervisorsList(BuildContext context) {
     if (_loadingSupervisor) {
+      // Layout is known → skeleton (never together with an indicator).
       return [
-        const Center(
-          child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: CircularProgressIndicator(),
+        M3Card(
+          child: Row(
+            children: const [
+              M3Skeleton(height: 40, width: 40, radius: 20),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    M3Skeleton(height: 14, width: 140),
+                    SizedBox(height: 8),
+                    M3Skeleton(height: 12, width: 100),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ];
@@ -846,18 +853,15 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
       ),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: colorScheme.errorContainer.withValues(
-                alpha: 0.2,
-              ),
-              foregroundColor: colorScheme.error,
+              backgroundColor: colorScheme.surfaceContainerHighest,
+              foregroundColor: colorScheme.onSurfaceVariant,
               child: const Icon(Symbols.person_off_rounded),
             ),
             const SizedBox(width: 12),
@@ -925,11 +929,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
       ),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             CircleAvatar(
@@ -978,20 +981,20 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               IconButton(
                 onPressed: () => _callNumber(phone),
                 icon: const Icon(Symbols.phone_rounded),
+                tooltip: isArabic ? 'اتصال' : 'Call',
                 style: IconButton.styleFrom(
-                  backgroundColor: colorScheme.tertiaryContainer,
-                  foregroundColor: colorScheme.onTertiaryContainer,
+                  backgroundColor: colorScheme.secondaryContainer,
+                  foregroundColor: colorScheme.onSecondaryContainer,
                 ),
               ),
               const SizedBox(width: 8),
               IconButton(
                 onPressed: () => _openWhatsApp(phone),
                 icon: const Icon(Symbols.chat_rounded),
+                tooltip: 'WhatsApp',
                 style: IconButton.styleFrom(
-                  backgroundColor: const Color(
-                    0xFF25D366,
-                  ).withValues(alpha: 0.2),
-                  foregroundColor: const Color(0xFF1DA851),
+                  backgroundColor: colorScheme.secondaryContainer,
+                  foregroundColor: colorScheme.onSecondaryContainer,
                 ),
               ),
             ],
@@ -1122,10 +1125,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(
-                      isArabic
-                          ? Symbols.arrow_back_rounded
-                          : Symbols.arrow_forward_rounded,
+                    Icon(Symbols.arrow_forward_rounded,
                       size: 16,
                       color: colorScheme.primary,
                     ),
@@ -1280,15 +1280,12 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return InkWell(
       onTap: widget.onNavigateToAttendance,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1328,10 +1325,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Icon(
-                        isArabic
-                            ? Symbols.chevron_left_rounded
-                            : Symbols.chevron_right_rounded,
+                      Icon(Symbols.chevron_right_rounded,
                         size: 20,
                         color: colorScheme.primary,
                       ),
@@ -1339,7 +1333,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
 
             // 3 Stat Badges: Attendance, Absence, Off Days
             Row(
@@ -1351,8 +1345,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     title: isArabic ? 'أيام الحضور' : 'Attended',
                     value: isArabic ? '$_attendedDays يوم' : '$_attendedDays d',
                     icon: Symbols.check_circle_rounded,
-                    containerColor: colorScheme.primaryContainer,
-                    iconColor: colorScheme.primary,
+                    containerColor: colorScheme.surfaceContainerHigh,
+                    iconColor: colorScheme.onSurfaceVariant,
                     textColor: colorScheme.onSurface,
                   ),
                 ),
@@ -1365,8 +1359,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     title: isArabic ? 'أيام الغياب' : 'Absent',
                     value: isArabic ? '$_absentDays يوم' : '$_absentDays d',
                     icon: Symbols.cancel_rounded,
-                    containerColor: colorScheme.errorContainer,
-                    iconColor: colorScheme.onErrorContainer,
+                    containerColor: colorScheme.surfaceContainerHigh,
+                    iconColor: _absentDays > 0
+                        ? colorScheme.error
+                        : colorScheme.onSurfaceVariant,
                     textColor: _absentDays > 0
                         ? colorScheme.error
                         : colorScheme.onSurface,
@@ -1383,22 +1379,22 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         ? '$_approvedLeavesThisMonth من 4 أيام'
                         : '$_approvedLeavesThisMonth of 4 days',
                     icon: Symbols.event_available_rounded,
-                    containerColor: colorScheme.tertiaryContainer,
-                    iconColor: colorScheme.onTertiaryContainer,
+                    containerColor: colorScheme.surfaceContainerHigh,
+                    iconColor: colorScheme.onSurfaceVariant,
                     textColor: colorScheme.onSurface,
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             // Clarification Note
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(10),
+                color: colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
@@ -1585,10 +1581,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1634,10 +1627,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        Icon(
-                          isArabic
-                              ? Symbols.chevron_left_rounded
-                              : Symbols.chevron_right_rounded,
+                        Icon(Symbols.chevron_right_rounded,
                           size: 16,
                           color: colorScheme.primary,
                         ),
@@ -1794,10 +1784,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Symbols.login_rounded,
                             size: 12,
-                            color: Color(0xFF10B981),
+                            color: colorScheme.primary,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1816,9 +1806,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           Icon(
                             Symbols.logout_rounded,
                             size: 12,
-                            color: session.checkOutTime != null
-                                ? colorScheme.error
-                                : const Color(0xFF10B981),
+                            color: colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1830,7 +1818,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                                   : FontWeight.normal,
                               color: session.checkOutTime != null
                                   ? colorScheme.onSurfaceVariant
-                                  : const Color(0xFF10B981),
+                                  : colorScheme.primary,
                             ),
                           ),
                         ],
@@ -1876,33 +1864,23 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     required Color textColor,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-        ),
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: containerColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 16, color: iconColor),
-          ),
-          const SizedBox(height: 6),
+          Icon(icon, size: 20, color: iconColor),
+          const SizedBox(height: 4),
           Text(
-            title,
-            style: TextStyle(
-              fontSize: 10.5,
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
+            value,
+            style: tt.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: textColor,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -1910,13 +1888,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           ),
           const SizedBox(height: 2),
           Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: textColor,
+            title,
+            style: tt.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -1946,18 +1924,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
         return Card(
           elevation: 0,
-          color: colorScheme.surface,
+          margin: EdgeInsets.zero,
+          color: colorScheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(
-              color: pendingCount > 0
-                  ? Colors.amber.withValues(alpha: 0.6)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.45),
-              width: pendingCount > 0 ? 1.5 : 1.0,
-            ),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             onTap: () {
               if (widget.onNavigateToLeaves != null) {
                 widget.onNavigateToLeaves!();
@@ -2011,7 +1984,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.amber.shade800,
+                                  color: colorScheme.tertiaryContainer,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
@@ -2040,10 +2013,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(
-                    isArabic
-                        ? Symbols.chevron_left_rounded
-                        : Symbols.chevron_right_rounded,
+                  Icon(Symbols.chevron_right_rounded,
                     color: colorScheme.outline,
                   ),
                 ],

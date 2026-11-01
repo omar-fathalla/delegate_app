@@ -396,6 +396,12 @@ Future<T?> showM3ModalBottomSheet<T>({
   return showModalBottomSheet<T>(
     context: context,
     builder: builder,
+    sheetAnimationStyle: const AnimationStyle(
+      duration: AppMotionDurations.long1,
+      curve: AppMotionCurves.expressiveDefaultSpatial,
+      reverseDuration: AppMotionDurations.short4,
+      reverseCurve: AppMotionCurves.emphasizedAccelerate,
+    ),
     backgroundColor: backgroundColor,
     isScrollControlled: isScrollControlled,
     shape: shape ??

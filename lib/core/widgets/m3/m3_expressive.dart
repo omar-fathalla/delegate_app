@@ -874,3 +874,12 @@ class M3Card extends StatelessWidget {
     return onTap == null ? card : M3PressScale(scale: 0.98, child: card);
   }
 }
+
+/// Bottom-sheet motion: enter with the expressive default-spatial spring
+/// curve (≈ spring 0.8/380), exit emphasized-accelerate.
+const AnimationStyle m3SheetAnimation = AnimationStyle(
+  duration: Duration(milliseconds: 450),
+  curve: Cubic(0.38, 1.21, 0.22, 1.00),
+  reverseDuration: Duration(milliseconds: 200),
+  reverseCurve: Cubic(0.3, 0, 0.8, 0.15),
+);

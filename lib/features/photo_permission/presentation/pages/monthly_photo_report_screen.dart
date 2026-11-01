@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
@@ -372,6 +373,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
 
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: m3SheetAnimation,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return Container(
@@ -589,7 +591,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             }
             final sortedAvailableKeys = availableMonthsMap.keys.toList()..sort((a, b) => b.compareTo(a));
 
-            return RefreshIndicator(
+            return M3Refresh(
               onRefresh: () async {
                 _loadPhotos();
               },
@@ -1410,7 +1412,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
 
                 // Trailing action
                 Icon(
-                  Symbols.chevron_left_rounded,
+                  Symbols.chevron_right_rounded,
                   color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                   size: 20,
                 ),
@@ -1477,6 +1479,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
 
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: m3SheetAnimation,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (modalContext) {

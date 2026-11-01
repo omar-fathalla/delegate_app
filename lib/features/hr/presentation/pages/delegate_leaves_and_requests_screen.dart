@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -123,20 +124,17 @@ class _DelegateLeavesAndRequestsScreenState
               ],
             )
           : null,
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: M3ExtendedFab(
         onPressed: () => _showCreateRequestDialog(context),
-        icon: const Icon(Symbols.add_task_rounded),
-        label: const Text(
-          'تسجيل إجازة / عذر',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        icon: Symbols.add_rounded,
+        label: 'تسجيل إجازة / عذر',
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: query.snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: M3DelayedLoading());
           }
 
           final docs = snapshot.data?.docs ?? [];

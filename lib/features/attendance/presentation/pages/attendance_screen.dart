@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'dart:async';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
@@ -674,7 +675,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
             floatingActionButton: widget.viewOnly
                 ? null
-                : FloatingActionButton.extended(
+                : M3PressScale(child: FloatingActionButton.extended(
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    extendedPadding:
+                        const EdgeInsetsDirectional.only(start: 16, end: 20),
                     onPressed: (state is AttendanceLoading || isSyncing)
                         ? null
                         : () {
@@ -692,7 +698,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             }
                           },
                     backgroundColor: isCheckedIn
-                        ? Theme.of(context).colorScheme.errorContainer
+                        ? Theme.of(context).colorScheme.primaryContainer
                         : (_isGeofenceMode
                             ? (_isInsideGeofence
                                 ? Theme.of(context).colorScheme.primaryContainer
@@ -709,7 +715,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                       : Symbols.location_searching_rounded))
                               : Symbols.qr_code_scanner_rounded),
                       color: isCheckedIn
-                          ? Theme.of(context).colorScheme.onErrorContainer
+                          ? Theme.of(context).colorScheme.onPrimaryContainer
                           : (_isGeofenceMode
                               ? (_isInsideGeofence
                                   ? Theme.of(context).colorScheme.onPrimaryContainer
@@ -723,10 +729,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         activeAttendance: activeAttendance,
                         l10n: l10n,
                       ),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
+                      style: m3ButtonLabel(context).copyWith(
                         color: isCheckedIn
-                            ? Theme.of(context).colorScheme.onErrorContainer
+                            ? Theme.of(context).colorScheme.onPrimaryContainer
                             : (_isGeofenceMode
                                 ? (_isInsideGeofence
                                     ? Theme.of(context).colorScheme.onPrimaryContainer
@@ -734,7 +739,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 : Theme.of(context).colorScheme.onPrimaryContainer),
                       ),
                     ),
-                  ),
+                  )),
             floatingActionButtonLocation:
                 FloatingActionButtonLocation.centerFloat,
           );
@@ -1591,7 +1596,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             );
 
       if (_dayKeys.isEmpty) {
-        return RefreshIndicator(
+        return M3Refresh(
           onRefresh: () async {
             if (_isGeofenceMode) {
               _detectNearestBranch(showSnackBar: false);
@@ -1738,7 +1743,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         );
       }
 
-      return RefreshIndicator(
+      return M3Refresh(
         onRefresh: () async {
           if (_isGeofenceMode) {
             _detectNearestBranch(showSnackBar: false);
@@ -2389,6 +2394,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: m3SheetAnimation,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (_) => _ScannerModal(action: action),
