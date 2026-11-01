@@ -1382,9 +1382,11 @@ class _DelegateLeavesAndRequestsScreenState
     XFile? pickedAttachment;
     bool isSubmitting = false;
 
-    await showDialog(
+    await showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) {
           final isLeaveType = selectedType == 'annual' ||
@@ -1399,16 +1401,12 @@ class _DelegateLeavesAndRequestsScreenState
 
           final calculatedDays = endDate.difference(startDate).inDays + 1;
 
-          return Dialog(
-            backgroundColor: colorScheme.surface,
-            surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
             ),
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-            clipBehavior: Clip.antiAlias,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
+              constraints: const BoxConstraints(maxWidth: 640),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1515,73 +1513,40 @@ class _DelegateLeavesAndRequestsScreenState
                             ),
                           ),
                           const SizedBox(height: 6),
-                          DropdownButtonFormField<String>(
-                            initialValue: selectedType,
-                            isExpanded: true,
-                            style: TextStyle(
-                              fontSize: 12.5,
+                          DropdownMenu<String>(
+                            initialSelection: selectedType,
+                            expandedInsets: EdgeInsets.zero,
+                            requestFocusOnTap: false,
+                            textStyle: TextStyle(
+                              fontSize: 14,
                               color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w500,
                             ),
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
+                            dropdownMenuEntries: [
+                              DropdownMenuEntry(
+                                value: 'annual',
+                                enabled: _isAnnualLeaveEnabled,
+                                label: _isAnnualLeaveEnabled
+                                    ? 'إجازة اعتيادية (خصم من الرصيد السنوي)'
+                                    : 'إجازة اعتيادية (غير مفعلة لحسابك حالياً)',
                               ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
-                              ),
-                            ),
-                            items: [
-                              if (_isAnnualLeaveEnabled)
-                                const DropdownMenuItem(
-                                  value: 'annual',
-                                  child: Text('إجازة اعتيادية (خصم من الرصيد السنوي)'),
-                                )
-                              else
-                                DropdownMenuItem(
-                                  value: 'annual',
-                                  enabled: false,
-                                  child: Text(
-                                    'إجازة اعتيادية (غير مفعلة لحسابك حالياً)',
-                                    style: TextStyle(color: colorScheme.outline),
-                                  ),
-                                ),
-                              const DropdownMenuItem(
-                                value: 'sick',
-                                child: Text('إجازة مرضية'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'emergency',
-                                child: Text('إجازة عارضة'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'unpaid',
-                                child: Text('إجازة بدون أجر (إجازة استثنائية)'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'delay',
-                                child: Text('عذر تأخير عن العمل (ساعي)'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'early_leave',
-                                child: Text('إذن انصراف مبكر (ساعي)'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'absence',
-                                child: Text('عذر غياب يوم كامل'),
-                              ),
+                              const DropdownMenuEntry(
+                                  value: 'sick', label: 'إجازة مرضية'),
+                              const DropdownMenuEntry(
+                                  value: 'emergency', label: 'إجازة عارضة'),
+                              const DropdownMenuEntry(
+                                  value: 'unpaid',
+                                  label: 'إجازة بدون أجر (إجازة استثنائية)'),
+                              const DropdownMenuEntry(
+                                  value: 'delay',
+                                  label: 'عذر تأخير عن العمل (ساعي)'),
+                              const DropdownMenuEntry(
+                                  value: 'early_leave',
+                                  label: 'إذن انصراف مبكر (ساعي)'),
+                              const DropdownMenuEntry(
+                                  value: 'absence',
+                                  label: 'عذر غياب يوم كامل'),
                             ],
-                            onChanged: (val) {
+                            onSelected: (val) {
                               if (val != null) {
                                 setDlgState(() {
                                   selectedType = val;
