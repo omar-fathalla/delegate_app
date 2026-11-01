@@ -16,6 +16,51 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       textTheme: baseTextTheme,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+
+      // Snackbars: floating, inverse surface (M3), lifted above FAB by Scaffold.
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: colorScheme.inverseSurface,
+        contentTextStyle: baseTextTheme.bodyMedium
+            ?.copyWith(color: colorScheme.onInverseSurface),
+        actionTextColor: colorScheme.inversePrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      ),
+
+      // Selected segments/chips use secondaryContainer (not primary/red).
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith((s) =>
+              s.contains(WidgetState.selected)
+                  ? colorScheme.secondaryContainer
+                  : null),
+          foregroundColor: WidgetStateProperty.resolveWith((s) =>
+              s.contains(WidgetState.selected)
+                  ? colorScheme.onSecondaryContainer
+                  : colorScheme.onSurface),
+          minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        selectedColor: colorScheme.secondaryContainer,
+        checkmarkColor: colorScheme.onSecondaryContainer,
+        secondaryLabelStyle:
+            TextStyle(color: colorScheme.onSecondaryContainer),
+      ),
+
+      bottomSheetTheme: BottomSheetThemeData(
+        showDragHandle: true,
+        backgroundColor: colorScheme.surfaceContainerLow,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+      ),
+      navigationDrawerTheme: NavigationDrawerThemeData(
+        backgroundColor: colorScheme.surfaceContainerLow,
+        indicatorColor: colorScheme.secondaryContainer,
+        tileHeight: 56,
+      ),
 
       // Inputs (Spacing & White Space)
       inputDecorationTheme: InputDecorationTheme(
