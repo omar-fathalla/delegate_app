@@ -454,16 +454,28 @@ class _LoginScreenState extends State<LoginScreen>
       Semantics(
         liveRegion: loading,
         label: loading ? (isArabic ? 'جارٍ تسجيل الدخول' : 'Signing in') : null,
-        child: SizedBox(
-          height: 52,
+        child: ConstrainedBox(
+          // min 52dp; grows with large text scales instead of clipping.
+          constraints: const BoxConstraints(minHeight: 52),
           child: FilledButton(
             key: const ValueKey('login_submit'),
             // IgnorePointer keeps the primary colour while loading (spec §3).
             onPressed: () => _submitLogin(context),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
+              // The app theme's FilledButton padding is vertical 16, which in
+              // a 52dp box left only 20dp for Cairo's ~27dp line and clipped
+              // the label. Keep vertical padding small and centre the label.
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              alignment: Alignment.center,
+              foregroundColor: colorScheme.onPrimary,
+              backgroundColor: colorScheme.primary,
               shape: const StadiumBorder(),
-              textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+              textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
             ),
             child: IgnorePointer(
               ignoring: loading,
@@ -477,7 +489,14 @@ class _LoginScreenState extends State<LoginScreen>
                         dimension: 20,
                         child: CircularProgressIndicator(strokeWidth: 2.5, color: colorScheme.onPrimary),
                       )
-                    : Text(l10n.loginButton, key: const ValueKey('login_label')),
+                    : Text(
+                        l10n.loginButton,
+                        key: const ValueKey('login_label'),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.visible,
+                        style: TextStyle(color: colorScheme.onPrimary),
+                      ),
               ),
             ),
           ),
