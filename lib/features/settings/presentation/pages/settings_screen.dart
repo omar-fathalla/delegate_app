@@ -41,7 +41,7 @@ class SettingsScreen extends StatelessWidget {
               centerTitle: false,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
-                tooltip: isArabic ? 'رجوع' : 'Back',
+                tooltip: AppLocalizations.of(context)!.backAction,
                 onPressed: () {
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
@@ -171,7 +171,7 @@ class SettingsScreen extends StatelessWidget {
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.feedback_rounded,
-                            title: isArabic ? 'إرسال مقترح' : 'Submit Feedback',
+                            title: AppLocalizations.of(context)!.sendFeedback,
                             onTap: () => context.push(
                               '/submit-feedback',
                               extra: delegate,
@@ -185,7 +185,7 @@ class SettingsScreen extends StatelessWidget {
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.star_rate_rounded,
-                            title: isArabic ? 'تقييم التطبيق على المتجر' : 'Rate Application',
+                            title: AppLocalizations.of(context)!.rateTheApp,
                             onTap: () => sl<ReviewService>().requestManualReview(),
                           ),
                           Divider(
@@ -197,10 +197,8 @@ class SettingsScreen extends StatelessWidget {
                             context: context,
                             icon: Icons.history_rounded,
                             title: delegate.role == UserRole.superAdmin
-                                ? (isArabic
-                                    ? 'إدارة المقترحات'
-                                    : 'Manage Feedbacks')
-                                : (isArabic ? 'مقترحاتي' : 'My Feedbacks'),
+                                ? AppLocalizations.of(context)!.manageFeedback
+                                : AppLocalizations.of(context)!.myFeedback,
                             onTap: () {
                               if (delegate.role == UserRole.superAdmin) {
                                 context.push('/admin/feedbacks');
@@ -218,7 +216,7 @@ class SettingsScreen extends StatelessWidget {
                             _buildSettingsTile(
                               context: context,
                               icon: Icons.camera_alt_rounded,
-                              title: isArabic ? 'أذونات التصوير المتاحة' : 'Photo Permissions',
+                              title: AppLocalizations.of(context)!.photoPermissions2,
                               onTap: () => context.push('/photo-permissions/delegate', extra: delegate),
                             ),
                             Divider(
@@ -259,8 +257,7 @@ class SettingsScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              isArabic ? 'ألوان التطبيق' : 'App Colors',
+                            Text(AppLocalizations.of(context)!.appColor,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,

@@ -2275,6 +2275,318 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Approved by {name}'**
   String approvedBy(Object name);
+
+  /// No description provided for @homeSupervisorsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your supervisors'**
+  String get homeSupervisorsTitle;
+
+  /// No description provided for @homeGreeting.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi, {firstName}'**
+  String homeGreeting(Object firstName);
+
+  /// No description provided for @roleFieldDelegate.
+  ///
+  /// In en, this message translates to:
+  /// **'Field delegate'**
+  String get roleFieldDelegate;
+
+  /// No description provided for @roleFieldSupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Field supervisor'**
+  String get roleFieldSupervisor;
+
+  /// No description provided for @homeCoreDuties.
+  ///
+  /// In en, this message translates to:
+  /// **'Your core duties'**
+  String get homeCoreDuties;
+
+  /// No description provided for @homeDutyAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Check in and out from the branch location.'**
+  String get homeDutyAttendance;
+
+  /// No description provided for @homeDutyTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete and track your daily tasks.'**
+  String get homeDutyTasks;
+
+  /// No description provided for @homeDutyPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph offers and brands in hypermarkets and branches.'**
+  String get homeDutyPhotos;
+
+  /// No description provided for @companySupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Company supervisor'**
+  String get companySupervisor;
+
+  /// No description provided for @supervisorOfCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Supervisor · {companyName}'**
+  String supervisorOfCompany(Object companyName);
+
+  /// No description provided for @assignedCompanySupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned company supervisor'**
+  String get assignedCompanySupervisor;
+
+  /// No description provided for @callAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Call'**
+  String get callAction;
+
+  /// No description provided for @offerPhotosTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer photos'**
+  String get offerPhotosTitle;
+
+  /// No description provided for @offerPhotosSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Take and upload approved offer photos in the hypermarket'**
+  String get offerPhotosSubtitle;
+
+  /// No description provided for @homeAttendanceSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance – {monthName}'**
+  String homeAttendanceSummary(Object monthName);
+
+  /// No description provided for @detailsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get detailsAction;
+
+  /// No description provided for @statAttended.
+  ///
+  /// In en, this message translates to:
+  /// **'Attended'**
+  String get statAttended;
+
+  /// No description provided for @daysCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day} other{{count} days}}'**
+  String daysCount(int count);
+
+  /// No description provided for @statAbsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Absent'**
+  String get statAbsent;
+
+  /// No description provided for @statDaysOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Days off'**
+  String get statDaysOff;
+
+  /// No description provided for @leavesOfFour.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of 4 days'**
+  String leavesOfFour(Object count);
+
+  /// No description provided for @workPolicyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'26 workdays/month • 4 days off not counted as absence'**
+  String get workPolicyNote;
+
+  /// No description provided for @chainGomlaMarket.
+  ///
+  /// In en, this message translates to:
+  /// **'Gomla Market'**
+  String get chainGomlaMarket;
+
+  /// No description provided for @chainFathallaMarket.
+  ///
+  /// In en, this message translates to:
+  /// **'Fathalla Market'**
+  String get chainFathallaMarket;
+
+  /// No description provided for @chainZahranMarket.
+  ///
+  /// In en, this message translates to:
+  /// **'Zahran Market'**
+  String get chainZahranMarket;
+
+  /// No description provided for @recentBranchActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent branch activity'**
+  String get recentBranchActivity;
+
+  /// No description provided for @viewLog.
+  ///
+  /// In en, this message translates to:
+  /// **'View log'**
+  String get viewLog;
+
+  /// No description provided for @unknownBranch.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown branch'**
+  String get unknownBranch;
+
+  /// No description provided for @onShift.
+  ///
+  /// In en, this message translates to:
+  /// **'On shift'**
+  String get onShift;
+
+  /// No description provided for @durationHm.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h {minutes}m'**
+  String durationHm(Object hours, Object minutes);
+
+  /// No description provided for @branchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch: {cleanBranchName}'**
+  String branchLabel(Object cleanBranchName);
+
+  /// No description provided for @homeRequestsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit and track leave and excuse requests'**
+  String get homeRequestsSubtitle;
+
+  /// No description provided for @companySupervisorWithName.
+  ///
+  /// In en, this message translates to:
+  /// **'Company supervisor ({companyName})'**
+  String companySupervisorWithName(Object companyName);
+
+  /// No description provided for @errorWithMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String errorWithMessage(Object error);
+
+  /// No description provided for @noSupervisorForCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'No supervisor registered for this company yet\n(Company ID: {companyUID})'**
+  String noSupervisorForCompany(Object companyUID);
+
+  /// No description provided for @pendingCountBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} pending'**
+  String pendingCountBadge(Object count);
+
+  /// No description provided for @orgMarketing.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketing'**
+  String get orgMarketing;
+
+  /// No description provided for @orgAdminPanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin panel'**
+  String get orgAdminPanel;
+
+  /// No description provided for @orgAccounting.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting'**
+  String get orgAccounting;
+
+  /// No description provided for @switchedToOrg.
+  ///
+  /// In en, this message translates to:
+  /// **'Switched to {orgLabel}'**
+  String switchedToOrg(Object orgLabel);
+
+  /// No description provided for @unknownOrganization.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown organization'**
+  String get unknownOrganization;
+
+  /// No description provided for @alreadyInOrg.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re already in this organization.'**
+  String get alreadyInOrg;
+
+  /// No description provided for @logoutAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get logoutAction;
+
+  /// No description provided for @logoutConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out?\nYour local data will be saved first.'**
+  String get logoutConfirm;
+
+  /// No description provided for @logoutFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t log out: {error}'**
+  String logoutFailed(Object error);
+
+  /// No description provided for @backAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get backAction;
+
+  /// No description provided for @sendFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Send feedback'**
+  String get sendFeedback;
+
+  /// No description provided for @rateTheApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate the app'**
+  String get rateTheApp;
+
+  /// No description provided for @manageFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage feedback'**
+  String get manageFeedback;
+
+  /// No description provided for @myFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'My feedback'**
+  String get myFeedback;
+
+  /// No description provided for @photoPermissions2.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo permissions'**
+  String get photoPermissions2;
+
+  /// No description provided for @appColor.
+  ///
+  /// In en, this message translates to:
+  /// **'App color'**
+  String get appColor;
 }
 
 class _AppLocalizationsDelegate

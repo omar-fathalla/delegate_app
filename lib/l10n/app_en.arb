@@ -1379,5 +1379,125 @@
     "placeholders": {
       "name": {}
     }
-  }
+  },
+  "homeSupervisorsTitle": "Your supervisors",
+  "homeGreeting": "Hi, {firstName}",
+  "@homeGreeting": {
+    "placeholders": {
+      "firstName": {}
+    }
+  },
+  "roleFieldDelegate": "Field delegate",
+  "roleFieldSupervisor": "Field supervisor",
+  "homeCoreDuties": "Your core duties",
+  "homeDutyAttendance": "Check in and out from the branch location.",
+  "homeDutyTasks": "Complete and track your daily tasks.",
+  "homeDutyPhotos": "Photograph offers and brands in hypermarkets and branches.",
+  "companySupervisor": "Company supervisor",
+  "supervisorOfCompany": "Supervisor · {companyName}",
+  "@supervisorOfCompany": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "assignedCompanySupervisor": "Assigned company supervisor",
+  "callAction": "Call",
+  "offerPhotosTitle": "Offer photos",
+  "offerPhotosSubtitle": "Take and upload approved offer photos in the hypermarket",
+  "homeAttendanceSummary": "Attendance – {monthName}",
+  "@homeAttendanceSummary": {
+    "placeholders": {
+      "monthName": {}
+    }
+  },
+  "detailsAction": "Details",
+  "statAttended": "Attended",
+  "daysCount": "{count, plural, =1{1 day} other{{count} days}}",
+  "@daysCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "statAbsent": "Absent",
+  "statDaysOff": "Days off",
+  "leavesOfFour": "{count} of 4 days",
+  "@leavesOfFour": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "workPolicyNote": "26 workdays/month • 4 days off not counted as absence",
+  "chainGomlaMarket": "Gomla Market",
+  "chainFathallaMarket": "Fathalla Market",
+  "chainZahranMarket": "Zahran Market",
+  "recentBranchActivity": "Recent branch activity",
+  "viewLog": "View log",
+  "unknownBranch": "Unknown branch",
+  "onShift": "On shift",
+  "durationHm": "{hours}h {minutes}m",
+  "@durationHm": {
+    "placeholders": {
+      "hours": {},
+      "minutes": {}
+    }
+  },
+  "branchLabel": "Branch: {cleanBranchName}",
+  "@branchLabel": {
+    "placeholders": {
+      "cleanBranchName": {}
+    }
+  },
+  "homeRequestsSubtitle": "Submit and track leave and excuse requests",
+  "companySupervisorWithName": "Company supervisor ({companyName})",
+  "@companySupervisorWithName": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "errorWithMessage": "Error: {error}",
+  "@errorWithMessage": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "noSupervisorForCompany": "No supervisor registered for this company yet\n(Company ID: {companyUID})",
+  "@noSupervisorForCompany": {
+    "placeholders": {
+      "companyUID": {}
+    }
+  },
+  "pendingCountBadge": "{count} pending",
+  "@pendingCountBadge": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "orgMarketing": "Marketing",
+  "orgAdminPanel": "Admin panel",
+  "orgAccounting": "Accounting",
+  "switchedToOrg": "Switched to {orgLabel}",
+  "@switchedToOrg": {
+    "placeholders": {
+      "orgLabel": {}
+    }
+  },
+  "unknownOrganization": "Unknown organization",
+  "alreadyInOrg": "You're already in this organization.",
+  "logoutAction": "Log out",
+  "logoutConfirm": "Log out?\nYour local data will be saved first.",
+  "logoutFailed": "Couldn't log out: {error}",
+  "@logoutFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "backAction": "Back",
+  "sendFeedback": "Send feedback",
+  "rateTheApp": "Rate the app",
+  "manageFeedback": "Manage feedback",
+  "myFeedback": "My feedback",
+  "photoPermissions2": "Photo permissions",
+  "appColor": "App color"
 }

@@ -1173,4 +1173,196 @@ class AppLocalizationsEn extends AppLocalizations {
   String approvedBy(Object name) {
     return 'Approved by $name';
   }
+
+  @override
+  String get homeSupervisorsTitle => 'Your supervisors';
+
+  @override
+  String homeGreeting(Object firstName) {
+    return 'Hi, $firstName';
+  }
+
+  @override
+  String get roleFieldDelegate => 'Field delegate';
+
+  @override
+  String get roleFieldSupervisor => 'Field supervisor';
+
+  @override
+  String get homeCoreDuties => 'Your core duties';
+
+  @override
+  String get homeDutyAttendance => 'Check in and out from the branch location.';
+
+  @override
+  String get homeDutyTasks => 'Complete and track your daily tasks.';
+
+  @override
+  String get homeDutyPhotos =>
+      'Photograph offers and brands in hypermarkets and branches.';
+
+  @override
+  String get companySupervisor => 'Company supervisor';
+
+  @override
+  String supervisorOfCompany(Object companyName) {
+    return 'Supervisor · $companyName';
+  }
+
+  @override
+  String get assignedCompanySupervisor => 'Assigned company supervisor';
+
+  @override
+  String get callAction => 'Call';
+
+  @override
+  String get offerPhotosTitle => 'Offer photos';
+
+  @override
+  String get offerPhotosSubtitle =>
+      'Take and upload approved offer photos in the hypermarket';
+
+  @override
+  String homeAttendanceSummary(Object monthName) {
+    return 'Attendance – $monthName';
+  }
+
+  @override
+  String get detailsAction => 'Details';
+
+  @override
+  String get statAttended => 'Attended';
+
+  @override
+  String daysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days',
+      one: '1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statAbsent => 'Absent';
+
+  @override
+  String get statDaysOff => 'Days off';
+
+  @override
+  String leavesOfFour(Object count) {
+    return '$count of 4 days';
+  }
+
+  @override
+  String get workPolicyNote =>
+      '26 workdays/month • 4 days off not counted as absence';
+
+  @override
+  String get chainGomlaMarket => 'Gomla Market';
+
+  @override
+  String get chainFathallaMarket => 'Fathalla Market';
+
+  @override
+  String get chainZahranMarket => 'Zahran Market';
+
+  @override
+  String get recentBranchActivity => 'Recent branch activity';
+
+  @override
+  String get viewLog => 'View log';
+
+  @override
+  String get unknownBranch => 'Unknown branch';
+
+  @override
+  String get onShift => 'On shift';
+
+  @override
+  String durationHm(Object hours, Object minutes) {
+    return '${hours}h ${minutes}m';
+  }
+
+  @override
+  String branchLabel(Object cleanBranchName) {
+    return 'Branch: $cleanBranchName';
+  }
+
+  @override
+  String get homeRequestsSubtitle =>
+      'Submit and track leave and excuse requests';
+
+  @override
+  String companySupervisorWithName(Object companyName) {
+    return 'Company supervisor ($companyName)';
+  }
+
+  @override
+  String errorWithMessage(Object error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String noSupervisorForCompany(Object companyUID) {
+    return 'No supervisor registered for this company yet\n(Company ID: $companyUID)';
+  }
+
+  @override
+  String pendingCountBadge(Object count) {
+    return '$count pending';
+  }
+
+  @override
+  String get orgMarketing => 'Marketing';
+
+  @override
+  String get orgAdminPanel => 'Admin panel';
+
+  @override
+  String get orgAccounting => 'Accounting';
+
+  @override
+  String switchedToOrg(Object orgLabel) {
+    return 'Switched to $orgLabel';
+  }
+
+  @override
+  String get unknownOrganization => 'Unknown organization';
+
+  @override
+  String get alreadyInOrg => 'You\'re already in this organization.';
+
+  @override
+  String get logoutAction => 'Log out';
+
+  @override
+  String get logoutConfirm => 'Log out?\nYour local data will be saved first.';
+
+  @override
+  String logoutFailed(Object error) {
+    return 'Couldn\'t log out: $error';
+  }
+
+  @override
+  String get backAction => 'Back';
+
+  @override
+  String get sendFeedback => 'Send feedback';
+
+  @override
+  String get rateTheApp => 'Rate the app';
+
+  @override
+  String get manageFeedback => 'Manage feedback';
+
+  @override
+  String get myFeedback => 'My feedback';
+
+  @override
+  String get photoPermissions2 => 'Photo permissions';
+
+  @override
+  String get appColor => 'App color';
 }

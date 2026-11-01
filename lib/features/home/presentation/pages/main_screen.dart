@@ -26,7 +26,6 @@ import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:delegate_app/main.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -320,7 +319,7 @@ class _MainScreenState extends State<MainScreen> {
           : delegate.organizationName;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('تم التبديل بنجاح إلى: $orgLabel'),
+          content: Text(AppLocalizations.of(context)!.switchedToOrg(orgLabel)),
           backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
         ),
@@ -346,7 +345,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _showOrgSwitcher(BuildContext context, ColorScheme colorScheme) {
-    final isArabic = localeProvider.isArabic;
     final currentDelegate = widget.delegate;
     final l10n = AppLocalizations.of(context)!;
 
@@ -382,13 +380,13 @@ class _MainScreenState extends State<MainScreen> {
                 ? delegate.companyName.trim()
                 : (delegate.role == UserRole.marketing ||
                         delegate.role == UserRole.marketingPromotion
-                    ? (isArabic ? 'إدارة التسويق' : 'Marketing Department')
+                    ? AppLocalizations.of(context)!.orgMarketing
                     : (delegate.role == UserRole.admin ||
                             delegate.role == UserRole.superAdmin ||
                             delegate.role == UserRole.organizationAdmin
-                        ? (isArabic ? 'لوحة الإدارة' : 'Admin Panel')
+                        ? AppLocalizations.of(context)!.orgAdminPanel
                         : (delegate.role == UserRole.accountant
-                            ? (isArabic ? 'الحسابات والمالية' : 'Accounting')
+                            ? AppLocalizations.of(context)!.orgAccounting
                             : '')));
 
             return Padding(
@@ -414,7 +412,7 @@ class _MainScreenState extends State<MainScreen> {
                   title: Text(
                     delegate.organizationName.isNotEmpty
                         ? delegate.organizationName
-                        : 'منظمة غير محددة',
+                        : AppLocalizations.of(context)!.unknownOrganization,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -437,8 +435,8 @@ class _MainScreenState extends State<MainScreen> {
                     Navigator.pop(dialogContext);
                     if (isCurrentOrg) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('أنت تعمل بالفعل ضمن هذه المنظمة حالياً.'),
+                        SnackBar(
+                          content: Text(AppLocalizations.of(context)!.alreadyInOrg),
                           behavior: SnackBarBehavior.floating,
                         ),
                       );

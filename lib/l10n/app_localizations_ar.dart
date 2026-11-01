@@ -1169,4 +1169,200 @@ class AppLocalizationsAr extends AppLocalizations {
   String approvedBy(Object name) {
     return 'اعتمده: $name';
   }
+
+  @override
+  String get homeSupervisorsTitle => 'المشرفون';
+
+  @override
+  String homeGreeting(Object firstName) {
+    return 'أهلًا، $firstName';
+  }
+
+  @override
+  String get roleFieldDelegate => 'مندوب ميداني';
+
+  @override
+  String get roleFieldSupervisor => 'مشرف ميداني';
+
+  @override
+  String get homeCoreDuties => 'مهامك الأساسية';
+
+  @override
+  String get homeDutyAttendance => 'سجّل حضورك وانصرافك من موقع الفرع.';
+
+  @override
+  String get homeDutyTasks => 'نفّذ مهامك اليومية وتابِعها.';
+
+  @override
+  String get homeDutyPhotos =>
+      'صوّر العروض والعلامات التجارية في الهايبر ماركت والفروع.';
+
+  @override
+  String get companySupervisor => 'مشرف الشركة';
+
+  @override
+  String supervisorOfCompany(Object companyName) {
+    return 'مشرف – $companyName';
+  }
+
+  @override
+  String get assignedCompanySupervisor => 'مشرف الشركة المنتدبة';
+
+  @override
+  String get callAction => 'اتصال';
+
+  @override
+  String get offerPhotosTitle => 'تصوير العروض';
+
+  @override
+  String get offerPhotosSubtitle =>
+      'صوّر العروض المعتمدة وارفعها من داخل الهايبر ماركت';
+
+  @override
+  String homeAttendanceSummary(Object monthName) {
+    return 'الحضور والغياب – $monthName';
+  }
+
+  @override
+  String get detailsAction => 'التفاصيل';
+
+  @override
+  String get statAttended => 'حضور';
+
+  @override
+  String daysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count يوم',
+      many: '$count يومًا',
+      few: '$count أيام',
+      two: 'يومان',
+      one: 'يوم واحد',
+      zero: '0 يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statAbsent => 'غياب';
+
+  @override
+  String get statDaysOff => 'إجازة';
+
+  @override
+  String leavesOfFour(Object count) {
+    return '$count من 4 أيام';
+  }
+
+  @override
+  String get workPolicyNote =>
+      '26 يوم عمل شهريًا • 4 أيام راحة لا تُحسب غيابًا';
+
+  @override
+  String get chainGomlaMarket => 'جملة ماركت';
+
+  @override
+  String get chainFathallaMarket => 'فتح الله ماركت';
+
+  @override
+  String get chainZahranMarket => 'زهران ماركت';
+
+  @override
+  String get recentBranchActivity => 'آخر الفروع والنشاط الميداني';
+
+  @override
+  String get viewLog => 'عرض السجل';
+
+  @override
+  String get unknownBranch => 'فرع غير محدد';
+
+  @override
+  String get onShift => 'قيد العمل';
+
+  @override
+  String durationHm(Object hours, Object minutes) {
+    return '$hours س $minutes د';
+  }
+
+  @override
+  String branchLabel(Object cleanBranchName) {
+    return 'الفرع: $cleanBranchName';
+  }
+
+  @override
+  String get homeRequestsSubtitle => 'قدّم طلبات الإجازة والأعذار وتابع رصيدك';
+
+  @override
+  String companySupervisorWithName(Object companyName) {
+    return 'مشرف الشركة ($companyName)';
+  }
+
+  @override
+  String errorWithMessage(Object error) {
+    return 'خطأ: $error';
+  }
+
+  @override
+  String noSupervisorForCompany(Object companyUID) {
+    return 'لا يوجد مشرف مسجّل لهذه الشركة حاليًا\n(Company ID: $companyUID)';
+  }
+
+  @override
+  String pendingCountBadge(Object count) {
+    return '$count قيد المراجعة';
+  }
+
+  @override
+  String get orgMarketing => 'إدارة التسويق';
+
+  @override
+  String get orgAdminPanel => 'لوحة الإدارة';
+
+  @override
+  String get orgAccounting => 'الحسابات والمالية';
+
+  @override
+  String switchedToOrg(Object orgLabel) {
+    return 'تم التبديل إلى: $orgLabel';
+  }
+
+  @override
+  String get unknownOrganization => 'منظمة غير محددة';
+
+  @override
+  String get alreadyInOrg => 'أنت تعمل ضمن هذه المنظمة بالفعل.';
+
+  @override
+  String get logoutAction => 'تسجيل الخروج';
+
+  @override
+  String get logoutConfirm =>
+      'تسجيل الخروج؟\nستُحفظ بياناتك المحلية قبل الخروج.';
+
+  @override
+  String logoutFailed(Object error) {
+    return 'تعذّر تسجيل الخروج: $error';
+  }
+
+  @override
+  String get backAction => 'رجوع';
+
+  @override
+  String get sendFeedback => 'إرسال ملاحظات';
+
+  @override
+  String get rateTheApp => 'قيّم التطبيق';
+
+  @override
+  String get manageFeedback => 'إدارة الملاحظات';
+
+  @override
+  String get myFeedback => 'ملاحظاتي';
+
+  @override
+  String get photoPermissions2 => 'أذونات التصوير';
+
+  @override
+  String get appColor => 'لون التطبيق';
 }

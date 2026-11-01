@@ -467,10 +467,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   children: [
                     Padding(
                       padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
-                      child: Text(
-                        Localizations.localeOf(context).languageCode == 'ar'
-                            ? 'فريق المتابعة'
-                            : 'Your team',
+                      child: Text(AppLocalizations.of(context)!.homeSupervisorsTitle,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w700,
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -513,10 +510,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      isArabic
-                          ? 'أهلاً بك، ${widget.delegate.firstName}'
-                          : 'Welcome, ${widget.delegate.firstName}',
+                    Text(AppLocalizations.of(context)!.homeGreeting(widget.delegate.firstName),
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: colorScheme.onPrimary,
@@ -534,11 +528,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                                     DelegatePosition.promoter ||
                                 widget.delegate.role ==
                                     UserRole.marketingPromotion
-                            ? (isArabic ? 'مندوب ميداني' : 'Field delegate')
+                            ? AppLocalizations.of(context)!.roleFieldDelegate
                             : widget.delegate.position ==
                                     DelegatePosition.supervisor
-                                ? (isArabic ? 'مشرف ميداني' : 'Field Supervisor')
-                                : (isArabic ? 'مندوب ميداني' : 'Field Delegate');
+                                ? AppLocalizations.of(context)!.roleFieldSupervisor
+                                : AppLocalizations.of(context)!.roleFieldDelegate;
 
                         final activeOrg = widget.delegate.organizationName.trim();
                         final affiliatedOrgs = <String>{};
@@ -643,8 +637,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           const SizedBox(height: 16),
 
           // Core Duties Summary
-          Text(
-            isArabic ? 'المهام الأساسية للمندوب:' : 'Core Delegate Duties:',
+          Text(AppLocalizations.of(context)!.homeCoreDuties,
             style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w700,
               color: colorScheme.onPrimary,
@@ -655,25 +648,19 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           _buildDutyItem(
             icon: Symbols.location_on_rounded,
             text:
-                isArabic
-                    ? 'تسجيل الحضور والانصراف المعتمد جغرافياً عند الوصول إلى الفرع.'
-                    : 'Geofenced attendance check-in & check-out at branches.',
+                AppLocalizations.of(context)!.homeDutyAttendance,
           ),
           const SizedBox(height: 6),
           _buildDutyItem(
             icon: Symbols.assignment_turned_in_rounded,
             text:
-                isArabic
-                    ? 'متابعة وتنفيذ المهام اليومية الموكلة بدقة.'
-                    : 'Review and complete assigned daily tasks accurately.',
+                AppLocalizations.of(context)!.homeDutyTasks,
           ),
           const SizedBox(height: 6),
           _buildDutyItem(
             icon: Symbols.camera_alt_rounded,
             text:
-                isArabic
-                    ? 'توثيق وتصوير العروض والبرندات الميدانية داخل الهايبر ماركت والفروع.'
-                    : 'Capture & document approved offers and brands in hypermarkets.',
+                AppLocalizations.of(context)!.homeDutyPhotos,
           ),
         ],
       ),
@@ -871,7 +858,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'مشرف الشركة (${widget.delegate.companyName})',
+                    AppLocalizations.of(context)!.companySupervisorWithName(widget.delegate.companyName),
                     style: TextStyle(
                       fontSize: 10,
                       color: colorScheme.onSurfaceVariant,
@@ -881,8 +868,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   const SizedBox(height: 2),
                   Text(
                     _supervisorError != null
-                        ? 'خطأ: $_supervisorError'
-                        : 'لا يوجد مشرف مسجل لهذه الشركة حالياً\n(Company ID: ${widget.delegate.companyUID})',
+                        ? AppLocalizations.of(context)!.errorWithMessage(_supervisorError ?? '')
+                        : AppLocalizations.of(context)!.noSupervisorForCompany(widget.delegate.companyUID),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -906,7 +893,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     Map<String, dynamic> supervisorData,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final rawName = (supervisorData['displayName'] as String?)?.trim() ??
         (supervisorData['fullName'] as String?)?.trim() ??
         (supervisorData['name'] as String?)?.trim() ??
@@ -917,13 +903,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     final displayName = rawName.isNotEmpty
         ? rawName
-        : (isArabic ? 'مشرف الشركة' : 'Company Supervisor');
+        : AppLocalizations.of(context)!.companySupervisor;
 
     final subtitleText = companyName.isNotEmpty
-        ? (isArabic
-            ? 'مشرف شركة $companyName'
-            : 'Supervisor - $companyName')
-        : (isArabic ? 'مشرف الشركة المنتدبة' : 'Assigned Company Supervisor');
+        ? AppLocalizations.of(context)!.supervisorOfCompany(companyName)
+        : AppLocalizations.of(context)!.assignedCompanySupervisor;
 
     return Card(
       elevation: 0,
@@ -982,7 +966,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               IconButton(
                 onPressed: () => _callNumber(phone),
                 icon: const Icon(Symbols.phone_rounded),
-                tooltip: isArabic ? 'اتصال' : 'Call',
+                tooltip: AppLocalizations.of(context)!.callAction,
                 style: IconButton.styleFrom(
                   backgroundColor: colorScheme.secondaryContainer,
                   foregroundColor: colorScheme.onSecondaryContainer,
@@ -1008,7 +992,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   Widget _buildPhotoCaptureCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     return M3PressScale(scale: 0.98, child: Card(
       elevation: 0,
@@ -1047,20 +1030,14 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          isArabic
-                              ? 'تصوير العروض الميدانية'
-                              : 'Field Offer Photos',
+                        Text(AppLocalizations.of(context)!.offerPhotosTitle,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: colorScheme.onSurface,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          isArabic
-                              ? 'التقاط وإرسال صور العروض والبرندات المعتمدة داخل الهايبر ماركت'
-                              : 'Capture & upload approved brand photos inside hypermarket',
+                        Text(AppLocalizations.of(context)!.offerPhotosSubtitle,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontSize: 12,
@@ -1283,10 +1260,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       color: colorScheme.primary,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      isArabic
-                          ? 'ملخص الحضور والغياب ($monthName)'
-                          : 'Attendance Summary ($monthName)',
+                    Text(AppLocalizations.of(context)!.homeAttendanceSummary(monthName),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -1298,8 +1272,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 if (widget.onNavigateToAttendance != null)
                   Row(
                     children: [
-                      Text(
-                        isArabic ? 'التفاصيل' : 'Details',
+                      Text(AppLocalizations.of(context)!.detailsAction,
                         style: TextStyle(
                           fontSize: 12,
                           color: colorScheme.primary,
@@ -1323,8 +1296,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 Expanded(
                   child: _buildAttendanceStatPill(
                     context,
-                    title: isArabic ? 'أيام الحضور' : 'Attended',
-                    value: isArabic ? '$_attendedDays يوم' : '$_attendedDays d',
+                    title: AppLocalizations.of(context)!.statAttended,
+                    value: AppLocalizations.of(context)!.daysCount(_attendedDays),
                     icon: Symbols.check_circle_rounded,
                     containerColor: colorScheme.surfaceContainer,
                     iconColor: colorScheme.onSurfaceVariant,
@@ -1337,8 +1310,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 Expanded(
                   child: _buildAttendanceStatPill(
                     context,
-                    title: isArabic ? 'أيام الغياب' : 'Absent',
-                    value: isArabic ? '$_absentDays يوم' : '$_absentDays d',
+                    title: AppLocalizations.of(context)!.statAbsent,
+                    value: AppLocalizations.of(context)!.daysCount(_absentDays),
                     icon: Symbols.cancel_rounded,
                     containerColor: colorScheme.surfaceContainer,
                     iconColor: _absentDays > 0
@@ -1355,10 +1328,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 Expanded(
                   child: _buildAttendanceStatPill(
                     context,
-                    title: isArabic ? 'أيام الإجازة' : 'Days Off',
-                    value: isArabic
-                        ? '$_approvedLeavesThisMonth من 4 أيام'
-                        : '$_approvedLeavesThisMonth of 4 days',
+                    title: AppLocalizations.of(context)!.statDaysOff,
+                    value: AppLocalizations.of(context)!.leavesOfFour(_approvedLeavesThisMonth),
                     icon: Symbols.event_available_rounded,
                     containerColor: colorScheme.surfaceContainer,
                     iconColor: colorScheme.onSurfaceVariant,
@@ -1386,10 +1357,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   ),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text(
-                      isArabic
-                          ? 'نظام 26 يوم عمل شهرياً • 4 أيام إجازة مستبعدة من الغياب'
-                          : '26 work days/month • 4 off days excluded from absence',
+                    child: Text(AppLocalizations.of(context)!.workPolicyNote,
                       style: TextStyle(
                         fontSize: 10,
                         color: colorScheme.onSurfaceVariant,
@@ -1450,13 +1418,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         bLower.startsWith('جمله ماركت') ||
         bLower.startsWith('gomla market') ||
         bLower.startsWith('jomla market')) {
-      return isArabic ? 'جملة ماركت' : 'Gomla Market';
+      return AppLocalizations.of(context)!.chainGomlaMarket;
     }
     if (bLower.startsWith('فتح الله') || bLower.startsWith('fathalla')) {
-      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
+      return AppLocalizations.of(context)!.chainFathallaMarket;
     }
     if (bLower.startsWith('زهران') || bLower.startsWith('zahran')) {
-      return isArabic ? 'زهران ماركت' : 'Zahran Market';
+      return AppLocalizations.of(context)!.chainZahranMarket;
     }
 
     final rClean = raw.trim();
@@ -1464,16 +1432,16 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     if (lower.contains('fathalla') ||
         rClean.contains('فتح الله') ||
         rClean.contains('فتح_الله')) {
-      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
+      return AppLocalizations.of(context)!.chainFathallaMarket;
     }
     if (lower.contains('gomla') ||
         lower.contains('jomla') ||
         rClean.contains('جملة') ||
         rClean.contains('جمله')) {
-      return isArabic ? 'جملة ماركت' : 'Gomla Market';
+      return AppLocalizations.of(context)!.chainGomlaMarket;
     }
     if (lower.contains('zahran') || rClean.contains('زهران')) {
-      return isArabic ? 'زهران ماركت' : 'Zahran Market';
+      return AppLocalizations.of(context)!.chainZahranMarket;
     }
     return rClean;
   }
@@ -1579,10 +1547,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     color: colorScheme.primary,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    isArabic
-                        ? 'آخر الفروع والنشاط الميداني'
-                        : 'Recent Branch Activity',
+                  Text(AppLocalizations.of(context)!.recentBranchActivity,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -1600,8 +1565,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          isArabic ? 'عرض السجل' : 'View Log',
+                        Text(AppLocalizations.of(context)!.viewLog,
                           style: TextStyle(
                             fontSize: 11.5,
                             color: colorScheme.primary,
@@ -1623,7 +1587,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           // Session Items (latest 2-3 sessions)
           ..._recentSessions.take(3).map((session) {
             final rawBranchName = session.branchName ??
-                (isArabic ? 'فرع غير محدد' : 'Unknown Branch');
+                AppLocalizations.of(context)!.unknownBranch;
             final cleanBranchName = _cleanBranchName(rawBranchName);
             final orgName = _resolveOrgLabel(
               session.organizationId,
@@ -1638,7 +1602,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkInTime);
             final checkOutStr = session.checkOutTime != null
                 ? DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkOutTime!)
-                : (isArabic ? 'قيد العمل' : 'Active');
+                : AppLocalizations.of(context)!.onShift;
 
             // Format date relative (اليوم، أمس، أو التاريخ)
             final now = _getTrustedNow();
@@ -1650,9 +1614,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 session.checkInTime.day == now.day - 1;
 
             final dateLabel = isToday
-                ? (isArabic ? 'اليوم' : 'Today')
+                ? AppLocalizations.of(context)!.today
                 : isYesterday
-                    ? (isArabic ? 'أمس' : 'Yesterday')
+                    ? AppLocalizations.of(context)!.yesterday
                     : DateFormat('EEE، d MMM', isArabic ? 'ar' : 'en').format(session.checkInTime);
 
             // Compute Duration
@@ -1661,9 +1625,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               final diff = session.checkOutTime!.difference(session.checkInTime);
               final hours = diff.inHours;
               final minutes = diff.inMinutes % 60;
-              durationLabel = isArabic
-                  ? '$hours س $minutes د'
-                  : '${hours}h ${minutes}m';
+              durationLabel = AppLocalizations.of(context)!.durationHm(hours, minutes);
             }
 
             return Container(
@@ -1719,10 +1681,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       ),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: Text(
-                          isArabic
-                              ? 'الفرع: $cleanBranchName'
-                              : 'Branch: $cleanBranchName',
+                        child: Text(AppLocalizations.of(context)!.branchLabel(cleanBranchName),
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.bold,
@@ -1882,7 +1841,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   Widget _buildLeavesAndRequestsCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
@@ -1945,10 +1903,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       children: [
                         Row(
                           children: [
-                            Text(
-                              isArabic
-                                  ? 'طلباتي (الإجازات والأعذار)'
-                                  : 'My Requests & Leaves',
+                            Text(AppLocalizations.of(context)!.reqTitle,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
@@ -1966,7 +1921,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
-                                  '$pendingCount معلق',
+                                  AppLocalizations.of(context)!.pendingCountBadge(pendingCount),
                                   style: const TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.bold,
@@ -1978,10 +1933,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          isArabic
-                              ? 'تقديم ومتابعة طلبات الإجازة والأعذار ورصيدك السنوي'
-                              : 'Submit & track your leave and excuse requests',
+                        Text(AppLocalizations.of(context)!.homeRequestsSubtitle,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontSize: 12,
