@@ -59,7 +59,7 @@ class AttendanceHistoryList extends StatelessWidget {
                         Icon(Symbols.auto_mode_rounded, size: 12, color: Colors.amber[800]),
                         const SizedBox(width: 4),
                         Text(
-                          'إغلاق تلقائي (9 س)',
+                          AppLocalizations.of(context)!.autoClosed9h,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,

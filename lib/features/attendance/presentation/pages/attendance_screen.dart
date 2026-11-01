@@ -549,7 +549,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             } else {
               AppSnackBar.showInfo(
                 context,
-                'تم تسجيل الدخول محلياً. ستتم المزامنة لاحقاً عند الاتصال بالشبكة.',
+                AppLocalizations.of(context)!.attCheckInSavedOffline,
               );
             }
             context.read<AttendanceBloc>().add(
@@ -569,7 +569,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             } else {
               AppSnackBar.showInfo(
                 context,
-                'تم تسجيل الانصراف محلياً. ستتم المزامنة لاحقاً عند الاتصال بالشبكة.',
+                AppLocalizations.of(context)!.attCheckOutSavedOffline,
               );
             }
             context.read<AttendanceBloc>().add(
@@ -602,7 +602,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             if (state.syncStatus == SyncStatus.success) {
               AppSnackBar.showSuccess(
                 context,
-                'تمت مزامنة البيانات المحفوظة بنجاح',
+                AppLocalizations.of(context)!.syncDone,
               );
               Future.delayed(const Duration(seconds: 1), () {
                 if (context.mounted) {
@@ -617,7 +617,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 }
               });
             } else if (state.syncStatus == SyncStatus.failure) {
-              AppSnackBar.showError(context, 'فشلت المزامنة');
+              AppSnackBar.showError(context, AppLocalizations.of(context)!.syncFailed);
             }
           }
         },
@@ -662,8 +662,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       widget.delegate.fullName.isNotEmpty
                           ? widget.delegate.fullName
                           : (widget.delegate.companyName.isNotEmpty
-                              ? 'مندوب - ${widget.delegate.companyName}'
-                              : 'سجل الحضور'),
+                              ? AppLocalizations.of(context)!.attDelegateOfCompany(widget.delegate.companyName)
+                              : AppLocalizations.of(context)!.attendanceLog),
                     ),
                   )
                 : null,
@@ -817,7 +817,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
     final locale = Localizations.localeOf(context).languageCode;
-    final isArabic = locale == 'ar';
     final l10n = AppLocalizations.of(context)!;
     final trustedNow = _getTrustedNow();
     final isCurrentMonth = _selectedMonth.year == trustedNow.year &&
@@ -837,28 +836,22 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (isBusy) {
       statusColor = colorScheme.primary;
       headerIcon = Symbols.radar_rounded;
-      statusTitle = isArabic ? 'جاري فحص النطاق...' : 'Checking location...';
-      statusSubtitle = isArabic
-          ? 'يتم الآن التحقق من إحداثياتك والمسافة للفرع'
-          : 'Verifying GPS coordinates and branch';
+      statusTitle = AppLocalizations.of(context)!.attCheckingZone;
+      statusSubtitle = AppLocalizations.of(context)!.attVerifyingCoords;
     } else if (_isInsideGeofence) {
       statusColor = Theme.of(context).colorScheme.primary; // Emerald M3 Success
       headerIcon = Symbols.verified_rounded;
-      statusTitle = isArabic ? 'أنت داخل نطاق العمل' : 'Inside Work Zone';
+      statusTitle = AppLocalizations.of(context)!.attInsideZone;
       statusSubtitle = activeBranch != null
-          ? (isArabic
-              ? 'متواجد داخل نطاق فرع ${BranchDisplayCache.instance.displayName(activeBranch.branchName)}'
-              : 'Within range of ${BranchDisplayCache.instance.displayName(activeBranch.branchName)}')
-          : (isArabic ? 'داخل النطاق المسموح' : 'Within approved range');
+          ? AppLocalizations.of(context)!.attWithinBranchRange(BranchDisplayCache.instance.displayName(activeBranch.branchName))
+          : AppLocalizations.of(context)!.attWithinAllowedRange;
     } else {
       statusColor = colorScheme.error;
       headerIcon = Symbols.wrong_location_rounded;
-      statusTitle = isArabic ? 'خارج نطاق العمل' : 'Outside Work Zone';
+      statusTitle = AppLocalizations.of(context)!.attOutsideZone;
       statusSubtitle = activeBranch != null
-          ? (isArabic
-              ? 'يرجى الاقتراب من فرع ${BranchDisplayCache.instance.displayName(activeBranch.branchName)} لتسجيل الحضور'
-              : 'Move closer to ${BranchDisplayCache.instance.displayName(activeBranch.branchName)} to check in')
-          : (isArabic ? 'خارج نطاق الفروع المعتمدة' : 'Outside approved branches');
+          ? AppLocalizations.of(context)!.attMoveCloserTo(BranchDisplayCache.instance.displayName(activeBranch.branchName))
+          : AppLocalizations.of(context)!.attOutsideApprovedBranches;
     }
 
     // Smart distance formatting
@@ -866,10 +859,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (_distanceToNearest != null && _distanceToNearest!.isFinite) {
       final meters = _distanceToNearest!.toInt();
       if (meters < 1000) {
-        formattedDistance = '$meters م';
+        formattedDistance = AppLocalizations.of(context)!.distanceMeters(meters);
       } else {
         final km = (_distanceToNearest! / 1000).toStringAsFixed(1);
-        formattedDistance = isArabic ? '$km كم ($meters م)' : '$km km ($meters m)';
+        formattedDistance = AppLocalizations.of(context)!.distanceKmM(km, meters);
       }
     }
 
@@ -901,7 +894,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     foregroundColor: colorScheme.onSurface,
                   ),
                   iconSize: 22,
-                  tooltip: isArabic ? 'الشهر السابق' : 'Previous month',
+                  tooltip: AppLocalizations.of(context)!.previousMonth,
                   onPressed: () {
                     setState(() {
                       _selectedMonth = DateTime(
@@ -950,8 +943,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               children: [
                                 Icon(Symbols.restore_rounded, size: 12, color: colorScheme.primary),
                                 const SizedBox(width: 4),
-                                Text(
-                                  isArabic ? 'العودة للشهر الحالي' : 'Back to current month',
+                                Text(AppLocalizations.of(context)!.currentMonth,
                                   style: textTheme.labelSmall?.copyWith(
                                     color: colorScheme.primary,
                                     fontWeight: FontWeight.bold,
@@ -971,7 +963,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     foregroundColor: colorScheme.onSurface,
                   ),
                   iconSize: 22,
-                  tooltip: isArabic ? 'الشهر التالي' : 'Next month',
+                  tooltip: AppLocalizations.of(context)!.nextMonth,
                   onPressed: () {
                     setState(() {
                       _selectedMonth = DateTime(
@@ -1028,16 +1020,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                isArabic ? 'حضور' : 'Attendance',
+                              Text(AppLocalizations.of(context)!.statAttended,
                                 style: textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
                               AnimatedSwitcher(
                                 duration: AppMotionDurations.short4,
-                                child: Text(
-                                  isArabic ? '$attendedDays يوم' : '$attendedDays days',
+                                child: Text(AppLocalizations.of(context)!.daysCount(attendedDays),
                                   key: ValueKey(attendedDays),
                                   style: textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
@@ -1080,16 +1070,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                isArabic ? 'غياب' : 'Absence',
+                              Text(AppLocalizations.of(context)!.statAbsent,
                                 style: textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
                               AnimatedSwitcher(
                                 duration: AppMotionDurations.short4,
-                                child: Text(
-                                  isArabic ? '$absentDays يوم' : '$absentDays days',
+                                child: Text(AppLocalizations.of(context)!.daysCount(absentDays),
                                   key: ValueKey(absentDays),
                                   style: textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
@@ -1117,10 +1105,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   color: colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  isArabic
-                      ? 'نظام 26 يوم عمل • 4 أيام إجازة مستبعدة من الغياب'
-                      : '26 work days • 4 off days excluded from absence',
+                Text(AppLocalizations.of(context)!.attWorkPolicyNote,
                   style: textTheme.labelSmall?.copyWith(
                     fontSize: 10.5,
                     color: colorScheme.onSurfaceVariant,
@@ -1225,8 +1210,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 color: statusColor,
                               ),
                               const SizedBox(width: 5),
-                              Text(
-                                isArabic ? 'المسافة: $formattedDistance' : 'Dist: $formattedDistance',
+                              Text(AppLocalizations.of(context)!.distanceLabel(formattedDistance),
                                 style: textTheme.labelSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: statusColor,
@@ -1284,8 +1268,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               children: [
                                 Icon(Symbols.radar_rounded, size: 14, color: colorScheme.onSurfaceVariant),
                                 const SizedBox(width: 5),
-                                Text(
-                                  isArabic ? 'النطاق: $allowedRadius م' : 'Radius: $allowedRadius m',
+                                Text(AppLocalizations.of(context)!.radiusLabel(allowedRadius),
                                   style: textTheme.labelSmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                   ),
@@ -1315,8 +1298,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                   ),
                                 )
                               : Icon(Symbols.refresh_rounded, size: 16, color: colorScheme.primary),
-                          label: Text(
-                            isArabic ? 'إعادة فحص الموقع' : 'Recheck Location',
+                          label: Text(AppLocalizations.of(context)!.recheckLocation,
                             style: textTheme.labelSmall?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: isBusy ? colorScheme.onSurfaceVariant : colorScheme.primary,
@@ -1377,7 +1359,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             _formatChainName(
               widget.delegate.organizationName.isNotEmpty
                   ? widget.delegate.organizationName
-                  : (isArabic ? 'السلسلة الحالية' : 'Active Chain'),
+                  : AppLocalizations.of(context)!.activeChain,
               isArabic: isArabic,
             ),
           ];
@@ -1479,7 +1461,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     final allTab = buildTab(
       filterKey: 'all',
-      label: isArabic ? 'جميع السلاسل' : 'All Chains',
+      label: AppLocalizations.of(context)!.allChains,
       count: _allAttendedDaysCount,
       icon: Symbols.hub_rounded,
     );
@@ -1577,7 +1559,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           : _formatChainName(
               widget.delegate.organizationName.isNotEmpty
                   ? widget.delegate.organizationName
-                  : (isArabic ? 'السلسلة الحالية' : 'Active Chain'),
+                  : AppLocalizations.of(context)!.activeChain,
               isArabic: isArabic,
             );
 
@@ -1622,10 +1604,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           color: colorScheme.outline,
                         ),
                         const SizedBox(height: 12),
-                        Text(
-                          isArabic
-                              ? 'لا توجد جلسات حضور مسجلة في $selectedChainLabel خلال هذا الشهر'
-                              : 'No sessions recorded for $selectedChainLabel this month',
+                        Text(AppLocalizations.of(context)!.attNoSessionsInChain(selectedChainLabel),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -1634,10 +1613,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          isArabic
-                              ? 'لديك $_allAttendedDaysCount يوم حضور مسجل في السلاسل الأخرى.'
-                              : 'You have $_allAttendedDaysCount attended days in other chains.',
+                        Text(AppLocalizations.of(context)!.attDaysInOtherChains(_allAttendedDaysCount),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 12,
@@ -1653,8 +1629,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             });
                           },
                           icon: const Icon(Symbols.hub_rounded, size: 18),
-                          label: Text(
-                            isArabic ? 'عرض جميع السلاسل' : 'Show All Chains',
+                          label: Text(AppLocalizations.of(context)!.showAllChains,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -1910,10 +1885,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                     ),
                                     const SizedBox(width: 4),
                                     Expanded(
-                                      child: Text(
-                                        isArabic
-                                            ? 'الفرع: $cleanBranchName'
-                                            : 'Branch: $cleanBranchName',
+                                      child: Text(AppLocalizations.of(context)!.branchLabel(cleanBranchName),
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w700,
@@ -1978,11 +1950,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                           ),
                                         ),
                                         child: Tooltip(
-                                          message: isArabic
-                                              ? 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً'
-                                              : 'Auto check-out after 9h shift expiration',
-                                          child: Text(
-                                            isArabic ? 'إغلاق تلقائي (9 س)' : 'Auto Closed (9h)',
+                                          message: AppLocalizations.of(context)!.attAutoClosedNote,
+                                          child: Text(AppLocalizations.of(context)!.autoClosed9h,
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
@@ -2074,16 +2043,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     required Attendance? activeAttendance,
     required AppLocalizations l10n,
   }) {
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     if (isCheckedIn) {
-      return isArabic ? 'تسجيل الانصراف' : 'Check Out';
+      return AppLocalizations.of(context)!.checkOut2;
     }
 
     if (_isCheckingLocation) {
-      return isArabic ? 'جاري فحص الموقع...' : 'Checking location...';
+      return AppLocalizations.of(context)!.attCheckingLocation;
     }
 
-    return isArabic ? 'تسجيل الحضور' : 'Check In';
+    return AppLocalizations.of(context)!.checkIn2;
   }
 
   Future<void> _fetchOrganizationSettings() async {
@@ -2136,14 +2104,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
 
       if (mounted) {
-        final isArabic = Localizations.localeOf(context).languageCode == 'ar';
         setState(() {
           _orgBranches = branchesList;
           _isLoadingBranches = false;
           if (branchesList.isEmpty) {
-            _locationStatusMessage = isArabic
-                ? 'لا توجد فروع مسجلة لهذه المؤسسة حالياً.'
-                : 'No branches registered for this organization yet.';
+            _locationStatusMessage = AppLocalizations.of(context)!.noBranchesForOrgYet;
             _isInsideGeofence = false;
           }
         });
@@ -2164,19 +2129,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }) async {
     if (!mounted || _isCheckingLocation) return;
     if (_orgBranches.isEmpty) {
-      final isArabic = Localizations.localeOf(context).languageCode == 'ar';
       setState(() {
         _isCheckingLocation = false;
-        _locationStatusMessage = isArabic
-            ? 'لا توجد فروع مسجلة لهذه المؤسسة.'
-            : 'No branches registered for this organization.';
+        _locationStatusMessage = AppLocalizations.of(context)!.noBranchesForOrg;
       });
       return;
     }
 
     setState(() {
       _isCheckingLocation = true;
-      _locationStatusMessage = 'جاري تحديد موقعك الجغرافي والتحقق من الفروع...';
+      _locationStatusMessage = AppLocalizations.of(context)!.attLocatingYou;
     });
 
     final position = await _getCurrentLocation(
@@ -2191,7 +2153,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       setState(() {
         _isCheckingLocation = false;
         _locationStatusMessage =
-            'تعذر الحصول على الموقع الجغرافي. يرجى تفعيل الـ GPS.';
+            AppLocalizations.of(context)!.attLocationUnavailable;
       });
       return;
     }
@@ -2226,9 +2188,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
     }
 
-    final isArabic = mounted
-        ? Localizations.localeOf(context).languageCode == 'ar'
-        : true;
 
     setState(() {
       _isCheckingLocation = false;
@@ -2238,17 +2197,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _isInsideGeofence = matched != null;
 
       if (matched != null) {
-        _locationStatusMessage = isArabic
-            ? 'أنت متواجد داخل نطاق فرع ${BranchDisplayCache.instance.displayName(matched.branchName)}'
-            : 'You are within range of ${BranchDisplayCache.instance.displayName(matched.branchName)}';
+        _locationStatusMessage = AppLocalizations.of(context)!.attYouAreWithinBranch(BranchDisplayCache.instance.displayName(matched.branchName));
       } else if (closest != null && minDistance.isFinite) {
-        _locationStatusMessage = isArabic
-            ? 'يرجى الاقتراب من الفرع لتتمكن من تسجيل الحضور'
-            : 'Move closer to the branch to check in';
+        _locationStatusMessage = AppLocalizations.of(context)!.attMoveCloser;
       } else {
-        _locationStatusMessage = isArabic
-            ? 'أنت خارج نطاق الفروع المعتمدة'
-            : 'You are outside approved branches';
+        _locationStatusMessage = AppLocalizations.of(context)!.attOutsideApproved;
       }
     });
 
@@ -2256,12 +2209,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (_isInsideGeofence && matched != null) {
         AppSnackBar.showSuccess(
           context,
-          'أنت داخل نطاق فرع ${BranchDisplayCache.instance.displayName(matched.branchName)} (${minDistance.toInt()} متر)',
+          AppLocalizations.of(context)!.attInsideBranchWithDistance(BranchDisplayCache.instance.displayName(matched.branchName), minDistance.toInt()),
         );
       } else if (closest != null) {
         AppSnackBar.showError(
           context,
-          'أنت خارج نطاق الفرع (${minDistance.toInt()} متر). النطاق المسموح: ${(closest.geofenceRadius + 50).toInt()} متر.',
+          AppLocalizations.of(context)!.attOutsideBranchWithRadius(minDistance.toInt(), (closest.geofenceRadius + 50).toInt()),
         );
       }
     }
@@ -2282,7 +2235,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (_currentPosition == null) {
       AppSnackBar.showError(
         parentContext,
-        'يرجى التأكد من تشغيل الـ GPS والانتظار حتى يتم تحديد موقعك.',
+        l10n.attEnsureGps,
       );
       return;
     }
@@ -2290,11 +2243,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final branchToUse = _matchedBranch ?? _nearestBranch;
     if (!_isInsideGeofence || branchToUse == null) {
       final distStr = _distanceToNearest != null
-          ? '${_distanceToNearest!.toInt()} متر'
+          ? l10n.metersValue(_distanceToNearest!.toInt())
           : '';
       AppSnackBar.showError(
         parentContext,
-        'عفواً، لا يمكنك تسجيل ${isCheckedIn ? "الانصراف" : "الحضور"} وأنت خارج نطاق الفرع ($distStr). يرجى التواجد داخل الفرع.',
+        l10n.attCannotActOutside(isCheckedIn ? l10n.attActionCheckOut : l10n.attActionCheckIn, distStr),
       );
       return;
     }
@@ -2357,7 +2310,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (parentContext.mounted) {
         AppSnackBar.showInfo(
           parentContext,
-          'تسجيل حضور في $branchName...',
+          l10n.attCheckingInAt(branchName),
         );
       }
     }
@@ -2446,7 +2399,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             if (parentContext.mounted) {
               AppSnackBar.showInfo(
                 parentContext,
-                'تسجيل حضور في $scannedBranch...',
+                AppLocalizations.of(context)!.attCheckingInAt(scannedBranch),
               );
             }
           }
@@ -2501,7 +2454,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (!serviceEnabled) {
       if (!context.mounted) return null;
       if (!silent) {
-        AppSnackBar.showError(context, 'خدمات الموقع معطلة. يرجى تفعيلها.');
+        AppSnackBar.showError(context, AppLocalizations.of(context)!.locationServicesOff);
       }
       return null;
     }
@@ -2512,7 +2465,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (permission == LocationPermission.denied) {
         if (!context.mounted) return null;
         if (!silent) {
-          AppSnackBar.showError(context, 'تم رفض إذن الوصول للموقع');
+          AppSnackBar.showError(context, AppLocalizations.of(context)!.locationPermissionDenied2);
         }
         return null;
       }
@@ -2521,7 +2474,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (permission == LocationPermission.deniedForever) {
       if (!context.mounted) return null;
       if (!silent) {
-        AppSnackBar.showError(context, 'إذن الموقع مرفوض بشكل دائم.');
+        AppSnackBar.showError(context, AppLocalizations.of(context)!.locationPermissionDeniedForever);
       }
       return null;
     }
@@ -2544,7 +2497,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         if (context.mounted && !silent) {
           AppSnackBar.showError(
             context,
-            'تم اكتشاف استخدام برنامج لتزييف الموقع الجغرافي (Fake GPS). يرجى إيقاف التطبيق لتسجيل الحضور والانصراف.',
+            AppLocalizations.of(context)!.fakeGpsDetected,
           );
         }
         return null;
@@ -2563,7 +2516,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           if (context.mounted && !silent) {
             AppSnackBar.showError(
               context,
-              'تم اكتشاف استخدام برنامج لتزييف الموقع الجغرافي (Fake GPS). يرجى إيقاف التطبيق لتسجيل الحضور والانصراف.',
+              AppLocalizations.of(context)!.fakeGpsDetected,
             );
           }
           return null;
@@ -2573,13 +2526,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (context.mounted && !silent) {
         AppSnackBar.showError(
           context,
-          'انتهى الوقت ولم نتمكن من تحديد الموقع. يرجى التأكد من تفعيل الـ GPS وأنت في مكان مفتوح.',
+          AppLocalizations.of(context)!.locationTimeout,
         );
       }
       return null;
     } catch (e) {
       if (context.mounted && !silent) {
-        AppSnackBar.showError(context, 'حدث خطأ أثناء تحديد الموقع.');
+        AppSnackBar.showError(context, AppLocalizations.of(context)!.locationError);
       }
       return null;
     }
@@ -3090,7 +3043,7 @@ class _ScannerModalState extends State<_ScannerModal>
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    'وقت موثوق 🔒',
+                                    AppLocalizations.of(context)!.trustedTime,
                                     style: TextStyle(
                                       fontSize: 10,
                                       color: Theme.of(context).colorScheme.primary,

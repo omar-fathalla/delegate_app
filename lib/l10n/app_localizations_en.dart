@@ -1365,4 +1365,211 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appColor => 'App color';
+
+  @override
+  String get attCheckingZone => 'Checking location…';
+
+  @override
+  String get attVerifyingCoords =>
+      'Verifying your location and distance to the branch';
+
+  @override
+  String get attInsideZone => 'Inside work zone';
+
+  @override
+  String attWithinBranchRange(Object branch) {
+    return 'Within range of $branch';
+  }
+
+  @override
+  String get attWithinAllowedRange => 'Within allowed range';
+
+  @override
+  String get attOutsideZone => 'Outside work zone';
+
+  @override
+  String attMoveCloserTo(Object branch) {
+    return 'Move closer to $branch to check in';
+  }
+
+  @override
+  String get attOutsideApprovedBranches => 'Outside approved branches';
+
+  @override
+  String distanceKmM(Object km, Object meters) {
+    return '$km km ($meters m)';
+  }
+
+  @override
+  String get previousMonth => 'Previous month';
+
+  @override
+  String get currentMonth => 'Current month';
+
+  @override
+  String get nextMonth => 'Next month';
+
+  @override
+  String get attWorkPolicyNote =>
+      '26 workdays • 4 days off not counted as absence';
+
+  @override
+  String distanceLabel(Object formattedDistance) {
+    return 'Distance: $formattedDistance';
+  }
+
+  @override
+  String radiusLabel(Object allowedRadius) {
+    return 'Radius: $allowedRadius m';
+  }
+
+  @override
+  String get recheckLocation => 'Recheck location';
+
+  @override
+  String get activeChain => 'Current chain';
+
+  @override
+  String get allChains => 'All chains';
+
+  @override
+  String attNoSessionsInChain(Object chain) {
+    return 'No attendance records for $chain this month';
+  }
+
+  @override
+  String attDaysInOtherChains(Object count) {
+    return 'You have $count attended days in other chains.';
+  }
+
+  @override
+  String get showAllChains => 'Show all chains';
+
+  @override
+  String get attAutoClosedNote =>
+      'Checked out automatically 9 hours after the shift started, since no check-out was recorded';
+
+  @override
+  String get autoClosed9h => 'Auto-closed (9h)';
+
+  @override
+  String get checkOut2 => 'Check out';
+
+  @override
+  String get attCheckingLocation => 'Checking location…';
+
+  @override
+  String get checkIn2 => 'Check in';
+
+  @override
+  String get noBranchesForOrgYet =>
+      'No branches registered for this organization yet.';
+
+  @override
+  String get noBranchesForOrg =>
+      'No branches registered for this organization.';
+
+  @override
+  String attYouAreWithinBranch(Object branch) {
+    return 'You are within range of $branch';
+  }
+
+  @override
+  String get attMoveCloser => 'Move closer to the branch to check in';
+
+  @override
+  String get attOutsideApproved => 'You are outside approved branches';
+
+  @override
+  String get attCheckInSavedOffline =>
+      'Check-in saved on this device. It will sync when you are back online.';
+
+  @override
+  String get attCheckOutSavedOffline =>
+      'Check-out saved on this device. It will sync when you are back online.';
+
+  @override
+  String get syncDone => 'Synced';
+
+  @override
+  String get syncFailed => 'Sync failed';
+
+  @override
+  String attDelegateOfCompany(Object companyName) {
+    return 'Delegate · $companyName';
+  }
+
+  @override
+  String get attendanceLog => 'Attendance log';
+
+  @override
+  String distanceMeters(Object meters) {
+    return '$meters m';
+  }
+
+  @override
+  String get attLocatingYou => 'Finding your location and checking branches…';
+
+  @override
+  String get attLocationUnavailable =>
+      'Couldn\'t get your location. Turn on GPS.';
+
+  @override
+  String attInsideBranchWithDistance(Object branch, Object meters) {
+    return 'You are within range of $branch ($meters m)';
+  }
+
+  @override
+  String attOutsideBranchWithRadius(Object meters, Object radius) {
+    return 'You are outside the branch range ($meters m). Allowed range: $radius m.';
+  }
+
+  @override
+  String get attEnsureGps => 'Make sure GPS is on and wait for your location.';
+
+  @override
+  String metersValue(Object value) {
+    return '$value m';
+  }
+
+  @override
+  String attCannotActOutside(Object action, Object distance) {
+    return 'You can\'t $action while outside the branch ($distance). Please be inside the branch.';
+  }
+
+  @override
+  String attCheckingInAt(Object branchName) {
+    return 'Checking in at $branchName…';
+  }
+
+  @override
+  String get locationServicesOff => 'Location services are off. Turn them on.';
+
+  @override
+  String get locationPermissionDenied2 => 'Location permission denied';
+
+  @override
+  String get locationPermissionDeniedForever =>
+      'Location permission is permanently denied.';
+
+  @override
+  String get fakeGpsDetected =>
+      'A fake GPS app was detected. Turn it off to check in and out.';
+
+  @override
+  String get locationTimeout =>
+      'Timed out getting your location. Make sure GPS is on and you\'re in an open area.';
+
+  @override
+  String get locationError =>
+      'Something went wrong while getting your location.';
+
+  @override
+  String get trustedTime => 'Trusted time';
+
+  @override
+  String get attActionCheckIn => 'check in';
+
+  @override
+  String get attActionCheckOut => 'check out';
 }

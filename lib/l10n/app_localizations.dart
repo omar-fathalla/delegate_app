@@ -2587,6 +2587,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'App color'**
   String get appColor;
+
+  /// No description provided for @attCheckingZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking location…'**
+  String get attCheckingZone;
+
+  /// No description provided for @attVerifyingCoords.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying your location and distance to the branch'**
+  String get attVerifyingCoords;
+
+  /// No description provided for @attInsideZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside work zone'**
+  String get attInsideZone;
+
+  /// No description provided for @attWithinBranchRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Within range of {branch}'**
+  String attWithinBranchRange(Object branch);
+
+  /// No description provided for @attWithinAllowedRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Within allowed range'**
+  String get attWithinAllowedRange;
+
+  /// No description provided for @attOutsideZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside work zone'**
+  String get attOutsideZone;
+
+  /// No description provided for @attMoveCloserTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Move closer to {branch} to check in'**
+  String attMoveCloserTo(Object branch);
+
+  /// No description provided for @attOutsideApprovedBranches.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside approved branches'**
+  String get attOutsideApprovedBranches;
+
+  /// No description provided for @distanceKmM.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km ({meters} m)'**
+  String distanceKmM(Object km, Object meters);
+
+  /// No description provided for @previousMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get previousMonth;
+
+  /// No description provided for @currentMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Current month'**
+  String get currentMonth;
+
+  /// No description provided for @nextMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get nextMonth;
+
+  /// No description provided for @attWorkPolicyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'26 workdays • 4 days off not counted as absence'**
+  String get attWorkPolicyNote;
+
+  /// No description provided for @distanceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance: {formattedDistance}'**
+  String distanceLabel(Object formattedDistance);
+
+  /// No description provided for @radiusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Radius: {allowedRadius} m'**
+  String radiusLabel(Object allowedRadius);
+
+  /// No description provided for @recheckLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Recheck location'**
+  String get recheckLocation;
+
+  /// No description provided for @activeChain.
+  ///
+  /// In en, this message translates to:
+  /// **'Current chain'**
+  String get activeChain;
+
+  /// No description provided for @allChains.
+  ///
+  /// In en, this message translates to:
+  /// **'All chains'**
+  String get allChains;
+
+  /// No description provided for @attNoSessionsInChain.
+  ///
+  /// In en, this message translates to:
+  /// **'No attendance records for {chain} this month'**
+  String attNoSessionsInChain(Object chain);
+
+  /// No description provided for @attDaysInOtherChains.
+  ///
+  /// In en, this message translates to:
+  /// **'You have {count} attended days in other chains.'**
+  String attDaysInOtherChains(Object count);
+
+  /// No description provided for @showAllChains.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all chains'**
+  String get showAllChains;
+
+  /// No description provided for @attAutoClosedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked out automatically 9 hours after the shift started, since no check-out was recorded'**
+  String get attAutoClosedNote;
+
+  /// No description provided for @autoClosed9h.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-closed (9h)'**
+  String get autoClosed9h;
+
+  /// No description provided for @checkOut2.
+  ///
+  /// In en, this message translates to:
+  /// **'Check out'**
+  String get checkOut2;
+
+  /// No description provided for @attCheckingLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking location…'**
+  String get attCheckingLocation;
+
+  /// No description provided for @checkIn2.
+  ///
+  /// In en, this message translates to:
+  /// **'Check in'**
+  String get checkIn2;
+
+  /// No description provided for @noBranchesForOrgYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No branches registered for this organization yet.'**
+  String get noBranchesForOrgYet;
+
+  /// No description provided for @noBranchesForOrg.
+  ///
+  /// In en, this message translates to:
+  /// **'No branches registered for this organization.'**
+  String get noBranchesForOrg;
+
+  /// No description provided for @attYouAreWithinBranch.
+  ///
+  /// In en, this message translates to:
+  /// **'You are within range of {branch}'**
+  String attYouAreWithinBranch(Object branch);
+
+  /// No description provided for @attMoveCloser.
+  ///
+  /// In en, this message translates to:
+  /// **'Move closer to the branch to check in'**
+  String get attMoveCloser;
+
+  /// No description provided for @attOutsideApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'You are outside approved branches'**
+  String get attOutsideApproved;
+
+  /// No description provided for @attCheckInSavedOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in saved on this device. It will sync when you are back online.'**
+  String get attCheckInSavedOffline;
+
+  /// No description provided for @attCheckOutSavedOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-out saved on this device. It will sync when you are back online.'**
+  String get attCheckOutSavedOffline;
+
+  /// No description provided for @syncDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced'**
+  String get syncDone;
+
+  /// No description provided for @syncFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync failed'**
+  String get syncFailed;
+
+  /// No description provided for @attDelegateOfCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate · {companyName}'**
+  String attDelegateOfCompany(Object companyName);
+
+  /// No description provided for @attendanceLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance log'**
+  String get attendanceLog;
+
+  /// No description provided for @distanceMeters.
+  ///
+  /// In en, this message translates to:
+  /// **'{meters} m'**
+  String distanceMeters(Object meters);
+
+  /// No description provided for @attLocatingYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding your location and checking branches…'**
+  String get attLocatingYou;
+
+  /// No description provided for @attLocationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t get your location. Turn on GPS.'**
+  String get attLocationUnavailable;
+
+  /// No description provided for @attInsideBranchWithDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'You are within range of {branch} ({meters} m)'**
+  String attInsideBranchWithDistance(Object branch, Object meters);
+
+  /// No description provided for @attOutsideBranchWithRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'You are outside the branch range ({meters} m). Allowed range: {radius} m.'**
+  String attOutsideBranchWithRadius(Object meters, Object radius);
+
+  /// No description provided for @attEnsureGps.
+  ///
+  /// In en, this message translates to:
+  /// **'Make sure GPS is on and wait for your location.'**
+  String get attEnsureGps;
+
+  /// No description provided for @metersValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} m'**
+  String metersValue(Object value);
+
+  /// No description provided for @attCannotActOutside.
+  ///
+  /// In en, this message translates to:
+  /// **'You can\'t {action} while outside the branch ({distance}). Please be inside the branch.'**
+  String attCannotActOutside(Object action, Object distance);
+
+  /// No description provided for @attCheckingInAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking in at {branchName}…'**
+  String attCheckingInAt(Object branchName);
+
+  /// No description provided for @locationServicesOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location services are off. Turn them on.'**
+  String get locationServicesOff;
+
+  /// No description provided for @locationPermissionDenied2.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission denied'**
+  String get locationPermissionDenied2;
+
+  /// No description provided for @locationPermissionDeniedForever.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission is permanently denied.'**
+  String get locationPermissionDeniedForever;
+
+  /// No description provided for @fakeGpsDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'A fake GPS app was detected. Turn it off to check in and out.'**
+  String get fakeGpsDetected;
+
+  /// No description provided for @locationTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Timed out getting your location. Make sure GPS is on and you\'re in an open area.'**
+  String get locationTimeout;
+
+  /// No description provided for @locationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong while getting your location.'**
+  String get locationError;
+
+  /// No description provided for @trustedTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Trusted time'**
+  String get trustedTime;
+
+  /// No description provided for @attActionCheckIn.
+  ///
+  /// In en, this message translates to:
+  /// **'check in'**
+  String get attActionCheckIn;
+
+  /// No description provided for @attActionCheckOut.
+  ///
+  /// In en, this message translates to:
+  /// **'check out'**
+  String get attActionCheckOut;
 }
 
 class _AppLocalizationsDelegate

@@ -1365,4 +1365,205 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get appColor => 'لون التطبيق';
+
+  @override
+  String get attCheckingZone => 'جارٍ فحص النطاق...';
+
+  @override
+  String get attVerifyingCoords =>
+      'يتم الآن التحقق من إحداثياتك والمسافة للفرع';
+
+  @override
+  String get attInsideZone => 'أنت داخل نطاق العمل';
+
+  @override
+  String attWithinBranchRange(Object branch) {
+    return 'داخل نطاق فرع $branch';
+  }
+
+  @override
+  String get attWithinAllowedRange => 'داخل النطاق المسموح';
+
+  @override
+  String get attOutsideZone => 'خارج نطاق العمل';
+
+  @override
+  String attMoveCloserTo(Object branch) {
+    return 'اقترب من فرع $branch لتسجيل الحضور';
+  }
+
+  @override
+  String get attOutsideApprovedBranches => 'خارج نطاق الفروع المعتمدة';
+
+  @override
+  String distanceKmM(Object km, Object meters) {
+    return '$km كم ($meters م)';
+  }
+
+  @override
+  String get previousMonth => 'الشهر السابق';
+
+  @override
+  String get currentMonth => 'الشهر الحالي';
+
+  @override
+  String get nextMonth => 'الشهر التالي';
+
+  @override
+  String get attWorkPolicyNote => '26 يوم عمل • 4 أيام راحة لا تُحسب غيابًا';
+
+  @override
+  String distanceLabel(Object formattedDistance) {
+    return 'المسافة: $formattedDistance';
+  }
+
+  @override
+  String radiusLabel(Object allowedRadius) {
+    return 'النطاق: $allowedRadius م';
+  }
+
+  @override
+  String get recheckLocation => 'إعادة فحص الموقع';
+
+  @override
+  String get activeChain => 'السلسلة الحالية';
+
+  @override
+  String get allChains => 'كل السلاسل';
+
+  @override
+  String attNoSessionsInChain(Object chain) {
+    return 'لا توجد سجلات حضور في $chain هذا الشهر';
+  }
+
+  @override
+  String attDaysInOtherChains(Object count) {
+    return 'لديك $count يوم حضور مسجّل في السلاسل الأخرى.';
+  }
+
+  @override
+  String get showAllChains => 'عرض جميع السلاسل';
+
+  @override
+  String get attAutoClosedNote =>
+      'أُغلق الانصراف تلقائيًا بعد 9 ساعات من بداية الوردية لعدم تسجيله يدويًا';
+
+  @override
+  String get autoClosed9h => 'إغلاق تلقائي (9 س)';
+
+  @override
+  String get checkOut2 => 'تسجيل الانصراف';
+
+  @override
+  String get attCheckingLocation => 'جارٍ فحص الموقع...';
+
+  @override
+  String get checkIn2 => 'تسجيل الحضور';
+
+  @override
+  String get noBranchesForOrgYet => 'لا توجد فروع مسجلة لهذه المؤسسة حاليًا.';
+
+  @override
+  String get noBranchesForOrg => 'لا توجد فروع مسجلة لهذه المؤسسة.';
+
+  @override
+  String attYouAreWithinBranch(Object branch) {
+    return 'أنت داخل نطاق فرع $branch';
+  }
+
+  @override
+  String get attMoveCloser => 'اقترب من الفرع لتسجيل الحضور';
+
+  @override
+  String get attOutsideApproved => 'أنت خارج نطاق الفروع المعتمدة';
+
+  @override
+  String get attCheckInSavedOffline =>
+      'سُجّل الحضور على الجهاز، وستتم المزامنة عند الاتصال بالإنترنت.';
+
+  @override
+  String get attCheckOutSavedOffline =>
+      'سُجّل الانصراف على الجهاز، وستتم المزامنة عند الاتصال بالإنترنت.';
+
+  @override
+  String get syncDone => 'تمت المزامنة';
+
+  @override
+  String get syncFailed => 'فشلت المزامنة';
+
+  @override
+  String attDelegateOfCompany(Object companyName) {
+    return 'مندوب – $companyName';
+  }
+
+  @override
+  String get attendanceLog => 'سجل الحضور';
+
+  @override
+  String distanceMeters(Object meters) {
+    return '$meters م';
+  }
+
+  @override
+  String get attLocatingYou => 'جارٍ تحديد موقعك والتحقق من الفروع...';
+
+  @override
+  String get attLocationUnavailable => 'تعذّر تحديد موقعك. فعّل GPS.';
+
+  @override
+  String attInsideBranchWithDistance(Object branch, Object meters) {
+    return 'أنت داخل نطاق فرع $branch ($meters متر)';
+  }
+
+  @override
+  String attOutsideBranchWithRadius(Object meters, Object radius) {
+    return 'أنت خارج نطاق الفرع ($meters متر). النطاق المسموح: $radius متر.';
+  }
+
+  @override
+  String get attEnsureGps => 'تأكد من تشغيل GPS وانتظر حتى يُحدَّد موقعك.';
+
+  @override
+  String metersValue(Object value) {
+    return '$value متر';
+  }
+
+  @override
+  String attCannotActOutside(Object action, Object distance) {
+    return 'لا يمكنك $action وأنت خارج نطاق الفرع ($distance). كن داخل الفرع.';
+  }
+
+  @override
+  String attCheckingInAt(Object branchName) {
+    return 'تسجيل الحضور في $branchName...';
+  }
+
+  @override
+  String get locationServicesOff => 'خدمات الموقع متوقفة. فعّلها.';
+
+  @override
+  String get locationPermissionDenied2 => 'تم رفض إذن الوصول للموقع';
+
+  @override
+  String get locationPermissionDeniedForever => 'إذن الموقع مرفوض بشكل دائم.';
+
+  @override
+  String get fakeGpsDetected =>
+      'تم اكتشاف استخدام برنامج لتزييف الموقع الجغرافي (Fake GPS). يرجى إيقاف التطبيق لتسجيل الحضور والانصراف.';
+
+  @override
+  String get locationTimeout =>
+      'انتهى الوقت ولم نتمكن من تحديد موقعك. تأكد من تفعيل GPS وأنك في مكان مفتوح.';
+
+  @override
+  String get locationError => 'حدث خطأ أثناء تحديد الموقع.';
+
+  @override
+  String get trustedTime => 'وقت موثوق';
+
+  @override
+  String get attActionCheckIn => 'تسجيل الحضور';
+
+  @override
+  String get attActionCheckOut => 'تسجيل الانصراف';
 }

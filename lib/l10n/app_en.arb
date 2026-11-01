@@ -1499,5 +1499,139 @@
   "manageFeedback": "Manage feedback",
   "myFeedback": "My feedback",
   "photoPermissions2": "Photo permissions",
-  "appColor": "App color"
+  "appColor": "App color",
+  "attCheckingZone": "Checking location…",
+  "attVerifyingCoords": "Verifying your location and distance to the branch",
+  "attInsideZone": "Inside work zone",
+  "attWithinBranchRange": "Within range of {branch}",
+  "@attWithinBranchRange": {
+    "placeholders": {
+      "branch": {}
+    }
+  },
+  "attWithinAllowedRange": "Within allowed range",
+  "attOutsideZone": "Outside work zone",
+  "attMoveCloserTo": "Move closer to {branch} to check in",
+  "@attMoveCloserTo": {
+    "placeholders": {
+      "branch": {}
+    }
+  },
+  "attOutsideApprovedBranches": "Outside approved branches",
+  "distanceKmM": "{km} km ({meters} m)",
+  "@distanceKmM": {
+    "placeholders": {
+      "km": {},
+      "meters": {}
+    }
+  },
+  "previousMonth": "Previous month",
+  "currentMonth": "Current month",
+  "nextMonth": "Next month",
+  "attWorkPolicyNote": "26 workdays • 4 days off not counted as absence",
+  "distanceLabel": "Distance: {formattedDistance}",
+  "@distanceLabel": {
+    "placeholders": {
+      "formattedDistance": {}
+    }
+  },
+  "radiusLabel": "Radius: {allowedRadius} m",
+  "@radiusLabel": {
+    "placeholders": {
+      "allowedRadius": {}
+    }
+  },
+  "recheckLocation": "Recheck location",
+  "activeChain": "Current chain",
+  "allChains": "All chains",
+  "attNoSessionsInChain": "No attendance records for {chain} this month",
+  "@attNoSessionsInChain": {
+    "placeholders": {
+      "chain": {}
+    }
+  },
+  "attDaysInOtherChains": "You have {count} attended days in other chains.",
+  "@attDaysInOtherChains": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "showAllChains": "Show all chains",
+  "attAutoClosedNote": "Checked out automatically 9 hours after the shift started, since no check-out was recorded",
+  "autoClosed9h": "Auto-closed (9h)",
+  "checkOut2": "Check out",
+  "attCheckingLocation": "Checking location…",
+  "checkIn2": "Check in",
+  "noBranchesForOrgYet": "No branches registered for this organization yet.",
+  "noBranchesForOrg": "No branches registered for this organization.",
+  "attYouAreWithinBranch": "You are within range of {branch}",
+  "@attYouAreWithinBranch": {
+    "placeholders": {
+      "branch": {}
+    }
+  },
+  "attMoveCloser": "Move closer to the branch to check in",
+  "attOutsideApproved": "You are outside approved branches",
+  "attCheckInSavedOffline": "Check-in saved on this device. It will sync when you are back online.",
+  "attCheckOutSavedOffline": "Check-out saved on this device. It will sync when you are back online.",
+  "syncDone": "Synced",
+  "syncFailed": "Sync failed",
+  "attDelegateOfCompany": "Delegate · {companyName}",
+  "@attDelegateOfCompany": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "attendanceLog": "Attendance log",
+  "distanceMeters": "{meters} m",
+  "@distanceMeters": {
+    "placeholders": {
+      "meters": {}
+    }
+  },
+  "attLocatingYou": "Finding your location and checking branches…",
+  "attLocationUnavailable": "Couldn't get your location. Turn on GPS.",
+  "attInsideBranchWithDistance": "You are within range of {branch} ({meters} m)",
+  "@attInsideBranchWithDistance": {
+    "placeholders": {
+      "branch": {},
+      "meters": {}
+    }
+  },
+  "attOutsideBranchWithRadius": "You are outside the branch range ({meters} m). Allowed range: {radius} m.",
+  "@attOutsideBranchWithRadius": {
+    "placeholders": {
+      "meters": {},
+      "radius": {}
+    }
+  },
+  "attEnsureGps": "Make sure GPS is on and wait for your location.",
+  "metersValue": "{value} m",
+  "@metersValue": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "attCannotActOutside": "You can't {action} while outside the branch ({distance}). Please be inside the branch.",
+  "@attCannotActOutside": {
+    "placeholders": {
+      "action": {},
+      "distance": {}
+    }
+  },
+  "attCheckingInAt": "Checking in at {branchName}…",
+  "@attCheckingInAt": {
+    "placeholders": {
+      "branchName": {}
+    }
+  },
+  "locationServicesOff": "Location services are off. Turn them on.",
+  "locationPermissionDenied2": "Location permission denied",
+  "locationPermissionDeniedForever": "Location permission is permanently denied.",
+  "fakeGpsDetected": "A fake GPS app was detected. Turn it off to check in and out.",
+  "locationTimeout": "Timed out getting your location. Make sure GPS is on and you're in an open area.",
+  "locationError": "Something went wrong while getting your location.",
+  "trustedTime": "Trusted time",
+  "attActionCheckIn": "check in",
+  "attActionCheckOut": "check out"
 }
