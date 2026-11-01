@@ -330,9 +330,6 @@ class _DelegateLeavesAndRequestsScreenState
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
-        ),
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withValues(alpha: 0.04),
@@ -637,9 +634,6 @@ class _DelegateLeavesAndRequestsScreenState
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
-        ),
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withValues(alpha: 0.03),
@@ -761,9 +755,6 @@ class _DelegateLeavesAndRequestsScreenState
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
       ),
       padding: const EdgeInsets.all(2.5),
       child: Row(
@@ -1432,9 +1423,6 @@ class _DelegateLeavesAndRequestsScreenState
             surfaceTintColor: Colors.transparent,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: BorderSide(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-              ),
             ),
             insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             clipBehavior: Clip.antiAlias,
@@ -1657,9 +1645,6 @@ class _DelegateLeavesAndRequestsScreenState
                                 decoration: BoxDecoration(
                                   color: colorScheme.surfaceContainerLow,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                  ),
                                 ),
                                 child: Row(
                                   children: [
@@ -1701,9 +1686,6 @@ class _DelegateLeavesAndRequestsScreenState
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
                               ),
                               child: Row(
                                 children: [
@@ -1867,9 +1849,6 @@ class _DelegateLeavesAndRequestsScreenState
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
                               ),
                               child: Row(
                                 children: [
@@ -2142,9 +2121,6 @@ class _DelegateLeavesAndRequestsScreenState
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
                               ),
                               child: Row(
                                 children: [
@@ -2272,9 +2248,6 @@ class _DelegateLeavesAndRequestsScreenState
                               style: OutlinedButton.styleFrom(
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                ),
-                                side: BorderSide(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.7),
                                 ),
                                 foregroundColor: colorScheme.onSurfaceVariant,
                                 padding: EdgeInsets.zero,
@@ -2430,8 +2403,16 @@ class _DelegateLeavesAndRequestsScreenState
                                         if (ctx.mounted) Navigator.pop(ctx);
                                         messenger.showSnackBar(
                                           SnackBar(
-                                            content: Text(
-                                              'تم إرسال طلبك بنجاح لمشرف الشركة وهو قيد المراجعة الآن.',
+                                            content: const Row(
+                                              children: [
+                                                M3AnimatedCheck(size: 28),
+                                                SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Text(
+                                                    'تم إرسال طلبك بنجاح لمشرف الشركة وهو قيد المراجعة الآن.',
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                             backgroundColor: successColor,
                                           ),

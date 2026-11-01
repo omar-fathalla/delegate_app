@@ -211,10 +211,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.8),
-                  width: 1,
-                ),
               ),
               clipBehavior: Clip.antiAlias,
               child: Row(
@@ -612,9 +608,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                          ),
                         ),
                         child: Row(
                           children: [
@@ -672,9 +665,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -913,7 +903,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
                         ),
                         child: Row(
                           children: [
@@ -1068,7 +1057,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Column(
         children: [
@@ -1200,7 +1188,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Theme(
@@ -1558,7 +1545,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               height: 340,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: InteractiveViewer(
@@ -1708,7 +1694,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,

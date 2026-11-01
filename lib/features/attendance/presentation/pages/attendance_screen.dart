@@ -884,10 +884,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       margin: const EdgeInsetsDirectional.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        side: BorderSide(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          width: 1.0,
-        ),
       ),
       color: colorScheme.surfaceContainer,
       child: Padding(
@@ -1252,9 +1248,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           decoration: BoxDecoration(
                             color: colorScheme.surface.withValues(alpha: 0.8),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1285,9 +1278,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             decoration: BoxDecoration(
                               color: colorScheme.surface.withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1313,7 +1303,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             shape: const StadiumBorder(),
                             visualDensity: VisualDensity.compact,
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            side: BorderSide(color: colorScheme.outlineVariant),
                             backgroundColor: colorScheme.surface.withValues(alpha: 0.7),
                           ),
                           icon: isBusy
@@ -1515,9 +1504,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
       ),
       child: chains.length <= 2
           ? Row(
@@ -1627,9 +1613,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                      ),
                     ),
                     child: Column(
                       children: [
@@ -1712,7 +1695,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainer,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: colorScheme.outlineVariant),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

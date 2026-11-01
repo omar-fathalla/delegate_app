@@ -1009,35 +1009,21 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     final colorScheme = theme.colorScheme;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    return Card(
-      elevation: 2,
-      shadowColor: colorScheme.primary.withValues(alpha: 0.2),
+    return M3PressScale(scale: 0.98, child: Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: colorScheme.primary.withValues(alpha: 0.35),
-          width: 1.5,
-        ),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: InkWell(
         onTap: () {
           context.push('/photo-permissions/delegate', extra: widget.delegate);
         },
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              colors: [
-                colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                colorScheme.primaryContainer.withValues(alpha: 0.15),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
+
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1046,23 +1032,16 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary,
+                      color: colorScheme.primaryContainer,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.primary.withValues(alpha: 0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
                     ),
-                    child: const Icon(
-                      Symbols.camera_alt_rounded,
-                      color: Colors.white,
-                      size: 26,
+                    child: Icon(
+                      Symbols.photo_camera_rounded,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 24,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1091,19 +1070,17 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Container(
                 width: double.infinity,
+                constraints: const BoxConstraints(minHeight: 48),
                 padding: const EdgeInsets.symmetric(
-                  vertical: 10,
+                  vertical: 8,
                   horizontal: 16,
                 ),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: colorScheme.primary.withValues(alpha: 0.25),
-                  ),
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(24),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1111,7 +1088,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     Icon(
                       Symbols.touch_app_rounded,
                       size: 18,
-                      color: colorScheme.primary,
+                      color: colorScheme.onSecondaryContainer,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -1119,15 +1096,16 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           ? 'اضغط هنا لبدء التصوير داخل الهايبر ماركت'
                           : 'Tap here to start photographing inside hypermarket',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
+                        fontSize: 14,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSecondaryContainer,
                       ),
                     ),
                     const SizedBox(width: 4),
                     Icon(Symbols.arrow_forward_rounded,
                       size: 16,
-                      color: colorScheme.primary,
+                      color: colorScheme.onSecondaryContainer,
                     ),
                   ],
                 ),
@@ -1136,7 +1114,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           ),
         ),
       ),
-    );
+    ));
   }
 
   // --- Monthly Attendance Summary Logic & UI ---
@@ -1691,9 +1669,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               decoration: BoxDecoration(
                 color: colorScheme.surface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

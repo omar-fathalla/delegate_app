@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'dart:async';
 
 import 'package:delegate_app/core/providers/locale_provider.dart';
@@ -69,6 +70,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 late final LocaleProvider localeProvider;
 
 void main() async {
+  // M3 design system: numbers always in Latin digits, also in Arabic dates.
+  DateFormat.useNativeDigitsByDefaultFor('ar', false);
   WidgetsFlutterBinding.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
 
