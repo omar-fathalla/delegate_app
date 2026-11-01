@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 class CompanyNameWithCode extends StatelessWidget {
   final String organizationUID;
@@ -24,6 +25,8 @@ class CompanyNameWithCode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    String codeLabel(String c) => l10n?.codeLabel(c) ?? 'كود: $c';
     final effectiveCodeStyle = codeStyle ??
         TextStyle(
           fontSize: 10.5,
@@ -45,7 +48,7 @@ class CompanyNameWithCode extends StatelessWidget {
           if (code != null && code.isNotEmpty && code != '0') ...[
             const SizedBox(height: 2),
             Text(
-              'كود: $code',
+              codeLabel(code),
               style: effectiveCodeStyle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -60,7 +63,7 @@ class CompanyNameWithCode extends StatelessWidget {
         return buildTwoLines(companyCode.toString());
       }
       return Text(
-        '$companyName - كود: $companyCode',
+        '$companyName - ${codeLabel(companyCode.toString())}',
         style: style,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -111,7 +114,7 @@ class CompanyNameWithCode extends StatelessWidget {
         }
         String display = companyName;
         if (code != null && code.isNotEmpty && code != '0') {
-          display = '$companyName - كود: $code';
+          display = '$companyName - ${codeLabel(code)}';
         }
         return Text(
           display,

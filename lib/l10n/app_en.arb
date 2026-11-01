@@ -2126,5 +2126,155 @@
     }
   },
   "chainCarrefour": "Carrefour",
-  "chainBeitElGomla": "Beit El Gomla"
+  "chainBeitElGomla": "Beit El Gomla",
+  "penSelectBranchesFirst": "Select one or more branches to pin as the default",
+  "penDefaultUnpinned": "Default branch group unpinned",
+  "penBranchPinned": "Branch pinned as the default for fines",
+  "penBranchesPinned": "{count} branches pinned as the default for fines",
+  "@penBranchesPinned": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "penSelectDisplayBranches": "Select branches to show",
+  "penShowingAllBranches": "Showing all branches",
+  "penBranchesSelected": "{count} branches selected",
+  "@penBranchesSelected": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "clearSelection": "Clear selection",
+  "searchBranchName": "Search by branch name…",
+  "allBranchesAll": "All branches",
+  "selectAll": "Select all",
+  "noMatchingBranches": "No matching branches",
+  "inDefault": "In default",
+  "confirmShowAllBranches": "Confirm (all branches)",
+  "confirmFilterCount": "Confirm filter ({count} branches)",
+  "@confirmFilterCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "finesSection": "Fines and violations",
+  "promoNoFinesAccess": "Promotion marketing accounts can't access fines and violations",
+  "myViolationsTitle": "My violations",
+  "violationsRecord": "Violations and fines",
+  "finesSettings": "Fines settings and policy",
+  "recordViolation": "Record violation",
+  "unknownCompany": "Unknown company",
+  "allBranchesOverview": "All branches",
+  "selectedGroupCount": "Selected group ({count} branches)",
+  "@selectedGroupCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "finesPolicyCardSubtitle": "The deduction for each violation, first time and when repeated",
+  "showViolationsFor": "Show violations for branch / group:",
+  "unpinDefaultGroup": "Unpin default group",
+  "pinSelectedAsDefault": "Pin selected branches as default",
+  "refreshFinesData": "Refresh fines data",
+  "finesDataRefreshed": "Fines data refreshed",
+  "pinnedDefaultGroup": "Pinned default group",
+  "showAll": "Show all",
+  "mySummary": "Summary",
+  "finesSummaryOf": "Fines summary ({branch})",
+  "@finesSummaryOf": {
+    "placeholders": {
+      "branch": {}
+    }
+  },
+  "companiesFinesSummary": "Fines summary by company",
+  "finesSummary": "Fines summary",
+  "myTotalFines": "Total fines",
+  "totalFines": "Total fines",
+  "deductedFromMe": "Deducted",
+  "deducted": "Deducted",
+  "violationsCountLabel": "Violations",
+  "companiesCount": "Companies",
+  "companiesN": "{count} companies",
+  "@companiesN": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "filterByCompany": "Filter by company:",
+  "allCompaniesCount": "All companies ({count})",
+  "@allCompaniesCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "recordClean": "Your record is clean!",
+  "noViolationsAnyCompany": "No violations recorded for any company yet",
+  "noViolationsThisCompany": "No violations recorded for this company",
+  "noViolationsRecorded": "No violations recorded.",
+  "rejectionReason": "Rejection reason",
+  "rejectionReasonHint": "Write the reason for rejecting this violation…",
+  "confirmRejection": "Confirm rejection",
+  "repeatedViolation": "Repeated violation",
+  "confidential": "Confidential",
+  "targetDelegate": "Delegate: {name}",
+  "@targetDelegate": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "violationDetails": "Violation details:",
+  "branchesMarketingApproval": "Branch marketing manager approval: {name}",
+  "@branchesMarketingApproval": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "generalManagerApproval": "General manager approval: {name}",
+  "@generalManagerApproval": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "attachmentsCount": "Attachments ({count})",
+  "@attachmentsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "tapToPreview2": "Tap to preview",
+  "editorName": "Recorded by: {name}",
+  "@editorName": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "documentsCount": "Documents ({count})",
+  "@documentsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "approveAction": "Approve",
+  "rejectAction": "Reject",
+  "violationsWithCount": "Violations: {count}",
+  "@violationsWithCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "totalWithValue": "Total: {value}",
+  "@totalWithValue": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "deductedWithValue": "Deducted: {value}",
+  "@deductedWithValue": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "catUnauthorizedPhoto": "Photography without permission",
+  "catDataMissing": "Missing data / features not enabled",
+  "catOther": "Other"
 }

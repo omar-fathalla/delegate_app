@@ -4471,6 +4471,426 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Beit El Gomla'**
   String get chainBeitElGomla;
+
+  /// No description provided for @penSelectBranchesFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Select one or more branches to pin as the default'**
+  String get penSelectBranchesFirst;
+
+  /// No description provided for @penDefaultUnpinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Default branch group unpinned'**
+  String get penDefaultUnpinned;
+
+  /// No description provided for @penBranchPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch pinned as the default for fines'**
+  String get penBranchPinned;
+
+  /// No description provided for @penBranchesPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} branches pinned as the default for fines'**
+  String penBranchesPinned(Object count);
+
+  /// No description provided for @penSelectDisplayBranches.
+  ///
+  /// In en, this message translates to:
+  /// **'Select branches to show'**
+  String get penSelectDisplayBranches;
+
+  /// No description provided for @penShowingAllBranches.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing all branches'**
+  String get penShowingAllBranches;
+
+  /// No description provided for @penBranchesSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} branches selected'**
+  String penBranchesSelected(Object count);
+
+  /// No description provided for @clearSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear selection'**
+  String get clearSelection;
+
+  /// No description provided for @searchBranchName.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by branch name…'**
+  String get searchBranchName;
+
+  /// No description provided for @allBranchesAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All branches'**
+  String get allBranchesAll;
+
+  /// No description provided for @selectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get selectAll;
+
+  /// No description provided for @noMatchingBranches.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching branches'**
+  String get noMatchingBranches;
+
+  /// No description provided for @inDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'In default'**
+  String get inDefault;
+
+  /// No description provided for @confirmShowAllBranches.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm (all branches)'**
+  String get confirmShowAllBranches;
+
+  /// No description provided for @confirmFilterCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm filter ({count} branches)'**
+  String confirmFilterCount(Object count);
+
+  /// No description provided for @finesSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Fines and violations'**
+  String get finesSection;
+
+  /// No description provided for @promoNoFinesAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotion marketing accounts can\'t access fines and violations'**
+  String get promoNoFinesAccess;
+
+  /// No description provided for @myViolationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My violations'**
+  String get myViolationsTitle;
+
+  /// No description provided for @violationsRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Violations and fines'**
+  String get violationsRecord;
+
+  /// No description provided for @finesSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Fines settings and policy'**
+  String get finesSettings;
+
+  /// No description provided for @recordViolation.
+  ///
+  /// In en, this message translates to:
+  /// **'Record violation'**
+  String get recordViolation;
+
+  /// No description provided for @unknownCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown company'**
+  String get unknownCompany;
+
+  /// No description provided for @allBranchesOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'All branches'**
+  String get allBranchesOverview;
+
+  /// No description provided for @selectedGroupCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected group ({count} branches)'**
+  String selectedGroupCount(Object count);
+
+  /// No description provided for @finesPolicyCardSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The deduction for each violation, first time and when repeated'**
+  String get finesPolicyCardSubtitle;
+
+  /// No description provided for @showViolationsFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Show violations for branch / group:'**
+  String get showViolationsFor;
+
+  /// No description provided for @unpinDefaultGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin default group'**
+  String get unpinDefaultGroup;
+
+  /// No description provided for @pinSelectedAsDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin selected branches as default'**
+  String get pinSelectedAsDefault;
+
+  /// No description provided for @refreshFinesData.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh fines data'**
+  String get refreshFinesData;
+
+  /// No description provided for @finesDataRefreshed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fines data refreshed'**
+  String get finesDataRefreshed;
+
+  /// No description provided for @pinnedDefaultGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned default group'**
+  String get pinnedDefaultGroup;
+
+  /// No description provided for @showAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all'**
+  String get showAll;
+
+  /// No description provided for @mySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get mySummary;
+
+  /// No description provided for @finesSummaryOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Fines summary ({branch})'**
+  String finesSummaryOf(Object branch);
+
+  /// No description provided for @companiesFinesSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Fines summary by company'**
+  String get companiesFinesSummary;
+
+  /// No description provided for @finesSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Fines summary'**
+  String get finesSummary;
+
+  /// No description provided for @myTotalFines.
+  ///
+  /// In en, this message translates to:
+  /// **'Total fines'**
+  String get myTotalFines;
+
+  /// No description provided for @totalFines.
+  ///
+  /// In en, this message translates to:
+  /// **'Total fines'**
+  String get totalFines;
+
+  /// No description provided for @deductedFromMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Deducted'**
+  String get deductedFromMe;
+
+  /// No description provided for @deducted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deducted'**
+  String get deducted;
+
+  /// No description provided for @violationsCountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Violations'**
+  String get violationsCountLabel;
+
+  /// No description provided for @companiesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Companies'**
+  String get companiesCount;
+
+  /// No description provided for @companiesN.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} companies'**
+  String companiesN(Object count);
+
+  /// No description provided for @filterByCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by company:'**
+  String get filterByCompany;
+
+  /// No description provided for @allCompaniesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'All companies ({count})'**
+  String allCompaniesCount(Object count);
+
+  /// No description provided for @recordClean.
+  ///
+  /// In en, this message translates to:
+  /// **'Your record is clean!'**
+  String get recordClean;
+
+  /// No description provided for @noViolationsAnyCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'No violations recorded for any company yet'**
+  String get noViolationsAnyCompany;
+
+  /// No description provided for @noViolationsThisCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'No violations recorded for this company'**
+  String get noViolationsThisCompany;
+
+  /// No description provided for @noViolationsRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'No violations recorded.'**
+  String get noViolationsRecorded;
+
+  /// No description provided for @rejectionReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejection reason'**
+  String get rejectionReason;
+
+  /// No description provided for @rejectionReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write the reason for rejecting this violation…'**
+  String get rejectionReasonHint;
+
+  /// No description provided for @confirmRejection.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm rejection'**
+  String get confirmRejection;
+
+  /// No description provided for @repeatedViolation.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeated violation'**
+  String get repeatedViolation;
+
+  /// No description provided for @confidential.
+  ///
+  /// In en, this message translates to:
+  /// **'Confidential'**
+  String get confidential;
+
+  /// No description provided for @targetDelegate.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate: {name}'**
+  String targetDelegate(Object name);
+
+  /// No description provided for @violationDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Violation details:'**
+  String get violationDetails;
+
+  /// No description provided for @branchesMarketingApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch marketing manager approval: {name}'**
+  String branchesMarketingApproval(Object name);
+
+  /// No description provided for @generalManagerApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'General manager approval: {name}'**
+  String generalManagerApproval(Object name);
+
+  /// No description provided for @attachmentsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments ({count})'**
+  String attachmentsCount(Object count);
+
+  /// No description provided for @tapToPreview2.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to preview'**
+  String get tapToPreview2;
+
+  /// No description provided for @editorName.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded by: {name}'**
+  String editorName(Object name);
+
+  /// No description provided for @documentsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents ({count})'**
+  String documentsCount(Object count);
+
+  /// No description provided for @approveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get approveAction;
+
+  /// No description provided for @rejectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get rejectAction;
+
+  /// No description provided for @violationsWithCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Violations: {count}'**
+  String violationsWithCount(Object count);
+
+  /// No description provided for @totalWithValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total: {value}'**
+  String totalWithValue(Object value);
+
+  /// No description provided for @deductedWithValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Deducted: {value}'**
+  String deductedWithValue(Object value);
+
+  /// No description provided for @catUnauthorizedPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photography without permission'**
+  String get catUnauthorizedPhoto;
+
+  /// No description provided for @catDataMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing data / features not enabled'**
+  String get catDataMissing;
+
+  /// No description provided for @catOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get catOther;
 }
 
 class _AppLocalizationsDelegate

@@ -2483,4 +2483,249 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get chainBeitElGomla => 'بيت الجملة';
+
+  @override
+  String get penSelectBranchesFirst =>
+      'يرجى تحديد فرع أو أكثر لتثبيتها كقطاع افتراضي';
+
+  @override
+  String get penDefaultUnpinned => 'تم إلغاء تثبيت القطاع الافتراضي للفروع';
+
+  @override
+  String get penBranchPinned => 'تم تثبيت الفرع كفرع افتراضي لقسم الغرامات';
+
+  @override
+  String penBranchesPinned(Object count) {
+    return 'تم تثبيت ($count فروع) كقطاع افتراضي لقسم الغرامات';
+  }
+
+  @override
+  String get penSelectDisplayBranches => 'تحديد فروع العرض (قطاع الفروع)';
+
+  @override
+  String get penShowingAllBranches => 'يتم عرض جميع الفروع حاليًا';
+
+  @override
+  String penBranchesSelected(Object count) {
+    return 'تم تحديد $count فرع للفلترة';
+  }
+
+  @override
+  String get clearSelection => 'مسح التحديد';
+
+  @override
+  String get searchBranchName => 'ابحث باسم الفرع…';
+
+  @override
+  String get allBranchesAll => 'جميع الفروع (الكل)';
+
+  @override
+  String get selectAll => 'تحديد الكل';
+
+  @override
+  String get noMatchingBranches => 'لا توجد فروع مطابقة للبحث';
+
+  @override
+  String get inDefault => 'ضمن الافتراضي';
+
+  @override
+  String get confirmShowAllBranches => 'تأكيد (عرض جميع الفروع)';
+
+  @override
+  String confirmFilterCount(Object count) {
+    return 'تأكيد الفلترة ($count فروع)';
+  }
+
+  @override
+  String get finesSection => 'قسم الغرامات والمخالفات';
+
+  @override
+  String get promoNoFinesAccess =>
+      'غير مسموح لحسابات تسويق العروض الوصول لنظام الغرامات والمخالفات';
+
+  @override
+  String get myViolationsTitle => 'سجل مخالفاتي وغراماتي';
+
+  @override
+  String get violationsRecord => 'سجل المخالفات والغرامات';
+
+  @override
+  String get finesSettings => 'إعدادات ولائحة الغرامات';
+
+  @override
+  String get recordViolation => 'تسجيل مخالفة';
+
+  @override
+  String get unknownCompany => 'شركة غير محددة';
+
+  @override
+  String get allBranchesOverview => 'جميع الفروع (عرض شامل)';
+
+  @override
+  String selectedGroupCount(Object count) {
+    return 'قطاع محدد: ($count فروع)';
+  }
+
+  @override
+  String get finesPolicyCardSubtitle =>
+      'قيمة الخصم لكل مخالفة، أول مرة وعند التكرار';
+
+  @override
+  String get showViolationsFor => 'عرض مخالفات الفرع / القطاع:';
+
+  @override
+  String get unpinDefaultGroup => 'إلغاء تثبيت القطاع الافتراضي';
+
+  @override
+  String get pinSelectedAsDefault => 'تثبيت الفروع المحددة كقطاع افتراضي';
+
+  @override
+  String get refreshFinesData => 'تحديث بيانات الغرامات';
+
+  @override
+  String get finesDataRefreshed => 'تم تحديث بيانات الغرامات';
+
+  @override
+  String get pinnedDefaultGroup => 'القطاع الافتراضي المثبت';
+
+  @override
+  String get showAll => 'عرض الكل';
+
+  @override
+  String get mySummary => 'الملخص';
+
+  @override
+  String finesSummaryOf(Object branch) {
+    return 'ملخص الغرامات ($branch)';
+  }
+
+  @override
+  String get companiesFinesSummary => 'ملخص غرامات ومخالفات الشركات';
+
+  @override
+  String get finesSummary => 'ملخص الغرامات والمخالفات';
+
+  @override
+  String get myTotalFines => 'إجمالي غراماتي';
+
+  @override
+  String get totalFines => 'إجمالي الغرامات';
+
+  @override
+  String get deductedFromMe => 'المخصوم مني';
+
+  @override
+  String get deducted => 'المخصوم';
+
+  @override
+  String get violationsCountLabel => 'عدد المخالفات';
+
+  @override
+  String get companiesCount => 'عدد الشركات';
+
+  @override
+  String companiesN(Object count) {
+    return '$count شركة';
+  }
+
+  @override
+  String get filterByCompany => 'تصفية حسب الشركة:';
+
+  @override
+  String allCompaniesCount(Object count) {
+    return 'جميع الشركات ($count)';
+  }
+
+  @override
+  String get recordClean => 'سجلك نظيف ومتميز!';
+
+  @override
+  String get noViolationsAnyCompany => 'لا توجد مخالفات مسجلة على أية شركة بعد';
+
+  @override
+  String get noViolationsThisCompany => 'لا توجد مخالفات مسجلة على هذه الشركة';
+
+  @override
+  String get noViolationsRecorded => 'لا توجد مخالفات مسجلة عليك حتى الآن.';
+
+  @override
+  String get rejectionReason => 'سبب الرفض';
+
+  @override
+  String get rejectionReasonHint => 'اكتب سبب رفض المخالفة…';
+
+  @override
+  String get confirmRejection => 'تأكيد الرفض';
+
+  @override
+  String get repeatedViolation => 'مخالفة مكررة';
+
+  @override
+  String get confidential => 'سرية ومقيدة';
+
+  @override
+  String targetDelegate(Object name) {
+    return 'المندوب المستهدف: $name';
+  }
+
+  @override
+  String get violationDetails => 'تفاصيل المخالفة:';
+
+  @override
+  String branchesMarketingApproval(Object name) {
+    return 'موافقة مدير تسويق الفروع: $name';
+  }
+
+  @override
+  String generalManagerApproval(Object name) {
+    return 'اعتماد المدير العام: $name';
+  }
+
+  @override
+  String attachmentsCount(Object count) {
+    return 'المرفقات ($count)';
+  }
+
+  @override
+  String get tapToPreview2 => 'اضغط للمعاينة والتكبير';
+
+  @override
+  String editorName(Object name) {
+    return 'المحرر: $name';
+  }
+
+  @override
+  String documentsCount(Object count) {
+    return 'المستندات ($count)';
+  }
+
+  @override
+  String get approveAction => 'اعتماد';
+
+  @override
+  String get rejectAction => 'رفض';
+
+  @override
+  String violationsWithCount(Object count) {
+    return 'المخالفات: $count';
+  }
+
+  @override
+  String totalWithValue(Object value) {
+    return 'الإجمالي: $value';
+  }
+
+  @override
+  String deductedWithValue(Object value) {
+    return 'المخصوم: $value';
+  }
+
+  @override
+  String get catUnauthorizedPhoto => 'تصوير بدون إذن رسمي';
+
+  @override
+  String get catDataMissing => 'عدم تفعيل خصائص / بيانات ناقصة';
+
+  @override
+  String get catOther => 'أخرى';
 }

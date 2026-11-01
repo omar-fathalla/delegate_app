@@ -1105,7 +1105,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
           (context, index) {
             final key = sortedKeys[index];
             final groupPhotos = grouped[key]!;
-            final displayDate = DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.parse(key));
+            final displayDate = DateFormat.yMMMMEEEEd(Localizations.localeOf(context).languageCode).format(DateTime.parse(key));
 
             return _buildGroupSection(
               title: displayDate,
@@ -1238,7 +1238,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
 
   Widget _buildCompactPhotoCard(BuildContext context, CapturedPhoto photo, ThemeData theme) {
     final colorScheme = theme.colorScheme;
-    final dateStr = DateFormat('yyyy-MM-dd • hh:mm a', 'ar').format(photo.capturedAt);
+    final dateStr = DateFormat('yyyy-MM-dd • hh:mm a', Localizations.localeOf(context).languageCode).format(photo.capturedAt);
     final isPending = photo.uid.startsWith('pending_');
 
     return Container(
@@ -1450,14 +1450,14 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
   }
 
   String _getMonthNameArabic(DateTime date) {
-    final formatter = DateFormat('MMMM yyyy', 'ar');
+    final formatter = DateFormat.yMMMM(Localizations.localeOf(context).languageCode);
     return formatter.format(date);
   }
 
   void _showPhotoDetails(BuildContext context, CapturedPhoto photo) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final formattedDate = DateFormat('EEEE، d MMMM yyyy - hh:mm a', 'ar').format(photo.capturedAt);
+    final formattedDate = DateFormat.yMMMMEEEEd(Localizations.localeOf(context).languageCode).add_jm().format(photo.capturedAt);
 
     showModalBottomSheet(
       context: context,

@@ -2477,4 +2477,252 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chainBeitElGomla => 'Beit El Gomla';
+
+  @override
+  String get penSelectBranchesFirst =>
+      'Select one or more branches to pin as the default';
+
+  @override
+  String get penDefaultUnpinned => 'Default branch group unpinned';
+
+  @override
+  String get penBranchPinned => 'Branch pinned as the default for fines';
+
+  @override
+  String penBranchesPinned(Object count) {
+    return '$count branches pinned as the default for fines';
+  }
+
+  @override
+  String get penSelectDisplayBranches => 'Select branches to show';
+
+  @override
+  String get penShowingAllBranches => 'Showing all branches';
+
+  @override
+  String penBranchesSelected(Object count) {
+    return '$count branches selected';
+  }
+
+  @override
+  String get clearSelection => 'Clear selection';
+
+  @override
+  String get searchBranchName => 'Search by branch name…';
+
+  @override
+  String get allBranchesAll => 'All branches';
+
+  @override
+  String get selectAll => 'Select all';
+
+  @override
+  String get noMatchingBranches => 'No matching branches';
+
+  @override
+  String get inDefault => 'In default';
+
+  @override
+  String get confirmShowAllBranches => 'Confirm (all branches)';
+
+  @override
+  String confirmFilterCount(Object count) {
+    return 'Confirm filter ($count branches)';
+  }
+
+  @override
+  String get finesSection => 'Fines and violations';
+
+  @override
+  String get promoNoFinesAccess =>
+      'Promotion marketing accounts can\'t access fines and violations';
+
+  @override
+  String get myViolationsTitle => 'My violations';
+
+  @override
+  String get violationsRecord => 'Violations and fines';
+
+  @override
+  String get finesSettings => 'Fines settings and policy';
+
+  @override
+  String get recordViolation => 'Record violation';
+
+  @override
+  String get unknownCompany => 'Unknown company';
+
+  @override
+  String get allBranchesOverview => 'All branches';
+
+  @override
+  String selectedGroupCount(Object count) {
+    return 'Selected group ($count branches)';
+  }
+
+  @override
+  String get finesPolicyCardSubtitle =>
+      'The deduction for each violation, first time and when repeated';
+
+  @override
+  String get showViolationsFor => 'Show violations for branch / group:';
+
+  @override
+  String get unpinDefaultGroup => 'Unpin default group';
+
+  @override
+  String get pinSelectedAsDefault => 'Pin selected branches as default';
+
+  @override
+  String get refreshFinesData => 'Refresh fines data';
+
+  @override
+  String get finesDataRefreshed => 'Fines data refreshed';
+
+  @override
+  String get pinnedDefaultGroup => 'Pinned default group';
+
+  @override
+  String get showAll => 'Show all';
+
+  @override
+  String get mySummary => 'Summary';
+
+  @override
+  String finesSummaryOf(Object branch) {
+    return 'Fines summary ($branch)';
+  }
+
+  @override
+  String get companiesFinesSummary => 'Fines summary by company';
+
+  @override
+  String get finesSummary => 'Fines summary';
+
+  @override
+  String get myTotalFines => 'Total fines';
+
+  @override
+  String get totalFines => 'Total fines';
+
+  @override
+  String get deductedFromMe => 'Deducted';
+
+  @override
+  String get deducted => 'Deducted';
+
+  @override
+  String get violationsCountLabel => 'Violations';
+
+  @override
+  String get companiesCount => 'Companies';
+
+  @override
+  String companiesN(Object count) {
+    return '$count companies';
+  }
+
+  @override
+  String get filterByCompany => 'Filter by company:';
+
+  @override
+  String allCompaniesCount(Object count) {
+    return 'All companies ($count)';
+  }
+
+  @override
+  String get recordClean => 'Your record is clean!';
+
+  @override
+  String get noViolationsAnyCompany =>
+      'No violations recorded for any company yet';
+
+  @override
+  String get noViolationsThisCompany =>
+      'No violations recorded for this company';
+
+  @override
+  String get noViolationsRecorded => 'No violations recorded.';
+
+  @override
+  String get rejectionReason => 'Rejection reason';
+
+  @override
+  String get rejectionReasonHint =>
+      'Write the reason for rejecting this violation…';
+
+  @override
+  String get confirmRejection => 'Confirm rejection';
+
+  @override
+  String get repeatedViolation => 'Repeated violation';
+
+  @override
+  String get confidential => 'Confidential';
+
+  @override
+  String targetDelegate(Object name) {
+    return 'Delegate: $name';
+  }
+
+  @override
+  String get violationDetails => 'Violation details:';
+
+  @override
+  String branchesMarketingApproval(Object name) {
+    return 'Branch marketing manager approval: $name';
+  }
+
+  @override
+  String generalManagerApproval(Object name) {
+    return 'General manager approval: $name';
+  }
+
+  @override
+  String attachmentsCount(Object count) {
+    return 'Attachments ($count)';
+  }
+
+  @override
+  String get tapToPreview2 => 'Tap to preview';
+
+  @override
+  String editorName(Object name) {
+    return 'Recorded by: $name';
+  }
+
+  @override
+  String documentsCount(Object count) {
+    return 'Documents ($count)';
+  }
+
+  @override
+  String get approveAction => 'Approve';
+
+  @override
+  String get rejectAction => 'Reject';
+
+  @override
+  String violationsWithCount(Object count) {
+    return 'Violations: $count';
+  }
+
+  @override
+  String totalWithValue(Object value) {
+    return 'Total: $value';
+  }
+
+  @override
+  String deductedWithValue(Object value) {
+    return 'Deducted: $value';
+  }
+
+  @override
+  String get catUnauthorizedPhoto => 'Photography without permission';
+
+  @override
+  String get catDataMissing => 'Missing data / features not enabled';
+
+  @override
+  String get catOther => 'Other';
 }

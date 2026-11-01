@@ -241,7 +241,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              'دليل بنود المخالفات والجزاءات المالية الرسمية',
+              AppLocalizations.of(context)!.policyOfficialSubtitle,
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -251,7 +251,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
         leading: Navigator.canPop(context)
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
-                tooltip: 'رجوع',
+                tooltip: AppLocalizations.of(context)!.backAction,
                 onPressed: () => Navigator.of(context).pop(),
               )
             : null,
@@ -309,7 +309,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                           Text(
                             _selectedCategory == null
                                 ? AppLocalizations.of(context)!.allPolicyItems(filtered.length)
-                                : '${_selectedCategory!.displayName} (${filtered.length})',
+                                : '${_selectedCategory!.localizedName(AppLocalizations.of(context)!)} (${filtered.length})',
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: colorScheme.onSurface,
@@ -457,7 +457,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
       child: Row(
         children: categories.map((cat) {
           final isSelected = _selectedCategory == cat;
-          final label = cat == null ? AppLocalizations.of(context)!.allWithCount(_allRules.length) : cat.displayName;
+          final label = cat == null ? AppLocalizations.of(context)!.allWithCount(_allRules.length) : cat.localizedName(AppLocalizations.of(context)!);
           final icon = cat == null ? Icons.apps_rounded : _getCategoryIcon(cat);
 
           return Padding(
@@ -545,7 +545,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                       Icon(catIcon, size: 14, color: colorScheme.primary),
                       const SizedBox(width: 6),
                       Text(
-                        item.category.displayName,
+                        item.category.localizedName(AppLocalizations.of(context)!),
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.bold,
