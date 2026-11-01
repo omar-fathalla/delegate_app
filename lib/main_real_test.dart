@@ -1,10 +1,10 @@
 // ignore_for_file: avoid_print
-/// Local/real-test entrypoint. Not used by release builds.
-///
-/// Example:
-/// flutter run -t lib/main_real_test.dart -d emulator-5554 \
-///   --dart-define=REAL_TEST_CUSTOM_TOKEN=... \
-///   --dart-define=REAL_TEST_START_BRANCH_TAB=true
+// Local/real-test entrypoint. Not used by release builds.
+//
+// Example:
+// flutter run -t lib/main_real_test.dart -d emulator-5554 \
+//   --dart-define=REAL_TEST_CUSTOM_TOKEN=... \
+//   --dart-define=REAL_TEST_START_BRANCH_TAB=true
 import 'dart:async';
 import 'dart:convert';
 

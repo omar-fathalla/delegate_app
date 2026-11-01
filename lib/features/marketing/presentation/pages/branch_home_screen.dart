@@ -1147,6 +1147,29 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                           ),
                         ),
                       IconButton(
+                        icon: const Icon(
+                          Icons.table_chart_rounded,
+                          color: Color(0xFF2E7D32),
+                          size: 20,
+                        ),
+                        tooltip: 'تصدير كشف الفرع إلى Excel',
+                        style: IconButton.styleFrom(
+                          backgroundColor:
+                              colorScheme.surface.withValues(alpha: 0.8),
+                          padding: const EdgeInsets.all(6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => _showExportExcelModal(
+                          context,
+                          preselectedBranch: branchName,
+                          branchRecords: {branchName: records},
+                          initialOnlyNotCheckedOut:
+                              currentFilter == 'not_checked_out',
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
                         icon: Icon(
                           Icons.delete_outline_rounded,
                           color: colorScheme.error,
