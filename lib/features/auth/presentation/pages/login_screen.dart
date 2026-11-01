@@ -460,12 +460,8 @@ class _LoginScreenState extends State<LoginScreen>
             Text(
               key: const ValueKey('login_mode_helper'),
               _isStaff
-                  ? (isArabic
-                        ? 'اختر نوع حسابك ثم ادخل بكلمة المرور'
-                        : 'Pick your account type, then sign in with your password')
-                  : (isArabic
-                        ? 'اختر نوع حسابك ثم أدخل بياناتك'
-                        : 'Pick your account type, then enter your details'),
+                  ? AppLocalizations.of(context)!.loginSubtitleStaff
+                  : AppLocalizations.of(context)!.loginSubtitleDelegate,
               style: text.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -479,8 +475,8 @@ class _LoginScreenState extends State<LoginScreen>
           key: const ValueKey('login_mode_switch'),
           values: const [LoginMode.delegate, LoginMode.staff],
           labels: [
-            isArabic ? 'مندوب' : 'Delegate',
-            isArabic ? 'موظف إداري' : 'Admin staff',
+            AppLocalizations.of(context)!.roleDelegate,
+            AppLocalizations.of(context)!.staffLabel,
           ],
           icons: const [
             Icons.badge_outlined,
@@ -552,8 +548,7 @@ class _LoginScreenState extends State<LoginScreen>
                 onPressed: loading
                     ? null
                     : () => _forgotPassword(context, isArabic),
-                child: Text(
-                  isArabic ? 'نسيت كلمة المرور؟' : 'Forgot password?',
+                child: Text(AppLocalizations.of(context)!.forgotPasswordQ,
                 ),
               ),
           ],
@@ -593,9 +588,7 @@ class _LoginScreenState extends State<LoginScreen>
         style: fieldStyle,
         decoration: _inputDecoration(
           label: l10n.mobileNumber,
-          helper: isArabic
-              ? 'رقم الجوال المسجل لدى الشركة'
-              : 'Your mobile number registered with the company',
+          helper: AppLocalizations.of(context)!.phoneHelper,
           colorScheme: colorScheme,
         ),
         validator: (value) => validateLoginPhone(
@@ -624,13 +617,13 @@ class _LoginScreenState extends State<LoginScreen>
           style: fieldStyle,
           decoration: _inputDecoration(
             label: l10n.nationalIdNumber,
-            helper: isArabic ? '14 رقم' : '14 digits',
+            helper: AppLocalizations.of(context)!.nationalIdHelper,
             colorScheme: colorScheme,
             suffixIcon: IconButton(
               key: const ValueKey('login_national_id_eye'),
               tooltip: _obscureNationalId
-                  ? (isArabic ? 'إظهار' : 'Show')
-                  : (isArabic ? 'إخفاء' : 'Hide'),
+                  ? AppLocalizations.of(context)!.showAction
+                  : AppLocalizations.of(context)!.hideAction,
               icon: Icon(
                 _obscureNationalId
                     ? Icons.visibility_rounded
@@ -662,12 +655,12 @@ class _LoginScreenState extends State<LoginScreen>
           obscureText: _obscurePassword,
           style: fieldStyle,
           decoration: _inputDecoration(
-            label: isArabic ? 'كلمة المرور' : 'Password',
+            label: AppLocalizations.of(context)!.password,
             colorScheme: colorScheme,
             suffixIcon: IconButton(
               tooltip: _obscurePassword
-                  ? (isArabic ? 'إظهار' : 'Show')
-                  : (isArabic ? 'إخفاء' : 'Hide'),
+                  ? AppLocalizations.of(context)!.showAction
+                  : AppLocalizations.of(context)!.hideAction,
               icon: Icon(
                 _obscurePassword
                     ? Icons.visibility_off_outlined
@@ -680,9 +673,7 @@ class _LoginScreenState extends State<LoginScreen>
           ),
           validator: (value) => validateStaffPassword(
             value,
-            emptyMessage: isArabic
-                ? 'يرجى إدخال كلمة المرور'
-                : 'Please enter your password',
+            emptyMessage: AppLocalizations.of(context)!.enterPassword2,
           ),
         ),
     ];
@@ -699,7 +690,7 @@ class _LoginScreenState extends State<LoginScreen>
     return [
       Semantics(
         liveRegion: loading,
-        label: loading ? (isArabic ? 'جارٍ تسجيل الدخول' : 'Signing in') : null,
+        label: loading ? AppLocalizations.of(context)!.signingIn : null,
         child: ConstrainedBox(
           // min 52dp; grows with large text scales instead of clipping.
           constraints: const BoxConstraints(minHeight: 52),
@@ -755,7 +746,7 @@ class _LoginScreenState extends State<LoginScreen>
       TextButton(
         key: const ValueKey('login_support_button'),
         onPressed: () => _launchPhoneDialer(l10n.contactNumber),
-        child: Text(isArabic ? 'تواصل مع الدعم الفني' : 'Contact support'),
+        child: Text(AppLocalizations.of(context)!.contactSupport),
       ),
       TashilVersionText(
         color: colorScheme.onSurfaceVariant,
@@ -872,9 +863,7 @@ class _LoginScreenState extends State<LoginScreen>
       final isArabic = localeProvider.isArabic;
       SemanticsService.sendAnnouncement(
         View.of(context),
-        isArabic
-            ? 'يرجى مراجعة البيانات المدخلة'
-            : 'Please check the highlighted fields',
+        AppLocalizations.of(context)!.checkHighlightedFields,
         isArabic ? TextDirection.rtl : TextDirection.ltr,
       );
       if (_autovalidate != AutovalidateMode.onUserInteraction) {
@@ -885,6 +874,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   // ---- Helper: Forgot password (staff only) ----
   Future<void> _forgotPassword(BuildContext context, bool isArabic) async {
+    final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     String? email;
@@ -905,10 +895,7 @@ class _LoginScreenState extends State<LoginScreen>
       messenger.showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          content: Text(
-            isArabic
-                ? 'لو الإيميل مسجّل، هيوصلك رابط لتغيير كلمة المرور.'
-                : 'If this email is registered, a reset link is on its way.',
+          content: Text(l10n.resetLinkSentIfRegistered,
           ),
         ),
       );
@@ -917,10 +904,7 @@ class _LoginScreenState extends State<LoginScreen>
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: colorScheme.error,
-          content: Text(
-            isArabic
-                ? 'تعذر إرسال رابط تغيير كلمة المرور. حاول مرة أخرى.'
-                : 'Could not send the reset link. Try again.',
+          content: Text(l10n.resetLinkFailed,
           ),
         ),
       );
@@ -938,7 +922,7 @@ class _LoginScreenState extends State<LoginScreen>
       context: context,
       builder: (dialogContext) => AlertDialog(
         icon: const Icon(Icons.lock_reset_rounded),
-        title: Text(isArabic ? 'نسيت كلمة المرور' : 'Forgot password'),
+        title: Text(AppLocalizations.of(context)!.forgotPassword),
         content: Form(
           key: key,
           child: TextFormField(
@@ -947,15 +931,13 @@ class _LoginScreenState extends State<LoginScreen>
             textDirection: TextDirection.ltr,
             autofocus: prefill == null,
             decoration: InputDecoration(
-              labelText: isArabic ? 'البريد الإلكتروني' : 'Email',
+              labelText: AppLocalizations.of(context)!.emailLabel,
               prefixIcon: const Icon(Icons.alternate_email_rounded),
             ),
             validator: (v) {
               final t = (v ?? '').trim();
               if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t)) {
-                return isArabic
-                    ? 'يرجى إدخال بريد إلكتروني صحيح'
-                    : 'Enter a valid email';
+                return AppLocalizations.of(context)!.invalidEmail2;
               }
               return null;
             },
@@ -964,7 +946,7 @@ class _LoginScreenState extends State<LoginScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: Text(isArabic ? 'إلغاء' : 'Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           TextButton(
             onPressed: () {
@@ -972,7 +954,7 @@ class _LoginScreenState extends State<LoginScreen>
                 Navigator.pop(dialogContext, controller.text.trim());
               }
             },
-            child: Text(isArabic ? 'إرسال الرابط' : 'Send link'),
+            child: Text(AppLocalizations.of(context)!.sendLink),
           ),
         ],
       ),
@@ -1027,7 +1009,6 @@ class _LoginScreenState extends State<LoginScreen>
     bool rememberMe,
   ) {
     final colorScheme = Theme.of(blocContext).colorScheme;
-    final isArabic = localeProvider.isArabic;
 
     showModalBottomSheet(
       context: blocContext,
@@ -1057,8 +1038,7 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               const SizedBox(height: 20),
-              Text(
-                isArabic ? 'اختر المنظمة' : 'Select Organization',
+              Text(AppLocalizations.of(context)!.selectOrganization,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -1066,10 +1046,7 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                isArabic
-                    ? 'أنت مسجل في أكثر من منظمة. اختر للمتابعة.'
-                    : 'You are registered in multiple organizations.',
+              Text(AppLocalizations.of(context)!.multipleOrgsChoose,
                 style: TextStyle(
                   fontSize: 14,
                   color: colorScheme.onSurfaceVariant,
