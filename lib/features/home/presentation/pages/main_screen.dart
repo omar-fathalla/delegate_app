@@ -299,7 +299,11 @@ class _MainScreenState extends State<MainScreen> {
         if (_initializedTabs.contains(3))
           BlocProvider(
             create: (context) => di.sl<PhotoPermissionBloc>(),
-            child: MonthlyPhotoReportScreen(delegate: delegate),
+            child: MonthlyPhotoReportScreen(
+              delegate: delegate,
+              // Single title: the workspace app bar; refresh = pull-to-refresh.
+              showAppBar: false,
+            ),
           )
         else
           const SizedBox.shrink(),

@@ -5,7 +5,6 @@ import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/config/theme/app_motion.dart';
-import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
 import 'package:delegate_app/core/widgets/app_photo_image.dart';
 import 'package:delegate_app/core/services/photo_cache_manager.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
@@ -552,12 +551,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
         },
         builder: (context, state) {
           if (state is PhotoPermissionLoading) {
-            return const Center(
-              child: AppLoadingIndicator(
-                style: AppLoadingStyle.threeArchedCircle,
-                label: 'جاري تحميل أرشيف الصور...',
-              ),
-            );
+            return const Center(child: M3DelayedLoading());
           }
 
           if (state is CapturedPhotosLoaded) {
@@ -989,7 +983,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             );
           }
 
-          return const Center(child: Text('جاري تحميل التقرير...'));
+          return const Center(child: M3DelayedLoading());
         },
       ),
     );
