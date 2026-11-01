@@ -3487,6 +3487,552 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 minute ago} other{{count} minutes ago}}'**
   String timeAgoMinutes(int count);
+
+  /// No description provided for @confirmDeletePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete photo?'**
+  String get confirmDeletePhoto;
+
+  /// No description provided for @deletePhotoFromConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this photo sent by \"{delegateName}\" at \"{branch}\"?'**
+  String deletePhotoFromConfirm(Object delegateName, Object branch);
+
+  /// No description provided for @photoDeletePermanentNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo will be permanently deleted from the database and storage.'**
+  String get photoDeletePermanentNote;
+
+  /// No description provided for @deletePermanently.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete permanently'**
+  String get deletePermanently;
+
+  /// No description provided for @chooseMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose month'**
+  String get chooseMonth;
+
+  /// No description provided for @photosCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No photos} =1{1 photo} other{{count} photos}}'**
+  String photosCount(int count);
+
+  /// No description provided for @photoReportsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo reports'**
+  String get photoReportsTitle;
+
+  /// No description provided for @refreshPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh photos'**
+  String get refreshPhotos;
+
+  /// No description provided for @photosArchiveNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos are stored in the company archive, separate from delegate accounts'**
+  String get photosArchiveNote;
+
+  /// No description provided for @totalPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Total photos'**
+  String get totalPhotos;
+
+  /// No description provided for @branchesVisited.
+  ///
+  /// In en, this message translates to:
+  /// **'Branches visited'**
+  String get branchesVisited;
+
+  /// No description provided for @activeDelegates.
+  ///
+  /// In en, this message translates to:
+  /// **'Active delegates'**
+  String get activeDelegates;
+
+  /// No description provided for @byDate.
+  ///
+  /// In en, this message translates to:
+  /// **'By date'**
+  String get byDate;
+
+  /// No description provided for @byBranch.
+  ///
+  /// In en, this message translates to:
+  /// **'By branch'**
+  String get byBranch;
+
+  /// No description provided for @byDelegate.
+  ///
+  /// In en, this message translates to:
+  /// **'By delegate'**
+  String get byDelegate;
+
+  /// No description provided for @photoReportsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load photo reports'**
+  String get photoReportsLoadFailed;
+
+  /// No description provided for @unknownDelegate.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown delegate'**
+  String get unknownDelegate;
+
+  /// No description provided for @pendingOnPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'On phone'**
+  String get pendingOnPhone;
+
+  /// No description provided for @uploadedToServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded'**
+  String get uploadedToServer;
+
+  /// No description provided for @noPhotosInMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'No photos in {month}'**
+  String noPhotosInMonth(Object month);
+
+  /// No description provided for @useArrowsForMonths.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the arrows above to view earlier months.'**
+  String get useArrowsForMonths;
+
+  /// No description provided for @photoDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo details'**
+  String get photoDetails;
+
+  /// No description provided for @deletePhotoPermanently.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete photo permanently'**
+  String get deletePhotoPermanently;
+
+  /// No description provided for @pinchToZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinch to zoom in'**
+  String get pinchToZoom;
+
+  /// No description provided for @deletePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete photo'**
+  String get deletePhoto;
+
+  /// No description provided for @photoSavedToGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo saved to your gallery.'**
+  String get photoSavedToGallery;
+
+  /// No description provided for @grantPhotosPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow photo access in your phone settings.'**
+  String get grantPhotosPermission;
+
+  /// No description provided for @photoSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the photo: {error}'**
+  String photoSaveFailed(Object error);
+
+  /// No description provided for @savingPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving photo…'**
+  String get savingPhoto;
+
+  /// No description provided for @savedToPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to phone'**
+  String get savedToPhone;
+
+  /// No description provided for @savePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Save photo'**
+  String get savePhoto;
+
+  /// No description provided for @branchField.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch'**
+  String get branchField;
+
+  /// No description provided for @capturedAtField.
+  ///
+  /// In en, this message translates to:
+  /// **'Captured at'**
+  String get capturedAtField;
+
+  /// No description provided for @delegateField.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate'**
+  String get delegateField;
+
+  /// No description provided for @delegateCommentField.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate\'s comment'**
+  String get delegateCommentField;
+
+  /// No description provided for @cameraOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the camera: {error}'**
+  String cameraOpenFailed(Object error);
+
+  /// No description provided for @photoRemovedFromSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo removed from this session.'**
+  String get photoRemovedFromSession;
+
+  /// No description provided for @offerPhotosSupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer photos (supervisor)'**
+  String get offerPhotosSupervisor;
+
+  /// No description provided for @photosSavedOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} photos saved on this device. They will upload automatically when you are back online.'**
+  String photosSavedOffline(Object count);
+
+  /// No description provided for @photosUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} photos uploaded and the report saved.'**
+  String photosUploaded(Object count);
+
+  /// No description provided for @photoSavedOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo saved on this device. It will upload automatically when you are back online.'**
+  String get photoSavedOffline;
+
+  /// No description provided for @photoUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo uploaded and the report saved.'**
+  String get photoUploaded;
+
+  /// No description provided for @loadingPhotoPermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading photo permissions…'**
+  String get loadingPhotoPermissions;
+
+  /// No description provided for @choosePhotoPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a photo permission *'**
+  String get choosePhotoPermission;
+
+  /// No description provided for @permissionOption.
+  ///
+  /// In en, this message translates to:
+  /// **'{companyName}{dept} - {length} branches'**
+  String permissionOption(Object companyName, Object dept, Object length);
+
+  /// No description provided for @branchWithId.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch {id}'**
+  String branchWithId(Object id);
+
+  /// No description provided for @offerPhotoPermissionOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer photo permission: {companyName}'**
+  String offerPhotoPermissionOf(Object companyName);
+
+  /// No description provided for @companyLabel2.
+  ///
+  /// In en, this message translates to:
+  /// **'Company: {companyName}'**
+  String companyLabel2(Object companyName);
+
+  /// No description provided for @departmentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Department: {department}'**
+  String departmentLabel(Object department);
+
+  /// No description provided for @noBranchesInPermissionFor.
+  ///
+  /// In en, this message translates to:
+  /// **'No branches are registered for ({organizationName}) in this permission.'**
+  String noBranchesInPermissionFor(Object organizationName);
+
+  /// No description provided for @noBranchesInPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'No branches are set for this permission yet. Ask your supervisor to add them.'**
+  String get noBranchesInPermission;
+
+  /// No description provided for @chooseBranchOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose branch ({organizationName}) *'**
+  String chooseBranchOf(Object organizationName);
+
+  /// No description provided for @chooseBranchRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose branch *'**
+  String get chooseBranchRequired;
+
+  /// No description provided for @takeOfferPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Take offer photos'**
+  String get takeOfferPhotos;
+
+  /// No description provided for @multiPhotoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can take several photos of this branch\'s products and stands at once'**
+  String get multiPhotoHint;
+
+  /// No description provided for @takeFirstPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take first photo'**
+  String get takeFirstPhoto;
+
+  /// No description provided for @visitGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit photos'**
+  String get visitGallery;
+
+  /// No description provided for @addPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photo'**
+  String get addPhoto;
+
+  /// No description provided for @photoNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo {number}'**
+  String photoNumber(Object number);
+
+  /// No description provided for @retakePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Retake this photo'**
+  String get retakePhoto;
+
+  /// No description provided for @deleteThisPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this photo'**
+  String get deleteThisPhoto;
+
+  /// No description provided for @addAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get addAction;
+
+  /// No description provided for @visitNotesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit notes ({count} photos) (optional)'**
+  String visitNotesLabel(Object count);
+
+  /// No description provided for @visitNotesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Products displayed, shelf arranged and prices clearly visible…'**
+  String get visitNotesHint;
+
+  /// No description provided for @uploadingPhotoXofY.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading photo {current} of {total}…'**
+  String uploadingPhotoXofY(Object current, Object total);
+
+  /// No description provided for @uploadingPhotosReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading photos and saving the report…'**
+  String get uploadingPhotosReport;
+
+  /// No description provided for @nameCompanySupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'{fullName} (company supervisor)'**
+  String nameCompanySupervisor(Object fullName);
+
+  /// No description provided for @chooseBranchFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a branch first.'**
+  String get chooseBranchFirst;
+
+  /// No description provided for @takeAtLeastOnePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take at least one photo before saving.'**
+  String get takeAtLeastOnePhoto;
+
+  /// No description provided for @submitReportCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit report ({count} photos)'**
+  String submitReportCount(Object count);
+
+  /// No description provided for @chooseBranchToStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a branch to start taking photos'**
+  String get chooseBranchToStart;
+
+  /// No description provided for @chooseBranchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the branch you are in from the list above to enable the camera button.'**
+  String get chooseBranchHint;
+
+  /// No description provided for @noPhotoPermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'No photo permissions right now'**
+  String get noPhotoPermissions;
+
+  /// No description provided for @askSupervisorForPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask your supervisor for a photo permission.'**
+  String get askSupervisorForPermission;
+
+  /// No description provided for @photoReportsOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo reports: {companyName}'**
+  String photoReportsOf(Object companyName);
+
+  /// No description provided for @loadingPhotoReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading photo reports…'**
+  String get loadingPhotoReports;
+
+  /// No description provided for @noUploadedPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'No uploaded photos yet'**
+  String get noUploadedPhotos;
+
+  /// No description provided for @filterByBranch.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by branch'**
+  String get filterByBranch;
+
+  /// No description provided for @allBranches.
+  ///
+  /// In en, this message translates to:
+  /// **'All branches'**
+  String get allBranches;
+
+  /// No description provided for @filterByDelegate.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by delegate'**
+  String get filterByDelegate;
+
+  /// No description provided for @allDelegates2.
+  ///
+  /// In en, this message translates to:
+  /// **'All delegates'**
+  String get allDelegates2;
+
+  /// No description provided for @shownResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {shown} of {total}'**
+  String shownResults(Object shown, Object total);
+
+  /// No description provided for @clearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get clearFilters;
+
+  /// No description provided for @noComment.
+  ///
+  /// In en, this message translates to:
+  /// **'No comment'**
+  String get noComment;
+
+  /// No description provided for @showMorePhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more ({count} more photos)'**
+  String showMorePhotos(Object count);
+
+  /// No description provided for @loadingPhotosReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading photos and reports…'**
+  String get loadingPhotosReports;
+
+  /// No description provided for @syncingPhotosXofY.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading photos ({synced} of {total})…'**
+  String syncingPhotosXofY(Object synced, Object total);
+
+  /// No description provided for @syncingRemainingPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading remaining photos…'**
+  String get syncingRemainingPhotos;
+
+  /// No description provided for @photosSavedOnPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} photos saved on the phone'**
+  String photosSavedOnPhone(Object count);
+
+  /// No description provided for @waitingToUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Will upload when you are online'**
+  String get waitingToUpload;
+
+  /// No description provided for @syncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get syncNow;
 }
 
 class _AppLocalizationsDelegate

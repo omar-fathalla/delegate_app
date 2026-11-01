@@ -1906,4 +1906,342 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get confirmDeletePhoto => 'Delete photo?';
+
+  @override
+  String deletePhotoFromConfirm(Object delegateName, Object branch) {
+    return 'Delete this photo sent by \"$delegateName\" at \"$branch\"?';
+  }
+
+  @override
+  String get photoDeletePermanentNote =>
+      'The photo will be permanently deleted from the database and storage.';
+
+  @override
+  String get deletePermanently => 'Delete permanently';
+
+  @override
+  String get chooseMonth => 'Choose month';
+
+  @override
+  String photosCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count photos',
+      one: '1 photo',
+      zero: 'No photos',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get photoReportsTitle => 'Photo reports';
+
+  @override
+  String get refreshPhotos => 'Refresh photos';
+
+  @override
+  String get photosArchiveNote =>
+      'Photos are stored in the company archive, separate from delegate accounts';
+
+  @override
+  String get totalPhotos => 'Total photos';
+
+  @override
+  String get branchesVisited => 'Branches visited';
+
+  @override
+  String get activeDelegates => 'Active delegates';
+
+  @override
+  String get byDate => 'By date';
+
+  @override
+  String get byBranch => 'By branch';
+
+  @override
+  String get byDelegate => 'By delegate';
+
+  @override
+  String get photoReportsLoadFailed => 'Couldn\'t load photo reports';
+
+  @override
+  String get unknownDelegate => 'Unknown delegate';
+
+  @override
+  String get pendingOnPhone => 'On phone';
+
+  @override
+  String get uploadedToServer => 'Uploaded';
+
+  @override
+  String noPhotosInMonth(Object month) {
+    return 'No photos in $month';
+  }
+
+  @override
+  String get useArrowsForMonths =>
+      'Use the arrows above to view earlier months.';
+
+  @override
+  String get photoDetails => 'Photo details';
+
+  @override
+  String get deletePhotoPermanently => 'Delete photo permanently';
+
+  @override
+  String get pinchToZoom => 'Pinch to zoom in';
+
+  @override
+  String get deletePhoto => 'Delete photo';
+
+  @override
+  String get photoSavedToGallery => 'Photo saved to your gallery.';
+
+  @override
+  String get grantPhotosPermission =>
+      'Allow photo access in your phone settings.';
+
+  @override
+  String photoSaveFailed(Object error) {
+    return 'Couldn\'t save the photo: $error';
+  }
+
+  @override
+  String get savingPhoto => 'Saving photo…';
+
+  @override
+  String get savedToPhone => 'Saved to phone';
+
+  @override
+  String get savePhoto => 'Save photo';
+
+  @override
+  String get branchField => 'Branch';
+
+  @override
+  String get capturedAtField => 'Captured at';
+
+  @override
+  String get delegateField => 'Delegate';
+
+  @override
+  String get delegateCommentField => 'Delegate\'s comment';
+
+  @override
+  String cameraOpenFailed(Object error) {
+    return 'Couldn\'t open the camera: $error';
+  }
+
+  @override
+  String get photoRemovedFromSession => 'Photo removed from this session.';
+
+  @override
+  String get offerPhotosSupervisor => 'Offer photos (supervisor)';
+
+  @override
+  String photosSavedOffline(Object count) {
+    return '$count photos saved on this device. They will upload automatically when you are back online.';
+  }
+
+  @override
+  String photosUploaded(Object count) {
+    return '$count photos uploaded and the report saved.';
+  }
+
+  @override
+  String get photoSavedOffline =>
+      'Photo saved on this device. It will upload automatically when you are back online.';
+
+  @override
+  String get photoUploaded => 'Photo uploaded and the report saved.';
+
+  @override
+  String get loadingPhotoPermissions => 'Loading photo permissions…';
+
+  @override
+  String get choosePhotoPermission => 'Choose a photo permission *';
+
+  @override
+  String permissionOption(Object companyName, Object dept, Object length) {
+    return '$companyName$dept - $length branches';
+  }
+
+  @override
+  String branchWithId(Object id) {
+    return 'Branch $id';
+  }
+
+  @override
+  String offerPhotoPermissionOf(Object companyName) {
+    return 'Offer photo permission: $companyName';
+  }
+
+  @override
+  String companyLabel2(Object companyName) {
+    return 'Company: $companyName';
+  }
+
+  @override
+  String departmentLabel(Object department) {
+    return 'Department: $department';
+  }
+
+  @override
+  String noBranchesInPermissionFor(Object organizationName) {
+    return 'No branches are registered for ($organizationName) in this permission.';
+  }
+
+  @override
+  String get noBranchesInPermission =>
+      'No branches are set for this permission yet. Ask your supervisor to add them.';
+
+  @override
+  String chooseBranchOf(Object organizationName) {
+    return 'Choose branch ($organizationName) *';
+  }
+
+  @override
+  String get chooseBranchRequired => 'Choose branch *';
+
+  @override
+  String get takeOfferPhotos => 'Take offer photos';
+
+  @override
+  String get multiPhotoHint =>
+      'You can take several photos of this branch\'s products and stands at once';
+
+  @override
+  String get takeFirstPhoto => 'Take first photo';
+
+  @override
+  String get visitGallery => 'Visit photos';
+
+  @override
+  String get addPhoto => 'Add photo';
+
+  @override
+  String photoNumber(Object number) {
+    return 'Photo $number';
+  }
+
+  @override
+  String get retakePhoto => 'Retake this photo';
+
+  @override
+  String get deleteThisPhoto => 'Delete this photo';
+
+  @override
+  String get addAction => 'Add';
+
+  @override
+  String visitNotesLabel(Object count) {
+    return 'Visit notes ($count photos) (optional)';
+  }
+
+  @override
+  String get visitNotesHint =>
+      'e.g. Products displayed, shelf arranged and prices clearly visible…';
+
+  @override
+  String uploadingPhotoXofY(Object current, Object total) {
+    return 'Uploading photo $current of $total…';
+  }
+
+  @override
+  String get uploadingPhotosReport => 'Uploading photos and saving the report…';
+
+  @override
+  String nameCompanySupervisor(Object fullName) {
+    return '$fullName (company supervisor)';
+  }
+
+  @override
+  String get chooseBranchFirst => 'Choose a branch first.';
+
+  @override
+  String get takeAtLeastOnePhoto => 'Take at least one photo before saving.';
+
+  @override
+  String submitReportCount(Object count) {
+    return 'Submit report ($count photos)';
+  }
+
+  @override
+  String get chooseBranchToStart => 'Choose a branch to start taking photos';
+
+  @override
+  String get chooseBranchHint =>
+      'Select the branch you are in from the list above to enable the camera button.';
+
+  @override
+  String get noPhotoPermissions => 'No photo permissions right now';
+
+  @override
+  String get askSupervisorForPermission =>
+      'Ask your supervisor for a photo permission.';
+
+  @override
+  String photoReportsOf(Object companyName) {
+    return 'Photo reports: $companyName';
+  }
+
+  @override
+  String get loadingPhotoReports => 'Loading photo reports…';
+
+  @override
+  String get noUploadedPhotos => 'No uploaded photos yet';
+
+  @override
+  String get filterByBranch => 'Filter by branch';
+
+  @override
+  String get allBranches => 'All branches';
+
+  @override
+  String get filterByDelegate => 'Filter by delegate';
+
+  @override
+  String get allDelegates2 => 'All delegates';
+
+  @override
+  String shownResults(Object shown, Object total) {
+    return 'Showing $shown of $total';
+  }
+
+  @override
+  String get clearFilters => 'Clear filters';
+
+  @override
+  String get noComment => 'No comment';
+
+  @override
+  String showMorePhotos(Object count) {
+    return 'Show more ($count more photos)';
+  }
+
+  @override
+  String get loadingPhotosReports => 'Loading photos and reports…';
+
+  @override
+  String syncingPhotosXofY(Object synced, Object total) {
+    return 'Uploading photos ($synced of $total)…';
+  }
+
+  @override
+  String get syncingRemainingPhotos => 'Uploading remaining photos…';
+
+  @override
+  String photosSavedOnPhone(Object count) {
+    return '$count photos saved on the phone';
+  }
+
+  @override
+  String get waitingToUpload => 'Will upload when you are online';
+
+  @override
+  String get syncNow => 'Sync now';
 }

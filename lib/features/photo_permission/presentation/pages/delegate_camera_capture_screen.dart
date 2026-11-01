@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'dart:io';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -99,6 +100,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
   }
 
   Future<void> _capturePhoto({bool isAddingMore = true}) async {
+    final l10n = AppLocalizations.of(context)!;
     final ImagePicker picker = ImagePicker();
     try {
       // إجبار المستخدم على الكاميرا فقط لضمان مصداقية التوثيق الميداني
@@ -121,7 +123,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
         });
       }
     } catch (e) {
-      _showErrorSnackBar('فشل في فتح الكاميرا: $e');
+      _showErrorSnackBar(l10n.cameraOpenFailed(e));
     }
   }
 
@@ -134,8 +136,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم حذف الصورة من الجلسة.'),
+      SnackBar(
+        content: Text(AppLocalizations.of(context)!.photoRemovedFromSession),
         duration: Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
@@ -161,7 +163,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          isSupervisor ? 'تصوير العروض الميدانية (مشرف)' : 'تصوير العروض الميدانية',
+          isSupervisor ? AppLocalizations.of(context)!.offerPhotosSupervisor : AppLocalizations.of(context)!.offerPhotosTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
@@ -182,8 +184,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                     Expanded(
                       child: Text(
                         isOffline
-                            ? '⏳ تم حفظ $count صور محلياً بأمان، وسيتم رفعها تلقائياً للسيرفر فور توفر الإنترنت.'
-                            : '✅ تم رفع $count صور وحفظ التقرير الميداني بنجاح على السيرفر.',
+                            ? AppLocalizations.of(context)!.photosSavedOffline(count)
+                            : AppLocalizations.of(context)!.photosUploaded(count),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -214,8 +216,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                     Expanded(
                       child: Text(
                         isOffline
-                            ? '⏳ تم حفظ الصورة محلياً بأمان، وسيتم رفعها تلقائياً للسيرفر فور توفر الإنترنت.'
-                            : '✅ تم رفع الصورة وحفظ التقرير بنجاح على السيرفر.',
+                            ? AppLocalizations.of(context)!.photoSavedOffline
+                            : AppLocalizations.of(context)!.photoUploaded,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -242,10 +244,10 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
           }
 
           if (state is PhotoPermissionLoading && _cachedPermissions == null) {
-            return const Center(
+            return Center(
               child: AppLoadingIndicator(
                 style: AppLoadingStyle.threeArchedCircle,
-                label: 'جاري جلب معلومات أذونات التصوير...',
+                label: AppLocalizations.of(context)!.loadingPhotoPermissions,
               ),
             );
           }
@@ -280,7 +282,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                     DropdownButtonFormField<PhotoPermission>(
                       initialValue: _selectedPermission ?? availablePermissions.first,
                       decoration: InputDecoration(
-                        labelText: 'اختر إذن / حملة التصوير المعتمدة *',
+                        labelText: AppLocalizations.of(context)!.choosePhotoPermission,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         prefixIcon: const Icon(Icons.assignment_turned_in_rounded),
                         filled: true,
@@ -292,7 +294,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             : '';
                         return DropdownMenuItem<PhotoPermission>(
                           value: p,
-                          child: Text('${p.companyName}$dept - ${p.branchNames.length} فرع'),
+                          child: Text(AppLocalizations.of(context)!.permissionOption(p.companyName, dept, p.branchNames.length)),
                         );
                       }).toList(),
                       onChanged: (val) {
@@ -320,7 +322,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                       final bName = i < activePermission.branchNames.length &&
                               activePermission.branchNames[i].trim().isNotEmpty
                           ? activePermission.branchNames[i].trim()
-                          : 'فرع $bId';
+                          : AppLocalizations.of(context)!.branchWithId(bId);
 
                       // If organization branches are loaded, strictly filter by delegate's active organization
                       if (_orgBranchesMap != null && _orgBranchesMap!.isNotEmpty) {
@@ -379,7 +381,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'إذن تصوير العروض: ${activePermission.companyName}',
+                                    AppLocalizations.of(context)!.offerPhotoPermissionOf(activePermission.companyName),
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -391,7 +393,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'الشركة: ${activePermission.companyName}',
+                              AppLocalizations.of(context)!.companyLabel2(activePermission.companyName),
                               style: TextStyle(
                                 fontSize: 13,
                                 color: colorScheme.onSurfaceVariant,
@@ -400,7 +402,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             if (activePermission.department != null && activePermission.department!.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
-                                'القسم: ${activePermission.department}',
+                                AppLocalizations.of(context)!.departmentLabel(activePermission.department ?? ''),
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.bold,
@@ -437,8 +439,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                               Expanded(
                                 child: Text(
                                   widget.delegate.organizationName.isNotEmpty
-                                      ? 'لا توجد فروع مسجلة لـ (${widget.delegate.organizationName}) في هذا الإذن.'
-                                      : 'لا توجد فروع محددة لهذا الإذن حالياً. يرجى التواصل مع مشرف الشركة لإضافة الفروع المعتمدة.',
+                                      ? AppLocalizations.of(context)!.noBranchesInPermissionFor(widget.delegate.organizationName)
+                                      : AppLocalizations.of(context)!.noBranchesInPermission,
                                   style: TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.bold,
@@ -455,8 +457,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                           initialValue: effectiveBranchId,
                           decoration: InputDecoration(
                             labelText: widget.delegate.organizationName.isNotEmpty
-                                ? 'اختر الفرع (${widget.delegate.organizationName}) *'
-                                : 'اختر الفرع *',
+                                ? AppLocalizations.of(context)!.chooseBranchOf(widget.delegate.organizationName)
+                                : AppLocalizations.of(context)!.chooseBranchRequired,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             prefixIcon: const Icon(Icons.store_rounded),
                             filled: true,
@@ -513,7 +515,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   ),
                                   const SizedBox(height: 14),
                                   Text(
-                                    'التقاط صور العرض الميداني بالكاميرا',
+                                    AppLocalizations.of(context)!.takeOfferPhotos,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -522,7 +524,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'يمكنك التقاط عدة صور لمنتجات وستاندات هذا الفرع دفعة واحدة',
+                                    AppLocalizations.of(context)!.multiPhotoHint,
                                     style: TextStyle(
                                       fontSize: 12.5,
                                       color: colorScheme.onSurfaceVariant,
@@ -532,7 +534,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   FilledButton.tonalIcon(
                                     onPressed: () => _capturePhoto(isAddingMore: true),
                                     icon: const Icon(Icons.add_a_photo_rounded, size: 18),
-                                    label: const Text('بدء التقاط أول صورة'),
+                                    label: Text(AppLocalizations.of(context)!.takeFirstPhoto),
                                   ),
                                 ],
                               ),
@@ -576,7 +578,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'معرض صور الزيارة',
+                                    AppLocalizations.of(context)!.visitGallery,
                                     style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.w600,
@@ -587,7 +589,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 FilledButton.tonalIcon(
                                   onPressed: () => _capturePhoto(isAddingMore: true),
                                   icon: const Icon(Icons.add_a_photo_rounded, size: 18),
-                                  label: const Text('إضافة صورة'),
+                                  label: Text(AppLocalizations.of(context)!.addPhoto),
                                   style: FilledButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     visualDensity: VisualDensity.compact,
@@ -643,7 +645,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                         border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                                       ),
                                       child: Text(
-                                        'صورة ${_selectedPhotoIndex + 1}',
+                                        AppLocalizations.of(context)!.photoNumber(_selectedPhotoIndex + 1),
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 12,
@@ -674,8 +676,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                           TextButton.icon(
                                             onPressed: () => _capturePhoto(isAddingMore: false),
                                             icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
-                                            label: const Text(
-                                              'إعادة التقاط هذه الصورة',
+                                            label: Text(
+                                              AppLocalizations.of(context)!.retakePhoto,
                                               style: TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 12.5,
@@ -695,7 +697,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                               backgroundColor: Colors.red.withValues(alpha: 0.8),
                                               foregroundColor: Colors.white,
                                             ),
-                                            tooltip: 'حذف هذه الصورة',
+                                            tooltip: AppLocalizations.of(context)!.deleteThisPhoto,
                                           ),
                                         ],
                                       ),
@@ -737,7 +739,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                           Icon(Icons.add_a_photo_rounded, size: 22, color: colorScheme.primary),
                                           const SizedBox(height: 4),
                                           Text(
-                                            'إضافة',
+                                            AppLocalizations.of(context)!.addAction,
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.bold,
@@ -826,9 +828,9 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             controller: _commentController,
                             maxLines: 3,
                             decoration: InputDecoration(
-                              labelText: 'ملاحظات الزيارة الميدانية (${_capturedPhotos.length} صور) (اختياري)',
+                              labelText: AppLocalizations.of(context)!.visitNotesLabel(_capturedPhotos.length),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                              hintText: 'مثال: تم عرض المنتجات وتنسيق الرف بشكل كامل والتأكد من وضوح الأسعار...',
+                              hintText: AppLocalizations.of(context)!.visitNotesHint,
                               prefixIcon: const Icon(Icons.comment_outlined),
                             ),
                           ),
@@ -855,7 +857,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                       ),
                                       const SizedBox(width: 12),
                                       Text(
-                                        'جاري رفع وإرسال الصورة ${state.current} من ${state.total}...',
+                                        AppLocalizations.of(context)!.uploadingPhotoXofY(state.current, state.total),
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: colorScheme.primary,
@@ -895,7 +897,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   ),
                                   const SizedBox(width: 12),
                                   Text(
-                                    'جاري رفع الصور إلى السيرفر وحفظ التقرير...',
+                                    AppLocalizations.of(context)!.uploadingPhotosReport,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: colorScheme.primary,
@@ -920,19 +922,19 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                     : widget.delegate.companyName;
                                 final compCode = currentPerm.companyCode;
                                 final uploaderName = widget.delegate.role == UserRole.admin
-                                    ? '${widget.delegate.fullName} (مشرف الشركة)'
+                                    ? AppLocalizations.of(context)!.nameCompanySupervisor(widget.delegate.fullName)
                                     : widget.delegate.fullName;
 
                                 final finalBranchId = effectiveBranchId ?? _selectedBranchId ?? '';
                                 final finalBranchName = effectiveBranchName ?? _selectedBranchName ?? finalBranchId;
 
                                 if (finalBranchId.isEmpty) {
-                                  _showErrorSnackBar('يرجى اختيار الفرع أولاً.');
+                                  _showErrorSnackBar(AppLocalizations.of(context)!.chooseBranchFirst);
                                   return;
                                 }
 
                                 if (_capturedPhotos.isEmpty) {
-                                  _showErrorSnackBar('يرجى التقاط صورة واحدة على الأقل قبل الحفظ.');
+                                  _showErrorSnackBar(AppLocalizations.of(context)!.takeAtLeastOnePhoto);
                                   return;
                                 }
 
@@ -962,7 +964,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 ),
                               ),
                               label: Text(
-                                'تسجيل التقرير الميداني (${_capturedPhotos.length} صور)',
+                                AppLocalizations.of(context)!.submitReportCount(_capturedPhotos.length),
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                               ),
                             ),
@@ -995,7 +997,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                               ),
                               const SizedBox(height: 14),
                               Text(
-                                'يرجى اختيار الفرع أولاً للبدء بالتصوير',
+                                AppLocalizations.of(context)!.chooseBranchToStart,
                                 style: TextStyle(
                                   fontSize: 15.5,
                                   fontWeight: FontWeight.bold,
@@ -1004,7 +1006,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'حدد الفرع الذي تتواجد فيه من القائمة أعلاه لتفعيل زر التقاط صورة العرض الميداني بالكاميرا.',
+                                AppLocalizations.of(context)!.chooseBranchHint,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 13,
@@ -1023,7 +1025,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
             );
           }
 
-          return const Center(child: Text('جاري جلب معلومات أذونات التصوير...'));
+          return Center(child: Text(AppLocalizations.of(context)!.loadingPhotoPermissions));
         },
       ),
     );
@@ -1041,7 +1043,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
           ),
           const SizedBox(height: 16),
           Text(
-            'لا توجد أذونات تصوير نشطة لشركتك',
+            AppLocalizations.of(context)!.noPhotoPermissions,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.onSurfaceVariant,
@@ -1051,7 +1053,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
-              'يرجى التواصل مع مشرف الشركة لتقديم طلب إذن تصوير، والتأكد من اعتماده من إدارة التسويق.',
+              AppLocalizations.of(context)!.askSupervisorForPermission,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
               ),

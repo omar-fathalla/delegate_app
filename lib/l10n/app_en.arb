@@ -1800,5 +1800,224 @@
         "type": "int"
       }
     }
-  }
+  },
+  "confirmDeletePhoto": "Delete photo?",
+  "deletePhotoFromConfirm": "Delete this photo sent by \"{delegateName}\" at \"{branch}\"?",
+  "@deletePhotoFromConfirm": {
+    "placeholders": {
+      "delegateName": {},
+      "branch": {}
+    }
+  },
+  "photoDeletePermanentNote": "The photo will be permanently deleted from the database and storage.",
+  "deletePermanently": "Delete permanently",
+  "chooseMonth": "Choose month",
+  "photosCount": "{count, plural, =0{No photos} =1{1 photo} other{{count} photos}}",
+  "@photosCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "photoReportsTitle": "Photo reports",
+  "refreshPhotos": "Refresh photos",
+  "photosArchiveNote": "Photos are stored in the company archive, separate from delegate accounts",
+  "totalPhotos": "Total photos",
+  "branchesVisited": "Branches visited",
+  "activeDelegates": "Active delegates",
+  "byDate": "By date",
+  "byBranch": "By branch",
+  "byDelegate": "By delegate",
+  "photoReportsLoadFailed": "Couldn't load photo reports",
+  "unknownDelegate": "Unknown delegate",
+  "pendingOnPhone": "On phone",
+  "uploadedToServer": "Uploaded",
+  "noPhotosInMonth": "No photos in {month}",
+  "@noPhotosInMonth": {
+    "placeholders": {
+      "month": {}
+    }
+  },
+  "useArrowsForMonths": "Use the arrows above to view earlier months.",
+  "photoDetails": "Photo details",
+  "deletePhotoPermanently": "Delete photo permanently",
+  "pinchToZoom": "Pinch to zoom in",
+  "deletePhoto": "Delete photo",
+  "photoSavedToGallery": "Photo saved to your gallery.",
+  "grantPhotosPermission": "Allow photo access in your phone settings.",
+  "photoSaveFailed": "Couldn't save the photo: {error}",
+  "@photoSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "savingPhoto": "Saving photo…",
+  "savedToPhone": "Saved to phone",
+  "savePhoto": "Save photo",
+  "branchField": "Branch",
+  "capturedAtField": "Captured at",
+  "delegateField": "Delegate",
+  "delegateCommentField": "Delegate's comment",
+  "cameraOpenFailed": "Couldn't open the camera: {error}",
+  "@cameraOpenFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "photoRemovedFromSession": "Photo removed from this session.",
+  "offerPhotosSupervisor": "Offer photos (supervisor)",
+  "photosSavedOffline": "{count} photos saved on this device. They will upload automatically when you are back online.",
+  "@photosSavedOffline": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "photosUploaded": "{count} photos uploaded and the report saved.",
+  "@photosUploaded": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "photoSavedOffline": "Photo saved on this device. It will upload automatically when you are back online.",
+  "photoUploaded": "Photo uploaded and the report saved.",
+  "loadingPhotoPermissions": "Loading photo permissions…",
+  "choosePhotoPermission": "Choose a photo permission *",
+  "permissionOption": "{companyName}{dept} - {length} branches",
+  "@permissionOption": {
+    "placeholders": {
+      "companyName": {},
+      "dept": {},
+      "length": {}
+    }
+  },
+  "branchWithId": "Branch {id}",
+  "@branchWithId": {
+    "placeholders": {
+      "id": {}
+    }
+  },
+  "offerPhotoPermissionOf": "Offer photo permission: {companyName}",
+  "@offerPhotoPermissionOf": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "companyLabel2": "Company: {companyName}",
+  "@companyLabel2": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "departmentLabel": "Department: {department}",
+  "@departmentLabel": {
+    "placeholders": {
+      "department": {}
+    }
+  },
+  "noBranchesInPermissionFor": "No branches are registered for ({organizationName}) in this permission.",
+  "@noBranchesInPermissionFor": {
+    "placeholders": {
+      "organizationName": {}
+    }
+  },
+  "noBranchesInPermission": "No branches are set for this permission yet. Ask your supervisor to add them.",
+  "chooseBranchOf": "Choose branch ({organizationName}) *",
+  "@chooseBranchOf": {
+    "placeholders": {
+      "organizationName": {}
+    }
+  },
+  "chooseBranchRequired": "Choose branch *",
+  "takeOfferPhotos": "Take offer photos",
+  "multiPhotoHint": "You can take several photos of this branch's products and stands at once",
+  "takeFirstPhoto": "Take first photo",
+  "visitGallery": "Visit photos",
+  "addPhoto": "Add photo",
+  "photoNumber": "Photo {number}",
+  "@photoNumber": {
+    "placeholders": {
+      "number": {}
+    }
+  },
+  "retakePhoto": "Retake this photo",
+  "deleteThisPhoto": "Delete this photo",
+  "addAction": "Add",
+  "visitNotesLabel": "Visit notes ({count} photos) (optional)",
+  "@visitNotesLabel": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "visitNotesHint": "e.g. Products displayed, shelf arranged and prices clearly visible…",
+  "uploadingPhotoXofY": "Uploading photo {current} of {total}…",
+  "@uploadingPhotoXofY": {
+    "placeholders": {
+      "current": {},
+      "total": {}
+    }
+  },
+  "uploadingPhotosReport": "Uploading photos and saving the report…",
+  "nameCompanySupervisor": "{fullName} (company supervisor)",
+  "@nameCompanySupervisor": {
+    "placeholders": {
+      "fullName": {}
+    }
+  },
+  "chooseBranchFirst": "Choose a branch first.",
+  "takeAtLeastOnePhoto": "Take at least one photo before saving.",
+  "submitReportCount": "Submit report ({count} photos)",
+  "@submitReportCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "chooseBranchToStart": "Choose a branch to start taking photos",
+  "chooseBranchHint": "Select the branch you are in from the list above to enable the camera button.",
+  "noPhotoPermissions": "No photo permissions right now",
+  "askSupervisorForPermission": "Ask your supervisor for a photo permission.",
+  "photoReportsOf": "Photo reports: {companyName}",
+  "@photoReportsOf": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "loadingPhotoReports": "Loading photo reports…",
+  "noUploadedPhotos": "No uploaded photos yet",
+  "filterByBranch": "Filter by branch",
+  "allBranches": "All branches",
+  "filterByDelegate": "Filter by delegate",
+  "allDelegates2": "All delegates",
+  "shownResults": "Showing {shown} of {total}",
+  "@shownResults": {
+    "placeholders": {
+      "shown": {},
+      "total": {}
+    }
+  },
+  "clearFilters": "Clear filters",
+  "noComment": "No comment",
+  "showMorePhotos": "Show more ({count} more photos)",
+  "@showMorePhotos": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "loadingPhotosReports": "Loading photos and reports…",
+  "syncingPhotosXofY": "Uploading photos ({synced} of {total})…",
+  "@syncingPhotosXofY": {
+    "placeholders": {
+      "synced": {},
+      "total": {}
+    }
+  },
+  "syncingRemainingPhotos": "Uploading remaining photos…",
+  "photosSavedOnPhone": "{count} photos saved on the phone",
+  "@photosSavedOnPhone": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "waitingToUpload": "Will upload when you are online",
+  "syncNow": "Sync now"
 }

@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
@@ -170,9 +171,9 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
               children: [
                 Icon(Symbols.warning_amber_rounded, color: colorScheme.error, size: 28),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'تأكيد حذف الصورة',
+                    AppLocalizations.of(context)!.confirmDeletePhoto,
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                 ),
@@ -180,7 +181,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             ),
             const SizedBox(height: 12),
             Text(
-              'هل أنت متأكد من حذف هذه الصورة المرسلة من "${photo.delegateName}" بفرع "${BranchDisplayCache.instance.displayName(photo.branchName)}"؟',
+              AppLocalizations.of(context)!.deletePhotoFromConfirm(photo.delegateName, BranchDisplayCache.instance.displayName(photo.branchName)),
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -197,7 +198,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'سيتم حذف الصورة بشكل نهائي من قاعدة البيانات ومساحة التخزين.',
+                      AppLocalizations.of(context)!.photoDeletePermanentNote,
                       style: TextStyle(fontSize: 12, color: colorScheme.error),
                     ),
                   ),
@@ -252,7 +253,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
-                                  'حذف نهائي',
+                                  AppLocalizations.of(context)!.deletePermanently,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
@@ -399,8 +400,8 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                     children: [
                       Icon(Symbols.calendar_month_rounded, color: colorScheme.primary, size: 22),
                       const SizedBox(width: 8),
-                      const Text(
-                        'أرشيف الشهور المسجلة',
+                      Text(
+                        AppLocalizations.of(context)!.chooseMonth,
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ],
@@ -459,7 +460,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         ),
                         subtitle: isCurrent
                             ? Text(
-                                'الشهر الحالي',
+                                AppLocalizations.of(context)!.currentMonth,
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: colorScheme.secondary,
@@ -476,7 +477,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            '$count صورة',
+                            AppLocalizations.of(context)!.photosCount(count),
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -507,8 +508,8 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     return Scaffold(
       appBar: widget.showAppBar
           ? AppBar(
-              title: const Text(
-                'الأرشيف الشهري لصور الشركة',
+              title: Text(
+                AppLocalizations.of(context)!.photoReportsTitle,
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
@@ -521,7 +522,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
               actions: [
                 IconButton(
                   icon: const Icon(Symbols.refresh_rounded),
-                  tooltip: 'تحديث الصور',
+                  tooltip: AppLocalizations.of(context)!.refreshPhotos,
                   onPressed: _loadPhotos,
                 ),
               ],
@@ -635,7 +636,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'جميع الصور محفوظة ومؤرشفة للشركة ومستقلة عن حسابات المناديب',
+                                    AppLocalizations.of(context)!.photosArchiveNote,
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: colorScheme.onSurfaceVariant,
@@ -677,7 +678,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                 textDirection: TextDirection.ltr,
                               ),
                               onPressed: _previousMonth,
-                              tooltip: 'الشهر السابق (أرشيف)',
+                              tooltip: AppLocalizations.of(context)!.previousMonth,
                             ),
 
                             // Animated Month Title + Picker trigger
@@ -747,7 +748,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
-                                                'العودة للشهر الحالي',
+                                                AppLocalizations.of(context)!.currentMonth,
                                                 style: TextStyle(
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.bold,
@@ -778,7 +779,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                 textDirection: TextDirection.ltr,
                               ),
                               onPressed: isCurrentMonth ? null : _nextMonth,
-                              tooltip: 'الشهر التالي',
+                              tooltip: AppLocalizations.of(context)!.nextMonth,
                             ),
                           ],
                         ),
@@ -859,7 +860,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         children: [
                           Expanded(
                             child: _buildMetricCard(
-                              title: 'إجمالي الصور',
+                              title: AppLocalizations.of(context)!.totalPhotos,
                               value: '$totalPhotos',
                               icon: Symbols.photo_library_rounded,
                               theme: theme,
@@ -868,7 +869,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                           const SizedBox(width: 8),
                           Expanded(
                             child: _buildMetricCard(
-                              title: 'الفروع المزارة',
+                              title: AppLocalizations.of(context)!.branchesVisited,
                               value: '$uniqueBranches',
                               icon: Symbols.storefront_rounded,
                               theme: theme,
@@ -877,7 +878,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                           const SizedBox(width: 8),
                           Expanded(
                             child: _buildMetricCard(
-                              title: 'المناديب النشطين',
+                              title: AppLocalizations.of(context)!.activeDelegates,
                               value: '$uniqueDelegates',
                               icon: Symbols.group_rounded,
                               theme: theme,
@@ -902,7 +903,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                           children: [
                             Expanded(
                               child: _buildSegmentButton(
-                                title: 'حسب التاريخ',
+                                title: AppLocalizations.of(context)!.byDate,
                                 icon: Symbols.calendar_month_rounded,
                                 isSelected: _currentGroupMode == GroupMode.byDate,
                                 onTap: () => setState(() => _currentGroupMode = GroupMode.byDate),
@@ -911,7 +912,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             ),
                             Expanded(
                               child: _buildSegmentButton(
-                                title: 'حسب الفرع',
+                                title: AppLocalizations.of(context)!.byBranch,
                                 icon: Symbols.store_rounded,
                                 isSelected: _currentGroupMode == GroupMode.byBranch,
                                 onTap: () => setState(() => _currentGroupMode = GroupMode.byBranch),
@@ -920,7 +921,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             ),
                             Expanded(
                               child: _buildSegmentButton(
-                                title: 'حسب المندوب',
+                                title: AppLocalizations.of(context)!.byDelegate,
                                 icon: Symbols.person_rounded,
                                 isSelected: _currentGroupMode == GroupMode.byDelegate,
                                 onTap: () => setState(() => _currentGroupMode = GroupMode.byDelegate),
@@ -962,7 +963,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                     Icon(Symbols.error_outline_rounded, size: 56, color: colorScheme.error),
                     const SizedBox(height: 16),
                     Text(
-                      'تعذر تحميل تقارير الصور',
+                      AppLocalizations.of(context)!.photoReportsLoadFailed,
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
@@ -975,7 +976,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                     FilledButton.tonalIcon(
                       onPressed: _loadPhotos,
                       icon: const Icon(Symbols.refresh_rounded, size: 18),
-                      label: const Text('إعادة المحاولة'),
+                      label: Text(AppLocalizations.of(context)!.retry),
                     ),
                   ],
                 ),
@@ -1144,7 +1145,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
       // GroupMode.byDelegate
       final Map<String, List<CapturedPhoto>> grouped = {};
       for (var photo in photos) {
-        final delName = photo.delegateName.trim().isNotEmpty ? photo.delegateName.trim() : 'مندوب غير محدد';
+        final delName = photo.delegateName.trim().isNotEmpty ? photo.delegateName.trim() : AppLocalizations.of(context)!.unknownDelegate;
         grouped.putIfAbsent(delName, () => []).add(photo);
       }
 
@@ -1217,7 +1218,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '${photos.length} صور',
+                  AppLocalizations.of(context)!.photosCount(photos.length),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -1333,7 +1334,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                   Icon(Symbols.cloud_off_rounded, size: 10, color: Theme.of(context).colorScheme.onTertiaryContainer),
                                   const SizedBox(width: 3),
                                   Text(
-                                    'معلقة بالهاتف',
+                                    AppLocalizations.of(context)!.pendingOnPhone,
                                     style: TextStyle(
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.bold,
@@ -1357,7 +1358,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                   Icon(Symbols.cloud_done_rounded, size: 10, color: Theme.of(context).colorScheme.onPrimaryContainer),
                                   const SizedBox(width: 3),
                                   Text(
-                                    'مرفوعة بالسيرفر',
+                                    AppLocalizations.of(context)!.uploadedToServer,
                                     style: TextStyle(
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.bold,
@@ -1426,7 +1427,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             ),
             const SizedBox(height: 16),
             Text(
-              'لا توجد صور ملتقطة في ${_getMonthNameArabic(_selectedMonth)}',
+              AppLocalizations.of(context)!.noPhotosInMonth(_getMonthNameArabic(_selectedMonth)),
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -1435,7 +1436,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             ),
             const SizedBox(height: 6),
             Text(
-              'يمكنك التنقل بين الشهور السابقة باستخدام الأسهم بالأعلى لتصفح الأرشيف الكامل للشركة.',
+              AppLocalizations.of(context)!.useArrowsForMonths,
               style: TextStyle(
                 fontSize: 12,
                 color: colorScheme.onSurfaceVariant,
@@ -1502,8 +1503,8 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'تفاصيل الصورة الميدانية',
+                            Text(
+                              AppLocalizations.of(context)!.photoDetails,
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                             Row(
@@ -1511,7 +1512,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               children: [
                                 if (_canDeletePhoto)
                                   IconButton(
-                                    tooltip: 'حذف الصورة نهائياً',
+                                    tooltip: AppLocalizations.of(context)!.deletePhotoPermanently,
                                     icon: Icon(Symbols.delete_outline_rounded, size: 22, color: Colors.red.shade700),
                                     onPressed: () {
                                       Navigator.pop(modalContext);
@@ -1554,7 +1555,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             const SizedBox(height: 6),
                             Center(
                               child: Text(
-                                'يمكنك قرص الصورة أو استخدام إصبعين لتكبير التفاصيل',
+                                AppLocalizations.of(context)!.pinchToZoom,
                                 style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
                               ),
                             ),
@@ -1571,7 +1572,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                     },
                                     icon: Icon(Symbols.delete_rounded, color: colorScheme.error, size: 18),
                                     label: Text(
-                                      'حذف الصورة',
+                                      AppLocalizations.of(context)!.deletePhoto,
                                       style: TextStyle(color: colorScheme.error, fontWeight: FontWeight.bold, fontSize: 13),
                                     ),
                                     style: OutlinedButton.styleFrom(
@@ -1601,8 +1602,8 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                                   isSaving = false;
                                                   saveSuccess = success;
                                                   statusText = success
-                                                      ? 'تم حفظ الصورة في ألبوم صور الهاتف بنجاح.'
-                                                      : 'يرجى منح الإذن للوصول للصور من إعدادات الهاتف.';
+                                                      ? AppLocalizations.of(context)!.photoSavedToGallery
+                                                      : AppLocalizations.of(context)!.grantPhotosPermission;
                                                 });
                                               }
                                             } catch (e) {
@@ -1610,7 +1611,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                                 setSheetState(() {
                                                   isSaving = false;
                                                   saveSuccess = false;
-                                                  statusText = 'تعذر حفظ الصورة: $e';
+                                                  statusText = AppLocalizations.of(context)!.photoSaveFailed(e);
                                                 });
                                               }
                                             }
@@ -1630,10 +1631,10 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                           ),
                                     label: Text(
                                       isSaving
-                                          ? 'جاري حفظ الصورة...'
+                                          ? AppLocalizations.of(context)!.savingPhoto
                                           : saveSuccess
-                                              ? 'تم الحفظ في الهاتف'
-                                              : 'حفظ الصورة',
+                                              ? AppLocalizations.of(context)!.savedToPhone
+                                              : AppLocalizations.of(context)!.savePhoto,
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                     ),
                                     style: FilledButton.styleFrom(
@@ -1694,7 +1695,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                 children: [
                                   _buildDetailItem(
                                     icon: Symbols.business_rounded,
-                                    title: 'الشركة التابعة:',
+                                    title: AppLocalizations.of(context)!.companyLabel,
                                     value: photo.companyName.isNotEmpty
                                         ? photo.companyName
                                         : widget.delegate.companyName,
@@ -1703,21 +1704,21 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                   const Divider(height: 18),
                                   _buildDetailItem(
                                     icon: Symbols.storefront_rounded,
-                                    title: 'الفرع المعتمد:',
+                                    title: AppLocalizations.of(context)!.branchField,
                                     value: photo.branchName,
                                     theme: theme,
                                   ),
                                   const Divider(height: 18),
                                   _buildDetailItem(
                                     icon: Symbols.calendar_today_rounded,
-                                    title: 'وقت وتاريخ الالتقاط:',
+                                    title: AppLocalizations.of(context)!.capturedAtField,
                                     value: formattedDate,
                                     theme: theme,
                                   ),
                                   const Divider(height: 18),
                                   _buildDetailItem(
                                     icon: Symbols.person_rounded,
-                                    title: 'بواسطة المندوب:',
+                                    title: AppLocalizations.of(context)!.delegateField,
                                     value: photo.delegateName,
                                     theme: theme,
                                   ),
@@ -1725,7 +1726,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                     const Divider(height: 18),
                                     _buildDetailItem(
                                       icon: Symbols.comment_rounded,
-                                      title: 'تعليق المندوب:',
+                                      title: AppLocalizations.of(context)!.delegateCommentField,
                                       value: photo.comment,
                                       theme: theme,
                                       isComment: true,

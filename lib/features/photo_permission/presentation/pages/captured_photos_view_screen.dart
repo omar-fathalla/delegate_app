@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -95,9 +96,9 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
-                'تأكيد حذف الصورة',
+                AppLocalizations.of(context)!.confirmDeletePhoto,
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
             ),
@@ -108,7 +109,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'هل أنت متأكد من حذف هذه الصورة المرسلة من المندوب "${photo.delegateName}" بفرع "${BranchDisplayCache.instance.displayName(photo.branchName)}"؟',
+              AppLocalizations.of(context)!.deletePhotoFromConfirm(photo.delegateName, BranchDisplayCache.instance.displayName(photo.branchName)),
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -123,9 +124,9 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                 children: [
                   Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'سيتم حذف الصورة بشكل نهائي من قاعدة البيانات ومساحة التخزين.',
+                      AppLocalizations.of(context)!.photoDeletePermanentNote,
                       style: TextStyle(fontSize: 12, color: Colors.red),
                     ),
                   ),
@@ -147,7 +148,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
             icon: const Icon(Icons.delete_forever_rounded, size: 18),
-            label: const Text('حذف نهائي'),
+            label: Text(AppLocalizations.of(context)!.deletePermanently),
           ),
         ],
       ),
@@ -184,7 +185,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'التقارير المصورة: ${permission.companyName}',
+              AppLocalizations.of(context)!.photoReportsOf(permission.companyName),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             Text(
@@ -223,10 +224,10 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
         },
         builder: (context, state) {
           if (state is PhotoPermissionLoading) {
-            return const Center(
+            return Center(
               child: AppLoadingIndicator(
                 style: AppLoadingStyle.threeArchedCircle,
-                label: 'جاري تحميل التقارير المصورة...',
+                label: AppLocalizations.of(context)!.loadingPhotoReports,
               ),
             );
           }
@@ -245,7 +246,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'لا توجد صور مرفوعة حتى الآن',
+                      AppLocalizations.of(context)!.noUploadedPhotos,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: colorScheme.onSurfaceVariant,
@@ -297,16 +298,16 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                               isExpanded: true,
                               initialValue: _selectedBranchId,
                               decoration: InputDecoration(
-                                labelText: 'تصفية حسب الفرع',
+                                labelText: AppLocalizations.of(context)!.filterByBranch,
                                 prefixIcon: const Icon(Icons.store_rounded, size: 20),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 isDense: true,
                               ),
                               items: [
-                                const DropdownMenuItem<String?>(
+                                DropdownMenuItem<String?>(
                                   value: null,
-                                  child: Text('جميع الفروع', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                  child: Text(AppLocalizations.of(context)!.allBranches, style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
                                 ),
                                 ...availableBranches.entries.map((e) => DropdownMenuItem<String?>(
                                       value: e.key,
@@ -325,16 +326,16 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                               isExpanded: true,
                               initialValue: _selectedDelegateUID,
                               decoration: InputDecoration(
-                                labelText: 'تصفية حسب المندوب',
+                                labelText: AppLocalizations.of(context)!.filterByDelegate,
                                 prefixIcon: const Icon(Icons.badge_rounded, size: 20),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 isDense: true,
                               ),
                               items: [
-                                const DropdownMenuItem<String?>(
+                                DropdownMenuItem<String?>(
                                   value: null,
-                                  child: Text('جميع المناديب', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                  child: Text(AppLocalizations.of(context)!.allDelegates2, style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
                                 ),
                                 ...availableDelegates.entries.map((e) => DropdownMenuItem<String?>(
                                       value: e.key,
@@ -355,7 +356,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'النتائج المعروضة: ${filteredPhotos.length} من أصل ${photos.length}',
+                              AppLocalizations.of(context)!.shownResults(filteredPhotos.length, photos.length),
                               style: theme.textTheme.labelMedium?.copyWith(
                                 color: colorScheme.primary,
                                 fontWeight: FontWeight.bold,
@@ -370,7 +371,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                 });
                               },
                               child: Text(
-                                'إلغاء الفلاتر',
+                                AppLocalizations.of(context)!.clearFilters,
                                 style: theme.textTheme.labelMedium?.copyWith(
                                   color: colorScheme.error,
                                   fontWeight: FontWeight.bold,
@@ -393,7 +394,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                             children: [
                               Icon(Icons.filter_list_off_rounded, size: 64, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
                               const SizedBox(height: 16),
-                              Text('لا توجد نتائج مطابقة للبحث', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant)),
+                              Text(AppLocalizations.of(context)!.noResults, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant)),
                             ],
                           ),
                         )
@@ -493,7 +494,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            photo.comment.isEmpty ? 'بدون تعليق' : photo.comment,
+                                            photo.comment.isEmpty ? AppLocalizations.of(context)!.noComment : photo.comment,
                                             style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, color: colorScheme.onSurfaceVariant),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
@@ -529,7 +530,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                       },
                       icon: const Icon(Icons.expand_more_rounded),
                       label: Text(
-                        'عرض المزيد (${filteredPhotos.length - _visibleCount} صورة إضافية)',
+                        AppLocalizations.of(context)!.showMorePhotos(filteredPhotos.length - _visibleCount),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -538,7 +539,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
             );
           }
 
-          return const Center(child: Text('جاري جلب الصور والتقارير الميدانية...'));
+          return Center(child: Text(AppLocalizations.of(context)!.loadingPhotosReports));
         },
       ),
     );
@@ -587,7 +588,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                         },
                         icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 18),
                         label: Text(
-                          'حذف الصورة',
+                          AppLocalizations.of(context)!.deletePhoto,
                           style: TextStyle(color: colorScheme.error, fontWeight: FontWeight.bold),
                         ),
                         style: OutlinedButton.styleFrom(
@@ -616,8 +617,8 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                         isSaving = false;
                                         saveSuccess = success;
                                         statusText = success
-                                            ? 'تم حفظ الصورة في الهاتف بنجاح'
-                                            : 'يرجى منح إذن الوصول للصور من الإعدادات.';
+                                            ? AppLocalizations.of(context)!.photoSavedToGallery
+                                            : AppLocalizations.of(context)!.grantPhotosPermission;
                                       });
                                     }
                                   } catch (e) {
@@ -625,7 +626,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                       setDialogState(() {
                                         isSaving = false;
                                         saveSuccess = false;
-                                        statusText = 'تعذر حفظ الصورة: $e';
+                                        statusText = AppLocalizations.of(context)!.photoSaveFailed(e);
                                       });
                                     }
                                   }
@@ -642,10 +643,10 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                 ),
                           label: Text(
                             isSaving
-                                ? 'جاري حفظ الصورة...'
+                                ? AppLocalizations.of(context)!.savingPhoto
                                 : saveSuccess
-                                    ? 'تم الحفظ في الهاتف'
-                                    : 'حفظ الصورة',
+                                    ? AppLocalizations.of(context)!.savedToPhone
+                                    : AppLocalizations.of(context)!.savePhoto,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           style: FilledButton.styleFrom(

@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/core/services/sync_manager.dart';
 import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
@@ -54,8 +55,8 @@ class SyncStatusBanner extends StatelessWidget {
                     Expanded(
                       child: Text(
                         syncState.totalToSync > 0
-                            ? 'جاري مزامنة ورفع الصور (${syncState.syncedCount} من ${syncState.totalToSync})...'
-                            : 'جاري مزامنة الصور المتبقية مع السيرفر...',
+                            ? AppLocalizations.of(context)!.syncingPhotosXofY(syncState.syncedCount, syncState.totalToSync)
+                            : AppLocalizations.of(context)!.syncingRemainingPhotos,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
@@ -115,7 +116,7 @@ class SyncStatusBanner extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'توجد (${syncState.pendingCount}) صور محفوظة على الهاتف',
+                      AppLocalizations.of(context)!.photosSavedOnPhone(syncState.pendingCount),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -124,7 +125,7 @@ class SyncStatusBanner extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'في انتظار رفعها للسيرفر فور الاتصال بالشبكة',
+                      AppLocalizations.of(context)!.waitingToUpload,
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.amber.shade900.withValues(alpha: 0.8),
@@ -148,13 +149,13 @@ class SyncStatusBanner extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.sync_rounded, size: 16),
                     SizedBox(width: 4),
                     Text(
-                      'مزامنة الآن',
+                      AppLocalizations.of(context)!.syncNow,
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ],

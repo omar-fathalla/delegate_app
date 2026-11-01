@@ -1907,4 +1907,343 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get confirmDeletePhoto => 'تأكيد حذف الصورة';
+
+  @override
+  String deletePhotoFromConfirm(Object delegateName, Object branch) {
+    return 'حذف هذه الصورة المرسلة من «$delegateName» في فرع «$branch»؟';
+  }
+
+  @override
+  String get photoDeletePermanentNote =>
+      'ستُحذف الصورة نهائيًا من قاعدة البيانات والتخزين.';
+
+  @override
+  String get deletePermanently => 'حذف نهائي';
+
+  @override
+  String get chooseMonth => 'اختر الشهر';
+
+  @override
+  String photosCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count صورة',
+      many: '$count صورة',
+      few: '$count صور',
+      two: 'صورتان',
+      one: 'صورة واحدة',
+      zero: 'لا توجد صور',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get photoReportsTitle => 'تقارير الصور';
+
+  @override
+  String get refreshPhotos => 'تحديث الصور';
+
+  @override
+  String get photosArchiveNote =>
+      'الصور محفوظة في أرشيف الشركة بشكل مستقل عن حسابات المندوبين';
+
+  @override
+  String get totalPhotos => 'إجمالي الصور';
+
+  @override
+  String get branchesVisited => 'الفروع';
+
+  @override
+  String get activeDelegates => 'المندوبون النشطون';
+
+  @override
+  String get byDate => 'حسب التاريخ';
+
+  @override
+  String get byBranch => 'حسب الفرع';
+
+  @override
+  String get byDelegate => 'حسب المندوب';
+
+  @override
+  String get photoReportsLoadFailed => 'تعذّر تحميل تقارير الصور';
+
+  @override
+  String get unknownDelegate => 'مندوب غير محدد';
+
+  @override
+  String get pendingOnPhone => 'على الهاتف';
+
+  @override
+  String get uploadedToServer => 'مرفوعة';
+
+  @override
+  String noPhotosInMonth(Object month) {
+    return 'لا توجد صور في $month';
+  }
+
+  @override
+  String get useArrowsForMonths => 'استخدم الأسهم بالأعلى لعرض الشهور السابقة.';
+
+  @override
+  String get photoDetails => 'تفاصيل الصورة';
+
+  @override
+  String get deletePhotoPermanently => 'حذف الصورة نهائيًا';
+
+  @override
+  String get pinchToZoom => 'قرّب بإصبعين لتكبير التفاصيل';
+
+  @override
+  String get deletePhoto => 'حذف الصورة';
+
+  @override
+  String get photoSavedToGallery => 'تم حفظ الصورة في معرض الهاتف.';
+
+  @override
+  String get grantPhotosPermission =>
+      'اسمح بالوصول إلى الصور من إعدادات الهاتف.';
+
+  @override
+  String photoSaveFailed(Object error) {
+    return 'تعذّر حفظ الصورة: $error';
+  }
+
+  @override
+  String get savingPhoto => 'جارٍ حفظ الصورة...';
+
+  @override
+  String get savedToPhone => 'تم الحفظ في الهاتف';
+
+  @override
+  String get savePhoto => 'حفظ الصورة';
+
+  @override
+  String get branchField => 'الفرع';
+
+  @override
+  String get capturedAtField => 'وقت الالتقاط';
+
+  @override
+  String get delegateField => 'المندوب';
+
+  @override
+  String get delegateCommentField => 'تعليق المندوب';
+
+  @override
+  String cameraOpenFailed(Object error) {
+    return 'تعذّر فتح الكاميرا: $error';
+  }
+
+  @override
+  String get photoRemovedFromSession => 'تم حذف الصورة من الجلسة.';
+
+  @override
+  String get offerPhotosSupervisor => 'تصوير العروض (مشرف)';
+
+  @override
+  String photosSavedOffline(Object count) {
+    return 'حُفظت $count صور على الجهاز، وستُرفع تلقائيًا عند الاتصال بالإنترنت.';
+  }
+
+  @override
+  String photosUploaded(Object count) {
+    return 'تم رفع $count صور وحفظ التقرير.';
+  }
+
+  @override
+  String get photoSavedOffline =>
+      'حُفظت الصورة على الجهاز، وستُرفع تلقائيًا عند الاتصال بالإنترنت.';
+
+  @override
+  String get photoUploaded => 'تم رفع الصورة وحفظ التقرير.';
+
+  @override
+  String get loadingPhotoPermissions => 'جارٍ تحميل أذونات التصوير...';
+
+  @override
+  String get choosePhotoPermission => 'اختر إذن التصوير *';
+
+  @override
+  String permissionOption(Object companyName, Object dept, Object length) {
+    return '$companyName$dept - $length فرع';
+  }
+
+  @override
+  String branchWithId(Object id) {
+    return 'فرع $id';
+  }
+
+  @override
+  String offerPhotoPermissionOf(Object companyName) {
+    return 'إذن تصوير العروض: $companyName';
+  }
+
+  @override
+  String companyLabel2(Object companyName) {
+    return 'الشركة: $companyName';
+  }
+
+  @override
+  String departmentLabel(Object department) {
+    return 'القسم: $department';
+  }
+
+  @override
+  String noBranchesInPermissionFor(Object organizationName) {
+    return 'لا توجد فروع مسجّلة لـ($organizationName) في هذا الإذن.';
+  }
+
+  @override
+  String get noBranchesInPermission =>
+      'لا توجد فروع محددة لهذا الإذن حاليًا. تواصل مع مشرفك لإضافة الفروع.';
+
+  @override
+  String chooseBranchOf(Object organizationName) {
+    return 'اختر الفرع ($organizationName) *';
+  }
+
+  @override
+  String get chooseBranchRequired => 'اختر الفرع *';
+
+  @override
+  String get takeOfferPhotos => 'صوّر العرض بالكاميرا';
+
+  @override
+  String get multiPhotoHint =>
+      'يمكنك التقاط عدة صور لمنتجات وستاندات هذا الفرع مرة واحدة';
+
+  @override
+  String get takeFirstPhoto => 'التقط أول صورة';
+
+  @override
+  String get visitGallery => 'معرض صور الزيارة';
+
+  @override
+  String get addPhoto => 'إضافة صورة';
+
+  @override
+  String photoNumber(Object number) {
+    return 'صورة $number';
+  }
+
+  @override
+  String get retakePhoto => 'أعد التقاط هذه الصورة';
+
+  @override
+  String get deleteThisPhoto => 'حذف هذه الصورة';
+
+  @override
+  String get addAction => 'إضافة';
+
+  @override
+  String visitNotesLabel(Object count) {
+    return 'ملاحظات الزيارة ($count صور) (اختياري)';
+  }
+
+  @override
+  String get visitNotesHint =>
+      'مثال: تم عرض المنتجات وتنسيق الرف بالكامل والتأكد من وضوح الأسعار...';
+
+  @override
+  String uploadingPhotoXofY(Object current, Object total) {
+    return 'جارٍ رفع الصورة $current من $total...';
+  }
+
+  @override
+  String get uploadingPhotosReport => 'جارٍ رفع الصور وحفظ التقرير...';
+
+  @override
+  String nameCompanySupervisor(Object fullName) {
+    return '$fullName (مشرف الشركة)';
+  }
+
+  @override
+  String get chooseBranchFirst => 'اختر الفرع أولًا.';
+
+  @override
+  String get takeAtLeastOnePhoto => 'التقط صورة واحدة على الأقل قبل الحفظ.';
+
+  @override
+  String submitReportCount(Object count) {
+    return 'إرسال التقرير ($count صور)';
+  }
+
+  @override
+  String get chooseBranchToStart => 'اختر الفرع أولًا لبدء التصوير';
+
+  @override
+  String get chooseBranchHint =>
+      'حدد الفرع الذي أنت فيه من القائمة بالأعلى لتفعيل زر التصوير.';
+
+  @override
+  String get noPhotoPermissions => 'لا توجد أذونات تصوير حاليًا';
+
+  @override
+  String get askSupervisorForPermission => 'تواصل مع مشرفك لطلب إذن تصوير.';
+
+  @override
+  String photoReportsOf(Object companyName) {
+    return 'تقارير الصور: $companyName';
+  }
+
+  @override
+  String get loadingPhotoReports => 'جارٍ تحميل تقارير الصور...';
+
+  @override
+  String get noUploadedPhotos => 'لا توجد صور مرفوعة بعد';
+
+  @override
+  String get filterByBranch => 'تصفية حسب الفرع';
+
+  @override
+  String get allBranches => 'كل الفروع';
+
+  @override
+  String get filterByDelegate => 'تصفية حسب المندوب';
+
+  @override
+  String get allDelegates2 => 'كل المندوبين';
+
+  @override
+  String shownResults(Object shown, Object total) {
+    return 'المعروض: $shown من $total';
+  }
+
+  @override
+  String get clearFilters => 'مسح الفلاتر';
+
+  @override
+  String get noComment => 'بدون تعليق';
+
+  @override
+  String showMorePhotos(Object count) {
+    return 'عرض المزيد ($count صورة إضافية)';
+  }
+
+  @override
+  String get loadingPhotosReports => 'جارٍ تحميل الصور والتقارير...';
+
+  @override
+  String syncingPhotosXofY(Object synced, Object total) {
+    return 'جارٍ رفع الصور ($synced من $total)...';
+  }
+
+  @override
+  String get syncingRemainingPhotos => 'جارٍ رفع الصور المتبقية...';
+
+  @override
+  String photosSavedOnPhone(Object count) {
+    return '$count صور محفوظة على الهاتف';
+  }
+
+  @override
+  String get waitingToUpload => 'ستُرفع عند الاتصال بالإنترنت';
+
+  @override
+  String get syncNow => 'مزامنة الآن';
 }
