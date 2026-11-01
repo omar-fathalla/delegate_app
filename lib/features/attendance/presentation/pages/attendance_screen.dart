@@ -1,3 +1,4 @@
+import 'package:material_symbols_icons/symbols.dart';
 import 'dart:async';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:convert';
@@ -699,14 +700,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             : Theme.of(context).colorScheme.primaryContainer),
                     icon: Icon(
                       isCheckedIn
-                          ? Icons.logout_rounded
+                          ? Symbols.logout_rounded
                           : (_isGeofenceMode
                               ? (_isCheckingLocation
-                                  ? Icons.radar_rounded
+                                  ? Symbols.radar_rounded
                                   : (_isInsideGeofence
-                                      ? Icons.how_to_reg_rounded
-                                      : Icons.location_searching_rounded))
-                              : Icons.qr_code_scanner_rounded),
+                                      ? Symbols.how_to_reg_rounded
+                                      : Symbols.location_searching_rounded))
+                              : Symbols.qr_code_scanner_rounded),
                       color: isCheckedIn
                           ? Theme.of(context).colorScheme.onErrorContainer
                           : (_isGeofenceMode
@@ -830,14 +831,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     if (isBusy) {
       statusColor = colorScheme.primary;
-      headerIcon = Icons.radar_rounded;
+      headerIcon = Symbols.radar_rounded;
       statusTitle = isArabic ? 'جاري فحص النطاق...' : 'Checking location...';
       statusSubtitle = isArabic
           ? 'يتم الآن التحقق من إحداثياتك والمسافة للفرع'
           : 'Verifying GPS coordinates and branch';
     } else if (_isInsideGeofence) {
       statusColor = const Color(0xFF059669); // Emerald M3 Success
-      headerIcon = Icons.verified_rounded;
+      headerIcon = Symbols.verified_rounded;
       statusTitle = isArabic ? 'أنت داخل نطاق العمل' : 'Inside Work Zone';
       statusSubtitle = activeBranch != null
           ? (isArabic
@@ -846,7 +847,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           : (isArabic ? 'داخل النطاق المسموح' : 'Within approved range');
     } else {
       statusColor = colorScheme.error;
-      headerIcon = Icons.wrong_location_rounded;
+      headerIcon = Symbols.wrong_location_rounded;
       statusTitle = isArabic ? 'خارج نطاق العمل' : 'Outside Work Zone';
       statusSubtitle = activeBranch != null
           ? (isArabic
@@ -911,7 +912,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     });
                   },
                   icon: const Icon(
-                    Icons.chevron_right_rounded,
+                    Symbols.chevron_right_rounded,
                     textDirection: TextDirection.ltr,
                   ),
                 ),
@@ -946,7 +947,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.restore_rounded, size: 12, color: colorScheme.primary),
+                                Icon(Symbols.restore_rounded, size: 12, color: colorScheme.primary),
                                 const SizedBox(width: 4),
                                 Text(
                                   isArabic ? 'العودة للشهر الحالي' : 'Back to current month',
@@ -981,7 +982,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     });
                   },
                   icon: const Icon(
-                    Icons.chevron_left_rounded,
+                    Symbols.chevron_left_rounded,
                     textDirection: TextDirection.ltr,
                   ),
                 ),
@@ -1016,7 +1017,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
-                            Icons.check_circle_rounded,
+                            Symbols.check_circle_rounded,
                             size: 18,
                             color: Color(0xFF059669),
                           ),
@@ -1068,7 +1069,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            Icons.event_busy_rounded,
+                            Symbols.event_busy_rounded,
                             size: 18,
                             color: colorScheme.error,
                           ),
@@ -1110,7 +1111,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.info_outline_rounded,
+                  Symbols.info_rounded,
                   size: 13,
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -1217,8 +1218,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             children: [
                               Icon(
                                 _isInsideGeofence
-                                    ? Icons.near_me_rounded
-                                    : Icons.straighten_rounded,
+                                    ? Symbols.near_me_rounded
+                                    : Symbols.straighten_rounded,
                                 size: 14,
                                 color: statusColor,
                               ),
@@ -1253,7 +1254,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.storefront_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                              Icon(Symbols.storefront_rounded, size: 14, color: colorScheme.onSurfaceVariant),
                               const SizedBox(width: 5),
                               Text(
                                 activeBranch.branchName,
@@ -1286,7 +1287,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.radar_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                                Icon(Symbols.radar_rounded, size: 14, color: colorScheme.onSurfaceVariant),
                                 const SizedBox(width: 5),
                                 Text(
                                   isArabic ? 'النطاق: $allowedRadius م' : 'Radius: $allowedRadius m',
@@ -1319,7 +1320,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                     color: colorScheme.primary,
                                   ),
                                 )
-                              : Icon(Icons.refresh_rounded, size: 16, color: colorScheme.primary),
+                              : Icon(Symbols.refresh_rounded, size: 16, color: colorScheme.primary),
                           label: Text(
                             isArabic ? 'إعادة فحص الموقع' : 'Recheck Location',
                             style: textTheme.labelSmall?.copyWith(
@@ -1354,7 +1355,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.cloud_off_rounded,
+            Symbols.cloud_off_rounded,
             color: colorScheme.onErrorContainer,
             size: 18,
           ),
@@ -1486,7 +1487,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       filterKey: 'all',
       label: isArabic ? 'جميع السلاسل' : 'All Chains',
       count: _allAttendedDaysCount,
-      icon: Icons.hub_rounded,
+      icon: Symbols.hub_rounded,
     );
 
     final chainTabs = chains.map((chainKey) {
@@ -1497,7 +1498,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         filterKey: chainKey,
         label: displayLabel,
         count: count,
-        icon: Icons.storefront_rounded,
+        icon: Symbols.storefront_rounded,
         accentFg: fg,
         accentBg: bg,
       );
@@ -1553,7 +1554,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline_rounded, size: 64, color: colorScheme.error),
+            Icon(Symbols.error_outline_rounded, size: 64, color: colorScheme.error),
             const SizedBox(height: 16),
             Text(
               state.message,
@@ -1628,7 +1629,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     child: Column(
                       children: [
                         Icon(
-                          Icons.storefront_rounded,
+                          Symbols.storefront_rounded,
                           size: 44,
                           color: colorScheme.outline,
                         ),
@@ -1663,7 +1664,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               _recomputeFilteredHistory();
                             });
                           },
-                          icon: const Icon(Icons.hub_rounded, size: 18),
+                          icon: const Icon(Symbols.hub_rounded, size: 18),
                           label: Text(
                             isArabic ? 'عرض جميع السلاسل' : 'Show All Chains',
                             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1680,7 +1681,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      Icons.verified_user_rounded,
+                      Symbols.verified_user_rounded,
                       size: 56,
                       color: colorScheme.primary,
                     ),
@@ -1712,7 +1713,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.qr_code_scanner_rounded,
+                          Symbols.qr_code_scanner_rounded,
                           color: colorScheme.primary,
                           size: 22,
                         ),
@@ -1797,7 +1798,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
-                          Icons.calendar_today_rounded,
+                          Symbols.calendar_today_rounded,
                           size: 18,
                           color: colorScheme.onPrimaryContainer,
                         ),
@@ -1897,7 +1898,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Icon(
-                                              Icons.storefront_rounded,
+                                              Symbols.storefront_rounded,
                                               size: 13,
                                               color: chipFg,
                                             ),
@@ -1916,7 +1917,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                       const SizedBox(width: 8),
                                     ],
                                     Icon(
-                                      Icons.location_on_rounded,
+                                      Symbols.location_on_rounded,
                                       size: 15,
                                       color: colorScheme.primary,
                                     ),
@@ -1940,7 +1941,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 Row(
                                   children: [
                                     Icon(
-                                      Icons.login_rounded,
+                                      Symbols.login_rounded,
                                       size: 16,
                                       color: colorScheme.tertiary,
                                     ),
@@ -1958,8 +1959,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                   children: [
                                     Icon(
                                       item.isEffectiveAutoCheckOut
-                                          ? Icons.auto_mode_rounded
-                                          : Icons.logout_rounded,
+                                          ? Symbols.auto_mode_rounded
+                                          : Symbols.logout_rounded,
                                       size: 16,
                                       color: item.isEffectiveAutoCheckOut
                                           ? Colors.amber[800]
@@ -2010,7 +2011,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 Row(
                                   children: [
                                     Icon(
-                                      Icons.timer_rounded,
+                                      Symbols.timer_rounded,
                                       size: 14,
                                       color: effectiveOut != null
                                           ? colorScheme.primary
@@ -2040,7 +2041,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               child: Tooltip(
                                 message: l10n.pendingSync,
                                 child: Icon(
-                                  Icons.cloud_off_rounded,
+                                  Symbols.cloud_off_rounded,
                                   color: colorScheme.error,
                                   size: 20,
                                 ),
@@ -3122,8 +3123,8 @@ class _ScannerModalState extends State<_ScannerModal>
                         ),
                         child: Icon(
                           isCheckedIn
-                              ? Icons.logout_rounded
-                              : Icons.login_rounded,
+                              ? Symbols.logout_rounded
+                              : Symbols.login_rounded,
                           color: color,
                           size: 30,
                         ),
@@ -3143,7 +3144,7 @@ class _ScannerModalState extends State<_ScannerModal>
               backgroundColor: Colors.black45,
               child: IconButton(
                 tooltip: 'Close Scanner',
-                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                icon: const Icon(Symbols.close_rounded, color: Colors.white),
                 onPressed: () {
                   Navigator.pop(context);
                 },
@@ -3253,10 +3254,10 @@ class _GeofenceRadarWidget extends StatelessWidget {
                   switchOutCurve: AppMotionCurves.standardAccelerate,
                   child: Icon(
                     isChecking
-                        ? Icons.radar_rounded
+                        ? Symbols.radar_rounded
                         : (isInside
-                            ? Icons.check_rounded
-                            : Icons.location_off_rounded),
+                            ? Symbols.check_rounded
+                            : Symbols.location_off_rounded),
                     key: ValueKey('${isChecking}_$isInside'),
                     color: Colors.white,
                     size: 20,

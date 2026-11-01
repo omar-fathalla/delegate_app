@@ -1,3 +1,4 @@
+import 'package:material_symbols_icons/symbols.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -114,7 +115,7 @@ class _DelegateLeavesAndRequestsScreenState
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
+                  icon: const Icon(Symbols.refresh_rounded),
                   tooltip: 'تحديث',
                   onPressed: () => setState(() {}),
                 ),
@@ -124,7 +125,7 @@ class _DelegateLeavesAndRequestsScreenState
           : null,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateRequestDialog(context),
-        icon: const Icon(Icons.add_task_rounded),
+        icon: const Icon(Symbols.add_task_rounded),
         label: const Text(
           'تسجيل إجازة / عذر',
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -265,7 +266,7 @@ class _DelegateLeavesAndRequestsScreenState
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            Icons.event_busy_rounded,
+                            Symbols.event_busy_rounded,
                             size: 54,
                             color: colorScheme.outline,
                           ),
@@ -354,7 +355,7 @@ class _DelegateLeavesAndRequestsScreenState
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  Icons.account_balance_wallet_outlined,
+                  Symbols.account_balance_wallet_rounded,
                   size: 20,
                   color: colorScheme.primary,
                 ),
@@ -473,7 +474,7 @@ class _DelegateLeavesAndRequestsScreenState
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  Icons.event_repeat_rounded,
+                  Symbols.event_repeat_rounded,
                   size: 20,
                   color: Colors.amber.shade900,
                 ),
@@ -519,7 +520,7 @@ class _DelegateLeavesAndRequestsScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.info_outline_rounded,
+                  Symbols.info_rounded,
                   size: 16,
                   color: colorScheme.primary,
                 ),
@@ -542,7 +543,7 @@ class _DelegateLeavesAndRequestsScreenState
             children: [
               Expanded(
                 child: _buildLeaveFeaturePill(
-                  icon: Icons.calendar_today_rounded,
+                  icon: Symbols.calendar_today_rounded,
                   label: 'راحة أسبوعية',
                   sublabel: 'يوم لكل 7 أيام',
                   colorScheme: colorScheme,
@@ -551,7 +552,7 @@ class _DelegateLeavesAndRequestsScreenState
               const SizedBox(width: 8),
               Expanded(
                 child: _buildLeaveFeaturePill(
-                  icon: Icons.schedule_rounded,
+                  icon: Symbols.schedule_rounded,
                   label: 'الأعذار الساعية',
                   sublabel: 'متاحة للتقديم',
                   colorScheme: colorScheme,
@@ -560,7 +561,7 @@ class _DelegateLeavesAndRequestsScreenState
               const SizedBox(width: 8),
               Expanded(
                 child: _buildLeaveFeaturePill(
-                  icon: Icons.lock_clock_rounded,
+                  icon: Symbols.lock_clock_rounded,
                   label: 'الرصيد السنوي (21)',
                   sublabel: 'عند التفعيل',
                   colorScheme: colorScheme,
@@ -656,7 +657,7 @@ class _DelegateLeavesAndRequestsScreenState
             child: _buildMiniKpi(
               title: 'الإجمالي',
               value: '$totalCount',
-              icon: Icons.event_note_rounded,
+              icon: Symbols.event_note_rounded,
               color: colorScheme.primary,
               colorScheme: colorScheme,
             ),
@@ -666,7 +667,7 @@ class _DelegateLeavesAndRequestsScreenState
             child: _buildMiniKpi(
               title: 'المراجعة',
               value: '$pendingCount',
-              icon: Icons.hourglass_top_rounded,
+              icon: Symbols.hourglass_top_rounded,
               color: Colors.amber.shade800,
               colorScheme: colorScheme,
             ),
@@ -676,7 +677,7 @@ class _DelegateLeavesAndRequestsScreenState
             child: _buildMiniKpi(
               title: 'المعتمدة',
               value: '$approvedCount',
-              icon: Icons.check_circle_rounded,
+              icon: Symbols.check_circle_rounded,
               color: const Color(0xFF2E7D32),
               colorScheme: colorScheme,
             ),
@@ -686,7 +687,7 @@ class _DelegateLeavesAndRequestsScreenState
             child: _buildMiniKpi(
               title: 'المرفوضة',
               value: '$rejectedCount',
-              icon: Icons.cancel_rounded,
+              icon: Symbols.cancel_rounded,
               color: colorScheme.error,
               colorScheme: colorScheme,
             ),
@@ -933,31 +934,31 @@ class _DelegateLeavesAndRequestsScreenState
     switch (type) {
       case 'sick':
         typeLabel = 'إجازة مرضية';
-        typeIcon = Icons.medical_services_rounded;
+        typeIcon = Symbols.medical_services_rounded;
         break;
       case 'emergency':
         typeLabel = 'إجازة عارضة';
-        typeIcon = Icons.warning_amber_rounded;
+        typeIcon = Symbols.warning_amber_rounded;
         break;
       case 'delay':
         typeLabel = 'عذر تأخير';
-        typeIcon = Icons.timer_outlined;
+        typeIcon = Symbols.timer_rounded;
         break;
       case 'early_leave':
         typeLabel = 'إذن انصراف مبكر';
-        typeIcon = Icons.logout_rounded;
+        typeIcon = Symbols.logout_rounded;
         break;
       case 'absence':
         typeLabel = 'عذر غياب';
-        typeIcon = Icons.person_off_outlined;
+        typeIcon = Symbols.person_off_rounded;
         break;
       case 'unpaid':
         typeLabel = 'إجازة بدون أجر';
-        typeIcon = Icons.money_off_rounded;
+        typeIcon = Symbols.money_off_rounded;
         break;
       default:
         typeLabel = 'إجازة اعتيادية';
-        typeIcon = Icons.beach_access_rounded;
+        typeIcon = Symbols.beach_access_rounded;
         break;
     }
 
@@ -969,17 +970,17 @@ class _DelegateLeavesAndRequestsScreenState
       case 'approved':
         statusColor = const Color(0xFF2E7D32);
         statusLabel = 'معتمد';
-        statusIcon = Icons.check_circle_rounded;
+        statusIcon = Symbols.check_circle_rounded;
         break;
       case 'rejected':
         statusColor = colorScheme.error;
         statusLabel = 'مرفوض';
-        statusIcon = Icons.cancel_rounded;
+        statusIcon = Symbols.cancel_rounded;
         break;
       default:
         statusColor = Colors.amber.shade800;
         statusLabel = 'قيد المراجعة';
-        statusIcon = Icons.hourglass_top_rounded;
+        statusIcon = Symbols.hourglass_top_rounded;
         break;
     }
 
@@ -1077,7 +1078,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Row(
                               children: [
                                 Icon(
-                                  Icons.calendar_today_rounded,
+                                  Symbols.calendar_today_rounded,
                                   size: 11,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
@@ -1131,7 +1132,7 @@ class _DelegateLeavesAndRequestsScreenState
                         turns: isExpanded ? 0.5 : 0.0,
                         duration: const Duration(milliseconds: 200),
                         child: Icon(
-                          Icons.expand_more_rounded,
+                          Symbols.expand_more_rounded,
                           size: 18,
                           color: colorScheme.outline,
                         ),
@@ -1184,7 +1185,7 @@ class _DelegateLeavesAndRequestsScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Icon(
-                              Icons.info_outline_rounded,
+                              Symbols.info_rounded,
                               size: 14,
                               color: colorScheme.error,
                             ),
@@ -1210,7 +1211,7 @@ class _DelegateLeavesAndRequestsScreenState
                       Row(
                         children: [
                           const Icon(
-                            Icons.verified_user_rounded,
+                            Symbols.verified_user_rounded,
                             size: 13,
                             color: Color(0xFF2E7D32),
                           ),
@@ -1252,7 +1253,7 @@ class _DelegateLeavesAndRequestsScreenState
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              icon: const Icon(Icons.attachment_rounded, size: 14),
+                              icon: const Icon(Symbols.attachment_rounded, size: 14),
                               label: const Text(
                                 'معاينة المرفق',
                                 style: TextStyle(fontSize: 11),
@@ -1271,7 +1272,7 @@ class _DelegateLeavesAndRequestsScreenState
                                 foregroundColor: colorScheme.error,
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                               ),
-                              icon: const Icon(Icons.delete_outline_rounded, size: 15),
+                              icon: const Icon(Symbols.delete_outline_rounded, size: 15),
                               label: const Text(
                                 'إلغاء الطلب',
                                 style: TextStyle(fontSize: 11),
@@ -1354,7 +1355,7 @@ class _DelegateLeavesAndRequestsScreenState
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded),
+                    icon: const Icon(Symbols.close_rounded),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -1457,7 +1458,7 @@ class _DelegateLeavesAndRequestsScreenState
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
-                            Icons.edit_calendar_rounded,
+                            Symbols.edit_calendar_rounded,
                             size: 18,
                             color: colorScheme.primary,
                           ),
@@ -1478,7 +1479,7 @@ class _DelegateLeavesAndRequestsScreenState
                           child: Padding(
                             padding: const EdgeInsets.all(4),
                             child: Icon(
-                              Icons.close_rounded,
+                              Symbols.close_rounded,
                               size: 20,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -1516,7 +1517,7 @@ class _DelegateLeavesAndRequestsScreenState
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Icon(
-                                    Icons.info_outline_rounded,
+                                    Symbols.info_rounded,
                                     size: 16,
                                     color: Colors.amber.shade900,
                                   ),
@@ -1665,7 +1666,7 @@ class _DelegateLeavesAndRequestsScreenState
                                 child: Row(
                                   children: [
                                     Icon(
-                                      Icons.calendar_today_rounded,
+                                      Symbols.calendar_today_rounded,
                                       size: 15,
                                       color: colorScheme.primary,
                                     ),
@@ -1679,7 +1680,7 @@ class _DelegateLeavesAndRequestsScreenState
                                     ),
                                     const Spacer(),
                                     Icon(
-                                      Icons.edit_calendar_rounded,
+                                      Symbols.edit_calendar_rounded,
                                       size: 15,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
@@ -1731,7 +1732,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         child: Row(
                                           children: [
                                             Icon(
-                                              Icons.schedule_rounded,
+                                              Symbols.schedule_rounded,
                                               size: 15,
                                               color: colorScheme.primary,
                                             ),
@@ -1793,7 +1794,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         child: Row(
                                           children: [
                                             Icon(
-                                              Icons.schedule_rounded,
+                                              Symbols.schedule_rounded,
                                               size: 15,
                                               color: colorScheme.primary,
                                             ),
@@ -1904,7 +1905,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         child: Row(
                                           children: [
                                             Icon(
-                                              Icons.calendar_today_rounded,
+                                              Symbols.calendar_today_rounded,
                                               size: 15,
                                               color: colorScheme.primary,
                                             ),
@@ -1968,7 +1969,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         child: Row(
                                           children: [
                                             Icon(
-                                              Icons.event_available_rounded,
+                                              Symbols.event_available_rounded,
                                               size: 15,
                                               color: colorScheme.primary,
                                             ),
@@ -2017,7 +2018,7 @@ class _DelegateLeavesAndRequestsScreenState
                                 child: Row(
                                   children: [
                                     Icon(
-                                      Icons.warning_amber_rounded,
+                                      Symbols.warning_amber_rounded,
                                       size: 15,
                                       color: Colors.amber.shade900,
                                     ),
@@ -2111,7 +2112,7 @@ class _DelegateLeavesAndRequestsScreenState
                               child: Row(
                                 children: [
                                   const Icon(
-                                    Icons.check_circle_rounded,
+                                    Symbols.check_circle_rounded,
                                     color: Color(0xFF2E7D32),
                                     size: 16,
                                   ),
@@ -2131,7 +2132,7 @@ class _DelegateLeavesAndRequestsScreenState
                                     borderRadius: BorderRadius.circular(20),
                                     child: const Padding(
                                       padding: EdgeInsets.all(4),
-                                      child: Icon(Icons.close_rounded, size: 16, color: Colors.red),
+                                      child: Icon(Symbols.close_rounded, size: 16, color: Colors.red),
                                     ),
                                   ),
                                 ],
@@ -2169,7 +2170,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           Icon(
-                                            Icons.camera_alt_rounded,
+                                            Symbols.camera_alt_rounded,
                                             size: 15,
                                             color: colorScheme.primary,
                                           ),
@@ -2210,7 +2211,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           Icon(
-                                            Icons.photo_library_rounded,
+                                            Symbols.photo_library_rounded,
                                             size: 15,
                                             color: colorScheme.primary,
                                           ),
@@ -2281,7 +2282,7 @@ class _DelegateLeavesAndRequestsScreenState
                                 padding: EdgeInsets.zero,
                               ),
                               onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
-                              icon: const Icon(Icons.close_rounded, size: 16),
+                              icon: const Icon(Symbols.close_rounded, size: 16),
                               label: const Text(
                                 'إلغاء',
                                 style: TextStyle(
@@ -2454,7 +2455,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         color: Colors.white,
                                       ),
                                     )
-                                  : const Icon(Icons.send_rounded, size: 16),
+                                  : const Icon(Symbols.send_rounded, size: 16),
                               label: Text(
                                 isSubmitting ? 'جارٍ الإرسال...' : 'إرسال الطلب',
                                 style: const TextStyle(

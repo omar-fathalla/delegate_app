@@ -1,3 +1,4 @@
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 
@@ -46,7 +47,7 @@ class AttendanceActionButton extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      isCheckedIn ? Icons.exit_to_app : Icons.touch_app,
+                      isCheckedIn ? Symbols.exit_to_app_rounded : Symbols.touch_app_rounded,
                       size: 40,
                       color: isCheckedIn
                           ? theme.colorScheme.secondary

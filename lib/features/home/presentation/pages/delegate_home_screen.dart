@@ -1,3 +1,4 @@
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/photo_permission/presentation/widgets/sync_status_banner.dart';
@@ -626,7 +627,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       radius: 26,
                       backgroundColor: Colors.white.withValues(alpha: 0.22),
                       foregroundColor: Colors.white,
-                      fallbackIcon: Icons.person_pin_rounded,
+                      fallbackIcon: Symbols.person_pin_rounded,
                     ),
                   );
                 },
@@ -649,7 +650,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           const SizedBox(height: 8),
 
           _buildDutyItem(
-            icon: Icons.location_on_rounded,
+            icon: Symbols.location_on_rounded,
             text:
                 isArabic
                     ? 'تسجيل الحضور والانصراف المعتمد جغرافياً عند الوصول إلى الفرع.'
@@ -657,7 +658,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           ),
           const SizedBox(height: 6),
           _buildDutyItem(
-            icon: Icons.assignment_turned_in_rounded,
+            icon: Symbols.assignment_turned_in_rounded,
             text:
                 isArabic
                     ? 'متابعة وتنفيذ المهام اليومية الموكلة بدقة.'
@@ -665,7 +666,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           ),
           const SizedBox(height: 6),
           _buildDutyItem(
-            icon: Icons.camera_alt_rounded,
+            icon: Symbols.camera_alt_rounded,
             text:
                 isArabic
                     ? 'توثيق وتصوير العروض والبرندات الميدانية داخل الهايبر ماركت والفروع.'
@@ -713,7 +714,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(
-            Icons.badge_rounded,
+            Symbols.badge_rounded,
             size: 14,
             color: Colors.white,
           ),
@@ -754,7 +755,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
-              Icons.domain_rounded,
+              Symbols.domain_rounded,
               size: 14,
               color: Color(0xFFFEF3C7),
             ),
@@ -798,7 +799,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.storefront_outlined,
+            Symbols.storefront_rounded,
             size: 14,
             color: Colors.white.withValues(alpha: 0.85),
           ),
@@ -857,7 +858,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 alpha: 0.2,
               ),
               foregroundColor: colorScheme.error,
-              child: const Icon(Icons.person_off_rounded),
+              child: const Icon(Symbols.person_off_rounded),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -934,7 +935,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             CircleAvatar(
               backgroundColor: colorScheme.primaryContainer,
               foregroundColor: colorScheme.onPrimaryContainer,
-              child: const Icon(Icons.person_rounded),
+              child: const Icon(Symbols.person_rounded),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -976,7 +977,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             if (phone.isNotEmpty) ...[
               IconButton(
                 onPressed: () => _callNumber(phone),
-                icon: const Icon(Icons.phone_rounded),
+                icon: const Icon(Symbols.phone_rounded),
                 style: IconButton.styleFrom(
                   backgroundColor: colorScheme.tertiaryContainer,
                   foregroundColor: colorScheme.onTertiaryContainer,
@@ -985,7 +986,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               const SizedBox(width: 8),
               IconButton(
                 onPressed: () => _openWhatsApp(phone),
-                icon: const Icon(Icons.chat_rounded),
+                icon: const Icon(Symbols.chat_rounded),
                 style: IconButton.styleFrom(
                   backgroundColor: const Color(
                     0xFF25D366,
@@ -1053,7 +1054,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       ],
                     ),
                     child: const Icon(
-                      Icons.camera_alt_rounded,
+                      Symbols.camera_alt_rounded,
                       color: Colors.white,
                       size: 26,
                     ),
@@ -1105,7 +1106,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.touch_app_rounded,
+                      Symbols.touch_app_rounded,
                       size: 18,
                       color: colorScheme.primary,
                     ),
@@ -1123,8 +1124,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     const SizedBox(width: 4),
                     Icon(
                       isArabic
-                          ? Icons.arrow_back_rounded
-                          : Icons.arrow_forward_rounded,
+                          ? Symbols.arrow_back_rounded
+                          : Symbols.arrow_forward_rounded,
                       size: 16,
                       color: colorScheme.primary,
                     ),
@@ -1299,7 +1300,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 Row(
                   children: [
                     Icon(
-                      Icons.insights_rounded,
+                      Symbols.insights_rounded,
                       size: 20,
                       color: colorScheme.primary,
                     ),
@@ -1329,8 +1330,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       ),
                       Icon(
                         isArabic
-                            ? Icons.chevron_left_rounded
-                            : Icons.chevron_right_rounded,
+                            ? Symbols.chevron_left_rounded
+                            : Symbols.chevron_right_rounded,
                         size: 20,
                         color: colorScheme.primary,
                       ),
@@ -1349,7 +1350,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     context,
                     title: isArabic ? 'أيام الحضور' : 'Attended',
                     value: isArabic ? '$_attendedDays يوم' : '$_attendedDays d',
-                    icon: Icons.check_circle_rounded,
+                    icon: Symbols.check_circle_rounded,
                     containerColor: colorScheme.primaryContainer,
                     iconColor: colorScheme.primary,
                     textColor: colorScheme.onSurface,
@@ -1363,7 +1364,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     context,
                     title: isArabic ? 'أيام الغياب' : 'Absent',
                     value: isArabic ? '$_absentDays يوم' : '$_absentDays d',
-                    icon: Icons.cancel_rounded,
+                    icon: Symbols.cancel_rounded,
                     containerColor: colorScheme.errorContainer,
                     iconColor: colorScheme.onErrorContainer,
                     textColor: _absentDays > 0
@@ -1381,7 +1382,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     value: isArabic
                         ? '$_approvedLeavesThisMonth من 4 أيام'
                         : '$_approvedLeavesThisMonth of 4 days',
-                    icon: Icons.event_available_rounded,
+                    icon: Symbols.event_available_rounded,
                     containerColor: colorScheme.tertiaryContainer,
                     iconColor: colorScheme.onTertiaryContainer,
                     textColor: colorScheme.onSurface,
@@ -1402,7 +1403,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               child: Row(
                 children: [
                   Icon(
-                    Icons.info_outline_rounded,
+                    Symbols.info_rounded,
                     size: 13,
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -1599,7 +1600,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               Row(
                 children: [
                   Icon(
-                    Icons.history_toggle_off_rounded,
+                    Symbols.history_toggle_off_rounded,
                     size: 20,
                     color: colorScheme.primary,
                   ),
@@ -1635,8 +1636,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         ),
                         Icon(
                           isArabic
-                              ? Icons.chevron_left_rounded
-                              : Icons.chevron_right_rounded,
+                              ? Symbols.chevron_left_rounded
+                              : Symbols.chevron_right_rounded,
                           size: 16,
                           color: colorScheme.primary,
                         ),
@@ -1725,7 +1726,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.storefront_rounded,
+                                Symbols.storefront_rounded,
                                 size: 12,
                                 color: chipFg,
                               ),
@@ -1744,7 +1745,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         const SizedBox(width: 8),
                       ],
                       Icon(
-                        Icons.location_on_rounded,
+                        Symbols.location_on_rounded,
                         size: 15,
                         color: colorScheme.primary,
                       ),
@@ -1794,7 +1795,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(
-                            Icons.login_rounded,
+                            Symbols.login_rounded,
                             size: 12,
                             color: Color(0xFF10B981),
                           ),
@@ -1813,7 +1814,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.logout_rounded,
+                            Symbols.logout_rounded,
                             size: 12,
                             color: session.checkOutTime != null
                                 ? colorScheme.error
@@ -1840,7 +1841,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.timelapse_rounded,
+                              Symbols.timelapse_rounded,
                               size: 12,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -1981,7 +1982,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
-                      Icons.event_note_rounded,
+                      Symbols.event_note_rounded,
                       size: 26,
                       color: colorScheme.primary,
                     ),
@@ -2041,8 +2042,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   const SizedBox(width: 8),
                   Icon(
                     isArabic
-                        ? Icons.chevron_left_rounded
-                        : Icons.chevron_right_rounded,
+                        ? Symbols.chevron_left_rounded
+                        : Symbols.chevron_right_rounded,
                     color: colorScheme.outline,
                   ),
                 ],

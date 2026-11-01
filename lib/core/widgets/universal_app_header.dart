@@ -1,3 +1,4 @@
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -374,7 +375,7 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
       actions: [
         ...?extraActions,
         PopupMenuButton<String>(
-          icon: const Icon(Icons.menu_rounded),
+          icon: const Icon(Symbols.menu_rounded),
           tooltip: 'القائمة الرئيسية',
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -478,7 +479,7 @@ class _PulsingActiveOrgChipState extends State<_PulsingActiveOrgChip>
               ),
               const SizedBox(width: 4.5),
               Icon(
-                Icons.storefront_rounded,
+                Symbols.storefront_rounded,
                 size: 12,
                 color: colorScheme.primary,
               ),

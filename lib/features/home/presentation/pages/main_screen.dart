@@ -26,6 +26,8 @@ import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 class MainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -111,7 +113,7 @@ class _MainScreenState extends State<MainScreen> {
     final isArabic = localeProvider.isArabic;
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
+      backgroundColor: colorScheme.surface,
       appBar: UniversalAppHeader(
         delegate: delegate,
         extraActions: [
@@ -137,7 +139,7 @@ class _MainScreenState extends State<MainScreen> {
                   label: Text('$unreadCount'),
                   isLabelVisible: unreadCount > 0,
                   child: IconButton(
-                    icon: const Icon(Icons.notifications_rounded),
+                    icon: const Icon(Symbols.notifications_rounded),
                     tooltip: l10n.notifications,
                     onPressed: () {
                       context.push('/notifications', extra: delegate);
@@ -223,7 +225,7 @@ class _MainScreenState extends State<MainScreen> {
             value: 'profile',
             child: Row(
               children: [
-                const Icon(Icons.person_rounded),
+                const Icon(Symbols.person_rounded),
                 const SizedBox(width: 12),
                 Text(l10n.profile),
               ],
@@ -233,7 +235,7 @@ class _MainScreenState extends State<MainScreen> {
             value: 'penalty_rules_catalog',
             child: Row(
               children: [
-                Icon(Icons.menu_book_rounded, color: colorScheme.primary),
+                Icon(Symbols.menu_book_rounded, color: colorScheme.primary),
                 const SizedBox(width: 12),
                 const Text('لائحة الغرامات'),
               ],
@@ -244,7 +246,7 @@ class _MainScreenState extends State<MainScreen> {
               value: 'manage_organizations',
               child: Row(
                 children: [
-                  Icon(Icons.corporate_fare_rounded, color: colorScheme.primary),
+                  Icon(Symbols.corporate_fare_rounded, color: colorScheme.primary),
                   const SizedBox(width: 12),
                   const Text('إدارة المنظمات والسلاسل'),
                 ],
@@ -258,7 +260,7 @@ class _MainScreenState extends State<MainScreen> {
               value: 'delegate_subscriptions',
               child: Row(
                 children: [
-                  Icon(Icons.how_to_reg_rounded, color: colorScheme.tertiary),
+                  Icon(Symbols.how_to_reg_rounded, color: colorScheme.tertiary),
                   const SizedBox(width: 12),
                   const Text('اشتراكات واعتماد المناديب'),
                 ],
@@ -270,7 +272,7 @@ class _MainScreenState extends State<MainScreen> {
               value: 'org_switch',
               child: Row(
                 children: [
-                  const Icon(Icons.swap_horiz_rounded),
+                  const Icon(Symbols.swap_horiz_rounded),
                   const SizedBox(width: 12),
                   Text(isArabic ? 'تبديل المنظمة' : 'Switch Organization'),
                 ],
@@ -281,7 +283,7 @@ class _MainScreenState extends State<MainScreen> {
             value: 'tasks',
             child: Row(
               children: [
-                Icon(Icons.task_alt_rounded, color: colorScheme.primary),
+                Icon(Symbols.task_alt_rounded, color: colorScheme.primary),
                 const SizedBox(width: 12),
                 Text(l10n.tasks),
               ],
@@ -292,7 +294,7 @@ class _MainScreenState extends State<MainScreen> {
             value: 'penalties',
             child: Row(
               children: [
-                Icon(Icons.gavel_rounded, color: colorScheme.error),
+                Icon(Symbols.gavel_rounded, color: colorScheme.error),
                 const SizedBox(width: 12),
                 Text(
                   'المخالفات والغرامات',
@@ -305,7 +307,7 @@ class _MainScreenState extends State<MainScreen> {
             value: 'logout',
             child: Row(
               children: [
-                Icon(Icons.logout_rounded, color: colorScheme.error),
+                Icon(Symbols.logout_rounded, color: colorScheme.error),
                 const SizedBox(width: 12),
                 Text(l10n.logout, style: TextStyle(color: colorScheme.error)),
               ],
@@ -317,7 +319,7 @@ class _MainScreenState extends State<MainScreen> {
             value: 'settings',
             child: Row(
               children: [
-                const Icon(Icons.settings_rounded),
+                const Icon(Symbols.settings_rounded),
                 const SizedBox(width: 12),
                 Text(l10n.settings),
               ],
@@ -326,45 +328,27 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
           body: _buildBody(delegate),
-          bottomNavigationBar: Container(
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainer,
-              border: Border(
-                top: BorderSide(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                  width: 0.8,
-                ),
+          bottomNavigationBar: M3NavBar(
+            selectedIndex: _currentIndex,
+            onSelected: (index) {
+              setState(() {
+                _currentIndex = index;
+                _initializedTabs.add(index); // Mark tab as visited
+              });
+            },
+            destinations: [
+              M3NavDestination(icon: Symbols.home_rounded, label: l10n.home),
+              M3NavDestination(
+                  icon: Symbols.schedule_rounded, label: l10n.attendance),
+              M3NavDestination(
+                icon: Symbols.event_note_rounded,
+                label: isArabic ? 'طلباتي' : 'My Requests',
               ),
-            ),
-            child: NavigationBar(
-              backgroundColor: colorScheme.surfaceContainer,
-              elevation: 0,
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                setState(() {
-                  _currentIndex = index;
-                  _initializedTabs.add(index); // Mark tab as visited
-                });
-              },
-              destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.home_rounded),
-                  label: l10n.home,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.access_time_filled_rounded),
-                  label: l10n.attendance,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.event_note_rounded),
-                  label: isArabic ? 'طلباتي' : 'My Requests',
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.photo_library_rounded),
-                  label: isArabic ? 'تقارير الصور' : 'Photo Report',
-                ),
-              ],
-            ),
+              M3NavDestination(
+                icon: Symbols.photo_library_rounded,
+                label: isArabic ? 'تقارير الصور' : 'Photo Report',
+              ),
+            ],
           ),
         );
   }
@@ -468,7 +452,7 @@ class _MainScreenState extends State<MainScreen> {
           contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           title: Row(
             children: [
-              Icon(Icons.swap_horiz_rounded, color: colorScheme.primary),
+              Icon(Symbols.swap_horiz_rounded, color: colorScheme.primary),
               const SizedBox(width: 12),
               Text(
                 isArabic ? 'تبديل المنظمة' : 'Switch Organization',
@@ -513,7 +497,7 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 child: ListTile(
                   leading: Icon(
-                    Icons.business_rounded,
+                    Symbols.business_rounded,
                     color: isCurrentOrg
                         ? colorScheme.primary
                         : colorScheme.onSurfaceVariant,
@@ -538,7 +522,7 @@ class _MainScreenState extends State<MainScreen> {
                         )
                       : null,
                   trailing: isCurrentOrg
-                      ? Icon(Icons.check_circle_rounded, color: colorScheme.primary)
+                      ? Icon(Symbols.check_circle_rounded, color: colorScheme.primary)
                       : null,
                   onTap: () {
                     Navigator.pop(dialogContext);
