@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -1091,16 +1092,18 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       color: colorScheme.onSecondaryContainer,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      isArabic
-                          ? 'اضغط هنا لبدء التصوير داخل الهايبر ماركت'
-                          : 'Tap here to start photographing inside hypermarket',
+                    Flexible(
+                      child: Text(
+                      AppLocalizations.of(context)!.startPhotosCta,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 14,
                         height: 1.4,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSecondaryContainer,
                       ),
+                    ),
                     ),
                     const SizedBox(width: 4),
                     Icon(Symbols.arrow_forward_rounded,

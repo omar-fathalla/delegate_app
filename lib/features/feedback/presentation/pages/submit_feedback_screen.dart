@@ -1,3 +1,5 @@
+import 'package:material_symbols_icons/symbols.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -146,7 +148,8 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                       children: FeedbackType.values.map((type) {
                         final isSelected = _selectedType == type;
                         return ChoiceChip(
-                          label: Text(type.getLabel(isArabic)),
+                          avatar: Icon(_feedbackIcon(type), size: 18),
+                          label: Text(_feedbackLabel(context, type)),
                           selected: isSelected,
                           onSelected: (selected) {
                             if (selected) {
@@ -155,14 +158,11 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                               });
                             }
                           },
-                          selectedColor: theme.colorScheme.primaryContainer,
+                          showCheckmark: false,
                           labelStyle: TextStyle(
                             color: isSelected
-                                ? theme.colorScheme.primary
+                                ? theme.colorScheme.onSecondaryContainer
                                 : theme.colorScheme.onSurface,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
                           ),
                         );
                       }).toList(),
@@ -323,5 +323,24 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
         ],
       ),
     );
+  }
+
+  IconData _feedbackIcon(FeedbackType t) => switch (t) {
+        FeedbackType.featureRequest => Symbols.lightbulb_rounded,
+        FeedbackType.bugReport => Symbols.bug_report_rounded,
+        FeedbackType.generalQuestion => Symbols.help_rounded,
+        FeedbackType.improvement => Symbols.star_rounded,
+        FeedbackType.other => Symbols.edit_note_rounded,
+      };
+
+  String _feedbackLabel(BuildContext context, FeedbackType t) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (t) {
+      FeedbackType.featureRequest => l10n.feedbackTypeFeature,
+      FeedbackType.bugReport => l10n.feedbackTypeBug,
+      FeedbackType.generalQuestion => l10n.feedbackTypeQuestion,
+      FeedbackType.improvement => l10n.feedbackTypeImprovement,
+      FeedbackType.other => l10n.feedbackTypeOther,
+    };
   }
 }

@@ -317,7 +317,7 @@ abstract class AppLocalizations {
   /// QR scanner title
   ///
   /// In en, this message translates to:
-  /// **'Scan for {action}'**
+  /// **'Scan to {action}'**
   String scanForAction(String action);
 
   /// QR scanner instruction
@@ -989,7 +989,7 @@ abstract class AppLocalizations {
   /// Help center setting label
   ///
   /// In en, this message translates to:
-  /// **'Help Center'**
+  /// **'Help center'**
   String get helpCenter;
 
   /// App version label in settings
@@ -1951,6 +1951,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t refresh. Check your connection and try again.'**
   String get refreshFailed;
+
+  /// No description provided for @startPhotosCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Start photos'**
+  String get startPhotosCta;
+
+  /// No description provided for @switchOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get switchOn;
+
+  /// No description provided for @switchOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get switchOff;
+
+  /// No description provided for @whatsNewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s new?'**
+  String get whatsNewTitle;
+
+  /// No description provided for @releaseVersionDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} – {date}'**
+  String releaseVersionDate(Object version, Object date);
+
+  /// No description provided for @feedbackTypeFeature.
+  ///
+  /// In en, this message translates to:
+  /// **'Feature request'**
+  String get feedbackTypeFeature;
+
+  /// No description provided for @feedbackTypeBug.
+  ///
+  /// In en, this message translates to:
+  /// **'Report a problem'**
+  String get feedbackTypeBug;
+
+  /// No description provided for @feedbackTypeQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'General question'**
+  String get feedbackTypeQuestion;
+
+  /// No description provided for @feedbackTypeImprovement.
+  ///
+  /// In en, this message translates to:
+  /// **'Improvement'**
+  String get feedbackTypeImprovement;
+
+  /// No description provided for @feedbackTypeOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get feedbackTypeOther;
 }
 
 class _AppLocalizationsDelegate

@@ -144,7 +144,7 @@
   "@scanQrInstruction": {
     "description": "Instruction to scan QR on empty history screen"
   },
-  "scanForAction": "Scan for {action}",
+  "scanForAction": "Scan to {action}",
   "@scanForAction": {
     "description": "QR scanner title",
     "placeholders": {
@@ -663,7 +663,7 @@
   "@privacyPolicy": {
     "description": "Privacy policy setting label"
   },
-  "helpCenter": "Help Center",
+  "helpCenter": "Help center",
   "@helpCenter": {
     "description": "Help center setting label"
   },
@@ -1276,5 +1276,21 @@
   },
   "offlineNoSyncYet": "We'll update when you're back online",
   "offlineNotifications": "Notifications can't load while you're offline. Connect and try again.",
-  "refreshFailed": "Couldn't refresh. Check your connection and try again."
+  "refreshFailed": "Couldn't refresh. Check your connection and try again.",
+  "startPhotosCta": "Start photos",
+  "switchOn": "On",
+  "switchOff": "Off",
+  "whatsNewTitle": "What's new?",
+  "releaseVersionDate": "Version {version} – {date}",
+  "@releaseVersionDate": {
+    "placeholders": {
+      "version": {},
+      "date": {}
+    }
+  },
+  "feedbackTypeFeature": "Feature request",
+  "feedbackTypeBug": "Report a problem",
+  "feedbackTypeQuestion": "General question",
+  "feedbackTypeImprovement": "Improvement",
+  "feedbackTypeOther": "Other"
 }

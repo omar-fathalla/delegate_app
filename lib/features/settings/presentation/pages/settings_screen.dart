@@ -110,8 +110,8 @@ class SettingsScreen extends StatelessWidget {
                             title: l10n.darkMode,
                             subtitle:
                                 context.watch<ThemeCubit>().state.isDarkMode
-                                    ? 'On'
-                                    : 'Off',
+                                    ? l10n.switchOn
+                                    : l10n.switchOff,
                             trailing: Switch(
                               value:
                                   context.watch<ThemeCubit>().state.isDarkMode,
@@ -160,7 +160,7 @@ class SettingsScreen extends StatelessWidget {
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.auto_awesome_rounded,
-                            title: isArabic ? 'ما الجديد؟' : "What's New?",
+                            title: l10n.whatsNewTitle,
                             onTap: () => context.push('/changelog'),
                           ),
                           Divider(
@@ -228,17 +228,8 @@ class SettingsScreen extends StatelessWidget {
                             ),
                           ],
 
-                          _buildSettingsTile(
-                            context: context,
-                            icon: Icons.help_outline_rounded,
-                            title: l10n.helpCenter,
-                            onTap: () {},
-                          ),
-                          Divider(
-                            height: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            indent: 64,
-                          ),
+                          // Help center hidden: no destination exists yet
+                          // (was a dead `onTap: () {}`).
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.logout_rounded,

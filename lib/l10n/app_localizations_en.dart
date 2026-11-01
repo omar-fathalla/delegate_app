@@ -124,7 +124,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String scanForAction(String action) {
-    return 'Scan for $action';
+    return 'Scan to $action';
   }
 
   @override
@@ -488,7 +488,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privacyPolicy => 'Privacy Policy';
 
   @override
-  String get helpCenter => 'Help Center';
+  String get helpCenter => 'Help center';
 
   @override
   String version(String version) {
@@ -993,4 +993,36 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get refreshFailed =>
       'Couldn\'t refresh. Check your connection and try again.';
+
+  @override
+  String get startPhotosCta => 'Start photos';
+
+  @override
+  String get switchOn => 'On';
+
+  @override
+  String get switchOff => 'Off';
+
+  @override
+  String get whatsNewTitle => 'What\'s new?';
+
+  @override
+  String releaseVersionDate(Object version, Object date) {
+    return 'Version $version – $date';
+  }
+
+  @override
+  String get feedbackTypeFeature => 'Feature request';
+
+  @override
+  String get feedbackTypeBug => 'Report a problem';
+
+  @override
+  String get feedbackTypeQuestion => 'General question';
+
+  @override
+  String get feedbackTypeImprovement => 'Improvement';
+
+  @override
+  String get feedbackTypeOther => 'Other';
 }

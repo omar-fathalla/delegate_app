@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/changelog/domain/entities/app_update.dart';
@@ -40,7 +41,7 @@ class _ChangelogViewState extends State<_ChangelogView> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: Text(isArabic ? 'سجل التحديثات' : 'Changelog'),
+        title: Text(AppLocalizations.of(context)!.whatsNewTitle),
         centerTitle: true,
       ),
       body: BlocBuilder<ChangelogBloc, ChangelogState>(
@@ -191,7 +192,8 @@ class _ChangelogViewState extends State<_ChangelogView> {
             Text(
               isExpanded
                   ? title
-                  : '${isArabic ? 'إصدارات التحديث' : 'Update Releases'} - $formattedDate',
+                  : AppLocalizations.of(context)!
+                      .releaseVersionDate(update.version, formattedDate),
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -213,7 +215,8 @@ class _ChangelogViewState extends State<_ChangelogView> {
                       height: 1.5,
                     ),
                   ),
-                  ..._buildHighlights(context, update),
+                  // Raw commit-message highlights are intentionally not
+                  // shown to users (no invented release notes).
                   const SizedBox(height: 12),
                   Text(
                     formattedDate,
@@ -288,6 +291,7 @@ class _ChangelogViewState extends State<_ChangelogView> {
     );
   }
 
+  // ignore: unused_element
   List<Widget> _buildHighlights(BuildContext context, AppUpdate update) {
     final colorScheme = Theme.of(context).colorScheme;
     final isArabic = localeProvider.isArabic;

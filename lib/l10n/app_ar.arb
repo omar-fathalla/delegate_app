@@ -152,7 +152,7 @@
   "@scanQrInstruction": {
     "description": "Instruction to scan QR on empty history screen"
   },
-  "scanForAction": "مسح لـ {action}",
+  "scanForAction": "امسح ل{action}",
   "@scanForAction": {
     "description": "QR scanner title",
     "placeholders": {
@@ -712,7 +712,7 @@
   "@dataSecurity": {
     "description": "Data security section title"
   },
-  "dataSecurityDesc": "ننطبق معايير الأمان المعتمدة في الصناعة لحماية بياناتك. نحن لا نبيع بياناتك الشخصية. تتم مشاركة معلوماتك فقط مع الشركاء المعتمدين لمعالجة الخدمات.",
+  "dataSecurityDesc": "نطبّق معايير الأمان المعتمدة في الصناعة لحماية بياناتك. نحن لا نبيع بياناتك الشخصية. تتم مشاركة معلوماتك فقط مع الشركاء المعتمدين لمعالجة الخدمات.",
   "@dataSecurityDesc": {
     "description": "Data security section description"
   },
@@ -1271,5 +1271,15 @@
   "offlineLastSync": "آخر تحديث {time}",
   "offlineNoSyncYet": "سيتم التحديث عند عودة الاتصال",
   "offlineNotifications": "لا يمكن تحميل الإشعارات بدون إنترنت. اتصل بالإنترنت وحاول مرة أخرى.",
-  "refreshFailed": "تعذّر التحديث. تحقق من الاتصال وحاول مرة أخرى."
+  "refreshFailed": "تعذّر التحديث. تحقق من الاتصال وحاول مرة أخرى.",
+  "startPhotosCta": "ابدأ التصوير",
+  "switchOn": "مفعّل",
+  "switchOff": "متوقف",
+  "whatsNewTitle": "ما الجديد؟",
+  "releaseVersionDate": "الإصدار {version} – {date}",
+  "feedbackTypeFeature": "فكرة تطويرية",
+  "feedbackTypeBug": "الإبلاغ عن مشكلة",
+  "feedbackTypeQuestion": "استفسار عام",
+  "feedbackTypeImprovement": "تحسين",
+  "feedbackTypeOther": "أخرى"
 }

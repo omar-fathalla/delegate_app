@@ -124,7 +124,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String scanForAction(String action) {
-    return 'مسح لـ $action';
+    return 'امسح ل$action';
   }
 
   @override
@@ -519,7 +519,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get dataSecurityDesc =>
-      'ننطبق معايير الأمان المعتمدة في الصناعة لحماية بياناتك. نحن لا نبيع بياناتك الشخصية. تتم مشاركة معلوماتك فقط مع الشركاء المعتمدين لمعالجة الخدمات.';
+      'نطبّق معايير الأمان المعتمدة في الصناعة لحماية بياناتك. نحن لا نبيع بياناتك الشخصية. تتم مشاركة معلوماتك فقط مع الشركاء المعتمدين لمعالجة الخدمات.';
 
   @override
   String get contactUs => 'تواصل معنا';
@@ -990,4 +990,36 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get refreshFailed => 'تعذّر التحديث. تحقق من الاتصال وحاول مرة أخرى.';
+
+  @override
+  String get startPhotosCta => 'ابدأ التصوير';
+
+  @override
+  String get switchOn => 'مفعّل';
+
+  @override
+  String get switchOff => 'متوقف';
+
+  @override
+  String get whatsNewTitle => 'ما الجديد؟';
+
+  @override
+  String releaseVersionDate(Object version, Object date) {
+    return 'الإصدار $version – $date';
+  }
+
+  @override
+  String get feedbackTypeFeature => 'فكرة تطويرية';
+
+  @override
+  String get feedbackTypeBug => 'الإبلاغ عن مشكلة';
+
+  @override
+  String get feedbackTypeQuestion => 'استفسار عام';
+
+  @override
+  String get feedbackTypeImprovement => 'تحسين';
+
+  @override
+  String get feedbackTypeOther => 'أخرى';
 }
