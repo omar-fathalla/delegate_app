@@ -32,6 +32,9 @@ ThemeData tashilAuthTheme(BuildContext context) {
   final base =
       dark ? AppTheme.darkTheme(kTashilSeed) : AppTheme.lightTheme(kTashilSeed);
   return base.copyWith(
+    // fromSeed's tonal-spot primary is #65558F; pin the approved brand
+    // primary in light mode so buttons match the header and native splash.
+    colorScheme: dark ? null : base.colorScheme.copyWith(primary: kTashilSeed),
     progressIndicatorTheme:
         // ignore: deprecated_member_use
         const ProgressIndicatorThemeData(year2023: false),
@@ -41,7 +44,11 @@ ThemeData tashilAuthTheme(BuildContext context) {
 /// Fixed light scheme used for the purple brand surfaces (header/splash) so
 /// they match the native splash exactly in both light and dark mode.
 final ColorScheme kTashilBrandScheme =
-    ColorScheme.fromSeed(seedColor: kTashilSeed);
+    ColorScheme.fromSeed(seedColor: kTashilSeed).copyWith(
+  primary: kTashilSeed,
+  primaryContainer: const Color(0xFFEADDFF),
+  onPrimaryContainer: const Color(0xFF21005D),
+);
 
 Future<PackageInfo>? _pkg;
 Future<PackageInfo> tashilPackageInfo() => _pkg ??= PackageInfo.fromPlatform();
