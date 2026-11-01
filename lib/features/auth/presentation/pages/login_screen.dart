@@ -343,10 +343,12 @@ class _LoginScreenState extends State<LoginScreen>
                       label: l10n.rememberMe,
                       child: Checkbox(
                         value: _rememberMe,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
                         onChanged: (v) => setState(() => _rememberMe = v ?? false),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
                     Text(l10n.rememberMe, style: text.bodyLarge?.copyWith(color: colorScheme.onSurface)),
                   ],
                 ),
