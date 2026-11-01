@@ -33,7 +33,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -46,6 +46,20 @@ class _LoginScreenState extends State<LoginScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _sheetSlide;
+  // Submit choreography: 0 = form, 1 = sheet gone + logo centered + loader.
+  late final AnimationController _submit = AnimationController(
+    vsync: this,
+    duration: M3Motion.medium4,
+  );
+  late final Animation<double> _submitCurve = CurvedAnimation(
+    parent: _submit,
+    curve: M3Motion.emphasizedAccel,
+    reverseCurve: M3Motion.emphasizedDecel,
+  );
+  late final Animation<double> _logoCurve = CurvedAnimation(
+    parent: _submit,
+    curve: Curves.easeInOutCubicEmphasized,
+  );
 
   @override
   void initState() {
@@ -60,12 +74,17 @@ class _LoginScreenState extends State<LoginScreen>
       parent: _animationController,
       curve: const Interval(0.1, 0.5, curve: M3Motion.standard),
     );
-    _sheetSlide = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(100 / 900, 600 / 900, curve: M3Motion.emphasizedDecel),
-      ),
-    );
+    _sheetSlide = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(
+              100 / 900,
+              600 / 900,
+              curve: M3Motion.emphasizedDecel,
+            ),
+          ),
+        );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (M3Motion.reduced(context)) {
@@ -102,6 +121,7 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void dispose() {
     _animationController.dispose();
+    _submit.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -130,7 +150,8 @@ class _LoginScreenState extends State<LoginScreen>
       backgroundColor: brand.primary,
       resizeToAvoidBottomInset: true,
       body: BlocConsumer<AuthBloc, AuthState>(
-        listener: (context, state) => _onAuthState(context, state, l10n, colorScheme),
+        listener: (context, state) =>
+            _onAuthState(context, state, l10n, colorScheme),
         builder: (context, state) {
           if (state is AuthPhoneOtpRequired) {
             return ColoredBox(
@@ -145,21 +166,38 @@ class _LoginScreenState extends State<LoginScreen>
               final headerHeight = compact
                   ? 176.0
                   : (constraints.maxHeight * 0.27).clamp(200.0, 250.0);
-              final header = _buildHeader(context, isArabic, headerHeight, compact);
-              final formRows = _buildFormRows(context, state, l10n, isArabic, loading);
+              final header = _buildHeader(
+                context,
+                isArabic,
+                headerHeight,
+                compact,
+              );
+              final formRows = _buildFormRows(
+                context,
+                state,
+                l10n,
+                isArabic,
+                loading,
+              );
               final bottom = _buildBottom(context, l10n, isArabic, loading);
 
               // Grouped sections on an 8dp rhythm. Leftover height is shared
               // evenly between the groups (Spacers); the button stays at the
               // bottom on tall screens and everything scrolls when it can't fit.
               final sheetBody = CustomScrollView(
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 slivers: [
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: SafeArea(
                       top: false,
-                      minimum: EdgeInsets.fromLTRB(16, compact ? 24 : 32, 16, 12),
+                      minimum: EdgeInsets.fromLTRB(
+                        16,
+                        compact ? 24 : 32,
+                        16,
+                        12,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -182,20 +220,66 @@ class _LoginScreenState extends State<LoginScreen>
                 ],
               );
 
-              return Column(
+              final reduce = M3Motion.reduced(context);
+              final sheet = SlideTransition(
+                position: _sheetSlide,
+                child: Material(
+                  color: colorScheme.surface,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(28),
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: sheetBody,
+                ),
+              );
+              return Stack(
                 children: [
-                  header,
-                  Expanded(
-                    child: SlideTransition(
-                      position: _sheetSlide,
-                      child: Material(
-                        color: colorScheme.surface,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                  Positioned.fill(
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height:
+                              headerHeight + MediaQuery.paddingOf(context).top,
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: sheetBody,
-                      ),
+                        Expanded(
+                          child: reduce
+                              ? FadeTransition(
+                                  opacity: ReverseAnimation(_submit),
+                                  child: sheet,
+                                )
+                              : SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: Offset.zero,
+                                    end: const Offset(0, 1.05),
+                                  ).animate(_submitCurve),
+                                  child: sheet,
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: AnimatedBuilder(
+                      animation: _logoCurve,
+                      builder: (context, child) {
+                        final t = _logoCurve.value;
+                        final dy = reduce
+                            ? 0.0
+                            : (constraints.maxHeight / 2 -
+                                      (MediaQuery.paddingOf(context).top +
+                                          headerHeight / 2)) *
+                                  t;
+                        return Transform.translate(
+                          offset: Offset(0, dy),
+                          child: child,
+                        );
+                      },
+                      child: header,
                     ),
                   ),
                 ],
@@ -213,19 +297,31 @@ class _LoginScreenState extends State<LoginScreen>
     final end = (start + 200 / 900).clamp(0.0, 1.0);
     final anim = CurvedAnimation(
       parent: _animationController,
-      curve: Interval(start.clamp(0.0, 1.0), end, curve: M3Motion.emphasizedDecel),
+      curve: Interval(
+        start.clamp(0.0, 1.0),
+        end,
+        curve: M3Motion.emphasizedDecel,
+      ),
     );
     return AnimatedBuilder(
       animation: anim,
       builder: (_, c) => Opacity(
         opacity: anim.value,
-        child: Transform.translate(offset: Offset(0, 16 * (1 - anim.value)), child: c),
+        child: Transform.translate(
+          offset: Offset(0, 16 * (1 - anim.value)),
+          child: c,
+        ),
       ),
       child: child,
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isArabic, double height, bool compact) {
+  Widget _buildHeader(
+    BuildContext context,
+    bool isArabic,
+    double height,
+    bool compact,
+  ) {
     final brand = kTashilBrandScheme;
     final text = Theme.of(context).textTheme;
     return SizedBox(
@@ -238,21 +334,70 @@ class _LoginScreenState extends State<LoginScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TashilLogoTile(size: compact ? 56 : 80),
+                  ScaleTransition(
+                    scale: Tween<double>(
+                      begin: 1,
+                      end: M3Motion.reduced(context)
+                          ? 1
+                          : (compact ? 1.6 : 1.3),
+                    ).animate(_logoCurve),
+                    child: TashilLogoTile(size: compact ? 56 : 80),
+                  ),
                   const SizedBox(height: 8),
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: Column(
-                      children: [
-                        Text(AppLocalizations.of(context)!.appTitle,
-                            style: text.headlineMedium?.copyWith(
-                                color: brand.onPrimary, fontWeight: FontWeight.w700, height: 1.3)),
-                        if (!compact)
-                          Text(AppLocalizations.of(context)!.delegateApp,
-                              style: text.bodyMedium?.copyWith(
-                                  color: brand.onPrimary.withValues(alpha: 0.85))),
-                      ],
-                    ),
+                  Stack(
+                    alignment: Alignment.topCenter,
+                    children: [
+                      FadeTransition(
+                        opacity: ReverseAnimation(_submit),
+                        child: FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: Column(
+                            children: [
+                              Text(
+                                AppLocalizations.of(context)!.appTitle,
+                                style: text.headlineMedium?.copyWith(
+                                  color: brand.onPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.3,
+                                ),
+                              ),
+                              if (!compact)
+                                Text(
+                                  AppLocalizations.of(context)!.delegateApp,
+                                  style: text.bodyMedium?.copyWith(
+                                    color: brand.onPrimary.withValues(
+                                      alpha: 0.85,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 24),
+                        child: FadeTransition(
+                          key: const ValueKey('login_submit_loader'),
+                          opacity: CurvedAnimation(
+                            parent: _submit,
+                            curve: const Interval(0.5, 1),
+                          ),
+                          child: SizedBox.square(
+                            dimension: 40,
+                            child: AnimatedBuilder(
+                              animation: _submit,
+                              builder: (_, _) => _submit.isDismissed
+                                  ? const SizedBox.shrink()
+                                  : CircularProgressIndicator(
+                                      color: brand.onPrimary,
+                                      strokeWidth: 4,
+                                      strokeCap: StrokeCap.round,
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -261,18 +406,23 @@ class _LoginScreenState extends State<LoginScreen>
               top: 4,
               end: 16,
               child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: OutlinedButton.icon(
-                  key: const ValueKey('login_language_toggle'),
-                  onPressed: () => localeProvider.toggleLocale(),
-                  icon: const Icon(Icons.language_rounded, size: 18),
-                  label: Text(isArabic ? 'English' : 'العربية'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: brand.onPrimary,
-                    minimumSize: const Size(0, 40),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    side: BorderSide(color: brand.onPrimary.withValues(alpha: 0.6)),
-                    shape: const StadiumBorder(),
+                opacity: ReverseAnimation(_submit),
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('login_language_toggle'),
+                    onPressed: () => localeProvider.toggleLocale(),
+                    icon: const Icon(Icons.language_rounded, size: 18),
+                    label: Text(isArabic ? 'English' : 'العربية'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: brand.onPrimary,
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      side: BorderSide(
+                        color: brand.onPrimary.withValues(alpha: 0.6),
+                      ),
+                      shape: const StadiumBorder(),
+                    ),
                   ),
                 ),
               ),
@@ -283,93 +433,147 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  List<Widget> _buildFormRows(BuildContext context, AuthState state,
-      AppLocalizations l10n, bool isArabic, bool loading) {
+  List<Widget> _buildFormRows(
+    BuildContext context,
+    AuthState state,
+    AppLocalizations l10n,
+    bool isArabic,
+    bool loading,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     var i = 0;
     return [
-      _row(i++, Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(l10n.loginButton,
-              style: text.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
-          const SizedBox(height: 4),
-          Text(
-            key: const ValueKey('login_mode_helper'),
-            _isStaff
-                ? (isArabic ? 'اختر نوع حسابك ثم ادخل بكلمة المرور' : 'Pick your account type, then sign in with your password')
-                : (isArabic ? 'اختر نوع حسابك ثم أدخل بياناتك' : 'Pick your account type, then enter your details'),
-            style: text.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-          ),
-        ],
-      )),
-      _row(i++, M3ButtonGroup<LoginMode>(
-        key: const ValueKey('login_mode_switch'),
-        values: const [LoginMode.delegate, LoginMode.staff],
-        labels: [isArabic ? 'مندوب' : 'Delegate', isArabic ? 'موظف إداري' : 'Admin staff'],
-        icons: const [Icons.badge_outlined, Icons.admin_panel_settings_outlined],
-        selected: _mode,
-        onChanged: loading ? null : _setMode,
-      )),
-      _row(i++, Shake(
-        key: _shakeKey,
-        child: Form(
-          key: _formKey,
-          autovalidateMode: _autovalidate,
-          child: AutofillGroup(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: _buildFields(context, l10n, isArabic, loading),
+      _row(
+        i++,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.loginButton,
+              style: text.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
             ),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              key: const ValueKey('login_mode_helper'),
+              _isStaff
+                  ? (isArabic
+                        ? 'اختر نوع حسابك ثم ادخل بكلمة المرور'
+                        : 'Pick your account type, then sign in with your password')
+                  : (isArabic
+                        ? 'اختر نوع حسابك ثم أدخل بياناتك'
+                        : 'Pick your account type, then enter your details'),
+              style: text.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
-      )),
-      _row(i++, Row(
-        children: [
-          // Compact: checkbox, 8dp, label; whole row tappable, 48dp min.
-          InkWell(
-            key: const ValueKey('login_remember_me'),
-            borderRadius: BorderRadius.circular(8),
-            onTap: () => setState(() => _rememberMe = !_rememberMe),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 48),
-              child: Padding(
-                padding: const EdgeInsetsDirectional.only(end: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Semantics(
-                      label: l10n.rememberMe,
-                      child: Checkbox(
-                        value: _rememberMe,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                        onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(l10n.rememberMe, style: text.bodyLarge?.copyWith(color: colorScheme.onSurface)),
-                  ],
-                ),
+      ),
+      _row(
+        i++,
+        M3ButtonGroup<LoginMode>(
+          key: const ValueKey('login_mode_switch'),
+          values: const [LoginMode.delegate, LoginMode.staff],
+          labels: [
+            isArabic ? 'مندوب' : 'Delegate',
+            isArabic ? 'موظف إداري' : 'Admin staff',
+          ],
+          icons: const [
+            Icons.badge_outlined,
+            Icons.admin_panel_settings_outlined,
+          ],
+          selected: _mode,
+          onChanged: loading ? null : _setMode,
+        ),
+      ),
+      _row(
+        i++,
+        Shake(
+          key: _shakeKey,
+          child: Form(
+            key: _formKey,
+            autovalidateMode: _autovalidate,
+            child: AutofillGroup(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _buildFields(context, l10n, isArabic, loading),
               ),
             ),
           ),
-          const Spacer(),
-          if (_isStaff)
-            TextButton(
-              key: const ValueKey('login_forgot_password'),
-              onPressed: loading ? null : () => _forgotPassword(context, isArabic),
-              child: Text(isArabic ? 'نسيت كلمة المرور؟' : 'Forgot password?'),
+        ),
+      ),
+      _row(
+        i++,
+        Row(
+          children: [
+            // Compact: checkbox, 8dp, label; whole row tappable, 48dp min.
+            InkWell(
+              key: const ValueKey('login_remember_me'),
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => setState(() => _rememberMe = !_rememberMe),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Semantics(
+                        label: l10n.rememberMe,
+                        child: Checkbox(
+                          value: _rememberMe,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          onChanged: (v) =>
+                              setState(() => _rememberMe = v ?? false),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        l10n.rememberMe,
+                        style: text.bodyLarge?.copyWith(
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-        ],
-      )),
+            const Spacer(),
+            if (_isStaff)
+              TextButton(
+                key: const ValueKey('login_forgot_password'),
+                onPressed: loading
+                    ? null
+                    : () => _forgotPassword(context, isArabic),
+                child: Text(
+                  isArabic ? 'نسيت كلمة المرور؟' : 'Forgot password?',
+                ),
+              ),
+          ],
+        ),
+      ),
     ];
   }
 
-  List<Widget> _buildFields(BuildContext context, AppLocalizations l10n, bool isArabic, bool loading) {
+  List<Widget> _buildFields(
+    BuildContext context,
+    AppLocalizations l10n,
+    bool isArabic,
+    bool loading,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
-    final fieldStyle = TextStyle(fontSize: 16, color: colorScheme.onSurface, letterSpacing: 1);
+    final fieldStyle = TextStyle(
+      fontSize: 16,
+      color: colorScheme.onSurface,
+      letterSpacing: 1,
+    );
     final eyeColor = colorScheme.onSurfaceVariant;
     return [
       TextFormField(
@@ -389,7 +593,9 @@ class _LoginScreenState extends State<LoginScreen>
         style: fieldStyle,
         decoration: _inputDecoration(
           label: l10n.mobileNumber,
-          helper: isArabic ? 'رقم الجوال المسجل لدى الشركة' : 'Your mobile number registered with the company',
+          helper: isArabic
+              ? 'رقم الجوال المسجل لدى الشركة'
+              : 'Your mobile number registered with the company',
           colorScheme: colorScheme,
         ),
         validator: (value) => validateLoginPhone(
@@ -422,10 +628,17 @@ class _LoginScreenState extends State<LoginScreen>
             colorScheme: colorScheme,
             suffixIcon: IconButton(
               key: const ValueKey('login_national_id_eye'),
-              tooltip: _obscureNationalId ? (isArabic ? 'إظهار' : 'Show') : (isArabic ? 'إخفاء' : 'Hide'),
-              icon: Icon(_obscureNationalId ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-                  color: eyeColor),
-              onPressed: () => setState(() => _obscureNationalId = !_obscureNationalId),
+              tooltip: _obscureNationalId
+                  ? (isArabic ? 'إظهار' : 'Show')
+                  : (isArabic ? 'إخفاء' : 'Hide'),
+              icon: Icon(
+                _obscureNationalId
+                    ? Icons.visibility_rounded
+                    : Icons.visibility_off_rounded,
+                color: eyeColor,
+              ),
+              onPressed: () =>
+                  setState(() => _obscureNationalId = !_obscureNationalId),
             ),
           ),
           validator: (value) => validateDelegateNationalId(
@@ -452,23 +665,35 @@ class _LoginScreenState extends State<LoginScreen>
             label: isArabic ? 'كلمة المرور' : 'Password',
             colorScheme: colorScheme,
             suffixIcon: IconButton(
-              tooltip: _obscurePassword ? (isArabic ? 'إظهار' : 'Show') : (isArabic ? 'إخفاء' : 'Hide'),
+              tooltip: _obscurePassword
+                  ? (isArabic ? 'إظهار' : 'Show')
+                  : (isArabic ? 'إخفاء' : 'Hide'),
               icon: Icon(
-                _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                _obscurePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
                 color: eyeColor,
               ),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
             ),
           ),
           validator: (value) => validateStaffPassword(
             value,
-            emptyMessage: isArabic ? 'يرجى إدخال كلمة المرور' : 'Please enter your password',
+            emptyMessage: isArabic
+                ? 'يرجى إدخال كلمة المرور'
+                : 'Please enter your password',
           ),
         ),
     ];
   }
 
-  List<Widget> _buildBottom(BuildContext context, AppLocalizations l10n, bool isArabic, bool loading) {
+  List<Widget> _buildBottom(
+    BuildContext context,
+    AppLocalizations l10n,
+    bool isArabic,
+    bool loading,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
     final reduce = M3Motion.reduced(context);
     return [
@@ -493,10 +718,10 @@ class _LoginScreenState extends State<LoginScreen>
               backgroundColor: colorScheme.primary,
               shape: const StadiumBorder(),
               textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    height: 1.4,
-                  ),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
             ),
             child: IgnorePointer(
               ignoring: loading,
@@ -508,7 +733,10 @@ class _LoginScreenState extends State<LoginScreen>
                     ? SizedBox.square(
                         key: const ValueKey('login_loading'),
                         dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: colorScheme.onPrimary),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: colorScheme.onPrimary,
+                        ),
                       )
                     : Text(
                         l10n.loginButton,
@@ -529,84 +757,97 @@ class _LoginScreenState extends State<LoginScreen>
         onPressed: () => _launchPhoneDialer(l10n.contactNumber),
         child: Text(isArabic ? 'تواصل مع الدعم الفني' : 'Contact support'),
       ),
-      TashilVersionText(color: colorScheme.onSurfaceVariant, isArabic: isArabic),
+      TashilVersionText(
+        color: colorScheme.onSurfaceVariant,
+        isArabic: isArabic,
+      ),
     ];
   }
 
-  void _onAuthState(BuildContext context, AuthState state, AppLocalizations l10n, ColorScheme colorScheme) {
-          if (state is AuthDeviceMismatchState) {
-            DeviceLockDialog.show(
-              context,
-              boundDeviceModel: state.boundDeviceModel,
-              currentDeviceModel: state.currentDeviceModel,
-              delegateName: state.delegate.fullName,
-              delegate: state.delegate,
-            );
-          } else if (state is AuthError) {
-            if (state.code == 'device_mismatch') {
-              DeviceLockDialog.show(context, requestAlreadyFiled: true);
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    localizedAuthError(
-                      l10n,
-                      message: state.message,
-                      code: state.code,
-                    ),
-                  ),
-                  backgroundColor: colorScheme.error,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              );
-            }
-          } else if (state is AuthOrganizationSelectionRequired) {
-            _showOrganizationSelector(
-              context,
-              state.delegates,
-              state.rememberMe,
-            );
-          } else if (state is AuthAuthenticated) {
-            final delegate = state.delegate;
-            debugPrint('🚀 LoginScreen: AuthAuthenticated received! name=${delegate.fullName}, role=${delegate.role}, uid=${delegate.uid}');
-            try {
-              if (delegate.role == UserRole.superAdmin ||
-                  delegate.role == UserRole.admin ||
-                  delegate.role == UserRole.organizationAdmin ||
-                  delegate.role == UserRole.technicalSupport ||
-                  delegate.role == UserRole.branchesMarketingManager) {
-                debugPrint('🚀 LoginScreen: Navigating to /admin/home');
-                context.go('/admin/home', extra: delegate);
-              } else if (delegate.role == UserRole.accountant) {
-                debugPrint('🚀 LoginScreen: Navigating to /accountant/home');
-                context.go('/accountant/home', extra: delegate);
-              } else if (delegate.role == UserRole.hr) {
-                debugPrint('🚀 LoginScreen: Navigating to /hr/home');
-                context.go('/hr/home', extra: delegate);
-              } else if (delegate.role == UserRole.marketing ||
-                  delegate.role == UserRole.marketingPromotion) {
-                debugPrint('🚀 LoginScreen: Navigating to /marketing/home');
-                context.go('/marketing/home', extra: delegate);
-              } else {
-                debugPrint('🚀 LoginScreen: Navigating to /home');
-                context.go('/home', extra: delegate);
-              }
-            } catch (e, stack) {
-              debugPrint('❌ Navigation Error in LoginScreen: $e\n$stack');
-            }
+  void _onAuthState(
+    BuildContext context,
+    AuthState state,
+    AppLocalizations l10n,
+    ColorScheme colorScheme,
+  ) {
+    if (state is! AuthLoading &&
+        state is! AuthAuthenticated &&
+        _submit.value > 0) {
+      // Failure / extra step: bring the form back, then shake on error.
+      final isError = state is AuthError || state is AuthDeviceMismatchState;
+      _submit.reverse().then((_) {
+        if (mounted && isError) _shakeKey.currentState?.shake();
+      });
+    }
+    if (state is AuthDeviceMismatchState) {
+      DeviceLockDialog.show(
+        context,
+        boundDeviceModel: state.boundDeviceModel,
+        currentDeviceModel: state.currentDeviceModel,
+        delegateName: state.delegate.fullName,
+        delegate: state.delegate,
+      );
+    } else if (state is AuthError) {
+      if (state.code == 'device_mismatch') {
+        DeviceLockDialog.show(context, requestAlreadyFiled: true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              localizedAuthError(
+                l10n,
+                message: state.message,
+                code: state.code,
+              ),
+            ),
+            backgroundColor: colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } else if (state is AuthOrganizationSelectionRequired) {
+      _showOrganizationSelector(context, state.delegates, state.rememberMe);
+    } else if (state is AuthAuthenticated) {
+      final delegate = state.delegate;
+      debugPrint(
+        '🚀 LoginScreen: AuthAuthenticated received! name=${delegate.fullName}, role=${delegate.role}, uid=${delegate.uid}',
+      );
+      try {
+        if (delegate.role == UserRole.superAdmin ||
+            delegate.role == UserRole.admin ||
+            delegate.role == UserRole.organizationAdmin ||
+            delegate.role == UserRole.technicalSupport ||
+            delegate.role == UserRole.branchesMarketingManager) {
+          debugPrint('🚀 LoginScreen: Navigating to /admin/home');
+          context.go('/admin/home', extra: delegate);
+        } else if (delegate.role == UserRole.accountant) {
+          debugPrint('🚀 LoginScreen: Navigating to /accountant/home');
+          context.go('/accountant/home', extra: delegate);
+        } else if (delegate.role == UserRole.hr) {
+          debugPrint('🚀 LoginScreen: Navigating to /hr/home');
+          context.go('/hr/home', extra: delegate);
+        } else if (delegate.role == UserRole.marketing ||
+            delegate.role == UserRole.marketingPromotion) {
+          debugPrint('🚀 LoginScreen: Navigating to /marketing/home');
+          context.go('/marketing/home', extra: delegate);
+        } else {
+          debugPrint('🚀 LoginScreen: Navigating to /home');
+          context.go('/home', extra: delegate);
+        }
+      } catch (e, stack) {
+        debugPrint('❌ Navigation Error in LoginScreen: $e\n$stack');
+      }
 
-            // تهيئة الإشعارات في الخلفية بعد اكتمال الانتقال لتجنب تجميد الواجهة أو قفل حوار الأذونات
-            Future.delayed(const Duration(milliseconds: 1500), () {
-              sl<PushNotificationService>()
-                  .initialize(delegate.uid)
-                  .catchError((e) {
-                    debugPrint('FCM Init Error: $e');
-                  });
-            });
-          }
+      // تهيئة الإشعارات في الخلفية بعد اكتمال الانتقال لتجنب تجميد الواجهة أو قفل حوار الأذونات
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        sl<PushNotificationService>().initialize(delegate.uid).catchError((e) {
+          debugPrint('FCM Init Error: $e');
+        });
+      });
+    }
   }
 
   // ---- Helper: Submit Login ----
@@ -614,6 +855,8 @@ class _LoginScreenState extends State<LoginScreen>
     if (BlocProvider.of<AuthBloc>(context).state is AuthLoading) return;
 
     if (_formKey.currentState!.validate()) {
+      FocusScope.of(context).unfocus();
+      _submit.forward();
       BlocProvider.of<AuthBloc>(context).add(
         LoginRequested(
           phoneNumber: _phoneController.text,
@@ -629,7 +872,9 @@ class _LoginScreenState extends State<LoginScreen>
       final isArabic = localeProvider.isArabic;
       SemanticsService.sendAnnouncement(
         View.of(context),
-        isArabic ? 'يرجى مراجعة البيانات المدخلة' : 'Please check the highlighted fields',
+        isArabic
+            ? 'يرجى مراجعة البيانات المدخلة'
+            : 'Please check the highlighted fields',
         isArabic ? TextDirection.rtl : TextDirection.ltr,
       );
       if (_autovalidate != AutovalidateMode.onUserInteraction) {
@@ -657,20 +902,28 @@ class _LoginScreenState extends State<LoginScreen>
     if (entered == null || !context.mounted) return;
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: entered);
-      messenger.showSnackBar(SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text(isArabic
-            ? 'لو الإيميل مسجّل، هيوصلك رابط لتغيير كلمة المرور.'
-            : 'If this email is registered, a reset link is on its way.'),
-      ));
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            isArabic
+                ? 'لو الإيميل مسجّل، هيوصلك رابط لتغيير كلمة المرور.'
+                : 'If this email is registered, a reset link is on its way.',
+          ),
+        ),
+      );
     } catch (_) {
-      messenger.showSnackBar(SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: colorScheme.error,
-        content: Text(isArabic
-            ? 'تعذر إرسال رابط تغيير كلمة المرور. حاول مرة أخرى.'
-            : 'Could not send the reset link. Try again.'),
-      ));
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: colorScheme.error,
+          content: Text(
+            isArabic
+                ? 'تعذر إرسال رابط تغيير كلمة المرور. حاول مرة أخرى.'
+                : 'Could not send the reset link. Try again.',
+          ),
+        ),
+      );
     }
   }
 
@@ -700,7 +953,9 @@ class _LoginScreenState extends State<LoginScreen>
             validator: (v) {
               final t = (v ?? '').trim();
               if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t)) {
-                return isArabic ? 'يرجى إدخال بريد إلكتروني صحيح' : 'Enter a valid email';
+                return isArabic
+                    ? 'يرجى إدخال بريد إلكتروني صحيح'
+                    : 'Enter a valid email';
               }
               return null;
             },
@@ -748,10 +1003,18 @@ class _LoginScreenState extends State<LoginScreen>
       helperStyle: TextStyle(color: colorScheme.onSurfaceVariant),
       filled: false,
       border: const OutlineInputBorder(),
-      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.outline)),
-      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.primary, width: 2)),
-      errorBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.error)),
-      focusedErrorBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.error, width: 2)),
+      enabledBorder: OutlineInputBorder(
+        borderSide: BorderSide(color: colorScheme.outline),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderSide: BorderSide(color: colorScheme.error),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderSide: BorderSide(color: colorScheme.error, width: 2),
+      ),
       counterText: '',
       suffixIcon: suffixIcon,
     );
