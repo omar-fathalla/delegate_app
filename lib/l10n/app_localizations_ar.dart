@@ -1719,4 +1719,192 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get passwordsDontMatch => 'كلمتا المرور غير متطابقتين';
+
+  @override
+  String get refreshPolicy => 'تحديث اللائحة';
+
+  @override
+  String allPolicyItems(Object count) {
+    return 'كل البنود ($count)';
+  }
+
+  @override
+  String get penPolicyCardBody =>
+      'قيمة الخصم لكل مخالفة عند أول مرة وعند التكرار.';
+
+  @override
+  String get searchPolicy => 'ابحث في اللائحة';
+
+  @override
+  String allWithCount(Object count) {
+    return 'الكل ($count)';
+  }
+
+  @override
+  String get adminRestricted => 'مقيدة إداريًا';
+
+  @override
+  String get firstTime => 'أول مرة';
+
+  @override
+  String amountEgp(Object amount) {
+    return '$amount ج.م';
+  }
+
+  @override
+  String get whenRepeated => 'عند التكرار';
+
+  @override
+  String get perManagementDecision => 'حسب قرار الإدارة';
+
+  @override
+  String plannedAction(Object action) {
+    return 'الإجراء المقرر: $action';
+  }
+
+  @override
+  String get noResults => 'لا توجد نتائج';
+
+  @override
+  String get tryOtherSearch => 'جرّب كلمات أخرى أو تصنيفًا مختلفًا.';
+
+  @override
+  String get noViolationDocs => 'لا توجد مستندات مرفقة لهذه المخالفة';
+
+  @override
+  String get violationReceipt => 'إيصال / مستند المخالفة';
+
+  @override
+  String get closeAction => 'إغلاق';
+
+  @override
+  String get imageLoadFailed => 'تعذّر عرض الصورة من الخادم';
+
+  @override
+  String get openInBrowser => 'فتح في المتصفح';
+
+  @override
+  String get attachedDocuments => 'المستندات والإيصالات المرفقة';
+
+  @override
+  String receiptNumber(Object number) {
+    return 'إيصال / مستند #$number';
+  }
+
+  @override
+  String get photoReceipt => 'صورة / إيصال';
+
+  @override
+  String get tapToPreview => 'اضغط للمعاينة';
+
+  @override
+  String get tapToOpen => 'اضغط للفتح';
+
+  @override
+  String get deleteAllNotifications => 'حذف جميع الإشعارات';
+
+  @override
+  String get deleteAllNotificationsConfirm =>
+      'حذف كل الإشعارات من قائمتك؟\n(لن تظهر في حسابك مرة أخرى، لكنها تبقى في سجل النظام).';
+
+  @override
+  String get allNotificationsDeleted => 'تم حذف كل الإشعارات من قائمتك';
+
+  @override
+  String get deleteAll => 'حذف الكل';
+
+  @override
+  String get sendNewNotification => 'إرسال إشعار جديد';
+
+  @override
+  String get deleteNotification => 'حذف الإشعار';
+
+  @override
+  String get deleteNotificationConfirm =>
+      'حذف هذا الإشعار من قائمتك؟\n(يبقى مسجّلًا في سجل النظام).';
+
+  @override
+  String get notificationDeleted => 'تم حذف الإشعار من قائمتك';
+
+  @override
+  String get systemAdministration => 'إدارة النظام';
+
+  @override
+  String senderLine(Object name, Object role) {
+    return 'المرسل: $name ($role)';
+  }
+
+  @override
+  String get markAsRead => 'تعليم كمقروء';
+
+  @override
+  String get viewTask => 'عرض المهمة';
+
+  @override
+  String get updateAppNow => 'تحديث التطبيق الآن';
+
+  @override
+  String get justNow => 'الآن';
+
+  @override
+  String get taskCompletedConfirmed => 'تم تأكيد إنجاز المهمة';
+
+  @override
+  String get taskStarted => 'بدأت العمل على المهمة';
+
+  @override
+  String get noTasksNow => 'لا توجد مهام حاليًا';
+
+  @override
+  String get tasksAppearHere => 'ستظهر هنا المهام فور إسنادها إليك.';
+
+  @override
+  String get taskDeleted => 'تم حذف المهمة';
+
+  @override
+  String taskDeleteFailed(Object error) {
+    return 'تعذّر حذف المهمة: $error';
+  }
+
+  @override
+  String timeAgoDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'منذ $count يوم',
+      many: 'منذ $count يومًا',
+      few: 'منذ $count أيام',
+      two: 'منذ يومين',
+      one: 'منذ يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeAgoHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'منذ $count ساعة',
+      many: 'منذ $count ساعة',
+      few: 'منذ $count ساعات',
+      two: 'منذ ساعتين',
+      one: 'منذ ساعة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeAgoMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'منذ $count دقيقة',
+      many: 'منذ $count دقيقة',
+      few: 'منذ $count دقائق',
+      two: 'منذ دقيقتين',
+      one: 'منذ دقيقة',
+    );
+    return '$_temp0';
+  }
 }

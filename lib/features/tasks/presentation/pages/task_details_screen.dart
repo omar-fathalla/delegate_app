@@ -804,7 +804,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                                       Navigator.pop(context, true);
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
-                                          content: const Text('تم حذف المهمة بنجاح'),
+                                          content: Text(AppLocalizations.of(context)!.taskDeleted),
                                           backgroundColor: Colors.green.shade700,
                                         ),
                                       );
@@ -815,7 +815,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                                     setModalState(() => isDeleting = false);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('حدث خطأ أثناء حذف المهمة: $e'),
+                                        content: Text(AppLocalizations.of(context)!.taskDeleteFailed(e)),
                                         backgroundColor: colorScheme.error,
                                       ),
                                     );

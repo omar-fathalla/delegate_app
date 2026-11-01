@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +14,7 @@ class PenaltyEvidenceViewer {
   }) {
     if (penalty.evidenceFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لا توجد مستندات مرفقة لهذه المخالفة')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.noViolationDocs)),
       );
       return;
     }
@@ -74,7 +75,7 @@ class PenaltyEvidenceViewer {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            title ?? 'إيصال / مستند المخالفة',
+                            title ?? AppLocalizations.of(context)!.violationReceipt,
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -98,7 +99,7 @@ class PenaltyEvidenceViewer {
                     ),
                     IconButton(
                       icon: const Icon(Icons.close_rounded, color: Colors.white),
-                      tooltip: 'إغلاق',
+                      tooltip: AppLocalizations.of(context)!.closeAction,
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
@@ -135,8 +136,8 @@ class PenaltyEvidenceViewer {
                                 const Icon(Icons.broken_image_rounded,
                                     color: Colors.white54, size: 48),
                                 const SizedBox(height: 12),
-                                const Text(
-                                  'تعذّر عرض الصورة من الخادم',
+                                Text(
+                                  AppLocalizations.of(context)!.imageLoadFailed,
                                   style: TextStyle(color: Colors.white70),
                                 ),
                                 const SizedBox(height: 8),
@@ -150,7 +151,7 @@ class PenaltyEvidenceViewer {
                                   },
                                   icon: const Icon(Icons.open_in_browser_rounded,
                                       size: 16),
-                                  label: const Text('فتح في المتصفح'),
+                                  label: Text(AppLocalizations.of(context)!.openInBrowser),
                                 ),
                               ],
                             ),
@@ -307,7 +308,7 @@ class _EvidenceListBottomSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'المستندات والإيصالات المرفقة',
+                      AppLocalizations.of(context)!.attachedDocuments,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -413,7 +414,7 @@ class _EvidenceListBottomSheet extends StatelessWidget {
                               Text(
                                 file.fileName.isNotEmpty
                                     ? file.fileName
-                                    : 'إيصال / مستند #${index + 1}',
+                                    : AppLocalizations.of(context)!.receiptNumber(index + 1),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
@@ -434,7 +435,7 @@ class _EvidenceListBottomSheet extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
-                                      isImage ? 'صورة / إيصال' : file.fileType,
+                                      isImage ? AppLocalizations.of(context)!.photoReceipt : file.fileType,
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
@@ -446,7 +447,7 @@ class _EvidenceListBottomSheet extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    isImage ? 'اضغط للمعاينة والتكبير' : 'اضغط للفتح',
+                                    isImage ? AppLocalizations.of(context)!.tapToPreview : AppLocalizations.of(context)!.tapToOpen,
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: colorScheme.onSurfaceVariant,

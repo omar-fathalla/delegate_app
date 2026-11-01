@@ -97,8 +97,8 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
               SnackBar(
                 content: Text(
                   state.newStatus == TaskStatus.completed
-                      ? 'تم تأكيد إنجاز المهمة بنجاح ✅'
-                      : 'تم بدء العمل على المهمة بنجاح ⏱️',
+                      ? AppLocalizations.of(context)!.taskCompletedConfirmed
+                      : AppLocalizations.of(context)!.taskStarted,
                 ),
                 backgroundColor: state.newStatus == TaskStatus.completed
                     ? theme.colorScheme.primary
@@ -158,7 +158,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'لا توجد مهام مسندة إليك حالياً',
+                        AppLocalizations.of(context)!.noTasksNow,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.onSurface,
@@ -166,7 +166,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'ستظهر هنا أي مهام يوجهها المشرف أو الإدارة فور إسنادها.',
+                        AppLocalizations.of(context)!.tasksAppearHere,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),

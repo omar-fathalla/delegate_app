@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -225,12 +226,12 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
           ),
         ),
         titleSpacing: 0,
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'لائحة الغرامات المعتمدة',
+              AppLocalizations.of(context)!.violationsPolicy,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14.5,
@@ -257,7 +258,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'تحديث اللائحة',
+            tooltip: AppLocalizations.of(context)!.refreshPolicy,
             onPressed: _loadRules,
           ),
         ],
@@ -307,7 +308,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                           const SizedBox(width: 8),
                           Text(
                             _selectedCategory == null
-                                ? 'جميع بنود اللائحة المعتمدة (${filtered.length})'
+                                ? AppLocalizations.of(context)!.allPolicyItems(filtered.length)
                                 : '${_selectedCategory!.displayName} (${filtered.length})',
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
@@ -382,7 +383,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'لائحة الجزاءات والمخالفات الميدانية',
+                  AppLocalizations.of(context)!.violationsPolicy,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.onSurface,
@@ -390,7 +391,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'مرجع شامل للمناديب والمشرفين يوضح قيمة الخصم المالي للمرة الأولى والتكرار والإجراء المتخذ.',
+                  AppLocalizations.of(context)!.penPolicyCardBody,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                     height: 1.35,
@@ -409,7 +410,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
       controller: _searchController,
       onChanged: (val) => setState(() => _searchQuery = val.trim()),
       decoration: InputDecoration(
-        hintText: 'بحث في بنود اللائحة أو الغرامات...',
+        hintText: AppLocalizations.of(context)!.searchPolicy,
         prefixIcon: const Icon(Icons.search_rounded),
         suffixIcon: _searchQuery.isNotEmpty
             ? IconButton(
@@ -456,7 +457,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
       child: Row(
         children: categories.map((cat) {
           final isSelected = _selectedCategory == cat;
-          final label = cat == null ? 'الكل (${_allRules.length})' : cat.displayName;
+          final label = cat == null ? AppLocalizations.of(context)!.allWithCount(_allRules.length) : cat.displayName;
           final icon = cat == null ? Icons.apps_rounded : _getCategoryIcon(cat);
 
           return Padding(
@@ -571,7 +572,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'مقيدة إدارياً',
+                          AppLocalizations.of(context)!.adminRestricted,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onTertiaryContainer,
                             fontWeight: FontWeight.bold,
@@ -649,14 +650,14 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'الغرامة الأولى',
+                                AppLocalizations.of(context)!.firstTime,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                   fontSize: 10,
                                 ),
                               ),
                               Text(
-                                '${item.defaultFine.toStringAsFixed(0)} ج.م',
+                                AppLocalizations.of(context)!.amountEgp(item.defaultFine.toStringAsFixed(0)),
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: colorScheme.primary,
@@ -702,7 +703,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'في التكرار',
+                                AppLocalizations.of(context)!.whenRepeated,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                   fontSize: 10,
@@ -710,8 +711,8 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                               ),
                               Text(
                                 hasRepeated
-                                    ? '${item.repeatedFine!.toStringAsFixed(0)} ج.م'
-                                    : 'حسب قرار الإدارة',
+                                    ? AppLocalizations.of(context)!.amountEgp(item.repeatedFine!.toStringAsFixed(0))
+                                    : AppLocalizations.of(context)!.perManagementDecision,
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: hasRepeated
@@ -751,7 +752,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'الإجراء المقرر: ${item.action1}',
+                        AppLocalizations.of(context)!.plannedAction(item.action1 ?? ''),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           fontSize: 11,
@@ -782,7 +783,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
             ),
             const SizedBox(height: 14),
             Text(
-              'لا توجد بنود مطابقة للبحث',
+              AppLocalizations.of(context)!.noResults,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onSurface,
@@ -790,7 +791,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
             ),
             const SizedBox(height: 6),
             Text(
-              'جرب البحث بكلمات أخرى أو اختر تصنيفاً مختلفاً.',
+              AppLocalizations.of(context)!.tryOtherSearch,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),

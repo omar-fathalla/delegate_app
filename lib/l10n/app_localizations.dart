@@ -3211,6 +3211,282 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Passwords don\'t match'**
   String get passwordsDontMatch;
+
+  /// No description provided for @refreshPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh policy'**
+  String get refreshPolicy;
+
+  /// No description provided for @allPolicyItems.
+  ///
+  /// In en, this message translates to:
+  /// **'All items ({count})'**
+  String allPolicyItems(Object count);
+
+  /// No description provided for @penPolicyCardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The deduction for each violation, first time and when repeated.'**
+  String get penPolicyCardBody;
+
+  /// No description provided for @searchPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Search the policy'**
+  String get searchPolicy;
+
+  /// No description provided for @allWithCount.
+  ///
+  /// In en, this message translates to:
+  /// **'All ({count})'**
+  String allWithCount(Object count);
+
+  /// No description provided for @adminRestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin only'**
+  String get adminRestricted;
+
+  /// No description provided for @firstTime.
+  ///
+  /// In en, this message translates to:
+  /// **'First time'**
+  String get firstTime;
+
+  /// No description provided for @amountEgp.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} EGP'**
+  String amountEgp(Object amount);
+
+  /// No description provided for @whenRepeated.
+  ///
+  /// In en, this message translates to:
+  /// **'When repeated'**
+  String get whenRepeated;
+
+  /// No description provided for @perManagementDecision.
+  ///
+  /// In en, this message translates to:
+  /// **'Per management decision'**
+  String get perManagementDecision;
+
+  /// No description provided for @plannedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Action: {action}'**
+  String plannedAction(Object action);
+
+  /// No description provided for @noResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results'**
+  String get noResults;
+
+  /// No description provided for @tryOtherSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Try other words or a different category.'**
+  String get tryOtherSearch;
+
+  /// No description provided for @noViolationDocs.
+  ///
+  /// In en, this message translates to:
+  /// **'No documents are attached to this violation'**
+  String get noViolationDocs;
+
+  /// No description provided for @violationReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Violation receipt / document'**
+  String get violationReceipt;
+
+  /// No description provided for @closeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeAction;
+
+  /// No description provided for @imageLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the image from the server'**
+  String get imageLoadFailed;
+
+  /// No description provided for @openInBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get openInBrowser;
+
+  /// No description provided for @attachedDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Attached documents and receipts'**
+  String get attachedDocuments;
+
+  /// No description provided for @receiptNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt / document #{number}'**
+  String receiptNumber(Object number);
+
+  /// No description provided for @photoReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo / receipt'**
+  String get photoReceipt;
+
+  /// No description provided for @tapToPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to preview'**
+  String get tapToPreview;
+
+  /// No description provided for @tapToOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to open'**
+  String get tapToOpen;
+
+  /// No description provided for @deleteAllNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all notifications'**
+  String get deleteAllNotifications;
+
+  /// No description provided for @deleteAllNotificationsConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all notifications from your list?\n(They won\'t appear in your account again but stay in the system log.)'**
+  String get deleteAllNotificationsConfirm;
+
+  /// No description provided for @allNotificationsDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'All notifications deleted from your list'**
+  String get allNotificationsDeleted;
+
+  /// No description provided for @deleteAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all'**
+  String get deleteAll;
+
+  /// No description provided for @sendNewNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Send new notification'**
+  String get sendNewNotification;
+
+  /// No description provided for @deleteNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete notification'**
+  String get deleteNotification;
+
+  /// No description provided for @deleteNotificationConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this notification from your list?\n(It stays in the system log.)'**
+  String get deleteNotificationConfirm;
+
+  /// No description provided for @notificationDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification deleted from your list'**
+  String get notificationDeleted;
+
+  /// No description provided for @systemAdministration.
+  ///
+  /// In en, this message translates to:
+  /// **'System administration'**
+  String get systemAdministration;
+
+  /// No description provided for @senderLine.
+  ///
+  /// In en, this message translates to:
+  /// **'From: {name} ({role})'**
+  String senderLine(Object name, Object role);
+
+  /// No description provided for @markAsRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as read'**
+  String get markAsRead;
+
+  /// No description provided for @viewTask.
+  ///
+  /// In en, this message translates to:
+  /// **'View task'**
+  String get viewTask;
+
+  /// No description provided for @updateAppNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Update the app now'**
+  String get updateAppNow;
+
+  /// No description provided for @justNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Just now'**
+  String get justNow;
+
+  /// No description provided for @taskCompletedConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Task marked as completed'**
+  String get taskCompletedConfirmed;
+
+  /// No description provided for @taskStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Task started'**
+  String get taskStarted;
+
+  /// No description provided for @noTasksNow.
+  ///
+  /// In en, this message translates to:
+  /// **'No tasks right now'**
+  String get noTasksNow;
+
+  /// No description provided for @tasksAppearHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks will appear here as soon as they are assigned to you.'**
+  String get tasksAppearHere;
+
+  /// No description provided for @taskDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Task deleted'**
+  String get taskDeleted;
+
+  /// No description provided for @taskDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t delete the task: {error}'**
+  String taskDeleteFailed(Object error);
+
+  /// No description provided for @timeAgoDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day ago} other{{count} days ago}}'**
+  String timeAgoDays(int count);
+
+  /// No description provided for @timeAgoHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 hour ago} other{{count} hours ago}}'**
+  String timeAgoHours(int count);
+
+  /// No description provided for @timeAgoMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 minute ago} other{{count} minutes ago}}'**
+  String timeAgoMinutes(int count);
 }
 
 class _AppLocalizationsDelegate

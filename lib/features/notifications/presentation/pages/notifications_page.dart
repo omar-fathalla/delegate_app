@@ -29,13 +29,13 @@ class NotificationsPage extends StatelessWidget {
             Icon(Icons.delete_sweep_rounded, color: colorScheme.error),
             const SizedBox(width: 8),
             Text(
-              'حذف جميع الإشعارات',
+              AppLocalizations.of(context)!.deleteAllNotifications,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
             ),
           ],
         ),
         content: Text(
-          'هل أنت متأكد من حذف جميع الإشعارات من قائمتك؟\n(لن تظهر هذه الإشعارات في حسابك مرة أخرى، مع بقائها في السجل المركزي للنظام).',
+          AppLocalizations.of(context)!.deleteAllNotificationsConfirm,
           style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
         ),
         actions: [
@@ -61,7 +61,7 @@ class NotificationsPage extends StatelessWidget {
               );
               messenger.showSnackBar(
                 SnackBar(
-                  content: const Text('تم حذف جميع الإشعارات من قائمتك'),
+                  content: Text(AppLocalizations.of(context)!.allNotificationsDeleted),
                   backgroundColor: colorScheme.inverseSurface,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -69,7 +69,7 @@ class NotificationsPage extends StatelessWidget {
                 ),
               );
             },
-            child: const Text('حذف الكل'),
+            child: Text(AppLocalizations.of(context)!.deleteAll),
           ),
         ],
       ),
@@ -118,7 +118,7 @@ class NotificationsPage extends StatelessWidget {
                 elevation: 2,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 icon: const Icon(Icons.send_rounded),
-                label: const Text('إرسال إشعار جديد'),
+                label: Text(AppLocalizations.of(context)!.sendNewNotification),
               )
             : null,
         appBar: AppBar(
@@ -170,7 +170,7 @@ class NotificationsPage extends StatelessWidget {
                           ),
                         ),
                       IconButton(
-                        tooltip: 'حذف جميع الإشعارات',
+                        tooltip: AppLocalizations.of(context)!.deleteAllNotifications,
                         icon: Icon(Icons.delete_sweep_rounded, color: colorScheme.error),
                         onPressed: () => _confirmDeleteAll(context, state.notifications),
                       ),

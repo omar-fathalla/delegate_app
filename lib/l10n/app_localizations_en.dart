@@ -1725,4 +1725,185 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get passwordsDontMatch => 'Passwords don\'t match';
+
+  @override
+  String get refreshPolicy => 'Refresh policy';
+
+  @override
+  String allPolicyItems(Object count) {
+    return 'All items ($count)';
+  }
+
+  @override
+  String get penPolicyCardBody =>
+      'The deduction for each violation, first time and when repeated.';
+
+  @override
+  String get searchPolicy => 'Search the policy';
+
+  @override
+  String allWithCount(Object count) {
+    return 'All ($count)';
+  }
+
+  @override
+  String get adminRestricted => 'Admin only';
+
+  @override
+  String get firstTime => 'First time';
+
+  @override
+  String amountEgp(Object amount) {
+    return '$amount EGP';
+  }
+
+  @override
+  String get whenRepeated => 'When repeated';
+
+  @override
+  String get perManagementDecision => 'Per management decision';
+
+  @override
+  String plannedAction(Object action) {
+    return 'Action: $action';
+  }
+
+  @override
+  String get noResults => 'No results';
+
+  @override
+  String get tryOtherSearch => 'Try other words or a different category.';
+
+  @override
+  String get noViolationDocs => 'No documents are attached to this violation';
+
+  @override
+  String get violationReceipt => 'Violation receipt / document';
+
+  @override
+  String get closeAction => 'Close';
+
+  @override
+  String get imageLoadFailed => 'Couldn\'t load the image from the server';
+
+  @override
+  String get openInBrowser => 'Open in browser';
+
+  @override
+  String get attachedDocuments => 'Attached documents and receipts';
+
+  @override
+  String receiptNumber(Object number) {
+    return 'Receipt / document #$number';
+  }
+
+  @override
+  String get photoReceipt => 'Photo / receipt';
+
+  @override
+  String get tapToPreview => 'Tap to preview';
+
+  @override
+  String get tapToOpen => 'Tap to open';
+
+  @override
+  String get deleteAllNotifications => 'Delete all notifications';
+
+  @override
+  String get deleteAllNotificationsConfirm =>
+      'Delete all notifications from your list?\n(They won\'t appear in your account again but stay in the system log.)';
+
+  @override
+  String get allNotificationsDeleted =>
+      'All notifications deleted from your list';
+
+  @override
+  String get deleteAll => 'Delete all';
+
+  @override
+  String get sendNewNotification => 'Send new notification';
+
+  @override
+  String get deleteNotification => 'Delete notification';
+
+  @override
+  String get deleteNotificationConfirm =>
+      'Delete this notification from your list?\n(It stays in the system log.)';
+
+  @override
+  String get notificationDeleted => 'Notification deleted from your list';
+
+  @override
+  String get systemAdministration => 'System administration';
+
+  @override
+  String senderLine(Object name, Object role) {
+    return 'From: $name ($role)';
+  }
+
+  @override
+  String get markAsRead => 'Mark as read';
+
+  @override
+  String get viewTask => 'View task';
+
+  @override
+  String get updateAppNow => 'Update the app now';
+
+  @override
+  String get justNow => 'Just now';
+
+  @override
+  String get taskCompletedConfirmed => 'Task marked as completed';
+
+  @override
+  String get taskStarted => 'Task started';
+
+  @override
+  String get noTasksNow => 'No tasks right now';
+
+  @override
+  String get tasksAppearHere =>
+      'Tasks will appear here as soon as they are assigned to you.';
+
+  @override
+  String get taskDeleted => 'Task deleted';
+
+  @override
+  String taskDeleteFailed(Object error) {
+    return 'Couldn\'t delete the task: $error';
+  }
+
+  @override
+  String timeAgoDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days ago',
+      one: '1 day ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeAgoHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hours ago',
+      one: '1 hour ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeAgoMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count minutes ago',
+      one: '1 minute ago',
+    );
+    return '$_temp0';
+  }
 }

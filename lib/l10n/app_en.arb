@@ -1697,5 +1697,108 @@
   "passwordMin6": "Password must be at least 6 characters",
   "confirmPassword": "Confirm password",
   "enterConfirmPassword": "Confirm your password",
-  "passwordsDontMatch": "Passwords don't match"
+  "passwordsDontMatch": "Passwords don't match",
+  "refreshPolicy": "Refresh policy",
+  "allPolicyItems": "All items ({count})",
+  "@allPolicyItems": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "penPolicyCardBody": "The deduction for each violation, first time and when repeated.",
+  "searchPolicy": "Search the policy",
+  "allWithCount": "All ({count})",
+  "@allWithCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "adminRestricted": "Admin only",
+  "firstTime": "First time",
+  "amountEgp": "{amount} EGP",
+  "@amountEgp": {
+    "placeholders": {
+      "amount": {}
+    }
+  },
+  "whenRepeated": "When repeated",
+  "perManagementDecision": "Per management decision",
+  "plannedAction": "Action: {action}",
+  "@plannedAction": {
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "noResults": "No results",
+  "tryOtherSearch": "Try other words or a different category.",
+  "noViolationDocs": "No documents are attached to this violation",
+  "violationReceipt": "Violation receipt / document",
+  "closeAction": "Close",
+  "imageLoadFailed": "Couldn't load the image from the server",
+  "openInBrowser": "Open in browser",
+  "attachedDocuments": "Attached documents and receipts",
+  "receiptNumber": "Receipt / document #{number}",
+  "@receiptNumber": {
+    "placeholders": {
+      "number": {}
+    }
+  },
+  "photoReceipt": "Photo / receipt",
+  "tapToPreview": "Tap to preview",
+  "tapToOpen": "Tap to open",
+  "deleteAllNotifications": "Delete all notifications",
+  "deleteAllNotificationsConfirm": "Delete all notifications from your list?\n(They won't appear in your account again but stay in the system log.)",
+  "allNotificationsDeleted": "All notifications deleted from your list",
+  "deleteAll": "Delete all",
+  "sendNewNotification": "Send new notification",
+  "deleteNotification": "Delete notification",
+  "deleteNotificationConfirm": "Delete this notification from your list?\n(It stays in the system log.)",
+  "notificationDeleted": "Notification deleted from your list",
+  "systemAdministration": "System administration",
+  "senderLine": "From: {name} ({role})",
+  "@senderLine": {
+    "placeholders": {
+      "name": {},
+      "role": {}
+    }
+  },
+  "markAsRead": "Mark as read",
+  "viewTask": "View task",
+  "updateAppNow": "Update the app now",
+  "justNow": "Just now",
+  "taskCompletedConfirmed": "Task marked as completed",
+  "taskStarted": "Task started",
+  "noTasksNow": "No tasks right now",
+  "tasksAppearHere": "Tasks will appear here as soon as they are assigned to you.",
+  "taskDeleted": "Task deleted",
+  "taskDeleteFailed": "Couldn't delete the task: {error}",
+  "@taskDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "timeAgoDays": "{count, plural, =1{1 day ago} other{{count} days ago}}",
+  "@timeAgoDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoHours": "{count, plural, =1{1 hour ago} other{{count} hours ago}}",
+  "@timeAgoHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoMinutes": "{count, plural, =1{1 minute ago} other{{count} minutes ago}}",
+  "@timeAgoMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }
