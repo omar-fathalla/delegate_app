@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:animations/animations.dart';
 
 /// Material Design 3 (M3) Motion Duration Tokens
 ///
@@ -313,9 +314,11 @@ abstract final class AppMotionPage {
       transitionDuration: duration,
       reverseTransitionDuration: reverseDuration,
       transitionsBuilder: (context, animation, secondaryAnimation, pageChild) {
-        return AppMotionTransitions.buildFadeThrough(
+        // animations package FadeThroughTransition (used for login → home).
+        return FadeThroughTransition(
           animation: animation,
           secondaryAnimation: secondaryAnimation,
+          fillColor: Theme.of(context).colorScheme.surface,
           child: pageChild,
         );
       },

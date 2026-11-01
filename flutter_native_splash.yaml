@@ -1,15 +1,13 @@
+# M3 redesign: solid brand primary (#6750A4) + centered 'ت' tile in
+# primaryContainer. Matches the Flutter SplashScreen so there is no flash.
 flutter_native_splash:
-  color: "#FFF9EF"
-  image: assets/images/splash_logo_light.png
-  color_dark: "#15130B"
-  image_dark: assets/images/splash_logo_dark.png
+  color: "#6750A4"
+  image: assets/images/splash_m3_tile.png
   android: true
   ios: true
-  
+  web: false
+
   android_12:
-    color: "#FFF9EF"
-    image: assets/images/splash_logo_light.png
-    color_dark: "#15130B"
-    image_dark: assets/images/splash_logo_dark.png
-    icon_background_color: "#FFF9EF"
-    icon_background_color_dark: "#15130B"
+    color: "#6750A4"
+    image: assets/images/splash_m3_tile_android12.png
+    icon_background_color: "#6750A4"

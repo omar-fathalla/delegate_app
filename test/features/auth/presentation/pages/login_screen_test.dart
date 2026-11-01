@@ -93,8 +93,9 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(createWidgetUnderTest());
+    await tester.pumpAndSettle(); // let the sheet entrance animation finish
 
-    await tester.tap(find.byIcon(Icons.admin_panel_settings_outlined));
+    await tester.tap(find.byKey(ValueKey('group_item_${LoginMode.staff}')));
     await tester.pumpAndSettle();
     final passwordFieldFinder = find.byType(TextFormField).at(1);
     
@@ -110,6 +111,7 @@ void main() {
     expect(visibilityOffIconFinder, findsOneWidget);
 
     // Tap the visibility toggle button (IconButton)
+    await tester.ensureVisible(visibilityOffIconFinder);
     await tester.tap(find.ancestor(
       of: visibilityOffIconFinder,
       matching: find.byType(IconButton),
@@ -150,8 +152,9 @@ void main() {
 
     when(() => mockAuthBloc.add(any())).thenAnswer((_) {});
     await tester.pumpWidget(createWidgetUnderTest());
+    await tester.pumpAndSettle(); // let the sheet entrance animation finish
     // The previous test may have saved staff mode; pick delegate explicitly.
-    await tester.tap(find.byIcon(Icons.badge_outlined));
+    await tester.tap(find.byKey(ValueKey('group_item_${LoginMode.delegate}')));
     await tester.pumpAndSettle();
 
     final loginButton = find.widgetWithText(FilledButton, 'Login');
