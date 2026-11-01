@@ -2019,5 +2019,104 @@
     }
   },
   "waitingToUpload": "Will upload when you are online",
-  "syncNow": "Sync now"
+  "syncNow": "Sync now",
+  "noFeedbackYet": "No feedback yet",
+  "sendFirstFeedback": "Send your first feedback",
+  "adminResponse": "Admin response",
+  "feedbackIntro": "Your opinion matters. Help us improve the app",
+  "feedbackType": "Type",
+  "yourMessage": "Your message",
+  "feedbackHint": "Write your feedback",
+  "enterMessage": "Enter your message",
+  "messageTooShort": "Message is too short (at least 10 characters)",
+  "screenshotOptional": "Screenshot (optional)",
+  "chooseImage": "Choose image",
+  "sendAction": "Send",
+  "thankYou": "Thank you!",
+  "feedbackReceived": "We've received your feedback and will review it soon.",
+  "okAction": "OK",
+  "noUpdatesNow": "No updates right now",
+  "newFeature": "New feature",
+  "bugFix": "Fix",
+  "importantBadge": "Important",
+  "criticalBadge": "Critical",
+  "loginSubtitleStaff": "Choose your account type and sign in",
+  "loginSubtitleDelegate": "Choose your account type and enter your details",
+  "staffLabel": "Staff",
+  "forgotPasswordQ": "Forgot password?",
+  "phoneHelper": "The phone number registered with your company",
+  "nationalIdHelper": "14 digits",
+  "showAction": "Show",
+  "hideAction": "Hide",
+  "enterPassword2": "Enter your password",
+  "signingIn": "Signing in",
+  "contactSupport": "Contact support",
+  "checkHighlightedFields": "Check the highlighted fields",
+  "resetLinkSentIfRegistered": "If this email is registered, a reset link is on its way.",
+  "resetLinkFailed": "Couldn't send the reset link. Try again.",
+  "forgotPassword": "Forgot password",
+  "sendLink": "Send link",
+  "selectOrganization": "Select organization",
+  "multipleOrgsChoose": "You're registered in more than one organization. Choose one to continue.",
+  "weeklyPlanNote": "You get one day off a week (4 a month). Annual leave becomes available once your supervisor approves it.",
+  "dateWithHours": "{date} • ({hours}h)",
+  "@dateWithHours": {
+    "placeholders": {
+      "date": {},
+      "hours": {}
+    }
+  },
+  "hoursCount": "{count} h",
+  "@hoursCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "cancelRequestFailed": "Couldn't cancel the request: {error}",
+  "@cancelRequestFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "requestAttachment": "Request attachment",
+  "attachmentLoadFailed": "Couldn't load the attachment image",
+  "annualLeaveFromBalance": "Annual leave (from annual balance)",
+  "annualLeaveUnavailable": "Annual leave (not available yet)",
+  "lateArrivalHourly": "Late arrival (hourly)",
+  "earlyLeaveHourly": "Early leave (hourly)",
+  "excusedAbsenceFullDay": "Excused absence (full day)",
+  "dateField": "Date",
+  "timeField": "Time",
+  "fromField": "From",
+  "toField": "To",
+  "periodField": "Period",
+  "daysExceedBalance": "Requested days ({requested}) exceed your remaining balance ({remaining})",
+  "@daysExceedBalance": {
+    "placeholders": {
+      "requested": {},
+      "remaining": {}
+    }
+  },
+  "reasonField": "Reason",
+  "reasonHint": "Briefly describe the reason",
+  "attachmentOptional": "Attachment (optional)",
+  "cameraLabel": "Camera",
+  "galleryLabel": "Gallery",
+  "sendingRequest": "Uploading the attachment and sending your request…",
+  "enterLeaveReason": "Enter the reason for the leave or excuse",
+  "annualNotActive": "Annual leave isn't active on your account yet. Choose another type.",
+  "requestSent": "Your request was sent to your supervisor and is pending review.",
+  "sendRequestFailed": "Couldn't send the request: {error}",
+  "@sendRequestFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "sendingEllipsis": "Sending…",
+  "durationLabel": "Duration: {duration}",
+  "@durationLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  }
 }

@@ -36,7 +36,6 @@ class _ChangelogViewState extends State<_ChangelogView> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isArabic = localeProvider.isArabic;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -73,7 +72,7 @@ class _ChangelogViewState extends State<_ChangelogView> {
                       onPressed: () =>
                           context.read<ChangelogBloc>().add(LoadAllUpdates()),
                       icon: const Icon(Icons.refresh_rounded),
-                      label: Text(isArabic ? 'إعادة المحاولة' : 'Retry'),
+                      label: Text(AppLocalizations.of(context)!.retry),
                     ),
                   ],
                 ),
@@ -93,10 +92,7 @@ class _ChangelogViewState extends State<_ChangelogView> {
                       color: colorScheme.primary.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      isArabic
-                          ? 'لا توجد تحديثات حالياً'
-                          : 'No updates available',
+                    Text(AppLocalizations.of(context)!.noUpdatesNow,
                       style: TextStyle(
                         fontSize: 16,
                         color: colorScheme.onSurfaceVariant,
@@ -242,7 +238,6 @@ class _ChangelogViewState extends State<_ChangelogView> {
 
   Widget _buildTypeChip(BuildContext context, UpdateType type) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isArabic = localeProvider.isArabic;
 
     final IconData icon;
     final String label;
@@ -252,17 +247,17 @@ class _ChangelogViewState extends State<_ChangelogView> {
     switch (type) {
       case UpdateType.feature:
         icon = Icons.rocket_launch_rounded;
-        label = isArabic ? 'ميزة جديدة' : 'New Feature';
+        label = AppLocalizations.of(context)!.newFeature;
         bgColor = colorScheme.primaryContainer;
         fgColor = colorScheme.onPrimaryContainer;
       case UpdateType.fix:
         icon = Icons.build_rounded;
-        label = isArabic ? 'إصلاح' : 'Bug Fix';
+        label = AppLocalizations.of(context)!.bugFix;
         bgColor = colorScheme.tertiaryContainer;
         fgColor = colorScheme.onTertiaryContainer;
       case UpdateType.improvement:
         icon = Icons.trending_up_rounded;
-        label = isArabic ? 'تحسين' : 'Improvement';
+        label = AppLocalizations.of(context)!.feedbackTypeImprovement;
         bgColor = colorScheme.secondaryContainer;
         fgColor = colorScheme.onSecondaryContainer;
     }
@@ -332,7 +327,6 @@ class _ChangelogViewState extends State<_ChangelogView> {
 
   Widget _buildPriorityChip(BuildContext context, UpdatePriority priority) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isArabic = localeProvider.isArabic;
 
     final String label;
     final Color bgColor;
@@ -340,11 +334,11 @@ class _ChangelogViewState extends State<_ChangelogView> {
 
     switch (priority) {
       case UpdatePriority.important:
-        label = isArabic ? 'مهم' : 'Important';
+        label = AppLocalizations.of(context)!.importantBadge;
         bgColor = Colors.orange.shade100;
         fgColor = Colors.orange.shade800;
       case UpdatePriority.critical:
-        label = isArabic ? 'هام جداً' : 'Critical';
+        label = AppLocalizations.of(context)!.criticalBadge;
         bgColor = colorScheme.errorContainer;
         fgColor = colorScheme.onErrorContainer;
       case UpdatePriority.normal:

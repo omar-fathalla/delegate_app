@@ -2246,4 +2246,222 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get syncNow => 'مزامنة الآن';
+
+  @override
+  String get noFeedbackYet => 'لا توجد ملاحظات بعد';
+
+  @override
+  String get sendFirstFeedback => 'أرسل ملاحظتك الأولى';
+
+  @override
+  String get adminResponse => 'رد الإدارة';
+
+  @override
+  String get feedbackIntro => 'رأيك يهمنا، ساعدنا نحسّن التطبيق';
+
+  @override
+  String get feedbackType => 'النوع';
+
+  @override
+  String get yourMessage => 'رسالتك';
+
+  @override
+  String get feedbackHint => 'اكتب ملاحظتك';
+
+  @override
+  String get enterMessage => 'اكتب رسالتك';
+
+  @override
+  String get messageTooShort => 'الرسالة قصيرة جدًا (10 أحرف على الأقل)';
+
+  @override
+  String get screenshotOptional => 'لقطة شاشة (اختياري)';
+
+  @override
+  String get chooseImage => 'اختر صورة';
+
+  @override
+  String get sendAction => 'إرسال';
+
+  @override
+  String get thankYou => 'شكرًا لك!';
+
+  @override
+  String get feedbackReceived => 'استلمنا ملاحظتك وسنراجعها قريبًا.';
+
+  @override
+  String get okAction => 'حسنًا';
+
+  @override
+  String get noUpdatesNow => 'لا توجد تحديثات حاليًا';
+
+  @override
+  String get newFeature => 'ميزة جديدة';
+
+  @override
+  String get bugFix => 'إصلاح';
+
+  @override
+  String get importantBadge => 'مهم';
+
+  @override
+  String get criticalBadge => 'مهم جدًا';
+
+  @override
+  String get loginSubtitleStaff => 'اختر نوع الحساب وسجّل الدخول بكلمة المرور';
+
+  @override
+  String get loginSubtitleDelegate => 'اختر نوع الحساب وأدخل بياناتك';
+
+  @override
+  String get staffLabel => 'موظف إداري';
+
+  @override
+  String get forgotPasswordQ => 'نسيت كلمة المرور؟';
+
+  @override
+  String get phoneHelper => 'رقم الجوال المسجَّل في الشركة';
+
+  @override
+  String get nationalIdHelper => '14 رقمًا';
+
+  @override
+  String get showAction => 'إظهار';
+
+  @override
+  String get hideAction => 'إخفاء';
+
+  @override
+  String get enterPassword2 => 'أدخل كلمة المرور';
+
+  @override
+  String get signingIn => 'جارٍ تسجيل الدخول';
+
+  @override
+  String get contactSupport => 'تواصل مع الدعم الفني';
+
+  @override
+  String get checkHighlightedFields => 'راجع الحقول المحددة';
+
+  @override
+  String get resetLinkSentIfRegistered =>
+      'إذا كان البريد مسجّلًا، سيصلك رابط لتغيير كلمة المرور.';
+
+  @override
+  String get resetLinkFailed =>
+      'تعذّر إرسال رابط تغيير كلمة المرور. حاول مرة أخرى.';
+
+  @override
+  String get forgotPassword => 'نسيت كلمة المرور';
+
+  @override
+  String get sendLink => 'إرسال الرابط';
+
+  @override
+  String get selectOrganization => 'اختر المنظمة';
+
+  @override
+  String get multipleOrgsChoose =>
+      'أنت مسجّل في أكثر من منظمة. اختر واحدة للمتابعة.';
+
+  @override
+  String get weeklyPlanNote =>
+      'لك يوم راحة كل أسبوع (4 أيام شهريًا). يُفعَّل رصيد الإجازة السنوية بعد موافقة المشرف.';
+
+  @override
+  String dateWithHours(Object date, Object hours) {
+    return '$date • ($hours س)';
+  }
+
+  @override
+  String hoursCount(Object count) {
+    return '$count ساعة';
+  }
+
+  @override
+  String cancelRequestFailed(Object error) {
+    return 'تعذّر إلغاء الطلب: $error';
+  }
+
+  @override
+  String get requestAttachment => 'مرفق الطلب';
+
+  @override
+  String get attachmentLoadFailed => 'تعذّر تحميل صورة المرفق';
+
+  @override
+  String get annualLeaveFromBalance => 'إجازة سنوية (تُخصم من الرصيد السنوي)';
+
+  @override
+  String get annualLeaveUnavailable => 'إجازة سنوية (غير متاحة حاليًا)';
+
+  @override
+  String get lateArrivalHourly => 'تأخير صباحي (بالساعة)';
+
+  @override
+  String get earlyLeaveHourly => 'انصراف مبكر (بالساعة)';
+
+  @override
+  String get excusedAbsenceFullDay => 'غياب بعذر (يوم كامل)';
+
+  @override
+  String get dateField => 'التاريخ';
+
+  @override
+  String get timeField => 'الوقت';
+
+  @override
+  String get fromField => 'من';
+
+  @override
+  String get toField => 'إلى';
+
+  @override
+  String get periodField => 'الفترة';
+
+  @override
+  String daysExceedBalance(Object requested, Object remaining) {
+    return 'الأيام المطلوبة ($requested يوم) أكثر من رصيدك المتبقي ($remaining يوم)';
+  }
+
+  @override
+  String get reasonField => 'السبب';
+
+  @override
+  String get reasonHint => 'اكتب السبب باختصار';
+
+  @override
+  String get attachmentOptional => 'مرفق (اختياري)';
+
+  @override
+  String get cameraLabel => 'الكاميرا';
+
+  @override
+  String get galleryLabel => 'المعرض';
+
+  @override
+  String get sendingRequest => 'جارٍ رفع المرفق وإرسال الطلب إلى المشرف...';
+
+  @override
+  String get enterLeaveReason => 'اكتب سبب الإجازة أو العذر';
+
+  @override
+  String get annualNotActive =>
+      'رصيد الإجازة السنوية غير مفعّل لحسابك حاليًا. اختر نوعًا آخر.';
+
+  @override
+  String get requestSent => 'أُرسل طلبك إلى المشرف وهو قيد المراجعة.';
+
+  @override
+  String sendRequestFailed(Object error) {
+    return 'تعذّر إرسال الطلب: $error';
+  }
+
+  @override
+  String get sendingEllipsis => 'جارٍ الإرسال...';
+
+  @override
+  String durationLabel(Object duration) {
+    return 'المدة: $duration';
+  }
 }

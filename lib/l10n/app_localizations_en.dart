@@ -2244,4 +2244,225 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get syncNow => 'Sync now';
+
+  @override
+  String get noFeedbackYet => 'No feedback yet';
+
+  @override
+  String get sendFirstFeedback => 'Send your first feedback';
+
+  @override
+  String get adminResponse => 'Admin response';
+
+  @override
+  String get feedbackIntro => 'Your opinion matters. Help us improve the app';
+
+  @override
+  String get feedbackType => 'Type';
+
+  @override
+  String get yourMessage => 'Your message';
+
+  @override
+  String get feedbackHint => 'Write your feedback';
+
+  @override
+  String get enterMessage => 'Enter your message';
+
+  @override
+  String get messageTooShort => 'Message is too short (at least 10 characters)';
+
+  @override
+  String get screenshotOptional => 'Screenshot (optional)';
+
+  @override
+  String get chooseImage => 'Choose image';
+
+  @override
+  String get sendAction => 'Send';
+
+  @override
+  String get thankYou => 'Thank you!';
+
+  @override
+  String get feedbackReceived =>
+      'We\'ve received your feedback and will review it soon.';
+
+  @override
+  String get okAction => 'OK';
+
+  @override
+  String get noUpdatesNow => 'No updates right now';
+
+  @override
+  String get newFeature => 'New feature';
+
+  @override
+  String get bugFix => 'Fix';
+
+  @override
+  String get importantBadge => 'Important';
+
+  @override
+  String get criticalBadge => 'Critical';
+
+  @override
+  String get loginSubtitleStaff => 'Choose your account type and sign in';
+
+  @override
+  String get loginSubtitleDelegate =>
+      'Choose your account type and enter your details';
+
+  @override
+  String get staffLabel => 'Staff';
+
+  @override
+  String get forgotPasswordQ => 'Forgot password?';
+
+  @override
+  String get phoneHelper => 'The phone number registered with your company';
+
+  @override
+  String get nationalIdHelper => '14 digits';
+
+  @override
+  String get showAction => 'Show';
+
+  @override
+  String get hideAction => 'Hide';
+
+  @override
+  String get enterPassword2 => 'Enter your password';
+
+  @override
+  String get signingIn => 'Signing in';
+
+  @override
+  String get contactSupport => 'Contact support';
+
+  @override
+  String get checkHighlightedFields => 'Check the highlighted fields';
+
+  @override
+  String get resetLinkSentIfRegistered =>
+      'If this email is registered, a reset link is on its way.';
+
+  @override
+  String get resetLinkFailed => 'Couldn\'t send the reset link. Try again.';
+
+  @override
+  String get forgotPassword => 'Forgot password';
+
+  @override
+  String get sendLink => 'Send link';
+
+  @override
+  String get selectOrganization => 'Select organization';
+
+  @override
+  String get multipleOrgsChoose =>
+      'You\'re registered in more than one organization. Choose one to continue.';
+
+  @override
+  String get weeklyPlanNote =>
+      'You get one day off a week (4 a month). Annual leave becomes available once your supervisor approves it.';
+
+  @override
+  String dateWithHours(Object date, Object hours) {
+    return '$date • (${hours}h)';
+  }
+
+  @override
+  String hoursCount(Object count) {
+    return '$count h';
+  }
+
+  @override
+  String cancelRequestFailed(Object error) {
+    return 'Couldn\'t cancel the request: $error';
+  }
+
+  @override
+  String get requestAttachment => 'Request attachment';
+
+  @override
+  String get attachmentLoadFailed => 'Couldn\'t load the attachment image';
+
+  @override
+  String get annualLeaveFromBalance => 'Annual leave (from annual balance)';
+
+  @override
+  String get annualLeaveUnavailable => 'Annual leave (not available yet)';
+
+  @override
+  String get lateArrivalHourly => 'Late arrival (hourly)';
+
+  @override
+  String get earlyLeaveHourly => 'Early leave (hourly)';
+
+  @override
+  String get excusedAbsenceFullDay => 'Excused absence (full day)';
+
+  @override
+  String get dateField => 'Date';
+
+  @override
+  String get timeField => 'Time';
+
+  @override
+  String get fromField => 'From';
+
+  @override
+  String get toField => 'To';
+
+  @override
+  String get periodField => 'Period';
+
+  @override
+  String daysExceedBalance(Object requested, Object remaining) {
+    return 'Requested days ($requested) exceed your remaining balance ($remaining)';
+  }
+
+  @override
+  String get reasonField => 'Reason';
+
+  @override
+  String get reasonHint => 'Briefly describe the reason';
+
+  @override
+  String get attachmentOptional => 'Attachment (optional)';
+
+  @override
+  String get cameraLabel => 'Camera';
+
+  @override
+  String get galleryLabel => 'Gallery';
+
+  @override
+  String get sendingRequest =>
+      'Uploading the attachment and sending your request…';
+
+  @override
+  String get enterLeaveReason => 'Enter the reason for the leave or excuse';
+
+  @override
+  String get annualNotActive =>
+      'Annual leave isn\'t active on your account yet. Choose another type.';
+
+  @override
+  String get requestSent =>
+      'Your request was sent to your supervisor and is pending review.';
+
+  @override
+  String sendRequestFailed(Object error) {
+    return 'Couldn\'t send the request: $error';
+  }
+
+  @override
+  String get sendingEllipsis => 'Sending…';
+
+  @override
+  String durationLabel(Object duration) {
+    return 'Duration: $duration';
+  }
 }

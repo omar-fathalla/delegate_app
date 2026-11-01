@@ -4033,6 +4033,408 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sync now'**
   String get syncNow;
+
+  /// No description provided for @noFeedbackYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No feedback yet'**
+  String get noFeedbackYet;
+
+  /// No description provided for @sendFirstFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Send your first feedback'**
+  String get sendFirstFeedback;
+
+  /// No description provided for @adminResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin response'**
+  String get adminResponse;
+
+  /// No description provided for @feedbackIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Your opinion matters. Help us improve the app'**
+  String get feedbackIntro;
+
+  /// No description provided for @feedbackType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get feedbackType;
+
+  /// No description provided for @yourMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your message'**
+  String get yourMessage;
+
+  /// No description provided for @feedbackHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write your feedback'**
+  String get feedbackHint;
+
+  /// No description provided for @enterMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your message'**
+  String get enterMessage;
+
+  /// No description provided for @messageTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Message is too short (at least 10 characters)'**
+  String get messageTooShort;
+
+  /// No description provided for @screenshotOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot (optional)'**
+  String get screenshotOptional;
+
+  /// No description provided for @chooseImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose image'**
+  String get chooseImage;
+
+  /// No description provided for @sendAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get sendAction;
+
+  /// No description provided for @thankYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Thank you!'**
+  String get thankYou;
+
+  /// No description provided for @feedbackReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ve received your feedback and will review it soon.'**
+  String get feedbackReceived;
+
+  /// No description provided for @okAction.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get okAction;
+
+  /// No description provided for @noUpdatesNow.
+  ///
+  /// In en, this message translates to:
+  /// **'No updates right now'**
+  String get noUpdatesNow;
+
+  /// No description provided for @newFeature.
+  ///
+  /// In en, this message translates to:
+  /// **'New feature'**
+  String get newFeature;
+
+  /// No description provided for @bugFix.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix'**
+  String get bugFix;
+
+  /// No description provided for @importantBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Important'**
+  String get importantBadge;
+
+  /// No description provided for @criticalBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical'**
+  String get criticalBadge;
+
+  /// No description provided for @loginSubtitleStaff.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your account type and sign in'**
+  String get loginSubtitleStaff;
+
+  /// No description provided for @loginSubtitleDelegate.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your account type and enter your details'**
+  String get loginSubtitleDelegate;
+
+  /// No description provided for @staffLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Staff'**
+  String get staffLabel;
+
+  /// No description provided for @forgotPasswordQ.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password?'**
+  String get forgotPasswordQ;
+
+  /// No description provided for @phoneHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'The phone number registered with your company'**
+  String get phoneHelper;
+
+  /// No description provided for @nationalIdHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'14 digits'**
+  String get nationalIdHelper;
+
+  /// No description provided for @showAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get showAction;
+
+  /// No description provided for @hideAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get hideAction;
+
+  /// No description provided for @enterPassword2.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password'**
+  String get enterPassword2;
+
+  /// No description provided for @signingIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing in'**
+  String get signingIn;
+
+  /// No description provided for @contactSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact support'**
+  String get contactSupport;
+
+  /// No description provided for @checkHighlightedFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the highlighted fields'**
+  String get checkHighlightedFields;
+
+  /// No description provided for @resetLinkSentIfRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'If this email is registered, a reset link is on its way.'**
+  String get resetLinkSentIfRegistered;
+
+  /// No description provided for @resetLinkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t send the reset link. Try again.'**
+  String get resetLinkFailed;
+
+  /// No description provided for @forgotPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password'**
+  String get forgotPassword;
+
+  /// No description provided for @sendLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Send link'**
+  String get sendLink;
+
+  /// No description provided for @selectOrganization.
+  ///
+  /// In en, this message translates to:
+  /// **'Select organization'**
+  String get selectOrganization;
+
+  /// No description provided for @multipleOrgsChoose.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re registered in more than one organization. Choose one to continue.'**
+  String get multipleOrgsChoose;
+
+  /// No description provided for @weeklyPlanNote.
+  ///
+  /// In en, this message translates to:
+  /// **'You get one day off a week (4 a month). Annual leave becomes available once your supervisor approves it.'**
+  String get weeklyPlanNote;
+
+  /// No description provided for @dateWithHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{date} • ({hours}h)'**
+  String dateWithHours(Object date, Object hours);
+
+  /// No description provided for @hoursCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} h'**
+  String hoursCount(Object count);
+
+  /// No description provided for @cancelRequestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t cancel the request: {error}'**
+  String cancelRequestFailed(Object error);
+
+  /// No description provided for @requestAttachment.
+  ///
+  /// In en, this message translates to:
+  /// **'Request attachment'**
+  String get requestAttachment;
+
+  /// No description provided for @attachmentLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the attachment image'**
+  String get attachmentLoadFailed;
+
+  /// No description provided for @annualLeaveFromBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual leave (from annual balance)'**
+  String get annualLeaveFromBalance;
+
+  /// No description provided for @annualLeaveUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual leave (not available yet)'**
+  String get annualLeaveUnavailable;
+
+  /// No description provided for @lateArrivalHourly.
+  ///
+  /// In en, this message translates to:
+  /// **'Late arrival (hourly)'**
+  String get lateArrivalHourly;
+
+  /// No description provided for @earlyLeaveHourly.
+  ///
+  /// In en, this message translates to:
+  /// **'Early leave (hourly)'**
+  String get earlyLeaveHourly;
+
+  /// No description provided for @excusedAbsenceFullDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Excused absence (full day)'**
+  String get excusedAbsenceFullDay;
+
+  /// No description provided for @dateField.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get dateField;
+
+  /// No description provided for @timeField.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get timeField;
+
+  /// No description provided for @fromField.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get fromField;
+
+  /// No description provided for @toField.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get toField;
+
+  /// No description provided for @periodField.
+  ///
+  /// In en, this message translates to:
+  /// **'Period'**
+  String get periodField;
+
+  /// No description provided for @daysExceedBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested days ({requested}) exceed your remaining balance ({remaining})'**
+  String daysExceedBalance(Object requested, Object remaining);
+
+  /// No description provided for @reasonField.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get reasonField;
+
+  /// No description provided for @reasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Briefly describe the reason'**
+  String get reasonHint;
+
+  /// No description provided for @attachmentOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment (optional)'**
+  String get attachmentOptional;
+
+  /// No description provided for @cameraLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get cameraLabel;
+
+  /// No description provided for @galleryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery'**
+  String get galleryLabel;
+
+  /// No description provided for @sendingRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading the attachment and sending your request…'**
+  String get sendingRequest;
+
+  /// No description provided for @enterLeaveReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the reason for the leave or excuse'**
+  String get enterLeaveReason;
+
+  /// No description provided for @annualNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual leave isn\'t active on your account yet. Choose another type.'**
+  String get annualNotActive;
+
+  /// No description provided for @requestSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your request was sent to your supervisor and is pending review.'**
+  String get requestSent;
+
+  /// No description provided for @sendRequestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t send the request: {error}'**
+  String sendRequestFailed(Object error);
+
+  /// No description provided for @sendingEllipsis.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get sendingEllipsis;
+
+  /// No description provided for @durationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration: {duration}'**
+  String durationLabel(Object duration);
 }
 
 class _AppLocalizationsDelegate
