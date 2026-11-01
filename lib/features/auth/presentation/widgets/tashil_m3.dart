@@ -23,6 +23,18 @@ abstract final class M3Motion {
       SpringDescription.withDampingRatio(mass: 1, stiffness: 800, ratio: 0.6);
   static final spatialDefault =
       SpringDescription.withDampingRatio(mass: 1, stiffness: 380, ratio: 0.8);
+  static final effects =
+      SpringDescription.withDampingRatio(mass: 1, stiffness: 1600, ratio: 1);
+
+  // home_v2 pattern durations (§37).
+  static const fadeThroughOut = Duration(milliseconds: 90);
+  static const fadeThroughIn = Duration(milliseconds: 210);
+  static const containerTransform = long2;
+  static const sharedAxis = medium2;
+  static const shake = Duration(milliseconds: 180);
+  static const staggerStep = Duration(milliseconds: 40);
+  static const staggerCap = 5;
+  static const reducedFade = Duration(milliseconds: 150);
   static bool reduced(BuildContext c) => MediaQuery.disableAnimationsOf(c);
 }
 
@@ -294,7 +306,7 @@ class _GroupItemState extends State<_GroupItem>
   }
 }
 
-/// Horizontal 3-cycle, 8px shake over 400ms. Call [ShakeState.shake].
+/// Horizontal field shake: 180ms, 2.5 cycles (<3), 6dp. Call [ShakeState.shake].
 class Shake extends StatefulWidget {
   const Shake({super.key, required this.child});
   final Widget child;
@@ -305,7 +317,7 @@ class Shake extends StatefulWidget {
 class ShakeState extends State<Shake> with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 400),
+    duration: M3Motion.shake,
   );
 
   void shake() {
@@ -326,7 +338,7 @@ class ShakeState extends State<Shake> with SingleTickerProviderStateMixin {
       builder: (_, child) {
         final v = _c.value;
         return Transform.translate(
-          offset: Offset(math.sin(v * math.pi * 6) * 8 * (1 - v), 0),
+          offset: Offset(math.sin(v * math.pi * 5) * 6 * (1 - v), 0),
           child: child,
         );
       },
