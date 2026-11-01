@@ -384,7 +384,7 @@ class _DelegateLeavesAndRequestsScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: remainingDays > 3
-                      ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
                       : colorScheme.error.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -394,7 +394,7 @@ class _DelegateLeavesAndRequestsScreenState
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: remainingDays > 3
-                        ? const Color(0xFF2E7D32)
+                        ? Theme.of(context).colorScheme.primary
                         : colorScheme.error,
                   ),
                 ),
@@ -450,7 +450,7 @@ class _DelegateLeavesAndRequestsScreenState
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.amber.withValues(alpha: 0.35),
+          color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.35),
         ),
         boxShadow: [
           BoxShadow(
@@ -468,13 +468,13 @@ class _DelegateLeavesAndRequestsScreenState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
+                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   Symbols.event_repeat_rounded,
                   size: 20,
-                  color: Colors.amber.shade900,
+                  color: Theme.of(context).colorScheme.onTertiaryContainer,
                 ),
               ),
               const SizedBox(width: 10),
@@ -490,10 +490,10 @@ class _DelegateLeavesAndRequestsScreenState
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
+                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.amber.withValues(alpha: 0.4),
+                    color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.4),
                   ),
                 ),
                 child: Text(
@@ -501,7 +501,7 @@ class _DelegateLeavesAndRequestsScreenState
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.bold,
-                    color: Colors.amber.shade900,
+                    color: Theme.of(context).colorScheme.onTertiaryContainer,
                   ),
                 ),
               ),
@@ -666,7 +666,7 @@ class _DelegateLeavesAndRequestsScreenState
               title: 'المراجعة',
               value: '$pendingCount',
               icon: Symbols.hourglass_top_rounded,
-              color: Colors.amber.shade800,
+              color: Theme.of(context).colorScheme.onTertiaryContainer,
               colorScheme: colorScheme,
             ),
           ),
@@ -676,7 +676,7 @@ class _DelegateLeavesAndRequestsScreenState
               title: 'المعتمدة',
               value: '$approvedCount',
               icon: Symbols.check_circle_rounded,
-              color: const Color(0xFF2E7D32),
+              color: Theme.of(context).colorScheme.primary,
               colorScheme: colorScheme,
             ),
           ),
@@ -778,14 +778,14 @@ class _DelegateLeavesAndRequestsScreenState
             label: 'المراجعة',
             count: pendingCount,
             value: 'pending',
-            activeColor: Colors.amber.shade800,
+            activeColor: Theme.of(context).colorScheme.onTertiaryContainer,
             colorScheme: colorScheme,
           ),
           _buildFilterSegment(
             label: 'المعتمدة',
             count: approvedCount,
             value: 'approved',
-            activeColor: const Color(0xFF2E7D32),
+            activeColor: Theme.of(context).colorScheme.primary,
             colorScheme: colorScheme,
           ),
           _buildFilterSegment(
@@ -841,7 +841,7 @@ class _DelegateLeavesAndRequestsScreenState
                     fontSize: 10.5,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                     color: isSelected
-                        ? (themeColor == Colors.amber.shade800 ? Colors.black87 : Colors.white)
+                        ? (themeColor == Theme.of(context).colorScheme.onTertiaryContainer ? Colors.black87 : Colors.white)
                         : colorScheme.onSurfaceVariant,
                   ),
                   maxLines: 1,
@@ -863,7 +863,7 @@ class _DelegateLeavesAndRequestsScreenState
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
                     color: isSelected
-                        ? (themeColor == Colors.amber.shade800 ? Colors.black87 : Colors.white)
+                        ? (themeColor == Theme.of(context).colorScheme.onTertiaryContainer ? Colors.black87 : Colors.white)
                         : colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -966,7 +966,7 @@ class _DelegateLeavesAndRequestsScreenState
     IconData statusIcon;
     switch (status) {
       case 'approved':
-        statusColor = const Color(0xFF2E7D32);
+        statusColor = Theme.of(context).colorScheme.primary;
         statusLabel = 'معتمد';
         statusIcon = Symbols.check_circle_rounded;
         break;
@@ -976,7 +976,7 @@ class _DelegateLeavesAndRequestsScreenState
         statusIcon = Symbols.cancel_rounded;
         break;
       default:
-        statusColor = Colors.amber.shade800;
+        statusColor = Theme.of(context).colorScheme.onTertiaryContainer;
         statusLabel = 'قيد المراجعة';
         statusIcon = Symbols.hourglass_top_rounded;
         break;
@@ -1208,18 +1208,18 @@ class _DelegateLeavesAndRequestsScreenState
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Symbols.verified_user_rounded,
                             size: 13,
-                            color: Color(0xFF2E7D32),
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                           const SizedBox(width: 5),
                           Text(
                             'تم الاعتماد بواسطة: $resolvedByName',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF2E7D32),
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
                           if (resolvedAt != null) ...[
@@ -1505,10 +1505,10 @@ class _DelegateLeavesAndRequestsScreenState
                               padding: const EdgeInsets.all(10),
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
-                                color: Colors.amber.withValues(alpha: 0.12),
+                                color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: Colors.amber.withValues(alpha: 0.35),
+                                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.35),
                                 ),
                               ),
                               child: Row(
@@ -1517,7 +1517,7 @@ class _DelegateLeavesAndRequestsScreenState
                                   Icon(
                                     Symbols.info_rounded,
                                     size: 16,
-                                    color: Colors.amber.shade900,
+                                    color: Theme.of(context).colorScheme.onTertiaryContainer,
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -1525,7 +1525,7 @@ class _DelegateLeavesAndRequestsScreenState
                                       'تنبيه: حسابك حالياً على نظام الإجازات الأسبوعية فقط. يمكنك التقديم على أعذار ساعية، أو عذر غياب، أو إجازة بدون أجر.',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Colors.amber.shade900,
+                                        color: Theme.of(context).colorScheme.onTertiaryContainer,
                                         fontWeight: FontWeight.w600,
                                         height: 1.35,
                                       ),
@@ -2009,16 +2009,16 @@ class _DelegateLeavesAndRequestsScreenState
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.amber.withValues(alpha: 0.15),
+                                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                                  border: Border.all(color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.4)),
                                 ),
                                 child: Row(
                                   children: [
                                     Icon(
                                       Symbols.warning_amber_rounded,
                                       size: 15,
-                                      color: Colors.amber.shade900,
+                                      color: Theme.of(context).colorScheme.onTertiaryContainer,
                                     ),
                                     const SizedBox(width: 6),
                                     Expanded(
@@ -2026,7 +2026,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         'تنبيه: الأيام المطلوبة ($calculatedDays يوم) تتجاوز رصيد إجازاتك المتبقي ($_currentRemainingBalance يوم)',
                                         style: TextStyle(
                                           fontSize: 10.5,
-                                          color: Colors.amber.shade900,
+                                          color: Theme.of(context).colorScheme.onTertiaryContainer,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -2104,14 +2104,14 @@ class _DelegateLeavesAndRequestsScreenState
                                 color: colorScheme.surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: const Color(0xFF2E7D32).withValues(alpha: 0.4),
+                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
                                 ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Symbols.check_circle_rounded,
-                                    color: Color(0xFF2E7D32),
+                                    color: Theme.of(context).colorScheme.primary,
                                     size: 16,
                                   ),
                                   const SizedBox(width: 8),
@@ -2428,11 +2428,11 @@ class _DelegateLeavesAndRequestsScreenState
 
                                         if (ctx.mounted) Navigator.pop(ctx);
                                         messenger.showSnackBar(
-                                          const SnackBar(
+                                          SnackBar(
                                             content: Text(
                                               'تم إرسال طلبك بنجاح لمشرف الشركة وهو قيد المراجعة الآن.',
                                             ),
-                                            backgroundColor: Color(0xFF2E7D32),
+                                            backgroundColor: Theme.of(context).colorScheme.primary,
                                           ),
                                         );
                                       } catch (e) {

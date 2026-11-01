@@ -146,7 +146,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           ? (
               const Color(0xFF143823),
               const Color(0xFF81C784),
-              const Color(0xFF2E7D32),
+              Theme.of(context).colorScheme.primary,
             )
           : (
               const Color(0xFFE8F5E9),
@@ -842,7 +842,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           ? 'يتم الآن التحقق من إحداثياتك والمسافة للفرع'
           : 'Verifying GPS coordinates and branch';
     } else if (_isInsideGeofence) {
-      statusColor = const Color(0xFF059669); // Emerald M3 Success
+      statusColor = Theme.of(context).colorScheme.primary; // Emerald M3 Success
       headerIcon = Symbols.verified_rounded;
       statusTitle = isArabic ? 'أنت داخل نطاق العمل' : 'Inside Work Zone';
       statusSubtitle = activeBranch != null
@@ -1018,13 +1018,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF059669).withValues(alpha: 0.15),
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Symbols.check_circle_rounded,
                             size: 18,
-                            color: Color(0xFF059669),
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -1145,7 +1145,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: _isInsideGeofence
-                      ? const Color(0xFF059669).withValues(alpha: 0.08)
+                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.08)
                       : (isBusy
                           ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
                           : colorScheme.error.withValues(alpha: 0.08)),
@@ -1968,7 +1968,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                           : Symbols.logout_rounded,
                                       size: 16,
                                       color: item.isEffectiveAutoCheckOut
-                                          ? Colors.amber[800]
+                                          ? Theme.of(context).colorScheme.onTertiaryContainer
                                           : colorScheme.error,
                                     ),
                                     const SizedBox(width: 4),
@@ -1977,7 +1977,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                       style: TextStyle(
                                         fontWeight: FontWeight.w500,
                                         color: item.isEffectiveAutoCheckOut
-                                            ? Colors.amber[900]
+                                            ? Theme.of(context).colorScheme.onTertiaryContainer
                                             : null,
                                       ),
                                     ),
@@ -1989,10 +1989,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.amber.withValues(alpha: 0.15),
+                                          color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
                                           borderRadius: BorderRadius.circular(4),
                                           border: Border.all(
-                                            color: Colors.amber.withValues(alpha: 0.5),
+                                            color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.5),
                                           ),
                                         ),
                                         child: Tooltip(
@@ -2004,7 +2004,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
-                                              color: Colors.amber[900],
+                                              color: Theme.of(context).colorScheme.onTertiaryContainer,
                                             ),
                                           ),
                                         ),
@@ -3107,11 +3107,11 @@ class _ScannerModalState extends State<_ScannerModal>
                                     color: Colors.green.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     'وقت موثوق 🔒',
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.green,
+                                      color: Theme.of(context).colorScheme.primary,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),

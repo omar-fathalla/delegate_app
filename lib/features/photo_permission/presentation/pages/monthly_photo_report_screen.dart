@@ -1266,7 +1266,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isPending
-              ? Colors.amber.shade300
+              ? Theme.of(context).colorScheme.tertiary
               : colorScheme.outlineVariant.withValues(alpha: 0.3),
         ),
       ),
@@ -1342,21 +1342,21 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                               decoration: BoxDecoration(
-                                color: Colors.amber.shade50,
+                                color: Theme.of(context).colorScheme.tertiaryContainer,
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.amber.shade300, width: 0.8),
+                                border: Border.all(color: Theme.of(context).colorScheme.tertiary, width: 0.8),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Symbols.cloud_off_rounded, size: 10, color: Colors.amber.shade900),
+                                  Icon(Symbols.cloud_off_rounded, size: 10, color: Theme.of(context).colorScheme.onTertiaryContainer),
                                   const SizedBox(width: 3),
                                   Text(
                                     'معلقة بالهاتف',
                                     style: TextStyle(
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.amber.shade900,
+                                      color: Theme.of(context).colorScheme.onTertiaryContainer,
                                     ),
                                   ),
                                 ],
@@ -1366,21 +1366,21 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                               decoration: BoxDecoration(
-                                color: Colors.green.shade50,
+                                color: Theme.of(context).colorScheme.primaryContainer,
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.green.shade300, width: 0.8),
+                                border: Border.all(color: Theme.of(context).colorScheme.primary, width: 0.8),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Symbols.cloud_done_rounded, size: 10, color: Colors.green.shade700),
+                                  Icon(Symbols.cloud_done_rounded, size: 10, color: Theme.of(context).colorScheme.onPrimaryContainer),
                                   const SizedBox(width: 3),
                                   Text(
                                     'مرفوعة بالسيرفر',
                                     style: TextStyle(
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.green.shade800,
+                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
                                     ),
                                   ),
                                 ],
@@ -1672,17 +1672,17 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: saveSuccess ? Colors.green.shade50 : Colors.amber.shade50,
+                                  color: saveSuccess ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.tertiaryContainer,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: saveSuccess ? Colors.green.shade300 : Colors.amber.shade300,
+                                    color: saveSuccess ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.tertiary,
                                   ),
                                 ),
                                 child: Row(
                                   children: [
                                     Icon(
                                       saveSuccess ? Symbols.check_circle_rounded : Symbols.info_rounded,
-                                      color: saveSuccess ? Colors.green.shade700 : Colors.amber.shade800,
+                                      color: saveSuccess ? Theme.of(context).colorScheme.onPrimaryContainer : Theme.of(context).colorScheme.onTertiaryContainer,
                                       size: 18,
                                     ),
                                     const SizedBox(width: 8),
@@ -1692,7 +1692,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
-                                          color: saveSuccess ? Colors.green.shade800 : Colors.amber.shade900,
+                                          color: saveSuccess ? Theme.of(context).colorScheme.onPrimaryContainer : Theme.of(context).colorScheme.onTertiaryContainer,
                                         ),
                                       ),
                                     ),
