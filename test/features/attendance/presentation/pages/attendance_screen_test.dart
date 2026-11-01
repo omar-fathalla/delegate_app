@@ -327,8 +327,8 @@ void main() {
       expect(find.text('الفرع: سان ستيفانو'), findsOneWidget);
       expect(find.text('الفرع: City Square'), findsNothing);
 
-      // Tap 'جميع السلاسل' to show all chains again
-      await tester.tap(find.text('جميع السلاسل').first);
+      // Tap 'كل السلاسل' to show all chains again
+      await tester.tap(find.text('كل السلاسل').first);
       await tester.pumpAndSettle();
 
       expect(find.text('الفرع: جناكليس'), findsOneWidget);

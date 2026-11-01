@@ -128,7 +128,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Confirmation modal should appear
-      expect(find.textContaining('Are you sure you want to logout?'), findsOneWidget);
+      expect(find.textContaining('Log out?'), findsOneWidget);
     });
 
     testWidgets('logout dialog has cancel and confirm buttons', (
@@ -145,7 +145,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Cancel'), findsOneWidget);
-      expect(find.text('Logout'), findsWidgets);
+      expect(find.text('Log out'), findsWidgets);
     });
 
     testWidgets('tapping cancel closes logout dialog', (
@@ -161,12 +161,12 @@ void main() {
       await tester.tap(logoutTile);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Are you sure you want to logout?'), findsOneWidget);
+      expect(find.textContaining('Log out?'), findsOneWidget);
 
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Are you sure you want to logout?'), findsNothing);
+      expect(find.textContaining('Log out?'), findsNothing);
     });
 
     testWidgets('color picker circles are rendered', (
