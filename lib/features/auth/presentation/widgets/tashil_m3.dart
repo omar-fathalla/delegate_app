@@ -31,7 +31,7 @@ abstract final class M3Motion {
   static const fadeThroughIn = Duration(milliseconds: 210);
   static const containerTransform = long2;
   static const sharedAxis = medium2;
-  static const shake = Duration(milliseconds: 180);
+  static const shake = Duration(milliseconds: 300);
   static const staggerStep = Duration(milliseconds: 40);
   static const staggerCap = 5;
   static const reducedFade = Duration(milliseconds: 150);
@@ -306,7 +306,7 @@ class _GroupItemState extends State<_GroupItem>
   }
 }
 
-/// Horizontal field shake: 180ms, 2.5 cycles (<3), 6dp. Call [ShakeState.shake].
+/// Horizontal field shake: 300ms, 2 cycles, ±8dp (damped). Call [ShakeState.shake].
 class Shake extends StatefulWidget {
   const Shake({super.key, required this.child});
   final Widget child;
@@ -338,7 +338,7 @@ class ShakeState extends State<Shake> with SingleTickerProviderStateMixin {
       builder: (_, child) {
         final v = _c.value;
         return Transform.translate(
-          offset: Offset(math.sin(v * math.pi * 5) * 6 * (1 - v), 0),
+          offset: Offset(math.sin(v * math.pi * 4) * 8 * (1 - v), 0),
           child: child,
         );
       },
