@@ -157,6 +157,30 @@ abstract final class AppMotionTransitions {
   ///
   /// Respects RTL directionality: in Arabic, the X-axis motion is inverted
   /// so that "Forward / Next" moves right-to-left naturally.
+  /// M3 shared axis X for full-screen routes: the outgoing page fades out
+  /// (first 30%) while the incoming fades in, over an opaque surface fill so
+  /// two pages are never visible through each other. Mirrored in RTL so
+  /// forward navigation enters from the reading-order end.
+  static Widget sharedAxisX(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return FadeTransition(opacity: animation, child: child);
+    }
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final transition = SharedAxisTransition(
+      animation: animation,
+      secondaryAnimation: secondaryAnimation,
+      transitionType: SharedAxisTransitionType.horizontal,
+      fillColor: Theme.of(context).colorScheme.surface,
+      child: rtl ? Transform.flip(flipX: true, child: child) : child,
+    );
+    return rtl ? Transform.flip(flipX: true, child: transition) : transition;
+  }
+
   static Widget buildSharedAxis({
     required BuildContext context,
     required Animation<double> animation,
@@ -274,6 +298,23 @@ abstract final class AppMotionTransitions {
   }
 }
 
+/// The single [PageTransitionsBuilder] used by the app theme on every
+/// platform (Settings and other imperative pushes included).
+class M3PageTransitionsBuilder extends PageTransitionsBuilder {
+  const M3PageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) =>
+      AppMotionTransitions.sharedAxisX(
+          context, animation, secondaryAnimation, child);
+}
+
 /// GoRouter CustomTransitionPage helpers adhering to M3 Motion
 abstract final class AppMotionPage {
   /// Returns a [CustomTransitionPage] implementing M3 Shared Axis transition.
@@ -281,8 +322,8 @@ abstract final class AppMotionPage {
     required GoRouterState state,
     required Widget child,
     M3SharedAxisDirection direction = M3SharedAxisDirection.horizontal,
-    Duration duration = AppMotionDurations.medium3, // 350ms
-    Duration reverseDuration = AppMotionDurations.short4, // 200ms
+    Duration duration = AppMotionDurations.medium2, // 300ms
+    Duration reverseDuration = AppMotionDurations.medium2, // 300ms
   }) {
     return CustomTransitionPage<T>(
       key: state.pageKey,
@@ -290,6 +331,13 @@ abstract final class AppMotionPage {
       transitionDuration: duration,
       reverseTransitionDuration: reverseDuration,
       transitionsBuilder: (context, animation, secondaryAnimation, pageChild) {
+        // Same transition as every Navigator/MaterialPageRoute push (see
+        // M3PageTransitionsBuilder) so go_router and imperative routes never
+        // mix two different animations on screen at once.
+        if (direction == M3SharedAxisDirection.horizontal) {
+          return AppMotionTransitions.sharedAxisX(
+              context, animation, secondaryAnimation, pageChild);
+        }
         return AppMotionTransitions.buildSharedAxis(
           context: context,
           animation: animation,

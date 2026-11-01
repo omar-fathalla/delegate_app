@@ -1,6 +1,7 @@
 // ignore: unnecessary_import
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'color_schemes.dart';
@@ -147,11 +148,13 @@ class AppTheme {
       ),
 
       // Material Design 3 Motion Page Transitions
+      // One transition for every route (go_router pages use the same
+      // AppMotionTransitions.sharedAxisX), so nothing overlaps mid-push.
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.android: M3PageTransitionsBuilder(),
+          TargetPlatform.iOS: M3PageTransitionsBuilder(),
+          TargetPlatform.macOS: M3PageTransitionsBuilder(),
         },
       ),
     );
