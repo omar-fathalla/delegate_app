@@ -1266,5 +1266,10 @@
   "roleTechSupport": "دعم فني",
   "roleMarketing": "تسويق",
   "roleHr": "موارد بشرية (HR)",
-  "defaultUserName": "مستخدم"
+  "defaultUserName": "مستخدم",
+  "offlineBannerTitle": "أنت غير متصل",
+  "offlineLastSync": "آخر تحديث {time}",
+  "offlineNoSyncYet": "سيتم التحديث عند عودة الاتصال",
+  "offlineNotifications": "لا يمكن تحميل الإشعارات بدون إنترنت. اتصل بالإنترنت وحاول مرة أخرى.",
+  "refreshFailed": "تعذّر التحديث. تحقق من الاتصال وحاول مرة أخرى."
 }

@@ -1921,6 +1921,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'User'**
   String get defaultUserName;
+
+  /// No description provided for @offlineBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re offline'**
+  String get offlineBannerTitle;
+
+  /// No description provided for @offlineLastSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated {time}'**
+  String offlineLastSync(Object time);
+
+  /// No description provided for @offlineNoSyncYet.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll update when you\'re back online'**
+  String get offlineNoSyncYet;
+
+  /// No description provided for @offlineNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications can\'t load while you\'re offline. Connect and try again.'**
+  String get offlineNotifications;
+
+  /// No description provided for @refreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t refresh. Check your connection and try again.'**
+  String get refreshFailed;
 }
 
 class _AppLocalizationsDelegate

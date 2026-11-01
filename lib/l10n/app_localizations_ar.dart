@@ -972,4 +972,22 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get defaultUserName => 'مستخدم';
+
+  @override
+  String get offlineBannerTitle => 'أنت غير متصل';
+
+  @override
+  String offlineLastSync(Object time) {
+    return 'آخر تحديث $time';
+  }
+
+  @override
+  String get offlineNoSyncYet => 'سيتم التحديث عند عودة الاتصال';
+
+  @override
+  String get offlineNotifications =>
+      'لا يمكن تحميل الإشعارات بدون إنترنت. اتصل بالإنترنت وحاول مرة أخرى.';
+
+  @override
+  String get refreshFailed => 'تعذّر التحديث. تحقق من الاتصال وحاول مرة أخرى.';
 }

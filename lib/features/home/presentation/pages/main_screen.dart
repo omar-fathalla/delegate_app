@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/offline_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -225,7 +226,12 @@ class _MainScreenState extends State<MainScreen> {
         menuItems: const [],
       ),
       drawer: _buildDrawer(context, delegate, l10n, onMenu),
-          body: _buildBody(delegate),
+          body: Column(
+            children: [
+              OfflineBanner(onRetry: () => setState(() {})),
+              Expanded(child: _buildBody(delegate)),
+            ],
+          ),
           bottomNavigationBar: M3NavBar(
             selectedIndex: _currentIndex,
             onSelected: (index) {

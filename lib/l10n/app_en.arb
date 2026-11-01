@@ -1266,5 +1266,15 @@
   "roleTechSupport": "Technical support",
   "roleMarketing": "Marketing",
   "roleHr": "HR",
-  "defaultUserName": "User"
+  "defaultUserName": "User",
+  "offlineBannerTitle": "You're offline",
+  "offlineLastSync": "Last updated {time}",
+  "@offlineLastSync": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "offlineNoSyncYet": "We'll update when you're back online",
+  "offlineNotifications": "Notifications can't load while you're offline. Connect and try again.",
+  "refreshFailed": "Couldn't refresh. Check your connection and try again."
 }

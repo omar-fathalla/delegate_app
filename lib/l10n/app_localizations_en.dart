@@ -974,4 +974,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultUserName => 'User';
+
+  @override
+  String get offlineBannerTitle => 'You\'re offline';
+
+  @override
+  String offlineLastSync(Object time) {
+    return 'Last updated $time';
+  }
+
+  @override
+  String get offlineNoSyncYet => 'We\'ll update when you\'re back online';
+
+  @override
+  String get offlineNotifications =>
+      'Notifications can\'t load while you\'re offline. Connect and try again.';
+
+  @override
+  String get refreshFailed =>
+      'Couldn\'t refresh. Check your connection and try again.';
 }

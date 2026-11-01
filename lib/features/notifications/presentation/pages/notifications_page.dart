@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/network/connectivity_status.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/notifications/domain/entities/notification_entity.dart';
 import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
@@ -208,6 +209,43 @@ class NotificationsPage extends StatelessWidget {
             }
 
             if (state is NotificationLoaded) {
+              if (state.notifications.isEmpty &&
+                  ConnectivityStatus.instance.isOffline.value) {
+                final cs = Theme.of(context).colorScheme;
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.cloud_off_rounded, size: 64, color: cs.outline),
+                        const SizedBox(height: 16),
+                        Text(
+                          AppLocalizations.of(context)!.offlineNotifications,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.tonal(
+                          onPressed: () async {
+                            final bloc = context.read<NotificationBloc>();
+                            if (await ConnectivityStatus.instance.recheck()) {
+                              bloc.add(LoadNotifications(
+                                delegateUid: delegate.uid,
+                                organizationId: delegate.organizationUID,
+                                phoneNumber: delegate.phoneNumber,
+                                userRole: delegate.role.name,
+                                accountCreatedAt: delegate.createdAt,
+                              ));
+                            }
+                          },
+                          child: Text(AppLocalizations.of(context)!.retry),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
               if (state.notifications.isEmpty) {
                 return Center(
                   child: Column(
