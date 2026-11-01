@@ -110,7 +110,6 @@ class _MainScreenState extends State<MainScreen> {
     final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
     final colorScheme = Theme.of(context).colorScheme;
-    final isArabic = localeProvider.isArabic;
 
     void onMenu(String value) {
           if (value == 'profile') {
@@ -339,6 +338,7 @@ class _MainScreenState extends State<MainScreen> {
   void _showOrgSwitcher(BuildContext context, ColorScheme colorScheme) {
     final isArabic = localeProvider.isArabic;
     final currentDelegate = widget.delegate;
+    final l10n = AppLocalizations.of(context)!;
 
     showM3Dialog(
       context: context,
