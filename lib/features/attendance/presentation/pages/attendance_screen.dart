@@ -885,7 +885,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
       ),
-      color: colorScheme.surfaceContainerHighest,
+      color: colorScheme.surfaceContainerHigh,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -1457,7 +1457,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 decoration: BoxDecoration(
                   color: isSelected
                       ? activeBg
-                      : colorScheme.surfaceContainerHighest,
+                      : colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -1502,7 +1502,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
+        color: colorScheme.surfaceContainer.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(14),
       ),
       child: chains.length <= 2
@@ -1665,7 +1665,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
+                      color: colorScheme.surfaceContainerHigh,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -1693,7 +1693,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
+                      color: colorScheme.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -2805,7 +2805,7 @@ class _ShimmerCardState extends State<_ShimmerCard>
 
   Widget _buildShimmerBar({required double width, required double height}) {
     final colorScheme = Theme.of(context).colorScheme;
-    final baseColor = colorScheme.surfaceContainerHighest;
+    final baseColor = colorScheme.surfaceContainerHigh;
     final highlightColor = colorScheme.surface;
 
     return AnimatedBuilder(

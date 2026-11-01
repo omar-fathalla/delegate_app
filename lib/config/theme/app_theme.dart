@@ -159,10 +159,48 @@ class AppTheme {
 
   static ThemeData lightTheme([Color? seedColor]) {
     final color = seedColor ?? AppColorSchemes.seedColors[0];
-    final colorScheme = ColorScheme.fromSeed(
+    var colorScheme = ColorScheme.fromSeed(
       seedColor: color,
       brightness: Brightness.light,
     );
+    // Approved neutral light surfaces (home_v2n). Applied to every seed;
+    // brand roles are pinned only for the default #6750A4 seed.
+    colorScheme = colorScheme.copyWith(
+      surface: const Color(0xFFFDF8F8),
+      surfaceBright: const Color(0xFFFDF8F8),
+      onSurface: const Color(0xFF1C1B1C),
+      surfaceDim: const Color(0xFFDDD9D9),
+      surfaceContainerLowest: const Color(0xFFFFFFFF),
+      surfaceContainerLow: const Color(0xFFF7F3F2),
+      surfaceContainer: const Color(0xFFF1EDED),
+      surfaceContainerHigh: const Color(0xFFEBE7E7),
+      surfaceContainerHighest: const Color(0xFFE6E1E1),
+      onSurfaceVariant: const Color(0xFF48464B),
+      // ignore: deprecated_member_use
+      surfaceVariant: const Color(0xFFE6E1E7),
+      outline: const Color(0xFF79767B),
+      outlineVariant: const Color(0xFFCAC5CB),
+      inverseSurface: const Color(0xFF313030),
+      onInverseSurface: const Color(0xFFF4F0F0),
+    );
+    if (color.toARGB32() == 0xFF6750A4) {
+      colorScheme = colorScheme.copyWith(
+        primary: const Color(0xFF6750A4),
+        onPrimary: const Color(0xFFFFFFFF),
+        primaryContainer: const Color(0xFFE9DDFF),
+        onPrimaryContainer: const Color(0xFF22005D),
+        inversePrimary: const Color(0xFFCFBCFF),
+        secondary: const Color(0xFF625B70),
+        secondaryContainer: const Color(0xFFE8DEF8),
+        onSecondaryContainer: const Color(0xFF1E192B),
+        tertiary: const Color(0xFF7E5260),
+        tertiaryContainer: const Color(0xFFFFD9E3),
+        onTertiaryContainer: const Color(0xFF31101D),
+        error: const Color(0xFFBA1A1A),
+        errorContainer: const Color(0xFFFFDAD6),
+        onErrorContainer: const Color(0xFF410002),
+      );
+    }
     final baseTextTheme = GoogleFonts.cairoTextTheme();
 
     return _baseTheme(colorScheme, baseTextTheme);

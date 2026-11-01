@@ -850,7 +850,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return Card(
       elevation: 0,
-      color: colorScheme.surfaceContainerHigh,
+      color: colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -860,7 +860,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: colorScheme.surfaceContainerHighest,
+              backgroundColor: colorScheme.surfaceContainerHigh,
               foregroundColor: colorScheme.onSurfaceVariant,
               child: const Icon(Symbols.person_off_rounded),
             ),
@@ -926,7 +926,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return Card(
       elevation: 0,
-      color: colorScheme.surfaceContainerHigh,
+      color: colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -1011,7 +1011,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return M3PressScale(scale: 0.98, child: Card(
       elevation: 0,
-      color: colorScheme.surfaceContainerHigh,
+      color: colorScheme.surfaceContainer,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -1262,7 +1262,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHigh,
+          color: colorScheme.surfaceContainer,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -1323,7 +1323,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     title: isArabic ? 'أيام الحضور' : 'Attended',
                     value: isArabic ? '$_attendedDays يوم' : '$_attendedDays d',
                     icon: Symbols.check_circle_rounded,
-                    containerColor: colorScheme.surfaceContainerHigh,
+                    containerColor: colorScheme.surfaceContainer,
                     iconColor: colorScheme.onSurfaceVariant,
                     textColor: colorScheme.onSurface,
                   ),
@@ -1337,7 +1337,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     title: isArabic ? 'أيام الغياب' : 'Absent',
                     value: isArabic ? '$_absentDays يوم' : '$_absentDays d',
                     icon: Symbols.cancel_rounded,
-                    containerColor: colorScheme.surfaceContainerHigh,
+                    containerColor: colorScheme.surfaceContainer,
                     iconColor: _absentDays > 0
                         ? colorScheme.error
                         : colorScheme.onSurfaceVariant,
@@ -1357,7 +1357,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         ? '$_approvedLeavesThisMonth من 4 أيام'
                         : '$_approvedLeavesThisMonth of 4 days',
                     icon: Symbols.event_available_rounded,
-                    containerColor: colorScheme.surfaceContainerHigh,
+                    containerColor: colorScheme.surfaceContainer,
                     iconColor: colorScheme.onSurfaceVariant,
                     textColor: colorScheme.onSurface,
                   ),
@@ -1371,7 +1371,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
+                color: colorScheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -1558,7 +1558,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -1844,7 +1844,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -1900,7 +1900,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         return Card(
           elevation: 0,
           margin: EdgeInsets.zero,
-          color: colorScheme.surfaceContainerHigh,
+          color: colorScheme.surfaceContainer,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

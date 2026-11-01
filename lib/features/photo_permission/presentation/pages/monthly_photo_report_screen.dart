@@ -209,7 +209,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             Container(
               height: 48,
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHigh,
+                color: colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(24),
               ),
               clipBehavior: Clip.antiAlias,
@@ -432,7 +432,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       child: Material(
                         color: isSelected
                             ? colorScheme.primaryContainer.withValues(alpha: 0.5)
-                            : colorScheme.surfaceContainerHigh,
+                            : colorScheme.surfaceContainer,
                         clipBehavior: Clip.antiAlias,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -473,7 +473,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                           decoration: BoxDecoration(
                             color: count > 0
                                 ? colorScheme.primary.withValues(alpha: 0.12)
-                                : colorScheme.surfaceContainerHighest,
+                                : colorScheme.surfaceContainerHigh,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -606,7 +606,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHigh,
+                          color: colorScheme.surfaceContainer,
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Row(
@@ -663,7 +663,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
+                          color: colorScheme.surfaceContainer.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
@@ -901,7 +901,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       child: Container(
                         height: 42,
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+                          color: colorScheme.surfaceContainer.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -1055,7 +1055,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -1186,7 +1186,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
       ),
       clipBehavior: Clip.antiAlias,
@@ -1194,7 +1194,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: false,
-          collapsedBackgroundColor: colorScheme.surfaceContainerHigh,
+          collapsedBackgroundColor: colorScheme.surfaceContainer,
           backgroundColor: colorScheme.surfaceContainerLowest,
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -1219,7 +1219,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
+                  color: colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -1421,7 +1421,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+                color: colorScheme.surfaceContainer.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -1692,7 +1692,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             Container(
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHigh,
+                                color: colorScheme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Column(

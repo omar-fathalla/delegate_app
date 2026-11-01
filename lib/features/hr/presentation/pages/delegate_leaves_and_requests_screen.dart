@@ -259,7 +259,7 @@ class _DelegateLeavesAndRequestsScreenState
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest
+                            color: colorScheme.surfaceContainerHigh
                                 .withValues(alpha: 0.4),
                             shape: BoxShape.circle,
                           ),
@@ -404,7 +404,7 @@ class _DelegateLeavesAndRequestsScreenState
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 7,
-              backgroundColor: colorScheme.surfaceContainerHighest,
+              backgroundColor: colorScheme.surfaceContainerHigh,
               valueColor: AlwaysStoppedAnimation<Color>(
                 progress > 0.85 ? colorScheme.error : colorScheme.primary,
               ),
@@ -444,18 +444,8 @@ class _DelegateLeavesAndRequestsScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.35),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,7 +455,7 @@ class _DelegateLeavesAndRequestsScreenState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
+                  color: Theme.of(context).colorScheme.tertiaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -487,11 +477,8 @@ class _DelegateLeavesAndRequestsScreenState
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
+                  color: Theme.of(context).colorScheme.tertiaryContainer,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.4),
-                  ),
                 ),
                 child: Text(
                   '4 أيام راحة شهرياً',
@@ -581,14 +568,9 @@ class _DelegateLeavesAndRequestsScreenState
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: isMuted
-            ? colorScheme.surfaceContainerHigh
-            : colorScheme.primaryContainer.withValues(alpha: 0.25),
+            ? colorScheme.surfaceContainer
+            : colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isMuted
-              ? colorScheme.outlineVariant.withValues(alpha: 0.3)
-              : colorScheme.primary.withValues(alpha: 0.2),
-        ),
       ),
       child: Column(
         children: [
@@ -753,7 +735,7 @@ class _DelegateLeavesAndRequestsScreenState
     return Container(
       height: 38,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(10),
       ),
       padding: const EdgeInsets.all(2.5),
@@ -1642,7 +1624,7 @@ class _DelegateLeavesAndRequestsScreenState
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerHigh,
+                                  color: colorScheme.surfaceContainer,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Row(
@@ -1683,7 +1665,7 @@ class _DelegateLeavesAndRequestsScreenState
                             const SizedBox(height: 6),
                             Container(
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHigh,
+                                color: colorScheme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
@@ -1846,7 +1828,7 @@ class _DelegateLeavesAndRequestsScreenState
                             const SizedBox(height: 6),
                             Container(
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHigh,
+                                color: colorScheme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
@@ -2079,7 +2061,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHigh,
+                                color: colorScheme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
@@ -2118,7 +2100,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Container(
                               height: 38,
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHigh,
+                                color: colorScheme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
