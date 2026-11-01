@@ -1,3 +1,4 @@
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -55,8 +56,11 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
   }
 
   void _loadTasks() {
-    context.read<DelegateTasksBloc>().add(
+    final bloc = context.read<DelegateTasksBloc>();
+    bloc.add(
       LoadDelegateTasksRequested(
+        // Keep the active filter on refresh (it used to reset to "all").
+        status: bloc.state.statusFilter,
         organizationId: widget.delegate.organizationUID,
         delegateId: widget.delegate.uid,
         companyId: widget.delegate.companyUID,
@@ -80,7 +84,8 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Symbols.refresh_rounded),
+            tooltip: AppLocalizations.of(context)!.retry,
             onPressed: _loadTasks,
           ),
         ],
