@@ -912,8 +912,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       _loadApprovedLeaves();
                     });
                   },
-                  icon: const Icon(
-                    Symbols.chevron_right_rounded,
+                  icon: Icon(
+                    Directionality.of(context) == TextDirection.rtl ? Symbols.chevron_right_rounded : Symbols.chevron_left_rounded,
                     textDirection: TextDirection.ltr,
                   ),
                 ),
@@ -982,8 +982,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       _loadApprovedLeaves();
                     });
                   },
-                  icon: const Icon(
-                    Symbols.chevron_left_rounded,
+                  icon: Icon(
+                    Directionality.of(context) == TextDirection.rtl ? Symbols.chevron_left_rounded : Symbols.chevron_right_rounded,
                     textDirection: TextDirection.ltr,
                   ),
                 ),

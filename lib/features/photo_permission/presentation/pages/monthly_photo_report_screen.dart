@@ -669,10 +669,10 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                 backgroundColor: colorScheme.surface,
                                 foregroundColor: colorScheme.primary,
                                 padding: const EdgeInsets.all(8),
-                                minimumSize: const Size(38, 38),
+                                minimumSize: const Size(48, 48),
                               ),
-                              icon: const Icon(
-                                Symbols.chevron_right_rounded,
+                              icon: Icon(
+                                Directionality.of(context) == TextDirection.rtl ? Symbols.chevron_right_rounded : Symbols.chevron_left_rounded,
                                 size: 22,
                                 textDirection: TextDirection.ltr,
                               ),
@@ -770,10 +770,10 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                 backgroundColor: colorScheme.surface,
                                 foregroundColor: isCurrentMonth ? colorScheme.outline : colorScheme.primary,
                                 padding: const EdgeInsets.all(8),
-                                minimumSize: const Size(38, 38),
+                                minimumSize: const Size(48, 48),
                               ),
-                              icon: const Icon(
-                                Symbols.chevron_left_rounded,
+                              icon: Icon(
+                                Directionality.of(context) == TextDirection.rtl ? Symbols.chevron_left_rounded : Symbols.chevron_right_rounded,
                                 size: 22,
                                 textDirection: TextDirection.ltr,
                               ),
