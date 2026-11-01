@@ -209,7 +209,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             Container(
               height: 48,
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerLow,
+                color: colorScheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(24),
               ),
               clipBehavior: Clip.antiAlias,
@@ -432,7 +432,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       child: Material(
                         color: isSelected
                             ? colorScheme.primaryContainer.withValues(alpha: 0.5)
-                            : colorScheme.surfaceContainerLow,
+                            : colorScheme.surfaceContainerHigh,
                         clipBehavior: Clip.antiAlias,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -606,7 +606,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerLow,
+                          color: colorScheme.surfaceContainerHigh,
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Row(
@@ -1008,12 +1008,12 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: isSelected ? colorScheme.primary : Colors.transparent,
+          color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: colorScheme.primary.withValues(alpha: 0.25),
+                    color: Colors.transparent,
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -1027,7 +1027,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
               Icon(
                 icon,
                 size: 15,
-                color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                color: isSelected ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: 4),
               Text(
@@ -1035,7 +1035,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                  color: isSelected ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -1055,7 +1055,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -1186,7 +1186,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
       ),
       clipBehavior: Clip.antiAlias,
@@ -1194,7 +1194,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: false,
-          collapsedBackgroundColor: colorScheme.surfaceContainerLow,
+          collapsedBackgroundColor: colorScheme.surfaceContainerHigh,
           backgroundColor: colorScheme.surfaceContainerLowest,
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -1692,7 +1692,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             Container(
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerLow,
+                                color: colorScheme.surfaceContainerHigh,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Column(

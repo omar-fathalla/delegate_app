@@ -885,7 +885,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
       ),
-      color: colorScheme.surfaceContainer,
+      color: colorScheme.surfaceContainerHighest,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -1693,7 +1693,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainer,
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(

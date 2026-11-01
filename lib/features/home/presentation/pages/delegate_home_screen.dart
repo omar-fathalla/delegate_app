@@ -498,7 +498,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
+        color: colorScheme.primary,
         borderRadius: BorderRadius.circular(28),
       ),
       child: Column(
@@ -518,7 +518,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           : 'Welcome, ${widget.delegate.firstName}',
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: colorScheme.onPrimaryContainer,
+                        color: colorScheme.onPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -628,8 +628,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       imageUrl: photoUrl,
                       fallbackText: widget.delegate.firstName,
                       radius: 26,
-                      backgroundColor: colorScheme.surface,
-                      foregroundColor: colorScheme.primary,
+                      backgroundColor: colorScheme.onPrimary.withValues(alpha: 0.12),
+                      foregroundColor: colorScheme.onPrimary,
                       fallbackIcon: Symbols.person_pin_rounded,
                     ),
                   );
@@ -638,7 +638,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             ],
           ),
           const SizedBox(height: 16),
-          Divider(color: colorScheme.onPrimaryContainer.withValues(alpha: 0.16), height: 1),
+          Divider(color: colorScheme.onPrimary.withValues(alpha: 0.16), height: 1),
           const SizedBox(height: 16),
 
           // Core Duties Summary
@@ -646,7 +646,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             isArabic ? 'المهام الأساسية للمندوب:' : 'Core Delegate Duties:',
             style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w700,
-              color: colorScheme.onPrimaryContainer,
+              color: colorScheme.onPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -683,14 +683,14 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8)),
+        Icon(icon, size: 18, color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.8)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
             style: TextStyle(
               fontSize: 13,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
+              color: Theme.of(context).colorScheme.onPrimary,
               height: 1.45,
             ),
           ),
@@ -706,7 +706,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+        color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -715,7 +715,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           Icon(
             Symbols.badge_rounded,
             size: 16,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: Theme.of(context).colorScheme.onPrimary,
           ),
           const SizedBox(width: 6),
           Text(
@@ -723,7 +723,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
+              color: Theme.of(context).colorScheme.onPrimary,
             ),
           ),
         ],
@@ -743,10 +743,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           vertical: 3,
         ),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: Theme.of(context).colorScheme.outline,
+            color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.24),
           ),
         ),
         child: Row(
@@ -755,7 +755,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             Icon(
               Symbols.domain_rounded,
               size: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: Theme.of(context).colorScheme.onPrimary,
             ),
             const SizedBox(width: 6),
             Text(
@@ -763,7 +763,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.onSurface,
+                color: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
             const SizedBox(width: 6),
@@ -772,7 +772,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               height: 5.5,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primary,
+                color: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
           ],
@@ -786,7 +786,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+        color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -795,7 +795,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           Icon(
             Symbols.storefront_rounded,
             size: 14,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: Theme.of(context).colorScheme.onPrimary,
           ),
           const SizedBox(width: 6),
           Text(
@@ -803,7 +803,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
+              color: Theme.of(context).colorScheme.onPrimary,
             ),
           ),
         ],
@@ -850,7 +850,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return Card(
       elevation: 0,
-      color: colorScheme.surfaceContainerLow,
+      color: colorScheme.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -926,7 +926,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return Card(
       elevation: 0,
-      color: colorScheme.surfaceContainerLow,
+      color: colorScheme.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -1011,7 +1011,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return M3PressScale(scale: 0.98, child: Card(
       elevation: 0,
-      color: colorScheme.surfaceContainerLow,
+      color: colorScheme.surfaceContainerHigh,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -1262,7 +1262,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
+          color: colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -1371,7 +1371,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainer,
+                color: colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -1558,7 +1558,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -1844,7 +1844,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -1900,7 +1900,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         return Card(
           elevation: 0,
           margin: EdgeInsets.zero,
-          color: colorScheme.surfaceContainerLow,
+          color: colorScheme.surfaceContainerHigh,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

@@ -836,9 +836,9 @@ class M3ContainerTransform extends StatelessWidget {
       transitionDuration: reduced ? const Duration(milliseconds: 150) : M3Motion.long2,
       closedElevation: 0,
       openElevation: 0,
-      closedColor: closedColor ?? cs.surfaceContainerLow,
+      closedColor: closedColor ?? cs.surfaceContainerHigh,
       openColor: cs.surface,
-      middleColor: cs.surfaceContainerLow,
+      middleColor: cs.surfaceContainerHigh,
       closedShape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
       closedBuilder: (c, open) => closedBuilder(c, open),
@@ -863,7 +863,7 @@ class M3Card extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final card = Material(
-      color: color ?? cs.surfaceContainerLow,
+      color: color ?? cs.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

@@ -581,7 +581,7 @@ class _DelegateLeavesAndRequestsScreenState
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: isMuted
-            ? colorScheme.surfaceContainerLow
+            ? colorScheme.surfaceContainerHigh
             : colorScheme.primaryContainer.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
@@ -753,7 +753,7 @@ class _DelegateLeavesAndRequestsScreenState
     return Container(
       height: 38,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(10),
       ),
       padding: const EdgeInsets.all(2.5),
@@ -799,7 +799,6 @@ class _DelegateLeavesAndRequestsScreenState
     required ColorScheme colorScheme,
   }) {
     final isSelected = _selectedStatusFilter == value;
-    final themeColor = activeColor ?? colorScheme.primary;
 
     return Expanded(
       child: InkWell(
@@ -808,12 +807,12 @@ class _DelegateLeavesAndRequestsScreenState
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
-            color: isSelected ? themeColor : Colors.transparent,
+            color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: themeColor.withValues(alpha: 0.25),
+                      color: Colors.transparent,
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),
@@ -832,7 +831,7 @@ class _DelegateLeavesAndRequestsScreenState
                     fontSize: 10.5,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                     color: isSelected
-                        ? (themeColor == Theme.of(context).colorScheme.onTertiaryContainer ? Colors.black87 : Colors.white)
+                        ? colorScheme.onSecondaryContainer
                         : colorScheme.onSurfaceVariant,
                   ),
                   maxLines: 1,
@@ -844,7 +843,7 @@ class _DelegateLeavesAndRequestsScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Colors.white.withValues(alpha: 0.25)
+                      ? colorScheme.onSecondaryContainer.withValues(alpha: 0.12)
                       : colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -854,7 +853,7 @@ class _DelegateLeavesAndRequestsScreenState
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
                     color: isSelected
-                        ? (themeColor == Theme.of(context).colorScheme.onTertiaryContainer ? Colors.black87 : Colors.white)
+                        ? colorScheme.onSecondaryContainer
                         : colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -1643,7 +1642,7 @@ class _DelegateLeavesAndRequestsScreenState
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerLow,
+                                  color: colorScheme.surfaceContainerHigh,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Row(
@@ -1684,7 +1683,7 @@ class _DelegateLeavesAndRequestsScreenState
                             const SizedBox(height: 6),
                             Container(
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerLow,
+                                color: colorScheme.surfaceContainerHigh,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
@@ -1847,7 +1846,7 @@ class _DelegateLeavesAndRequestsScreenState
                             const SizedBox(height: 6),
                             Container(
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerLow,
+                                color: colorScheme.surfaceContainerHigh,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
@@ -2080,7 +2079,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerLow,
+                                color: colorScheme.surfaceContainerHigh,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
@@ -2119,7 +2118,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Container(
                               height: 38,
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerLow,
+                                color: colorScheme.surfaceContainerHigh,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
