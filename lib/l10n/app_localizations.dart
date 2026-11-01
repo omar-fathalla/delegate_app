@@ -1819,6 +1819,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wallets Management'**
   String get walletsManagement;
+
+  /// No description provided for @violationsPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Violations policy'**
+  String get violationsPolicy;
+
+  /// No description provided for @myViolations.
+  ///
+  /// In en, this message translates to:
+  /// **'My violations'**
+  String get myViolations;
+
+  /// No description provided for @switchOrganization.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch organization'**
+  String get switchOrganization;
+
+  /// No description provided for @manageOrganizationsChains.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage organizations and chains'**
+  String get manageOrganizationsChains;
+
+  /// No description provided for @delegateSubscriptionsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate subscriptions'**
+  String get delegateSubscriptionsMenu;
+
+  /// No description provided for @mainMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Main menu'**
+  String get mainMenu;
+
+  /// No description provided for @navRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'Requests'**
+  String get navRequests;
+
+  /// No description provided for @navPhotoReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get navPhotoReports;
+
+  /// No description provided for @roleDelegate.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate'**
+  String get roleDelegate;
+
+  /// No description provided for @roleSupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Supervisor'**
+  String get roleSupervisor;
+
+  /// No description provided for @roleCompanyAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Company admin'**
+  String get roleCompanyAdmin;
+
+  /// No description provided for @roleSuperAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Super admin'**
+  String get roleSuperAdmin;
+
+  /// No description provided for @roleOrgAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Organization admin'**
+  String get roleOrgAdmin;
+
+  /// No description provided for @roleTechSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical support'**
+  String get roleTechSupport;
+
+  /// No description provided for @roleMarketing.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketing'**
+  String get roleMarketing;
+
+  /// No description provided for @roleHr.
+  ///
+  /// In en, this message translates to:
+  /// **'HR'**
+  String get roleHr;
+
+  /// No description provided for @defaultUserName.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get defaultUserName;
 }
 
 class _AppLocalizationsDelegate

@@ -30,6 +30,11 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
   /// إظهار شريحة المنظمة النشطة بجانب الدور (تُخفى في هيدر مشرف/مسؤول الشركة).
   final bool showActiveOrganization;
 
+  /// M3 layout used by the delegate workspace: `leading` opens
+  /// [Scaffold.drawer] (start edge, so right in RTL), `actions` hold the
+  /// extra actions and the avatar. Other roles keep the popup menu.
+  final bool useDrawer;
+
   const UniversalAppHeader({
     super.key,
     required this.delegate,
@@ -42,6 +47,7 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
     this.onBackPressed,
     this.firestore,
     this.showActiveOrganization = true,
+    this.useDrawer = false,
   });
 
   @override
@@ -53,7 +59,7 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
     Map<String, dynamic>? userData,
   ]) {
     final l10n = AppLocalizations.of(context);
-    return roleLabelFor(
+    final label = roleLabelFor(
       del.role,
       position: del.position,
       rawRole: userData?['role'] as String?,
@@ -61,6 +67,32 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
       marketingPromotionLabel: l10n?.roleMarketingPromotion,
       branchesMarketingManagerLabel: l10n?.roleBranchesMarketingManager,
     );
+    return localizeRoleLabel(label, l10n);
+  }
+
+  /// Glossary: one role name per locale («مندوب» / Delegate; never «مروج»).
+  static String localizeRoleLabel(String label, AppLocalizations? l10n) {
+    if (l10n == null) return label;
+    switch (label) {
+      case 'مندوب':
+      case 'مروج':
+        return l10n.roleDelegate;
+      case 'مشرف':
+        return l10n.roleSupervisor;
+      case 'مسؤول شركة':
+        return l10n.roleCompanyAdmin;
+      case 'سوبر أدمن':
+        return l10n.roleSuperAdmin;
+      case 'أدمن منظمة':
+        return l10n.roleOrgAdmin;
+      case 'دعم فني':
+        return l10n.roleTechSupport;
+      case 'تسويق':
+        return l10n.roleMarketing;
+      case 'موارد بشرية (HR)':
+        return l10n.roleHr;
+    }
+    return label;
   }
 
   /// يحوّل دور المستخدم إلى تسمية عربية قصيرة تظهر تحت الاسم في الهيدر.
@@ -246,13 +278,22 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 2.0,
+      automaticallyImplyLeading: false,
       leading: showBackButton
           ? IconButton(
               icon: const BackButtonIcon(),
               onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
             )
-          : null,
-      titleSpacing: showBackButton ? 0 : null,
+          : useDrawer
+              ? Builder(
+                  builder: (ctx) => IconButton(
+                    icon: const Icon(Symbols.menu_rounded),
+                    tooltip: AppLocalizations.of(ctx)?.mainMenu,
+                    onPressed: () => Scaffold.of(ctx).openDrawer(),
+                  ),
+                )
+              : null,
+      titleSpacing: showBackButton || useDrawer ? 0 : null,
       shape: Border(
         bottom: BorderSide(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
@@ -315,15 +356,17 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
 
           return Row(
             children: [
-              GestureDetector(
-                onTap: () => context.push('/user-profile', extra: delegate),
-                child: AppAvatar(
-                  imageUrl: photoUrl,
-                  fallbackText: displayName.characters.first,
-                  radius: 20,
+              if (!useDrawer) ...[
+                GestureDetector(
+                  onTap: () => context.push('/user-profile', extra: delegate),
+                  child: AppAvatar(
+                    imageUrl: photoUrl,
+                    fallbackText: displayName.characters.first,
+                    radius: 20,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: GestureDetector(
                   onTap: () => context.push('/user-profile', extra: delegate),
@@ -372,11 +415,23 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
           );
         },
       ),
-      actions: [
+      actions: useDrawer
+          ? [
+              ...?extraActions,
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8),
+                child: IconButton(
+                  tooltip: AppLocalizations.of(context)?.profile,
+                  onPressed: () => context.push('/user-profile', extra: delegate),
+                  icon: _HeaderAvatar(delegate: delegate, header: this),
+                ),
+              ),
+            ]
+          : [
         ...?extraActions,
         PopupMenuButton<String>(
           icon: const Icon(Symbols.menu_rounded),
-          tooltip: 'القائمة الرئيسية',
+          tooltip: AppLocalizations.of(context)?.mainMenu ?? 'القائمة الرئيسية',
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -498,6 +553,39 @@ class _PulsingActiveOrgChipState extends State<_PulsingActiveOrgChip>
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+}
+
+/// Avatar shown in the app bar actions in drawer mode (live photo from the
+/// user document, initial as fallback).
+class _HeaderAvatar extends StatelessWidget {
+  const _HeaderAvatar({required this.delegate, required this.header});
+  final Delegate delegate;
+  final UniversalAppHeader header;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: () {
+        try {
+          return (header.firestore ?? FirebaseFirestore.instance)
+              .collection('users')
+              .doc(delegate.uid)
+              .snapshots();
+        } catch (_) {
+          return const Stream<DocumentSnapshot<Map<String, dynamic>>>.empty();
+        }
+      }(),
+      builder: (context, snapshot) {
+        final userData = snapshot.data?.data();
+        final name = UniversalAppHeader.resolveDisplayName(delegate, userData);
+        return AppAvatar(
+          imageUrl: header._resolvePhotoUrl(delegate, userData),
+          fallbackText: name.characters.first,
+          radius: 16,
         );
       },
     );

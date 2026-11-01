@@ -921,4 +921,55 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get walletsManagement => 'إدارة المحافظ';
+
+  @override
+  String get violationsPolicy => 'لائحة المخالفات';
+
+  @override
+  String get myViolations => 'مخالفاتي';
+
+  @override
+  String get switchOrganization => 'تبديل المنظمة';
+
+  @override
+  String get manageOrganizationsChains => 'إدارة المنظمات والسلاسل';
+
+  @override
+  String get delegateSubscriptionsMenu => 'اشتراكات واعتماد المندوبين';
+
+  @override
+  String get mainMenu => 'القائمة الرئيسية';
+
+  @override
+  String get navRequests => 'طلباتي';
+
+  @override
+  String get navPhotoReports => 'تقارير الصور';
+
+  @override
+  String get roleDelegate => 'مندوب';
+
+  @override
+  String get roleSupervisor => 'مشرف';
+
+  @override
+  String get roleCompanyAdmin => 'مسؤول شركة';
+
+  @override
+  String get roleSuperAdmin => 'سوبر أدمن';
+
+  @override
+  String get roleOrgAdmin => 'أدمن منظمة';
+
+  @override
+  String get roleTechSupport => 'دعم فني';
+
+  @override
+  String get roleMarketing => 'تسويق';
+
+  @override
+  String get roleHr => 'موارد بشرية (HR)';
+
+  @override
+  String get defaultUserName => 'مستخدم';
 }

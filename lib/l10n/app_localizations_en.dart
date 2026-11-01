@@ -923,4 +923,55 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get walletsManagement => 'Wallets Management';
+
+  @override
+  String get violationsPolicy => 'Violations policy';
+
+  @override
+  String get myViolations => 'My violations';
+
+  @override
+  String get switchOrganization => 'Switch organization';
+
+  @override
+  String get manageOrganizationsChains => 'Manage organizations and chains';
+
+  @override
+  String get delegateSubscriptionsMenu => 'Delegate subscriptions';
+
+  @override
+  String get mainMenu => 'Main menu';
+
+  @override
+  String get navRequests => 'Requests';
+
+  @override
+  String get navPhotoReports => 'Photos';
+
+  @override
+  String get roleDelegate => 'Delegate';
+
+  @override
+  String get roleSupervisor => 'Supervisor';
+
+  @override
+  String get roleCompanyAdmin => 'Company admin';
+
+  @override
+  String get roleSuperAdmin => 'Super admin';
+
+  @override
+  String get roleOrgAdmin => 'Organization admin';
+
+  @override
+  String get roleTechSupport => 'Technical support';
+
+  @override
+  String get roleMarketing => 'Marketing';
+
+  @override
+  String get roleHr => 'HR';
+
+  @override
+  String get defaultUserName => 'User';
 }
