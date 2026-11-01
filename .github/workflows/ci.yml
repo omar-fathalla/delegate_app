@@ -55,6 +55,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Hosted runners fill up while Gradle installs the NDK. Same cleanup the
+      # Google Play workflow uses before bundleRelease.
+      - name: Free disk space
+        run: |
+          echo "Before cleanup:" && df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/node_modules \
+            /opt/ghc /usr/local/.ghcup \
+            /usr/share/swift \
+            /usr/local/share/boost \
+            /usr/local/share/powershell \
+            /usr/local/share/chromium \
+            /usr/lib/jvm \
+            /opt/hostedtoolcache/CodeQL \
+            /opt/hostedtoolcache/PyPy \
+            /opt/hostedtoolcache/go || true
+          sudo docker image prune --all --force || true
+          sudo apt-get clean || true
+          echo "After cleanup:" && df -h /
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
