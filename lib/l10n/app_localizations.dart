@@ -2917,6 +2917,300 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'check out'**
   String get attActionCheckOut;
+
+  /// No description provided for @userNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'User not found'**
+  String get userNotFound;
+
+  /// No description provided for @accountNotIdentified.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t identify the account'**
+  String get accountNotIdentified;
+
+  /// No description provided for @profilePhotoUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile photo updated'**
+  String get profilePhotoUpdated;
+
+  /// No description provided for @photoUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t upload the photo: {error}'**
+  String photoUploadFailed(Object error);
+
+  /// No description provided for @profilePhotoDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile photo removed'**
+  String get profilePhotoDeleted;
+
+  /// No description provided for @photoDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t remove the photo: {error}'**
+  String photoDeleteFailed(Object error);
+
+  /// No description provided for @profilePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile photo'**
+  String get profilePhoto;
+
+  /// No description provided for @takePhotoCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo'**
+  String get takePhotoCamera;
+
+  /// No description provided for @chooseFromGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get chooseFromGallery;
+
+  /// No description provided for @removeCurrentPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove current photo'**
+  String get removeCurrentPhoto;
+
+  /// No description provided for @roleSuperAdmin2.
+  ///
+  /// In en, this message translates to:
+  /// **'Super admin'**
+  String get roleSuperAdmin2;
+
+  /// No description provided for @roleTechSupport2.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical support'**
+  String get roleTechSupport2;
+
+  /// No description provided for @roleOrgAdmin2.
+  ///
+  /// In en, this message translates to:
+  /// **'Organization admin'**
+  String get roleOrgAdmin2;
+
+  /// No description provided for @roleCompanyAdmin2.
+  ///
+  /// In en, this message translates to:
+  /// **'Company admin'**
+  String get roleCompanyAdmin2;
+
+  /// No description provided for @roleHrOfficer.
+  ///
+  /// In en, this message translates to:
+  /// **'HR officer'**
+  String get roleHrOfficer;
+
+  /// No description provided for @roleAccountant.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting'**
+  String get roleAccountant;
+
+  /// No description provided for @roleMarketing2.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketing'**
+  String get roleMarketing2;
+
+  /// No description provided for @personalInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal information'**
+  String get personalInfo;
+
+  /// No description provided for @nameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get nameLabel;
+
+  /// No description provided for @emailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get emailLabel;
+
+  /// No description provided for @phoneNumberLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get phoneNumberLabel;
+
+  /// No description provided for @securitySection.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get securitySection;
+
+  /// No description provided for @changePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get changePassword;
+
+  /// No description provided for @editField.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit {label}'**
+  String editField(Object label);
+
+  /// No description provided for @nameUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Name updated'**
+  String get nameUpdated;
+
+  /// No description provided for @emailUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Email updated'**
+  String get emailUpdated;
+
+  /// No description provided for @phoneUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number updated'**
+  String get phoneUpdated;
+
+  /// No description provided for @editName2.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit name'**
+  String get editName2;
+
+  /// No description provided for @editEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit email'**
+  String get editEmail;
+
+  /// No description provided for @editPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit phone number'**
+  String get editPhone;
+
+  /// No description provided for @fullName2.
+  ///
+  /// In en, this message translates to:
+  /// **'Full name'**
+  String get fullName2;
+
+  /// No description provided for @newEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'New email'**
+  String get newEmail;
+
+  /// No description provided for @newPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'New phone number'**
+  String get newPhone;
+
+  /// No description provided for @enterName.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your name'**
+  String get enterName;
+
+  /// No description provided for @enterEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email'**
+  String get enterEmail;
+
+  /// No description provided for @enterPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your phone number'**
+  String get enterPhone;
+
+  /// No description provided for @nameMin3.
+  ///
+  /// In en, this message translates to:
+  /// **'Name must be at least 3 characters'**
+  String get nameMin3;
+
+  /// No description provided for @invalidEmail2.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email'**
+  String get invalidEmail2;
+
+  /// No description provided for @invalidPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid phone number'**
+  String get invalidPhone;
+
+  /// No description provided for @saveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get saveAction;
+
+  /// No description provided for @passwordChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Password changed'**
+  String get passwordChanged;
+
+  /// No description provided for @currentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password'**
+  String get currentPassword;
+
+  /// No description provided for @enterCurrentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your current password'**
+  String get enterCurrentPassword;
+
+  /// No description provided for @newPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get newPassword;
+
+  /// No description provided for @enterNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a new password'**
+  String get enterNewPassword;
+
+  /// No description provided for @passwordMin6.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 6 characters'**
+  String get passwordMin6;
+
+  /// No description provided for @confirmPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm password'**
+  String get confirmPassword;
+
+  /// No description provided for @enterConfirmPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your password'**
+  String get enterConfirmPassword;
+
+  /// No description provided for @passwordsDontMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords don\'t match'**
+  String get passwordsDontMatch;
 }
 
 class _AppLocalizationsDelegate

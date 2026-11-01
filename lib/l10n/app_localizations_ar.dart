@@ -1566,4 +1566,157 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get attActionCheckOut => 'تسجيل الانصراف';
+
+  @override
+  String get userNotFound => 'لم يتم العثور على المستخدم';
+
+  @override
+  String get accountNotIdentified => 'تعذّر تحديد الحساب';
+
+  @override
+  String get profilePhotoUpdated => 'تم تحديث الصورة الشخصية';
+
+  @override
+  String photoUploadFailed(Object error) {
+    return 'تعذّر رفع الصورة: $error';
+  }
+
+  @override
+  String get profilePhotoDeleted => 'تم حذف الصورة الشخصية';
+
+  @override
+  String photoDeleteFailed(Object error) {
+    return 'تعذّر حذف الصورة: $error';
+  }
+
+  @override
+  String get profilePhoto => 'الصورة الشخصية';
+
+  @override
+  String get takePhotoCamera => 'التقط صورة بالكاميرا';
+
+  @override
+  String get chooseFromGallery => 'اختر من معرض الصور';
+
+  @override
+  String get removeCurrentPhoto => 'حذف الصورة الحالية';
+
+  @override
+  String get roleSuperAdmin2 => 'المشرف العام';
+
+  @override
+  String get roleTechSupport2 => 'الدعم الفني';
+
+  @override
+  String get roleOrgAdmin2 => 'مسؤول المنظمة';
+
+  @override
+  String get roleCompanyAdmin2 => 'مشرف الشركة';
+
+  @override
+  String get roleHrOfficer => 'مسؤول موارد بشرية';
+
+  @override
+  String get roleAccountant => 'إدارة الحسابات';
+
+  @override
+  String get roleMarketing2 => 'التسويق والعلاقات';
+
+  @override
+  String get personalInfo => 'المعلومات الشخصية';
+
+  @override
+  String get nameLabel => 'الاسم';
+
+  @override
+  String get emailLabel => 'البريد الإلكتروني';
+
+  @override
+  String get phoneNumberLabel => 'رقم الجوال';
+
+  @override
+  String get securitySection => 'الأمان';
+
+  @override
+  String get changePassword => 'تغيير كلمة المرور';
+
+  @override
+  String editField(Object label) {
+    return 'تعديل $label';
+  }
+
+  @override
+  String get nameUpdated => 'تم تحديث الاسم';
+
+  @override
+  String get emailUpdated => 'تم تحديث البريد الإلكتروني';
+
+  @override
+  String get phoneUpdated => 'تم تحديث رقم الجوال';
+
+  @override
+  String get editName2 => 'تعديل الاسم';
+
+  @override
+  String get editEmail => 'تعديل البريد الإلكتروني';
+
+  @override
+  String get editPhone => 'تعديل رقم الجوال';
+
+  @override
+  String get fullName2 => 'الاسم الكامل';
+
+  @override
+  String get newEmail => 'البريد الإلكتروني الجديد';
+
+  @override
+  String get newPhone => 'رقم الجوال الجديد';
+
+  @override
+  String get enterName => 'أدخل الاسم';
+
+  @override
+  String get enterEmail => 'أدخل البريد الإلكتروني';
+
+  @override
+  String get enterPhone => 'أدخل رقم الجوال';
+
+  @override
+  String get nameMin3 => 'يجب ألا يقل الاسم عن 3 أحرف';
+
+  @override
+  String get invalidEmail2 => 'أدخل بريدًا إلكترونيًا صحيحًا';
+
+  @override
+  String get invalidPhone => 'أدخل رقم جوال صحيحًا';
+
+  @override
+  String get saveAction => 'حفظ';
+
+  @override
+  String get passwordChanged => 'تم تغيير كلمة المرور';
+
+  @override
+  String get currentPassword => 'كلمة المرور الحالية';
+
+  @override
+  String get enterCurrentPassword => 'أدخل كلمة المرور الحالية';
+
+  @override
+  String get newPassword => 'كلمة المرور الجديدة';
+
+  @override
+  String get enterNewPassword => 'أدخل كلمة المرور الجديدة';
+
+  @override
+  String get passwordMin6 => 'يجب ألا تقل كلمة المرور عن 6 أحرف';
+
+  @override
+  String get confirmPassword => 'تأكيد كلمة المرور';
+
+  @override
+  String get enterConfirmPassword => 'أكّد كلمة المرور';
+
+  @override
+  String get passwordsDontMatch => 'كلمتا المرور غير متطابقتين';
 }

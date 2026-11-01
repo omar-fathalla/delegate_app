@@ -1633,5 +1633,69 @@
   "locationError": "Something went wrong while getting your location.",
   "trustedTime": "Trusted time",
   "attActionCheckIn": "check in",
-  "attActionCheckOut": "check out"
+  "attActionCheckOut": "check out",
+  "userNotFound": "User not found",
+  "accountNotIdentified": "Couldn't identify the account",
+  "profilePhotoUpdated": "Profile photo updated",
+  "photoUploadFailed": "Couldn't upload the photo: {error}",
+  "@photoUploadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "profilePhotoDeleted": "Profile photo removed",
+  "photoDeleteFailed": "Couldn't remove the photo: {error}",
+  "@photoDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "profilePhoto": "Profile photo",
+  "takePhotoCamera": "Take a photo",
+  "chooseFromGallery": "Choose from gallery",
+  "removeCurrentPhoto": "Remove current photo",
+  "roleSuperAdmin2": "Super admin",
+  "roleTechSupport2": "Technical support",
+  "roleOrgAdmin2": "Organization admin",
+  "roleCompanyAdmin2": "Company admin",
+  "roleHrOfficer": "HR officer",
+  "roleAccountant": "Accounting",
+  "roleMarketing2": "Marketing",
+  "personalInfo": "Personal information",
+  "nameLabel": "Name",
+  "emailLabel": "Email",
+  "phoneNumberLabel": "Phone number",
+  "securitySection": "Security",
+  "changePassword": "Change password",
+  "editField": "Edit {label}",
+  "@editField": {
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "nameUpdated": "Name updated",
+  "emailUpdated": "Email updated",
+  "phoneUpdated": "Phone number updated",
+  "editName2": "Edit name",
+  "editEmail": "Edit email",
+  "editPhone": "Edit phone number",
+  "fullName2": "Full name",
+  "newEmail": "New email",
+  "newPhone": "New phone number",
+  "enterName": "Enter your name",
+  "enterEmail": "Enter your email",
+  "enterPhone": "Enter your phone number",
+  "nameMin3": "Name must be at least 3 characters",
+  "invalidEmail2": "Enter a valid email",
+  "invalidPhone": "Enter a valid phone number",
+  "saveAction": "Save",
+  "passwordChanged": "Password changed",
+  "currentPassword": "Current password",
+  "enterCurrentPassword": "Enter your current password",
+  "newPassword": "New password",
+  "enterNewPassword": "Enter a new password",
+  "passwordMin6": "Password must be at least 6 characters",
+  "confirmPassword": "Confirm password",
+  "enterConfirmPassword": "Confirm your password",
+  "passwordsDontMatch": "Passwords don't match"
 }

@@ -1572,4 +1572,157 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get attActionCheckOut => 'check out';
+
+  @override
+  String get userNotFound => 'User not found';
+
+  @override
+  String get accountNotIdentified => 'Couldn\'t identify the account';
+
+  @override
+  String get profilePhotoUpdated => 'Profile photo updated';
+
+  @override
+  String photoUploadFailed(Object error) {
+    return 'Couldn\'t upload the photo: $error';
+  }
+
+  @override
+  String get profilePhotoDeleted => 'Profile photo removed';
+
+  @override
+  String photoDeleteFailed(Object error) {
+    return 'Couldn\'t remove the photo: $error';
+  }
+
+  @override
+  String get profilePhoto => 'Profile photo';
+
+  @override
+  String get takePhotoCamera => 'Take a photo';
+
+  @override
+  String get chooseFromGallery => 'Choose from gallery';
+
+  @override
+  String get removeCurrentPhoto => 'Remove current photo';
+
+  @override
+  String get roleSuperAdmin2 => 'Super admin';
+
+  @override
+  String get roleTechSupport2 => 'Technical support';
+
+  @override
+  String get roleOrgAdmin2 => 'Organization admin';
+
+  @override
+  String get roleCompanyAdmin2 => 'Company admin';
+
+  @override
+  String get roleHrOfficer => 'HR officer';
+
+  @override
+  String get roleAccountant => 'Accounting';
+
+  @override
+  String get roleMarketing2 => 'Marketing';
+
+  @override
+  String get personalInfo => 'Personal information';
+
+  @override
+  String get nameLabel => 'Name';
+
+  @override
+  String get emailLabel => 'Email';
+
+  @override
+  String get phoneNumberLabel => 'Phone number';
+
+  @override
+  String get securitySection => 'Security';
+
+  @override
+  String get changePassword => 'Change password';
+
+  @override
+  String editField(Object label) {
+    return 'Edit $label';
+  }
+
+  @override
+  String get nameUpdated => 'Name updated';
+
+  @override
+  String get emailUpdated => 'Email updated';
+
+  @override
+  String get phoneUpdated => 'Phone number updated';
+
+  @override
+  String get editName2 => 'Edit name';
+
+  @override
+  String get editEmail => 'Edit email';
+
+  @override
+  String get editPhone => 'Edit phone number';
+
+  @override
+  String get fullName2 => 'Full name';
+
+  @override
+  String get newEmail => 'New email';
+
+  @override
+  String get newPhone => 'New phone number';
+
+  @override
+  String get enterName => 'Enter your name';
+
+  @override
+  String get enterEmail => 'Enter your email';
+
+  @override
+  String get enterPhone => 'Enter your phone number';
+
+  @override
+  String get nameMin3 => 'Name must be at least 3 characters';
+
+  @override
+  String get invalidEmail2 => 'Enter a valid email';
+
+  @override
+  String get invalidPhone => 'Enter a valid phone number';
+
+  @override
+  String get saveAction => 'Save';
+
+  @override
+  String get passwordChanged => 'Password changed';
+
+  @override
+  String get currentPassword => 'Current password';
+
+  @override
+  String get enterCurrentPassword => 'Enter your current password';
+
+  @override
+  String get newPassword => 'New password';
+
+  @override
+  String get enterNewPassword => 'Enter a new password';
+
+  @override
+  String get passwordMin6 => 'Password must be at least 6 characters';
+
+  @override
+  String get confirmPassword => 'Confirm password';
+
+  @override
+  String get enterConfirmPassword => 'Confirm your password';
+
+  @override
+  String get passwordsDontMatch => 'Passwords don\'t match';
 }
