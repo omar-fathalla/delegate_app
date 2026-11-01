@@ -1,0 +1,84 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ==================== HELPER FUNCTIONS ====================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // ==================== FEEDBACK SCREENSHOTS ====================
+    // Screenshots attached to user feedbacks (delegates, supervisors, admins, marketing)
+    match /feedback_screenshots/{fileName} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== PHOTO PERMISSION IMAGES ====================
+    match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== ORGANIZATION FILES ====================
+    match /organizations/{orgId}/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== COMPANY FILES ====================
+    match /companies/{compId}/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /companies/{fileName} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== DELEGATE FILES ====================
+    match /delegates/{delegateId}/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== PENALTIES ATTACHMENTS ====================
+    match /penalties/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== LEAVE ATTACHMENTS ====================
+    match /leave_attachments/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================
+    match /delegate_documents/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /delegate_subscription_receipts/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== PUBLIC FILES ====================
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // ==================== STAGING PATH ====================
+    match /staging/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== GUIDE VIDEOS PATH ====================
+    match /guide-videos/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // ==================== FALLBACK FOR ALL OTHER AUTHENTICATED PATHS ====================
+    match /{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
+
+
