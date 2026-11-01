@@ -149,38 +149,38 @@ class _LoginScreenState extends State<LoginScreen>
               final formRows = _buildFormRows(context, state, l10n, isArabic, loading);
               final bottom = _buildBottom(context, l10n, isArabic, loading);
 
-              final sheetBody = compact
-                  ? SingleChildScrollView(
-                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
+              // Grouped sections on an 8dp rhythm. Leftover height is shared
+              // evenly between the groups (Spacers); the button stays at the
+              // bottom on tall screens and everything scrolls when it can't fit.
+              final sheetBody = CustomScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                slivers: [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: SafeArea(
+                      top: false,
+                      minimum: EdgeInsets.fromLTRB(16, compact ? 24 : 32, 16, 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [...formRows, const SizedBox(height: 24), ...bottom],
+                        children: [
+                          formRows[0], // (1) title + subtitle
+                          const SizedBox(height: 24),
+                          const Spacer(),
+                          formRows[1], // (2) account type
+                          const SizedBox(height: 32),
+                          const Spacer(),
+                          formRows[2], // (3) fields
+                          const SizedBox(height: 8),
+                          formRows[3], // (4) remember me + forgot password
+                          const SizedBox(height: 24),
+                          const Spacer(),
+                          ...bottom, // (5) login + support + version
+                        ],
                       ),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: SingleChildScrollView(
-                            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                            padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: formRows,
-                            ),
-                          ),
-                        ),
-                        SafeArea(
-                          top: false,
-                          minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: bottom,
-                          ),
-                        ),
-                      ],
-                    );
+                    ),
+                  ),
+                ],
+              );
 
               return Column(
                 children: [
@@ -289,16 +289,21 @@ class _LoginScreenState extends State<LoginScreen>
     final text = Theme.of(context).textTheme;
     var i = 0;
     return [
-      _row(i++, Text(l10n.loginButton,
-          style: text.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface))),
-      _row(i++, Text(
-        key: const ValueKey('login_mode_helper'),
-        _isStaff
-            ? (isArabic ? 'اختر نوع حسابك ثم ادخل بكلمة المرور' : 'Pick your account type, then sign in with your password')
-            : (isArabic ? 'اختر نوع حسابك ثم أدخل بياناتك' : 'Pick your account type, then enter your details'),
-        style: text.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+      _row(i++, Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.loginButton,
+              style: text.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+          const SizedBox(height: 4),
+          Text(
+            key: const ValueKey('login_mode_helper'),
+            _isStaff
+                ? (isArabic ? 'اختر نوع حسابك ثم ادخل بكلمة المرور' : 'Pick your account type, then sign in with your password')
+                : (isArabic ? 'اختر نوع حسابك ثم أدخل بياناتك' : 'Pick your account type, then enter your details'),
+            style: text.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+        ],
       )),
-      const SizedBox(height: 20),
       _row(i++, M3ButtonGroup<LoginMode>(
         key: const ValueKey('login_mode_switch'),
         values: const [LoginMode.delegate, LoginMode.staff],
@@ -307,7 +312,6 @@ class _LoginScreenState extends State<LoginScreen>
         selected: _mode,
         onChanged: loading ? null : _setMode,
       )),
-      const SizedBox(height: 24),
       _row(i++, Shake(
         key: _shakeKey,
         child: Form(
@@ -321,16 +325,27 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
       )),
-      _row(i++, CheckboxListTile(
-        key: const ValueKey('login_remember_me'),
-        value: _rememberMe,
-        onChanged: (v) => setState(() => _rememberMe = v ?? false),
-        controlAffinity: ListTileControlAffinity.leading,
-        contentPadding: EdgeInsets.zero,
-        dense: false,
-        visualDensity: VisualDensity.standard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        title: Text(l10n.rememberMe, style: text.bodyLarge?.copyWith(color: colorScheme.onSurface)),
+      _row(i++, Row(
+        children: [
+          Expanded(
+            child: CheckboxListTile(
+              key: const ValueKey('login_remember_me'),
+              value: _rememberMe,
+              onChanged: (v) => setState(() => _rememberMe = v ?? false),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              visualDensity: VisualDensity.standard,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              title: Text(l10n.rememberMe, style: text.bodyLarge?.copyWith(color: colorScheme.onSurface)),
+            ),
+          ),
+          if (_isStaff)
+            TextButton(
+              key: const ValueKey('login_forgot_password'),
+              onPressed: loading ? null : () => _forgotPassword(context, isArabic),
+              child: Text(isArabic ? 'نسيت كلمة المرور؟' : 'Forgot password?'),
+            ),
+        ],
       )),
     ];
   }
@@ -433,17 +448,6 @@ class _LoginScreenState extends State<LoginScreen>
             emptyMessage: isArabic ? 'يرجى إدخال كلمة المرور' : 'Please enter your password',
           ),
         ),
-      if (_isStaff)
-        Align(
-          alignment: AlignmentDirectional.centerEnd,
-          child: TextButton(
-            key: const ValueKey('login_forgot_password'),
-            onPressed: loading ? null : () => _forgotPassword(context, isArabic),
-            child: Text(isArabic ? 'نسيت كلمة المرور؟' : 'Forgot password?'),
-          ),
-        )
-      else
-        const SizedBox(height: 8),
     ];
   }
 
