@@ -534,7 +534,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                                     DelegatePosition.promoter ||
                                 widget.delegate.role ==
                                     UserRole.marketingPromotion
-                            ? (isArabic ? 'مروج ميداني' : 'Field Promoter')
+                            ? (isArabic ? 'مندوب ميداني' : 'Field delegate')
                             : widget.delegate.position ==
                                     DelegatePosition.supervisor
                                 ? (isArabic ? 'مشرف ميداني' : 'Field Supervisor')
