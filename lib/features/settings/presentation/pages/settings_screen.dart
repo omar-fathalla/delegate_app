@@ -133,7 +133,7 @@ class SettingsScreen extends StatelessWidget {
                     // Section: Account
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildSectionHeader(context, l10n.account),
+                      child: _buildSectionHeader(context, l10n.settingsGeneral),
                     ),
                     const SizedBox(height: 12),
 

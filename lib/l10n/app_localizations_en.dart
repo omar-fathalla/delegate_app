@@ -18,7 +18,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get login => 'Login';
 
   @override
-  String get logout => 'Logout';
+  String get logout => 'Log out';
 
   @override
   String get loginToContinue => 'Welcome back, please enter your details';
@@ -119,8 +119,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scanToCheckOut => 'Scan to Check Out';
 
   @override
-  String get scanQrInstruction =>
-      'Scan the QR code located in the marketing office.';
+  String get scanQrInstruction => 'Scan the QR code in the marketing office.';
 
   @override
   String scanForAction(String action) {
@@ -172,7 +171,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get recentHistory => 'Recent History';
 
   @override
-  String get noHistoryAvailable => 'No history available';
+  String get noHistoryAvailable => 'No attendance records';
 
   @override
   String get somethingWentWrong => 'Something went wrong';
@@ -426,7 +425,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get locationServicesDisabled => 'Location services are disabled.';
 
   @override
-  String get locationPermissionDenied => 'Location permission denied.';
+  String get locationPermissionDenied => 'Location access denied';
 
   @override
   String get errorFetchingLocation => 'Error fetching location.';
@@ -482,10 +481,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contactNumber => '01211857725';
 
   @override
-  String get darkMode => 'Dark Mode';
+  String get darkMode => 'Dark mode';
 
   @override
-  String get privacyPolicy => 'Privacy Policy';
+  String get privacyPolicy => 'Privacy policy';
 
   @override
   String get helpCenter => 'Help center';
@@ -692,7 +691,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskPending => 'Pending';
 
   @override
-  String get taskInProgress => 'In Progress';
+  String get taskInProgress => 'In progress';
 
   @override
   String get taskCompleted => 'Completed';
@@ -1004,7 +1003,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchOff => 'Off';
 
   @override
-  String get whatsNewTitle => 'What\'s new?';
+  String get whatsNewTitle => 'What\'s new';
 
   @override
   String releaseVersionDate(Object version, Object date) {
@@ -1042,8 +1041,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reqEmptyFilter => 'No requests with this status';
 
   @override
-  String get reqEmptyHint =>
-      'Tap \"New request\" to send one to your supervisor';
+  String get reqEmptyHint => 'Tap “New request” to send one to your supervisor';
 
   @override
   String get annualLeaveBalance => 'Annual leave balance';
@@ -1067,7 +1065,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get availableLabel => 'Available';
 
   @override
-  String get annualBalance21 => 'Annual balance: 21 days';
+  String get annualBalance21 => 'Annual: 21 days';
 
   @override
   String get onceActivated => 'Once activated';
@@ -1183,9 +1181,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get roleFieldDelegate => 'Field delegate';
-
-  @override
   String get roleFieldSupervisor => 'Field supervisor';
 
   @override
@@ -1251,7 +1246,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statDaysOff => 'Days off';
 
   @override
-  String leavesOfFour(Object count) {
+  String leavesOfFour(int count) {
     return '$count of 4 days';
   }
 
@@ -1269,10 +1264,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chainZahranMarket => 'Zahran Market';
 
   @override
-  String get recentBranchActivity => 'Recent branch activity';
+  String get recentBranchActivity => 'Recent activity';
 
   @override
-  String get viewLog => 'View log';
+  String get viewLog => 'View history';
 
   @override
   String get unknownBranch => 'Unknown branch';
@@ -1318,10 +1313,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get orgMarketing => 'Marketing';
 
   @override
-  String get orgAdminPanel => 'Admin panel';
+  String get orgAdminPanel => 'Administration';
 
   @override
-  String get orgAccounting => 'Accounting';
+  String get orgAccounting => 'Finance & accounting';
 
   @override
   String switchedToOrg(Object orgLabel) {
@@ -1333,9 +1328,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get alreadyInOrg => 'You\'re already in this organization.';
-
-  @override
-  String get logoutAction => 'Log out';
 
   @override
   String get logoutConfirm => 'Log out?\nYour local data will be saved first.';
@@ -1370,11 +1362,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get attCheckingZone => 'Checking location…';
 
   @override
-  String get attVerifyingCoords =>
-      'Verifying your location and distance to the branch';
+  String get attVerifyingCoords => 'Checking your location…';
 
   @override
-  String get attInsideZone => 'Inside work zone';
+  String get attInsideZone => 'You\'re in the work zone';
 
   @override
   String attWithinBranchRange(Object branch) {
@@ -1382,10 +1373,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get attWithinAllowedRange => 'Within allowed range';
-
-  @override
-  String get attOutsideZone => 'Outside work zone';
+  String get attOutsideZone => 'You\'re outside the work zone';
 
   @override
   String attMoveCloserTo(Object branch) {
@@ -1393,7 +1381,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get attOutsideApprovedBranches => 'Outside approved branches';
+  String get attOutsideApprovedBranches => 'You\'re not at an approved branch';
 
   @override
   String distanceKmM(Object km, Object meters) {
@@ -1420,11 +1408,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String radiusLabel(Object allowedRadius) {
-    return 'Radius: $allowedRadius m';
+    return 'Allowed radius: $allowedRadius m';
   }
 
   @override
-  String get recheckLocation => 'Recheck location';
+  String get recheckLocation => 'Check again';
 
   @override
   String get activeChain => 'Current chain';
@@ -1443,9 +1431,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get showAllChains => 'Show all chains';
-
-  @override
   String get attAutoClosedNote =>
       'Checked out automatically 9 hours after the shift started, since no check-out was recorded';
 
@@ -1462,12 +1447,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checkIn2 => 'Check in';
 
   @override
-  String get noBranchesForOrgYet =>
-      'No branches registered for this organization yet.';
-
-  @override
-  String get noBranchesForOrg =>
-      'No branches registered for this organization.';
+  String get noBranchesForOrg => 'No branches for this organization yet';
 
   @override
   String attYouAreWithinBranch(Object branch) {
@@ -1476,9 +1456,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get attMoveCloser => 'Move closer to the branch to check in';
-
-  @override
-  String get attOutsideApproved => 'You are outside approved branches';
 
   @override
   String get attCheckInSavedOffline =>
@@ -1492,7 +1469,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get syncDone => 'Synced';
 
   @override
-  String get syncFailed => 'Sync failed';
+  String get syncFailed => 'Couldn\'t sync';
 
   @override
   String attDelegateOfCompany(Object companyName) {
@@ -1500,7 +1477,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get attendanceLog => 'Attendance log';
+  String get attendanceLog => 'Attendance history';
 
   @override
   String distanceMeters(Object meters) {
@@ -1528,11 +1505,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get attEnsureGps => 'Make sure GPS is on and wait for your location.';
 
   @override
-  String metersValue(Object value) {
-    return '$value m';
-  }
-
-  @override
   String attCannotActOutside(Object action, Object distance) {
     return 'You can\'t $action while outside the branch ($distance). Please be inside the branch.';
   }
@@ -1550,19 +1522,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get locationPermissionDeniedForever =>
-      'Location permission is permanently denied.';
+      'Location access is off. Turn it on in Settings.';
 
   @override
   String get fakeGpsDetected =>
-      'A fake GPS app was detected. Turn it off to check in and out.';
+      'A fake GPS app was detected. Turn it off to check in or out.';
 
   @override
   String get locationTimeout =>
       'Timed out getting your location. Make sure GPS is on and you\'re in an open area.';
 
   @override
-  String get locationError =>
-      'Something went wrong while getting your location.';
+  String get locationError => 'Couldn\'t get your location. Try again.';
 
   @override
   String get trustedTime => 'Trusted time';
@@ -1588,7 +1559,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get profilePhotoDeleted => 'Profile photo removed';
+  String get profilePhotoDeleted => 'Profile photo deleted';
 
   @override
   String photoDeleteFailed(Object error) {
@@ -1605,7 +1576,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chooseFromGallery => 'Choose from gallery';
 
   @override
-  String get removeCurrentPhoto => 'Remove current photo';
+  String get removeCurrentPhoto => 'Delete photo';
 
   @override
   String get roleSuperAdmin2 => 'Super admin';
@@ -1727,7 +1698,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passwordsDontMatch => 'Passwords don\'t match';
 
   @override
-  String get refreshPolicy => 'Refresh policy';
+  String get refreshPolicy => 'Refresh';
 
   @override
   String allPolicyItems(Object count) {
@@ -1775,30 +1746,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tryOtherSearch => 'Try other words or a different category.';
 
   @override
-  String get noViolationDocs => 'No documents are attached to this violation';
+  String get noViolationDocs => 'No attachments';
 
   @override
-  String get violationReceipt => 'Violation receipt / document';
+  String get violationReceipt => 'Violation document';
 
   @override
   String get closeAction => 'Close';
 
   @override
-  String get imageLoadFailed => 'Couldn\'t load the image from the server';
+  String get imageLoadFailed => 'Couldn\'t load image';
 
   @override
   String get openInBrowser => 'Open in browser';
 
   @override
-  String get attachedDocuments => 'Attached documents and receipts';
+  String get attachedDocuments => 'Attachments';
 
   @override
   String receiptNumber(Object number) {
-    return 'Receipt / document #$number';
+    return 'Document $number';
   }
 
   @override
-  String get photoReceipt => 'Photo / receipt';
+  String get photoReceipt => 'Document photo';
 
   @override
   String get tapToPreview => 'Tap to preview';
@@ -1821,7 +1792,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteAll => 'Delete all';
 
   @override
-  String get sendNewNotification => 'Send new notification';
+  String get sendNewNotification => 'Send notification';
 
   @override
   String get deleteNotification => 'Delete notification';
@@ -1831,7 +1802,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete this notification from your list?\n(It stays in the system log.)';
 
   @override
-  String get notificationDeleted => 'Notification deleted from your list';
+  String get notificationDeleted => 'Notification deleted';
 
   @override
   String get systemAdministration => 'System administration';
@@ -1848,7 +1819,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get viewTask => 'View task';
 
   @override
-  String get updateAppNow => 'Update the app now';
+  String get updateAppNow => 'Update now';
 
   @override
   String get justNow => 'Just now';
@@ -2037,7 +2008,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get photoRemovedFromSession => 'Photo removed from this session.';
+  String get photoRemovedFromSession => 'Photo deleted';
 
   @override
   String get offerPhotosSupervisor => 'Offer photos (supervisor)';
@@ -2077,7 +2048,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String offerPhotoPermissionOf(Object companyName) {
-    return 'Offer photo permission: $companyName';
+    return 'Photo permission: $companyName';
   }
 
   @override
@@ -2101,11 +2072,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chooseBranchOf(Object organizationName) {
-    return 'Choose branch ($organizationName) *';
+    return 'Select branch ($organizationName) *';
   }
 
   @override
-  String get chooseBranchRequired => 'Choose branch *';
+  String get chooseBranchRequired => 'Select branch *';
 
   @override
   String get takeOfferPhotos => 'Take offer photos';
@@ -2130,9 +2101,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get retakePhoto => 'Retake this photo';
-
-  @override
-  String get deleteThisPhoto => 'Delete this photo';
 
   @override
   String get addAction => 'Add';
@@ -2276,7 +2244,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get screenshotOptional => 'Screenshot (optional)';
 
   @override
-  String get chooseImage => 'Choose image';
+  String get chooseImage => 'Choose photo';
 
   @override
   String get sendAction => 'Send';
@@ -2298,7 +2266,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newFeature => 'New feature';
 
   @override
-  String get bugFix => 'Fix';
+  String get bugFix => 'Bug fixes';
 
   @override
   String get importantBadge => 'Important';
@@ -2335,7 +2303,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get enterPassword2 => 'Enter your password';
 
   @override
-  String get signingIn => 'Signing in';
+  String get signingIn => 'Signing in…';
 
   @override
   String get contactSupport => 'Contact support';
@@ -2383,7 +2351,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get requestAttachment => 'Request attachment';
+  String get requestAttachment => 'Attachment';
 
   @override
   String get attachmentLoadFailed => 'Couldn\'t load the attachment image';
@@ -2465,4 +2433,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String durationLabel(Object duration) {
     return 'Duration: $duration';
   }
+
+  @override
+  String get settingsGeneral => 'General';
+
+  @override
+  String get senderRoleSystem => 'System';
+
+  @override
+  String get senderRoleCompanySupervisor => 'Company supervisor';
+
+  @override
+  String get senderRoleOrgAdmin => 'Organization admin';
+
+  @override
+  String get senderRoleBranchesMarketing => 'Branch marketing';
+
+  @override
+  String get senderRolePromotionMarketing => 'Promotion marketing';
+
+  @override
+  String get senderRoleMarketing => 'Marketing';
+
+  @override
+  String get senderRoleTechSupport => 'Tech support';
+
+  @override
+  String codeLabel(Object code) {
+    return 'Code: $code';
+  }
+
+  @override
+  String get policyOfficialSubtitle => 'Official list of violations and fines';
+
+  @override
+  String get catBranchRules => 'Branch rule violation';
+
+  @override
+  String get catTheftDamage => 'Theft / damage';
+
+  @override
+  String get chainCarrefour => 'Carrefour';
+
+  @override
+  String get chainBeitElGomla => 'Beit El Gomla';
 }

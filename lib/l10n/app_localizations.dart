@@ -119,7 +119,7 @@ abstract class AppLocalizations {
   /// Logout label
   ///
   /// In en, this message translates to:
-  /// **'Logout'**
+  /// **'Log out'**
   String get logout;
 
   /// Login subtitle
@@ -311,7 +311,7 @@ abstract class AppLocalizations {
   /// Instruction to scan QR on empty history screen
   ///
   /// In en, this message translates to:
-  /// **'Scan the QR code located in the marketing office.'**
+  /// **'Scan the QR code in the marketing office.'**
   String get scanQrInstruction;
 
   /// QR scanner title
@@ -389,7 +389,7 @@ abstract class AppLocalizations {
   /// Empty history message
   ///
   /// In en, this message translates to:
-  /// **'No history available'**
+  /// **'No attendance records'**
   String get noHistoryAvailable;
 
   /// Generic error message
@@ -869,7 +869,7 @@ abstract class AppLocalizations {
   /// Error when location permission is denied.
   ///
   /// In en, this message translates to:
-  /// **'Location permission denied.'**
+  /// **'Location access denied'**
   String get locationPermissionDenied;
 
   /// Generic error when fetching location fails.
@@ -977,13 +977,13 @@ abstract class AppLocalizations {
   /// Dark mode setting label
   ///
   /// In en, this message translates to:
-  /// **'Dark Mode'**
+  /// **'Dark mode'**
   String get darkMode;
 
   /// Privacy policy setting label
   ///
   /// In en, this message translates to:
-  /// **'Privacy Policy'**
+  /// **'Privacy policy'**
   String get privacyPolicy;
 
   /// Help center setting label
@@ -1379,7 +1379,7 @@ abstract class AppLocalizations {
   /// In Progress task status label
   ///
   /// In en, this message translates to:
-  /// **'In Progress'**
+  /// **'In progress'**
   String get taskInProgress;
 
   /// Completed task status label
@@ -1973,7 +1973,7 @@ abstract class AppLocalizations {
   /// No description provided for @whatsNewTitle.
   ///
   /// In en, this message translates to:
-  /// **'What\'s new?'**
+  /// **'What\'s new'**
   String get whatsNewTitle;
 
   /// No description provided for @releaseVersionDate.
@@ -2045,7 +2045,7 @@ abstract class AppLocalizations {
   /// No description provided for @reqEmptyHint.
   ///
   /// In en, this message translates to:
-  /// **'Tap \"New request\" to send one to your supervisor'**
+  /// **'Tap “New request” to send one to your supervisor'**
   String get reqEmptyHint;
 
   /// No description provided for @annualLeaveBalance.
@@ -2093,7 +2093,7 @@ abstract class AppLocalizations {
   /// No description provided for @annualBalance21.
   ///
   /// In en, this message translates to:
-  /// **'Annual balance: 21 days'**
+  /// **'Annual: 21 days'**
   String get annualBalance21;
 
   /// No description provided for @onceActivated.
@@ -2288,12 +2288,6 @@ abstract class AppLocalizations {
   /// **'Hi, {firstName}'**
   String homeGreeting(Object firstName);
 
-  /// No description provided for @roleFieldDelegate.
-  ///
-  /// In en, this message translates to:
-  /// **'Field delegate'**
-  String get roleFieldDelegate;
-
   /// No description provided for @roleFieldSupervisor.
   ///
   /// In en, this message translates to:
@@ -2400,7 +2394,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{count} of 4 days'**
-  String leavesOfFour(Object count);
+  String leavesOfFour(int count);
 
   /// No description provided for @workPolicyNote.
   ///
@@ -2429,13 +2423,13 @@ abstract class AppLocalizations {
   /// No description provided for @recentBranchActivity.
   ///
   /// In en, this message translates to:
-  /// **'Recent branch activity'**
+  /// **'Recent activity'**
   String get recentBranchActivity;
 
   /// No description provided for @viewLog.
   ///
   /// In en, this message translates to:
-  /// **'View log'**
+  /// **'View history'**
   String get viewLog;
 
   /// No description provided for @unknownBranch.
@@ -2501,13 +2495,13 @@ abstract class AppLocalizations {
   /// No description provided for @orgAdminPanel.
   ///
   /// In en, this message translates to:
-  /// **'Admin panel'**
+  /// **'Administration'**
   String get orgAdminPanel;
 
   /// No description provided for @orgAccounting.
   ///
   /// In en, this message translates to:
-  /// **'Accounting'**
+  /// **'Finance & accounting'**
   String get orgAccounting;
 
   /// No description provided for @switchedToOrg.
@@ -2527,12 +2521,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You\'re already in this organization.'**
   String get alreadyInOrg;
-
-  /// No description provided for @logoutAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Log out'**
-  String get logoutAction;
 
   /// No description provided for @logoutConfirm.
   ///
@@ -2597,13 +2585,13 @@ abstract class AppLocalizations {
   /// No description provided for @attVerifyingCoords.
   ///
   /// In en, this message translates to:
-  /// **'Verifying your location and distance to the branch'**
+  /// **'Checking your location…'**
   String get attVerifyingCoords;
 
   /// No description provided for @attInsideZone.
   ///
   /// In en, this message translates to:
-  /// **'Inside work zone'**
+  /// **'You\'re in the work zone'**
   String get attInsideZone;
 
   /// No description provided for @attWithinBranchRange.
@@ -2612,16 +2600,10 @@ abstract class AppLocalizations {
   /// **'Within range of {branch}'**
   String attWithinBranchRange(Object branch);
 
-  /// No description provided for @attWithinAllowedRange.
-  ///
-  /// In en, this message translates to:
-  /// **'Within allowed range'**
-  String get attWithinAllowedRange;
-
   /// No description provided for @attOutsideZone.
   ///
   /// In en, this message translates to:
-  /// **'Outside work zone'**
+  /// **'You\'re outside the work zone'**
   String get attOutsideZone;
 
   /// No description provided for @attMoveCloserTo.
@@ -2633,7 +2615,7 @@ abstract class AppLocalizations {
   /// No description provided for @attOutsideApprovedBranches.
   ///
   /// In en, this message translates to:
-  /// **'Outside approved branches'**
+  /// **'You\'re not at an approved branch'**
   String get attOutsideApprovedBranches;
 
   /// No description provided for @distanceKmM.
@@ -2675,13 +2657,13 @@ abstract class AppLocalizations {
   /// No description provided for @radiusLabel.
   ///
   /// In en, this message translates to:
-  /// **'Radius: {allowedRadius} m'**
+  /// **'Allowed radius: {allowedRadius} m'**
   String radiusLabel(Object allowedRadius);
 
   /// No description provided for @recheckLocation.
   ///
   /// In en, this message translates to:
-  /// **'Recheck location'**
+  /// **'Check again'**
   String get recheckLocation;
 
   /// No description provided for @activeChain.
@@ -2707,12 +2689,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You have {count} attended days in other chains.'**
   String attDaysInOtherChains(Object count);
-
-  /// No description provided for @showAllChains.
-  ///
-  /// In en, this message translates to:
-  /// **'Show all chains'**
-  String get showAllChains;
 
   /// No description provided for @attAutoClosedNote.
   ///
@@ -2744,16 +2720,10 @@ abstract class AppLocalizations {
   /// **'Check in'**
   String get checkIn2;
 
-  /// No description provided for @noBranchesForOrgYet.
-  ///
-  /// In en, this message translates to:
-  /// **'No branches registered for this organization yet.'**
-  String get noBranchesForOrgYet;
-
   /// No description provided for @noBranchesForOrg.
   ///
   /// In en, this message translates to:
-  /// **'No branches registered for this organization.'**
+  /// **'No branches for this organization yet'**
   String get noBranchesForOrg;
 
   /// No description provided for @attYouAreWithinBranch.
@@ -2767,12 +2737,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Move closer to the branch to check in'**
   String get attMoveCloser;
-
-  /// No description provided for @attOutsideApproved.
-  ///
-  /// In en, this message translates to:
-  /// **'You are outside approved branches'**
-  String get attOutsideApproved;
 
   /// No description provided for @attCheckInSavedOffline.
   ///
@@ -2795,7 +2759,7 @@ abstract class AppLocalizations {
   /// No description provided for @syncFailed.
   ///
   /// In en, this message translates to:
-  /// **'Sync failed'**
+  /// **'Couldn\'t sync'**
   String get syncFailed;
 
   /// No description provided for @attDelegateOfCompany.
@@ -2807,7 +2771,7 @@ abstract class AppLocalizations {
   /// No description provided for @attendanceLog.
   ///
   /// In en, this message translates to:
-  /// **'Attendance log'**
+  /// **'Attendance history'**
   String get attendanceLog;
 
   /// No description provided for @distanceMeters.
@@ -2846,12 +2810,6 @@ abstract class AppLocalizations {
   /// **'Make sure GPS is on and wait for your location.'**
   String get attEnsureGps;
 
-  /// No description provided for @metersValue.
-  ///
-  /// In en, this message translates to:
-  /// **'{value} m'**
-  String metersValue(Object value);
-
   /// No description provided for @attCannotActOutside.
   ///
   /// In en, this message translates to:
@@ -2879,13 +2837,13 @@ abstract class AppLocalizations {
   /// No description provided for @locationPermissionDeniedForever.
   ///
   /// In en, this message translates to:
-  /// **'Location permission is permanently denied.'**
+  /// **'Location access is off. Turn it on in Settings.'**
   String get locationPermissionDeniedForever;
 
   /// No description provided for @fakeGpsDetected.
   ///
   /// In en, this message translates to:
-  /// **'A fake GPS app was detected. Turn it off to check in and out.'**
+  /// **'A fake GPS app was detected. Turn it off to check in or out.'**
   String get fakeGpsDetected;
 
   /// No description provided for @locationTimeout.
@@ -2897,7 +2855,7 @@ abstract class AppLocalizations {
   /// No description provided for @locationError.
   ///
   /// In en, this message translates to:
-  /// **'Something went wrong while getting your location.'**
+  /// **'Couldn\'t get your location. Try again.'**
   String get locationError;
 
   /// No description provided for @trustedTime.
@@ -2945,7 +2903,7 @@ abstract class AppLocalizations {
   /// No description provided for @profilePhotoDeleted.
   ///
   /// In en, this message translates to:
-  /// **'Profile photo removed'**
+  /// **'Profile photo deleted'**
   String get profilePhotoDeleted;
 
   /// No description provided for @photoDeleteFailed.
@@ -2975,7 +2933,7 @@ abstract class AppLocalizations {
   /// No description provided for @removeCurrentPhoto.
   ///
   /// In en, this message translates to:
-  /// **'Remove current photo'**
+  /// **'Delete photo'**
   String get removeCurrentPhoto;
 
   /// No description provided for @roleSuperAdmin2.
@@ -3215,7 +3173,7 @@ abstract class AppLocalizations {
   /// No description provided for @refreshPolicy.
   ///
   /// In en, this message translates to:
-  /// **'Refresh policy'**
+  /// **'Refresh'**
   String get refreshPolicy;
 
   /// No description provided for @allPolicyItems.
@@ -3293,13 +3251,13 @@ abstract class AppLocalizations {
   /// No description provided for @noViolationDocs.
   ///
   /// In en, this message translates to:
-  /// **'No documents are attached to this violation'**
+  /// **'No attachments'**
   String get noViolationDocs;
 
   /// No description provided for @violationReceipt.
   ///
   /// In en, this message translates to:
-  /// **'Violation receipt / document'**
+  /// **'Violation document'**
   String get violationReceipt;
 
   /// No description provided for @closeAction.
@@ -3311,7 +3269,7 @@ abstract class AppLocalizations {
   /// No description provided for @imageLoadFailed.
   ///
   /// In en, this message translates to:
-  /// **'Couldn\'t load the image from the server'**
+  /// **'Couldn\'t load image'**
   String get imageLoadFailed;
 
   /// No description provided for @openInBrowser.
@@ -3323,19 +3281,19 @@ abstract class AppLocalizations {
   /// No description provided for @attachedDocuments.
   ///
   /// In en, this message translates to:
-  /// **'Attached documents and receipts'**
+  /// **'Attachments'**
   String get attachedDocuments;
 
   /// No description provided for @receiptNumber.
   ///
   /// In en, this message translates to:
-  /// **'Receipt / document #{number}'**
+  /// **'Document {number}'**
   String receiptNumber(Object number);
 
   /// No description provided for @photoReceipt.
   ///
   /// In en, this message translates to:
-  /// **'Photo / receipt'**
+  /// **'Document photo'**
   String get photoReceipt;
 
   /// No description provided for @tapToPreview.
@@ -3377,7 +3335,7 @@ abstract class AppLocalizations {
   /// No description provided for @sendNewNotification.
   ///
   /// In en, this message translates to:
-  /// **'Send new notification'**
+  /// **'Send notification'**
   String get sendNewNotification;
 
   /// No description provided for @deleteNotification.
@@ -3395,7 +3353,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationDeleted.
   ///
   /// In en, this message translates to:
-  /// **'Notification deleted from your list'**
+  /// **'Notification deleted'**
   String get notificationDeleted;
 
   /// No description provided for @systemAdministration.
@@ -3425,7 +3383,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateAppNow.
   ///
   /// In en, this message translates to:
-  /// **'Update the app now'**
+  /// **'Update now'**
   String get updateAppNow;
 
   /// No description provided for @justNow.
@@ -3707,7 +3665,7 @@ abstract class AppLocalizations {
   /// No description provided for @photoRemovedFromSession.
   ///
   /// In en, this message translates to:
-  /// **'Photo removed from this session.'**
+  /// **'Photo deleted'**
   String get photoRemovedFromSession;
 
   /// No description provided for @offerPhotosSupervisor.
@@ -3767,7 +3725,7 @@ abstract class AppLocalizations {
   /// No description provided for @offerPhotoPermissionOf.
   ///
   /// In en, this message translates to:
-  /// **'Offer photo permission: {companyName}'**
+  /// **'Photo permission: {companyName}'**
   String offerPhotoPermissionOf(Object companyName);
 
   /// No description provided for @companyLabel2.
@@ -3797,13 +3755,13 @@ abstract class AppLocalizations {
   /// No description provided for @chooseBranchOf.
   ///
   /// In en, this message translates to:
-  /// **'Choose branch ({organizationName}) *'**
+  /// **'Select branch ({organizationName}) *'**
   String chooseBranchOf(Object organizationName);
 
   /// No description provided for @chooseBranchRequired.
   ///
   /// In en, this message translates to:
-  /// **'Choose branch *'**
+  /// **'Select branch *'**
   String get chooseBranchRequired;
 
   /// No description provided for @takeOfferPhotos.
@@ -3847,12 +3805,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retake this photo'**
   String get retakePhoto;
-
-  /// No description provided for @deleteThisPhoto.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete this photo'**
-  String get deleteThisPhoto;
 
   /// No description provided for @addAction.
   ///
@@ -4097,7 +4049,7 @@ abstract class AppLocalizations {
   /// No description provided for @chooseImage.
   ///
   /// In en, this message translates to:
-  /// **'Choose image'**
+  /// **'Choose photo'**
   String get chooseImage;
 
   /// No description provided for @sendAction.
@@ -4139,7 +4091,7 @@ abstract class AppLocalizations {
   /// No description provided for @bugFix.
   ///
   /// In en, this message translates to:
-  /// **'Fix'**
+  /// **'Bug fixes'**
   String get bugFix;
 
   /// No description provided for @importantBadge.
@@ -4211,7 +4163,7 @@ abstract class AppLocalizations {
   /// No description provided for @signingIn.
   ///
   /// In en, this message translates to:
-  /// **'Signing in'**
+  /// **'Signing in…'**
   String get signingIn;
 
   /// No description provided for @contactSupport.
@@ -4289,7 +4241,7 @@ abstract class AppLocalizations {
   /// No description provided for @requestAttachment.
   ///
   /// In en, this message translates to:
-  /// **'Request attachment'**
+  /// **'Attachment'**
   String get requestAttachment;
 
   /// No description provided for @attachmentLoadFailed.
@@ -4435,6 +4387,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Duration: {duration}'**
   String durationLabel(Object duration);
+
+  /// No description provided for @settingsGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get settingsGeneral;
+
+  /// No description provided for @senderRoleSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get senderRoleSystem;
+
+  /// No description provided for @senderRoleCompanySupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Company supervisor'**
+  String get senderRoleCompanySupervisor;
+
+  /// No description provided for @senderRoleOrgAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Organization admin'**
+  String get senderRoleOrgAdmin;
+
+  /// No description provided for @senderRoleBranchesMarketing.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch marketing'**
+  String get senderRoleBranchesMarketing;
+
+  /// No description provided for @senderRolePromotionMarketing.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotion marketing'**
+  String get senderRolePromotionMarketing;
+
+  /// No description provided for @senderRoleMarketing.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketing'**
+  String get senderRoleMarketing;
+
+  /// No description provided for @senderRoleTechSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Tech support'**
+  String get senderRoleTechSupport;
+
+  /// No description provided for @codeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code: {code}'**
+  String codeLabel(Object code);
+
+  /// No description provided for @policyOfficialSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Official list of violations and fines'**
+  String get policyOfficialSubtitle;
+
+  /// No description provided for @catBranchRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch rule violation'**
+  String get catBranchRules;
+
+  /// No description provided for @catTheftDamage.
+  ///
+  /// In en, this message translates to:
+  /// **'Theft / damage'**
+  String get catTheftDamage;
+
+  /// No description provided for @chainCarrefour.
+  ///
+  /// In en, this message translates to:
+  /// **'Carrefour'**
+  String get chainCarrefour;
+
+  /// No description provided for @chainBeitElGomla.
+  ///
+  /// In en, this message translates to:
+  /// **'Beit El Gomla'**
+  String get chainBeitElGomla;
 }
 
 class _AppLocalizationsDelegate

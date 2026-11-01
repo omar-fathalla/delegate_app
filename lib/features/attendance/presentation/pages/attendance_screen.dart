@@ -844,7 +844,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       statusTitle = AppLocalizations.of(context)!.attInsideZone;
       statusSubtitle = activeBranch != null
           ? AppLocalizations.of(context)!.attWithinBranchRange(BranchDisplayCache.instance.displayName(activeBranch.branchName))
-          : AppLocalizations.of(context)!.attWithinAllowedRange;
+          : AppLocalizations.of(context)!.attInsideZone;
     } else {
       statusColor = colorScheme.error;
       headerIcon = Symbols.wrong_location_rounded;
@@ -1629,7 +1629,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             });
                           },
                           icon: const Icon(Symbols.hub_rounded, size: 18),
-                          label: Text(AppLocalizations.of(context)!.showAllChains,
+                          label: Text(AppLocalizations.of(context)!.allChains,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -2108,7 +2108,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           _orgBranches = branchesList;
           _isLoadingBranches = false;
           if (branchesList.isEmpty) {
-            _locationStatusMessage = AppLocalizations.of(context)!.noBranchesForOrgYet;
+            _locationStatusMessage = AppLocalizations.of(context)!.noBranchesForOrg;
             _isInsideGeofence = false;
           }
         });
@@ -2201,7 +2201,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       } else if (closest != null && minDistance.isFinite) {
         _locationStatusMessage = AppLocalizations.of(context)!.attMoveCloser;
       } else {
-        _locationStatusMessage = AppLocalizations.of(context)!.attOutsideApproved;
+        _locationStatusMessage = AppLocalizations.of(context)!.attOutsideApprovedBranches;
       }
     });
 
@@ -2243,7 +2243,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final branchToUse = _matchedBranch ?? _nearestBranch;
     if (!_isInsideGeofence || branchToUse == null) {
       final distStr = _distanceToNearest != null
-          ? l10n.metersValue(_distanceToNearest!.toInt())
+          ? l10n.distanceMeters(_distanceToNearest!.toInt())
           : '';
       AppSnackBar.showError(
         parentContext,

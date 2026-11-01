@@ -697,7 +697,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                               backgroundColor: Colors.red.withValues(alpha: 0.8),
                                               foregroundColor: Colors.white,
                                             ),
-                                            tooltip: AppLocalizations.of(context)!.deleteThisPhoto,
+                                            tooltip: AppLocalizations.of(context)!.deletePhoto,
                                           ),
                                         ],
                                       ),

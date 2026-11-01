@@ -171,7 +171,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get recentHistory => 'السجل الأخير';
 
   @override
-  String get noHistoryAvailable => 'لا يوجد سجل حضور';
+  String get noHistoryAvailable => 'لا توجد سجلات حضور';
 
   @override
   String get somethingWentWrong => 'حدث خطأ';
@@ -425,7 +425,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get locationServicesDisabled => 'خدمات الموقع معطلة.';
 
   @override
-  String get locationPermissionDenied => 'تم رفض صلاحية الموقع.';
+  String get locationPermissionDenied => 'لم يُسمح بالوصول إلى الموقع';
 
   @override
   String get errorFetchingLocation => 'حدث خطأ أثناء جلب الموقع.';
@@ -1063,7 +1063,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get availableLabel => 'متاح';
 
   @override
-  String get annualBalance21 => 'الرصيد السنوي: 21 يومًا';
+  String get annualBalance21 => 'السنوي: 21 يومًا';
 
   @override
   String get onceActivated => 'بعد التفعيل';
@@ -1179,9 +1179,6 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get roleFieldDelegate => 'مندوب ميداني';
-
-  @override
   String get roleFieldSupervisor => 'مشرف ميداني';
 
   @override
@@ -1251,7 +1248,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get statDaysOff => 'إجازة';
 
   @override
-  String leavesOfFour(Object count) {
+  String leavesOfFour(int count) {
     return '$count من 4 أيام';
   }
 
@@ -1269,7 +1266,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chainZahranMarket => 'زهران ماركت';
 
   @override
-  String get recentBranchActivity => 'آخر الفروع والنشاط الميداني';
+  String get recentBranchActivity => 'آخر النشاط';
 
   @override
   String get viewLog => 'عرض السجل';
@@ -1278,7 +1275,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get unknownBranch => 'فرع غير محدد';
 
   @override
-  String get onShift => 'قيد العمل';
+  String get onShift => 'على رأس العمل';
 
   @override
   String durationHm(Object hours, Object minutes) {
@@ -1317,7 +1314,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get orgMarketing => 'إدارة التسويق';
 
   @override
-  String get orgAdminPanel => 'لوحة الإدارة';
+  String get orgAdminPanel => 'الإدارة';
 
   @override
   String get orgAccounting => 'الحسابات والمالية';
@@ -1328,13 +1325,10 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get unknownOrganization => 'منظمة غير محددة';
+  String get unknownOrganization => 'مؤسسة غير محددة';
 
   @override
   String get alreadyInOrg => 'أنت تعمل ضمن هذه المنظمة بالفعل.';
-
-  @override
-  String get logoutAction => 'تسجيل الخروج';
 
   @override
   String get logoutConfirm =>
@@ -1370,8 +1364,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get attCheckingZone => 'جارٍ فحص النطاق...';
 
   @override
-  String get attVerifyingCoords =>
-      'يتم الآن التحقق من إحداثياتك والمسافة للفرع';
+  String get attVerifyingCoords => 'جارٍ التحقق من موقعك…';
 
   @override
   String get attInsideZone => 'أنت داخل نطاق العمل';
@@ -1382,10 +1375,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get attWithinAllowedRange => 'داخل النطاق المسموح';
-
-  @override
-  String get attOutsideZone => 'خارج نطاق العمل';
+  String get attOutsideZone => 'أنت خارج نطاق العمل';
 
   @override
   String attMoveCloserTo(Object branch) {
@@ -1393,7 +1383,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get attOutsideApprovedBranches => 'خارج نطاق الفروع المعتمدة';
+  String get attOutsideApprovedBranches => 'أنت خارج نطاق الفروع المعتمدة';
 
   @override
   String distanceKmM(Object km, Object meters) {
@@ -1419,11 +1409,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String radiusLabel(Object allowedRadius) {
-    return 'النطاق: $allowedRadius م';
+    return 'النطاق المسموح: $allowedRadius م';
   }
 
   @override
-  String get recheckLocation => 'إعادة فحص الموقع';
+  String get recheckLocation => 'تحقق مجددًا';
 
   @override
   String get activeChain => 'السلسلة الحالية';
@@ -1442,14 +1432,11 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get showAllChains => 'عرض جميع السلاسل';
-
-  @override
   String get attAutoClosedNote =>
       'أُغلق الانصراف تلقائيًا بعد 9 ساعات من بداية الوردية لعدم تسجيله يدويًا';
 
   @override
-  String get autoClosed9h => 'إغلاق تلقائي (9 س)';
+  String get autoClosed9h => 'أُغلق تلقائيًا (9 س)';
 
   @override
   String get checkOut2 => 'تسجيل الانصراف';
@@ -1461,10 +1448,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get checkIn2 => 'تسجيل الحضور';
 
   @override
-  String get noBranchesForOrgYet => 'لا توجد فروع مسجلة لهذه المؤسسة حاليًا.';
-
-  @override
-  String get noBranchesForOrg => 'لا توجد فروع مسجلة لهذه المؤسسة.';
+  String get noBranchesForOrg => 'لا توجد فروع لهذه المؤسسة بعد';
 
   @override
   String attYouAreWithinBranch(Object branch) {
@@ -1473,9 +1457,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get attMoveCloser => 'اقترب من الفرع لتسجيل الحضور';
-
-  @override
-  String get attOutsideApproved => 'أنت خارج نطاق الفروع المعتمدة';
 
   @override
   String get attCheckInSavedOffline =>
@@ -1489,7 +1470,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get syncDone => 'تمت المزامنة';
 
   @override
-  String get syncFailed => 'فشلت المزامنة';
+  String get syncFailed => 'تعذّرت المزامنة';
 
   @override
   String attDelegateOfCompany(Object companyName) {
@@ -1524,11 +1505,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get attEnsureGps => 'تأكد من تشغيل GPS وانتظر حتى يُحدَّد موقعك.';
 
   @override
-  String metersValue(Object value) {
-    return '$value متر';
-  }
-
-  @override
   String attCannotActOutside(Object action, Object distance) {
     return 'لا يمكنك $action وأنت خارج نطاق الفرع ($distance). كن داخل الفرع.';
   }
@@ -1545,18 +1521,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get locationPermissionDenied2 => 'تم رفض إذن الوصول للموقع';
 
   @override
-  String get locationPermissionDeniedForever => 'إذن الموقع مرفوض بشكل دائم.';
+  String get locationPermissionDeniedForever =>
+      'الوصول إلى الموقع متوقف. فعّله من الإعدادات.';
 
   @override
   String get fakeGpsDetected =>
-      'تم اكتشاف استخدام برنامج لتزييف الموقع الجغرافي (Fake GPS). يرجى إيقاف التطبيق لتسجيل الحضور والانصراف.';
+      'تم اكتشاف تطبيق لتزييف الموقع. أوقفه لتتمكن من تسجيل الحضور والانصراف.';
 
   @override
   String get locationTimeout =>
       'انتهى الوقت ولم نتمكن من تحديد موقعك. تأكد من تفعيل GPS وأنك في مكان مفتوح.';
 
   @override
-  String get locationError => 'حدث خطأ أثناء تحديد الموقع.';
+  String get locationError => 'تعذّر تحديد موقعك. حاول مرة أخرى.';
 
   @override
   String get trustedTime => 'وقت موثوق';
@@ -1599,7 +1576,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chooseFromGallery => 'اختر من معرض الصور';
 
   @override
-  String get removeCurrentPhoto => 'حذف الصورة الحالية';
+  String get removeCurrentPhoto => 'حذف الصورة';
 
   @override
   String get roleSuperAdmin2 => 'المشرف العام';
@@ -1721,7 +1698,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get passwordsDontMatch => 'كلمتا المرور غير متطابقتين';
 
   @override
-  String get refreshPolicy => 'تحديث اللائحة';
+  String get refreshPolicy => 'تحديث';
 
   @override
   String allPolicyItems(Object count) {
@@ -1741,7 +1718,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get adminRestricted => 'مقيدة إداريًا';
+  String get adminRestricted => 'للإدارة فقط';
 
   @override
   String get firstTime => 'أول مرة';
@@ -1759,7 +1736,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String plannedAction(Object action) {
-    return 'الإجراء المقرر: $action';
+    return 'الإجراء: $action';
   }
 
   @override
@@ -1769,30 +1746,30 @@ class AppLocalizationsAr extends AppLocalizations {
   String get tryOtherSearch => 'جرّب كلمات أخرى أو تصنيفًا مختلفًا.';
 
   @override
-  String get noViolationDocs => 'لا توجد مستندات مرفقة لهذه المخالفة';
+  String get noViolationDocs => 'لا توجد مرفقات';
 
   @override
-  String get violationReceipt => 'إيصال / مستند المخالفة';
+  String get violationReceipt => 'مستند المخالفة';
 
   @override
   String get closeAction => 'إغلاق';
 
   @override
-  String get imageLoadFailed => 'تعذّر عرض الصورة من الخادم';
+  String get imageLoadFailed => 'تعذّر تحميل الصورة';
 
   @override
   String get openInBrowser => 'فتح في المتصفح';
 
   @override
-  String get attachedDocuments => 'المستندات والإيصالات المرفقة';
+  String get attachedDocuments => 'المرفقات';
 
   @override
   String receiptNumber(Object number) {
-    return 'إيصال / مستند #$number';
+    return 'مستند $number';
   }
 
   @override
-  String get photoReceipt => 'صورة / إيصال';
+  String get photoReceipt => 'صورة المستند';
 
   @override
   String get tapToPreview => 'اضغط للمعاينة';
@@ -1814,7 +1791,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get deleteAll => 'حذف الكل';
 
   @override
-  String get sendNewNotification => 'إرسال إشعار جديد';
+  String get sendNewNotification => 'إرسال إشعار';
 
   @override
   String get deleteNotification => 'حذف الإشعار';
@@ -1824,7 +1801,7 @@ class AppLocalizationsAr extends AppLocalizations {
       'حذف هذا الإشعار من قائمتك؟\n(يبقى مسجّلًا في سجل النظام).';
 
   @override
-  String get notificationDeleted => 'تم حذف الإشعار من قائمتك';
+  String get notificationDeleted => 'تم حذف الإشعار';
 
   @override
   String get systemAdministration => 'إدارة النظام';
@@ -1835,13 +1812,13 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get markAsRead => 'تعليم كمقروء';
+  String get markAsRead => 'تحديد كمقروء';
 
   @override
   String get viewTask => 'عرض المهمة';
 
   @override
-  String get updateAppNow => 'تحديث التطبيق الآن';
+  String get updateAppNow => 'حدّث الآن';
 
   @override
   String get justNow => 'الآن';
@@ -1909,7 +1886,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get confirmDeletePhoto => 'تأكيد حذف الصورة';
+  String get confirmDeletePhoto => 'حذف الصورة؟';
 
   @override
   String deletePhotoFromConfirm(Object delegateName, Object branch) {
@@ -2040,7 +2017,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get photoRemovedFromSession => 'تم حذف الصورة من الجلسة.';
+  String get photoRemovedFromSession => 'تم حذف الصورة';
 
   @override
   String get offerPhotosSupervisor => 'تصوير العروض (مشرف)';
@@ -2080,7 +2057,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String offerPhotoPermissionOf(Object companyName) {
-    return 'إذن تصوير العروض: $companyName';
+    return 'إذن التصوير: $companyName';
   }
 
   @override
@@ -2121,7 +2098,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get takeFirstPhoto => 'التقط أول صورة';
 
   @override
-  String get visitGallery => 'معرض صور الزيارة';
+  String get visitGallery => 'صور الزيارة';
 
   @override
   String get addPhoto => 'إضافة صورة';
@@ -2133,9 +2110,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get retakePhoto => 'أعد التقاط هذه الصورة';
-
-  @override
-  String get deleteThisPhoto => 'حذف هذه الصورة';
 
   @override
   String get addAction => 'إضافة';
@@ -2299,7 +2273,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get newFeature => 'ميزة جديدة';
 
   @override
-  String get bugFix => 'إصلاح';
+  String get bugFix => 'إصلاحات';
 
   @override
   String get importantBadge => 'مهم';
@@ -2335,7 +2309,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get enterPassword2 => 'أدخل كلمة المرور';
 
   @override
-  String get signingIn => 'جارٍ تسجيل الدخول';
+  String get signingIn => 'جارٍ تسجيل الدخول…';
 
   @override
   String get contactSupport => 'تواصل مع الدعم الفني';
@@ -2358,11 +2332,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sendLink => 'إرسال الرابط';
 
   @override
-  String get selectOrganization => 'اختر المنظمة';
+  String get selectOrganization => 'اختر المؤسسة';
 
   @override
   String get multipleOrgsChoose =>
-      'أنت مسجّل في أكثر من منظمة. اختر واحدة للمتابعة.';
+      'أنت مسجّل في أكثر من مؤسسة. اختر واحدة للمتابعة.';
 
   @override
   String get weeklyPlanNote =>
@@ -2384,7 +2358,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get requestAttachment => 'مرفق الطلب';
+  String get requestAttachment => 'مرفق';
 
   @override
   String get attachmentLoadFailed => 'تعذّر تحميل صورة المرفق';
@@ -2458,10 +2432,55 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get sendingEllipsis => 'جارٍ الإرسال...';
+  String get sendingEllipsis => 'جارٍ الإرسال…';
 
   @override
   String durationLabel(Object duration) {
     return 'المدة: $duration';
   }
+
+  @override
+  String get settingsGeneral => 'عام';
+
+  @override
+  String get senderRoleSystem => 'النظام';
+
+  @override
+  String get senderRoleCompanySupervisor => 'مشرف الشركة';
+
+  @override
+  String get senderRoleOrgAdmin => 'مسؤول المؤسسة';
+
+  @override
+  String get senderRoleBranchesMarketing => 'مسؤول تسويق الفروع';
+
+  @override
+  String get senderRolePromotionMarketing => 'مسؤول تسويق العروض';
+
+  @override
+  String get senderRoleMarketing => 'مسؤول التسويق';
+
+  @override
+  String get senderRoleTechSupport => 'الدعم الفني';
+
+  @override
+  String codeLabel(Object code) {
+    return 'كود: $code';
+  }
+
+  @override
+  String get policyOfficialSubtitle =>
+      'دليل بنود المخالفات والجزاءات المالية الرسمية';
+
+  @override
+  String get catBranchRules => 'مخالفة تعليمات الفرع';
+
+  @override
+  String get catTheftDamage => 'سرقة / تلفيات';
+
+  @override
+  String get chainCarrefour => 'كارفور';
+
+  @override
+  String get chainBeitElGomla => 'بيت الجملة';
 }

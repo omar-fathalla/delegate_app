@@ -182,7 +182,7 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
           const SizedBox(height: 16),
 
           // عنوان التأكيد
-          Text(AppLocalizations.of(context)!.logoutAction,
+          Text(AppLocalizations.of(context)!.logout,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
               fontSize: 18,
@@ -239,7 +239,7 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
                                   color: colorScheme.error,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(AppLocalizations.of(context)!.logoutAction,
+                                Text(AppLocalizations.of(context)!.logout,
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,

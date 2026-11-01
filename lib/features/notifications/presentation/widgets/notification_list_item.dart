@@ -281,7 +281,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          AppLocalizations.of(context)!.senderLine(displaySenderName, displaySenderRoleArabic),
+                          AppLocalizations.of(context)!.senderLine(displaySenderName, _localizedSenderRole(displaySenderRoleArabic, AppLocalizations.of(context)!)),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -511,4 +511,31 @@ class _NotificationListItemState extends State<NotificationListItem> {
       return AppLocalizations.of(context)!.justNow;
     }
   }
+}
+
+/// Maps the Arabic sender role from [NotificationModel.formatSenderRoleArabic]
+/// to the active locale. Unknown values are shown as-is (raw data).
+String _localizedSenderRole(String arabicRole, AppLocalizations l10n) {
+  switch (arabicRole) {
+    case 'النظام':
+      return l10n.senderRoleSystem;
+    case 'مشرف الشركة':
+      return l10n.senderRoleCompanySupervisor;
+    case 'سوبر أدمن':
+      return l10n.roleSuperAdmin;
+    case 'مسؤول المنظمة':
+      return l10n.senderRoleOrgAdmin;
+    case 'مسؤول تسويق الفروع':
+      return l10n.senderRoleBranchesMarketing;
+    case 'مسؤول تسويق العروض':
+      return l10n.senderRolePromotionMarketing;
+    case 'مسؤول التسويق':
+      return l10n.senderRoleMarketing;
+    case 'الدعم الفني':
+      return l10n.senderRoleTechSupport;
+    case 'مروج':
+    case 'مندوب':
+      return l10n.roleDelegate;
+  }
+  return arabicRole;
 }

@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -347,11 +348,13 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
           final photoUrl = _resolvePhotoUrl(delegate, userData);
 
           // حل الاسم
-          final displayName = resolveDisplayName(delegate, userData);
+          final resolvedName = resolveDisplayName(delegate, userData);
+          final displayName = nameForLocale(resolvedName, resolvedName,
+              isArabic: Localizations.localeOf(context).languageCode == 'ar');
 
           final roleLabel = _getRoleLabel(context, delegate, userData);
           final activeOrgName = showActiveOrganization
-              ? _getActiveOrganizationLabel(delegate, userData)
+              ? localizeChainName(_getActiveOrganizationLabel(delegate, userData), AppLocalizations.of(context))
               : '';
 
           return Row(

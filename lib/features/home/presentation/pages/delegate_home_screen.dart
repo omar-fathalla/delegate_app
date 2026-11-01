@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -510,7 +511,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(AppLocalizations.of(context)!.homeGreeting(widget.delegate.firstName),
+                    Text(AppLocalizations.of(context)!.homeGreeting(firstNameForLocale(widget.delegate.fullName, widget.delegate.firstName, isArabic: Localizations.localeOf(context).languageCode == 'ar')),
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: colorScheme.onPrimary,
@@ -528,11 +529,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                                     DelegatePosition.promoter ||
                                 widget.delegate.role ==
                                     UserRole.marketingPromotion
-                            ? AppLocalizations.of(context)!.roleFieldDelegate
+                            ? AppLocalizations.of(context)!.roleDelegate
                             : widget.delegate.position ==
                                     DelegatePosition.supervisor
                                 ? AppLocalizations.of(context)!.roleFieldSupervisor
-                                : AppLocalizations.of(context)!.roleFieldDelegate;
+                                : AppLocalizations.of(context)!.roleDelegate;
 
                         final activeOrg = widget.delegate.organizationName.trim();
                         final affiliatedOrgs = <String>{};
@@ -747,7 +748,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             ),
             const SizedBox(width: 6),
             Text(
-              orgName,
+              localizeChainName(orgName, AppLocalizations.of(context)),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -787,7 +788,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           ),
           const SizedBox(width: 6),
           Text(
-            orgName,
+            localizeChainName(orgName, AppLocalizations.of(context)),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
