@@ -5,6 +5,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/utils/branch_key.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_button_group.dart';
@@ -785,6 +786,10 @@ class _HRDelegateAttendanceDetailScreenState
       'lastAdjustedAt': FieldValue.serverTimestamp(),
       'adjustmentReason': reason,
       if (notes.isNotEmpty) 'adjustmentNotes': notes,
+      // Read-reduction Phase 1: keep branchKey on HR-edited check-ins.
+      // 'غير محدد' is the UI placeholder for a missing branch; never key it.
+      if (session.branchName != 'غير محدد')
+        ...branchKeyField(session.branchName),
       // Denormalize checkout onto check-in (fix2) when HR sets/adjusts out time.
       if (hasCheckOut && newOutTime != null) 'checkOutTime': Timestamp.fromDate(newOutTime),
       if (!hasCheckOut) 'checkOutTime': FieldValue.delete(),
@@ -817,6 +822,9 @@ class _HRDelegateAttendanceDetailScreenState
           'type': 'check_out',
           'relatedCheckInId': session.id,
           'branchName': session.branchName,
+          // 'غير محدد' is the UI placeholder for a missing branch; never key it.
+          if (session.branchName != 'غير محدد')
+            ...branchKeyField(session.branchName),
           'deviceInfo': 'تسجيل يدوي بواسطة الموارد البشرية',
           if (session.latitude != null && session.longitude != null)
             'location': {

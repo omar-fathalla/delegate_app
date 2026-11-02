@@ -1,10 +1,14 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
+import 'package:delegate_app/core/utils/branch_key.dart';
+import 'package:delegate_app/core/config/read_reduction_flags.dart';
+import 'package:delegate_app/features/marketing/data/datasources/today_attendance_query.dart';
 import 'package:delegate_app/features/marketing/data/services/delegate_profile_cache.dart';
 import 'package:delegate_app/features/marketing/data/services/real_test_metrics.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
@@ -74,21 +78,18 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
   final FirebaseFirestore firestore;
   final DelegateProfileCache? profileCache;
 
+  /// Read-reduction kill switches (Remote Config). Defaults: new query on.
+  final ReadReductionFlags flags;
+
   MarketingRemoteDataSourceImpl({
     required this.firestore,
     this.profileCache,
-  });
+    ReadReductionFlags? flags,
+  }) : flags = flags ?? ReadReductionFlags.instance;
 
   /// التطبيع الموحد لأسماء الفروع لمنع أي فقدان في السجلات بسبب الهمزات والمسافات
-  static String normalizeBranchName(String name) {
-    return name
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp(r'[أإآ]'), 'ا')
-        .replaceAll('ة', 'ه')
-        .replaceAll('ى', 'ي')
-        .replaceAll(RegExp(r'\s+'), ' ');
-  }
+  /// Delegates to [branchKey] so writers and readers share one normalizer.
+  static String normalizeBranchName(String name) => branchKey(name);
 
   List<DelegateModel> _deduplicateDelegates(Iterable<DelegateModel> list) {
     final seen = <String>{};
@@ -351,76 +352,41 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       final todayStart = DateTime(targetDate.year, targetDate.month, targetDate.day);
       final todayEnd = todayStart.add(const Duration(days: 1));
 
-      // ── Step 1: جلب سجلات الحضور مع تطبيع أسماء الفروع والاستعلام الموثوق ──
-      final Set<String> queryBranchTerms = {};
+      // ── Step 1: جلب سجلات الحضور (branchKey أولاً، ثم الاستعلام القديم كاحتياطي) ──
       final Map<String, String> normalizedToBranch = {};
-
       for (final b in branchNames) {
         final trimmed = b.trim();
         if (trimmed.isEmpty) continue;
         normalizedToBranch[normalizeBranchName(trimmed)] = b;
-        queryBranchTerms.add(trimmed);
-
-        // إضافة أشكال الحروف المختلفة (الهمزات، التاء المربوطة، الياء/الألف المقصورة) لضمان عدم سقوط أي سجل في whereIn
-        final withoutHamza = trimmed.replaceAll(RegExp(r'[أإآ]'), 'ا');
-        queryBranchTerms.add(withoutHamza);
-        final withAlifHamza = trimmed.replaceAll('ا', 'أ');
-        queryBranchTerms.add(withAlifHamza);
-        final withTa = trimmed.replaceAll('ه', 'ة');
-        queryBranchTerms.add(withTa);
-        final withHa = trimmed.replaceAll('ة', 'ه');
-        queryBranchTerms.add(withHa);
-        final withYa = trimmed.replaceAll('ى', 'ي');
-        queryBranchTerms.add(withYa);
-      }
-
-      final queryBranchList = queryBranchTerms.toList();
-      // Firestore caps (filter clauses * whereIn size) at 100. With
-      // organizationId + branchName + timestamp>= + timestamp< (=4), max whereIn is 25.
-      const branchWhereInChunkSize = 20;
-      final branchChunks = <List<String>>[];
-      for (var i = 0; i < queryBranchList.length; i += branchWhereInChunkSize) {
-        branchChunks.add(
-          queryBranchList.sublist(
-            i,
-            (i + branchWhereInChunkSize > queryBranchList.length)
-                ? queryBranchList.length
-                : i + branchWhereInChunkSize,
-          ),
-        );
       }
 
       // attendance_logs writes use `organizationId` (see AttendanceRemoteDataSource).
-      // Bound the query by org + branchName variants + today's local calendar day
-      // (device TZ; production users are Africa/Cairo) + a hard limit so we never
-      // download the full historical collection.
       String queryOrgId = organizationId.trim();
       if (queryOrgId.isEmpty) {
         queryOrgId = 'PiioBFgxaHAeuRdjlDgj'; // Fathalla Market default
       }
       final todayStartTs = Timestamp.fromDate(todayStart);
       final todayEndTs = Timestamp.fromDate(todayEnd);
-      // Favorites UIs are typically << this; guards runaway orgs / bad data.
-      const todayAttendanceQueryLimit = 2000;
+      const todayAttendanceQueryLimit = kTodayAttendanceQueryLimit;
 
-      final List<QueryDocumentSnapshot<Map<String, dynamic>>> todayDocs = [];
+      // Read-reduction Phase 1: one `branchKey` per branch (not ~6 spellings),
+      // with the bounded legacy `branchName` query kept as a fallback for old
+      // records without `branchKey`. See today_attendance_query.dart.
       final attSw = Stopwatch()..start();
-      for (final chunk in branchChunks) {
-        final snap = await firestore
-            .collection(kAttendanceCollection)
-            .where('organizationId', isEqualTo: queryOrgId)
-            .where('branchName', whereIn: chunk)
-            .where('timestamp', isGreaterThanOrEqualTo: todayStartTs)
-            .where('timestamp', isLessThan: todayEndTs)
-            .limit(todayAttendanceQueryLimit)
-            .getResilient(forceServer: true);
-        todayDocs.addAll(snap.docs);
-      }
+      final fetch = await fetchTodayAttendanceDocs(
+        firestore: firestore,
+        branchNames: branchNames,
+        organizationId: queryOrgId,
+        dayStart: todayStart,
+        dayEnd: todayEnd,
+        flags: flags,
+      );
+      final todayDocs = fetch.docs;
       attSw.stop();
       if (RealTestMetrics.enabled) {
         RealTestMetrics.attendanceQueryMs = attSw.elapsedMilliseconds;
         RealTestMetrics.attendanceDocs = todayDocs.length;
-        RealTestMetrics.attendanceChunks = branchChunks.length;
+        RealTestMetrics.attendanceChunks = fetch.queries;
       }
 
       // Map: branchName -> Map<delegateId, record>
@@ -1034,8 +1000,49 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
   }
 
 
-  /// Batch-fetch company display names with whereIn(documentId) chunks + in-memory cache.
+  /// Session-level company name memo (read-reduction Phase 1.4 / 4):
+  /// company names are near-static, so each id is fetched at most once per
+  /// [companyNameTtl] per app session instead of on every branch reload.
+  static final Map<String, ({String name, DateTime at})> _sessionCompanyNames =
+      {};
+  static const Duration companyNameTtl = Duration(hours: 6);
+
+  @visibleForTesting
+  static void debugClearCompanyNameCache() => _sessionCompanyNames.clear();
+
   Future<void> _fillCompanyNameCache({
+    required String organizationId,
+    required Iterable<String> companyIds,
+    required Map<String, String> companyNameCache,
+  }) async {
+    final now = DateTime.now();
+    final toFetch = <String>[];
+    for (final id in companyIds.toSet()) {
+      if (id.isEmpty) continue;
+      if (companyNameCache[id]?.isNotEmpty ?? false) continue;
+      final hit = _sessionCompanyNames['$organizationId|$id'];
+      if (hit != null && now.difference(hit.at) < companyNameTtl) {
+        companyNameCache[id] = hit.name;
+      } else {
+        toFetch.add(id);
+      }
+    }
+    if (toFetch.isEmpty) return;
+    await _fillCompanyNameCacheNetwork(
+      organizationId: organizationId,
+      companyIds: toFetch,
+      companyNameCache: companyNameCache,
+    );
+    for (final id in toFetch) {
+      final name = companyNameCache[id];
+      if (name != null && name.isNotEmpty) {
+        _sessionCompanyNames['$organizationId|$id'] = (name: name, at: now);
+      }
+    }
+  }
+
+  /// Batch-fetch company display names with whereIn(documentId) chunks + in-memory cache.
+  Future<void> _fillCompanyNameCacheNetwork({
     required String organizationId,
     required Iterable<String> companyIds,
     required Map<String, String> companyNameCache,

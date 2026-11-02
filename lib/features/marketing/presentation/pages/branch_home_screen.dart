@@ -20,6 +20,8 @@ import 'package:delegate_app/features/marketing/data/models/floor_verification_m
 import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/marketing/data/services/real_test_metrics.dart';
+import 'package:delegate_app/core/config/read_reduction_flags.dart';
+import 'package:delegate_app/features/marketing/data/datasources/today_attendance_query.dart';
 
 /// الشاشة الرئيسية للفروع - تعرض جميع الفروع المفضلة في نفس الصفحة
 class BranchHomeScreen extends StatelessWidget {
@@ -96,6 +98,13 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   /// Timestamp of the last successful sync with server
   DateTime? _lastSyncTime;
 
+  /// Today-only attendance listener (refresh signal) and its state.
+  StreamSubscription<int>? _liveSub;
+  Timer? _liveDebounce;
+  String? _liveSignature;
+  bool _tabVisible = true;
+  bool _appResumed = true;
+
   @override
   void initState() {
     super.initState();
@@ -109,9 +118,12 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       _floorVerifications = _floorService.getLocalVerifications(_selectedDate);
       _syncFloorVerificationsFromCloud();
 
-      // Auto-refresh heartbeat every 30 seconds for live zero-drop data delivery
+      // Read-reduction Phase 1: a today-only snapshot listener replaces the
+      // 30 s forceServer timer. The timer only runs if `branch_live_listener`
+      // is switched off in Remote Config (kill switch).
       // Disabled during REAL_TEST_METRICS so cold/warm measurements are not polluted.
-      if (!RealTestMetrics.enabled) {
+      if (!RealTestMetrics.enabled &&
+          !ReadReductionFlags.instance.branchLiveListener) {
         _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
           if (mounted && _favoriteBranches.isNotEmpty) {
             _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
@@ -120,20 +132,87 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         });
       }
 
-      // Revalidate immediately when app resumes from background
+      // Revalidate once on resume; pause the listener in the background.
       _lifecycleListener = AppLifecycleListener(
         onResume: () {
+          _appResumed = true;
           if (mounted && _favoriteBranches.isNotEmpty) {
-            _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+            _loadAllBranches(context, _favoriteBranches);
             _syncFloorVerificationsFromCloud();
           }
+          _syncLiveListener();
+        },
+        onPause: () {
+          _appResumed = false;
+          _syncLiveListener();
         },
       );
     } catch (_) {}
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Offstage tabs (IndexedStack) get TickerMode disabled → pause listener.
+    _tabVisible = TickerMode.valuesOf(context).enabled;
+    _syncLiveListener();
+  }
+
+  bool _isSelectedDateToday() {
+    final now = DateTime.now();
+    return _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
+  }
+
+  String get _orgIdForQueries => widget.marketingUser.organizationUID.isNotEmpty
+      ? widget.marketingUser.organizationUID
+      : 'PiioBFgxaHAeuRdjlDgj';
+
+  /// Starts, restarts or stops the today-only listener so it only runs while
+  /// the tab is visible, the app is in the foreground and today is selected.
+  void _syncLiveListener() {
+    final shouldRun = !RealTestMetrics.enabled &&
+        ReadReductionFlags.instance.branchLiveListener &&
+        mounted &&
+        _tabVisible &&
+        _appResumed &&
+        _favoriteBranches.isNotEmpty &&
+        _isSelectedDateToday() &&
+        di.sl.isRegistered<FirebaseFirestore>();
+    final signature = shouldRun
+        ? '$_orgIdForQueries|${(List.of(_favoriteBranches)..sort()).join(',')}|'
+            '${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}'
+        : null;
+    if (signature == _liveSignature) return;
+    _liveSub?.cancel();
+    _liveSub = null;
+    _liveDebounce?.cancel();
+    _liveSignature = signature;
+    if (signature == null) return;
+    final start =
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    _liveSub = watchTodayBranchAttendanceChanges(
+      firestore: di.sl<FirebaseFirestore>(),
+      branchNames: List.of(_favoriteBranches),
+      organizationId: _orgIdForQueries,
+      dayStart: start,
+      dayEnd: start.add(const Duration(days: 1)),
+    ).listen((_) {
+      // Coalesce bursts of check-ins into one reload.
+      _liveDebounce?.cancel();
+      _liveDebounce = Timer(const Duration(seconds: 3), () {
+        if (mounted && _favoriteBranches.isNotEmpty) {
+          _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+        }
+      });
+    });
+  }
+
+  @override
   void dispose() {
+    _liveSub?.cancel();
+    _liveDebounce?.cancel();
     _autoRefreshTimer?.cancel();
     _lifecycleListener?.dispose();
     _searchController.dispose();
@@ -464,7 +543,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         date: _selectedDate,
         forceRefresh: forceRefresh,
       ),
-    );
+    );    // Favorites / selected date may have changed → (re)start or stop listener.
+    _syncLiveListener();
   }
 
   Future<void> _selectDate() async {

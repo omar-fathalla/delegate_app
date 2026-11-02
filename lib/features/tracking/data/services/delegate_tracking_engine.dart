@@ -8,6 +8,22 @@ import 'delegate_tracking_service.dart';
 /// محرك البث الميداني الحقيقي بهاتف المندوب (Real-time Field Telemetry & Tracking Engine)
 /// يعمل بنظام البث المستمر في الخلفية (Background Location Stream + Foreground Service)
 /// مع المزامنة اللحظية لأوامر المشرف والمؤقت الدوري الذكي
+/// Minimum movement / interval between stream-driven tracking writes.
+const double kTrackingMinMoveMeters = 50;
+const Duration kTrackingMinInterval = Duration(seconds: 90);
+
+/// True when a GPS stream point should be written: first point, moved at
+/// least [kTrackingMinMoveMeters], or [kTrackingMinInterval] elapsed.
+bool shouldSendTrackingPing({
+  required double? movedMeters,
+  required DateTime? lastSentAt,
+  required DateTime now,
+}) {
+  if (movedMeters == null || lastSentAt == null) return true;
+  if (movedMeters >= kTrackingMinMoveMeters) return true;
+  return now.difference(lastSentAt) >= kTrackingMinInterval;
+}
+
 class DelegateTrackingEngine {
   final DelegateTrackingService _trackingService;
   final Battery _battery;
@@ -161,6 +177,25 @@ class DelegateTrackingEngine {
       ).listen(
         (position) async {
           if (!_isTracking || !_remoteTrackingEnabled) return;
+          // Read-reduction Phase 2: every tracking write is re-read by each
+          // supervisor listening to delegate_tracking. Only send when the
+          // device moved >= 50 m or 90 s passed since the last sent ping.
+          final last = _lastRecordedPosition;
+          final movedMeters = last == null
+              ? null
+              : Geolocator.distanceBetween(
+                  last.latitude,
+                  last.longitude,
+                  position.latitude,
+                  position.longitude,
+                );
+          if (!shouldSendTrackingPing(
+            movedMeters: movedMeters,
+            lastSentAt: _lastPingTime,
+            now: DateTime.now(),
+          )) {
+            return;
+          }
           await _handleIncomingPosition(position);
         },
         onError: (err) {

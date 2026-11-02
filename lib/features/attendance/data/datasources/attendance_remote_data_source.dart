@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/utils/branch_key.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/core/models/pagination_response.dart';
@@ -158,6 +159,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             'location': {'latitude': lat, 'longitude': long},
             'deviceInfo': deviceInfo,
             'branchName': branchName,
+            ...branchKeyField(branchName),
           };
       // Fix3: denormalize display fields so marketing cards skip N+1 profile reads.
       final trimmedName = delegateName?.trim();
@@ -266,6 +268,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'location': {'latitude': lat, 'longitude': long},
         'relatedCheckInId': attendanceId,
         if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
+        ...branchKeyField(lastData['branchName']),
       });
       batch.update(checkInRef, {
         'checkOutTime': FieldValue.serverTimestamp(),
@@ -305,6 +308,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
                 'location': {'latitude': lat, 'longitude': long},
                 'relatedCheckInId': doc.id,
                 if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
+                ...branchKeyField(lastData['branchName']),
                 'autoClosedDuplicate': true,
               });
               orphanBatch.update(doc.reference, {
@@ -779,6 +783,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'isAutoCheckOut': true,
         'autoCheckOutReason': 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
         'branchName': ?branchName,
+        ...branchKeyField(branchName),
       });
       autoBatch.update(checkInDoc.reference, {
         'checkOutTime': Timestamp.fromDate(autoCheckOutTime),
@@ -854,6 +859,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         }
         if (action['branchName'] != null) {
           data['branchName'] = action['branchName'];
+          data.addAll(branchKeyField(action['branchName']));
         }
         if (action['relatedCheckInId'] != null) {
           data['relatedCheckInId'] = action['relatedCheckInId'];

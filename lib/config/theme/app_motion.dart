@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/config/read_reduction_flags.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -414,11 +415,18 @@ class M3FadeThroughIndexedStack extends StatefulWidget {
   final List<Widget> children;
   final Duration duration;
 
+  /// When true (default, unless Remote Config `lazy_tabs` is off), a child is
+  /// only built after its index has been shown once, then kept alive. This
+  /// stops hidden tabs from mounting and starting Firestore reads/listeners
+  /// the user never opens (read-reduction Phase 1.1).
+  final bool? lazy;
+
   const M3FadeThroughIndexedStack({
     super.key,
     required this.index,
     required this.children,
     this.duration = AppMotionDurations.medium2, // 300ms
+    this.lazy,
   });
 
   @override
@@ -430,11 +438,13 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late int _currentIndex;
+  final Set<int> _visited = <int>{};
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.index;
+    _visited.add(widget.index);
     _controller = AnimationController(
       vsync: this,
       duration: widget.duration,
@@ -447,6 +457,7 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.index != widget.index) {
       _currentIndex = widget.index;
+      _visited.add(widget.index);
       _controller.forward(from: 0.0);
     }
   }
@@ -461,9 +472,17 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
   Widget build(BuildContext context) {
     final disableAnimations = MediaQuery.of(context).disableAnimations;
 
+    final lazy = widget.lazy ?? ReadReductionFlags.instance.lazyTabs;
     final stack = IndexedStack(
       index: _currentIndex,
-      children: widget.children,
+      children: lazy
+          ? [
+              for (var i = 0; i < widget.children.length; i++)
+                _visited.contains(i)
+                    ? widget.children[i]
+                    : const SizedBox.shrink(),
+            ]
+          : widget.children,
     );
 
     if (disableAnimations) {
