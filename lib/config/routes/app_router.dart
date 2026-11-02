@@ -18,7 +18,6 @@ import 'package:delegate_app/features/hr/presentation/pages/hr_main_screen.dart'
 import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
-import 'package:delegate_app/features/changelog/presentation/pages/changelog_screen.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/task_details_screen.dart';
 import 'package:delegate_app/features/notifications/presentation/pages/notifications_page.dart';
@@ -216,13 +215,6 @@ final appRouter = GoRouter(
           ),
         );
       },
-    ),
-    GoRoute(
-      path: '/changelog',
-      pageBuilder: (context, state) => AppMotionPage.sharedAxis(
-        state: state,
-        child: const ChangelogScreen(),
-      ),
     ),
     GoRoute(
       path: '/notifications',

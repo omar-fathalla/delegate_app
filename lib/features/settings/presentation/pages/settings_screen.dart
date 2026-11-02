@@ -159,17 +159,6 @@ class SettingsScreen extends StatelessWidget {
                           ),
                           _buildSettingsTile(
                             context: context,
-                            icon: Icons.auto_awesome_rounded,
-                            title: l10n.whatsNewTitle,
-                            onTap: () => context.push('/changelog'),
-                          ),
-                          Divider(
-                            height: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            indent: 64,
-                          ),
-                          _buildSettingsTile(
-                            context: context,
                             icon: Icons.feedback_rounded,
                             title: AppLocalizations.of(context)!.sendFeedback,
                             onTap: () => context.push(

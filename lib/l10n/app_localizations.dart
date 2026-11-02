@@ -1970,12 +1970,6 @@ abstract class AppLocalizations {
   /// **'Off'**
   String get switchOff;
 
-  /// No description provided for @whatsNewTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'What\'s new'**
-  String get whatsNewTitle;
-
   /// No description provided for @releaseVersionDate.
   ///
   /// In en, this message translates to:
@@ -4075,36 +4069,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'OK'**
   String get okAction;
-
-  /// No description provided for @noUpdatesNow.
-  ///
-  /// In en, this message translates to:
-  /// **'No updates right now'**
-  String get noUpdatesNow;
-
-  /// No description provided for @newFeature.
-  ///
-  /// In en, this message translates to:
-  /// **'New feature'**
-  String get newFeature;
-
-  /// No description provided for @bugFix.
-  ///
-  /// In en, this message translates to:
-  /// **'Bug fixes'**
-  String get bugFix;
-
-  /// No description provided for @importantBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'Important'**
-  String get importantBadge;
-
-  /// No description provided for @criticalBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'Critical'**
-  String get criticalBadge;
 
   /// No description provided for @loginSubtitleStaff.
   ///

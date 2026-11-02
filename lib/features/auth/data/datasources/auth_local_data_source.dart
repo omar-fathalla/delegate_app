@@ -101,7 +101,6 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
       if (key == 'persistent_app_device_uuid' ||
           key == 'app_theme_mode' ||
           key == 'locale_code' ||
-          key == 'last_seen_changelog_build' ||
           key.startsWith('review_service_')) {
         continue;
       }

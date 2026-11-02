@@ -1280,7 +1280,6 @@
   "startPhotosCta": "Start photos",
   "switchOn": "On",
   "switchOff": "Off",
-  "whatsNewTitle": "What's new",
   "releaseVersionDate": "Version {version} – {date}",
   "@releaseVersionDate": {
     "placeholders": {
@@ -2024,11 +2023,6 @@
   "thankYou": "Thank you!",
   "feedbackReceived": "We've received your feedback and will review it soon.",
   "okAction": "OK",
-  "noUpdatesNow": "No updates right now",
-  "newFeature": "New feature",
-  "bugFix": "Bug fixes",
-  "importantBadge": "Important",
-  "criticalBadge": "Critical",
   "loginSubtitleStaff": "Choose your account type and sign in",
   "loginSubtitleDelegate": "Choose your account type and enter your details",
   "staffLabel": "Staff",

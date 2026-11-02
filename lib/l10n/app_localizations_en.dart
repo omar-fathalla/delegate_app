@@ -1003,9 +1003,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchOff => 'Off';
 
   @override
-  String get whatsNewTitle => 'What\'s new';
-
-  @override
   String releaseVersionDate(Object version, Object date) {
     return 'Version $version – $date';
   }
@@ -2258,21 +2255,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get okAction => 'OK';
-
-  @override
-  String get noUpdatesNow => 'No updates right now';
-
-  @override
-  String get newFeature => 'New feature';
-
-  @override
-  String get bugFix => 'Bug fixes';
-
-  @override
-  String get importantBadge => 'Important';
-
-  @override
-  String get criticalBadge => 'Critical';
 
   @override
   String get loginSubtitleStaff => 'Choose your account type and sign in';

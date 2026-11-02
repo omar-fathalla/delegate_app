@@ -1001,9 +1001,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get switchOff => 'متوقف';
 
   @override
-  String get whatsNewTitle => 'ما الجديد؟';
-
-  @override
   String releaseVersionDate(Object version, Object date) {
     return 'الإصدار $version – $date';
   }
@@ -2265,21 +2262,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get okAction => 'حسنًا';
-
-  @override
-  String get noUpdatesNow => 'لا توجد تحديثات حاليًا';
-
-  @override
-  String get newFeature => 'ميزة جديدة';
-
-  @override
-  String get bugFix => 'إصلاحات';
-
-  @override
-  String get importantBadge => 'مهم';
-
-  @override
-  String get criticalBadge => 'مهم جدًا';
 
   @override
   String get loginSubtitleStaff => 'اختر نوع الحساب وسجّل الدخول بكلمة المرور';
