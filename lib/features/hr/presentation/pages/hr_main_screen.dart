@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/badge_counts_service.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -108,14 +108,10 @@ class _HRMainScreenState extends State<HRMainScreen> {
   /// شارة طلبات الإجازات والأذونات المعلقة
   Widget _buildLeaveRequestsBadge(Widget icon, ColorScheme colorScheme) {
     if (widget.delegate.companyUID.isEmpty) return icon;
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('leave_requests')
-          .where('companyUID', isEqualTo: widget.delegate.companyUID)
-          .where('status', isEqualTo: 'pending')
-          .snapshots(),
+    return StreamBuilder<int>(
+      stream: BadgeCountsService.instance.watch('leave_requests', widget.delegate.companyUID),
       builder: (context, snapshot) {
-        final count = snapshot.data?.docs.length ?? 0;
+        final count = snapshot.data ?? 0;
         if (count == 0) return icon;
         return Badge(
           label: Text(
@@ -133,14 +129,10 @@ class _HRMainScreenState extends State<HRMainScreen> {
   /// شارة طلبات فك وربط الأجهزة المعلقة
   Widget _buildDeviceRequestsBadge(Widget icon, ColorScheme colorScheme) {
     if (widget.delegate.companyUID.isEmpty) return icon;
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('device_unbind_requests')
-          .where('companyUID', isEqualTo: widget.delegate.companyUID)
-          .where('status', isEqualTo: 'pending')
-          .snapshots(),
+    return StreamBuilder<int>(
+      stream: BadgeCountsService.instance.watch('device_unbind_requests', widget.delegate.companyUID),
       builder: (context, snapshot) {
-        final count = snapshot.data?.docs.length ?? 0;
+        final count = snapshot.data ?? 0;
         if (count == 0) return icon;
         return Badge(
           label: Text(

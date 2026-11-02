@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/badge_counts_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -40,7 +41,6 @@ import 'package:delegate_app/features/marketing_search/presentation/pages/market
 import 'package:delegate_app/features/marketing/presentation/pages/branches_marketing_home_screen.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_session_control_screen.dart';
 import 'package:delegate_app/features/tracking/presentation/pages/delegate_tracking_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
@@ -597,14 +597,10 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       if (widget.delegate.companyUID.isEmpty) {
         return Icon(icon, size: 20);
       }
-      return StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection(collection)
-            .where('companyUID', isEqualTo: widget.delegate.companyUID)
-            .where('status', isEqualTo: 'pending')
-            .snapshots(),
+      return StreamBuilder<int>(
+        stream: BadgeCountsService.instance.watch(collection, widget.delegate.companyUID),
         builder: (context, snapshot) {
-          final count = snapshot.data?.docs.length ?? 0;
+          final count = snapshot.data ?? 0;
           final iconWidget = Icon(icon, size: 20);
           if (count == 0) return iconWidget;
           return Badge(
