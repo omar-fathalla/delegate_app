@@ -1486,6 +1486,23 @@ class AppLocalizationsAr extends AppLocalizations {
   String get attLocatingYou => 'جارٍ تحديد موقعك والتحقق من الفروع...';
 
   @override
+  String get attLocatingShort => 'جارٍ تحديد موقعك…';
+
+  @override
+  String get attEarlyCheckOutTitle => 'متأكد إنك عايز تسجّل انصراف؟';
+
+  @override
+  String attEarlyCheckOutBody(int minutes) {
+    return 'إنت لسه مسجّل حضور من $minutes دقيقة. لو سجّلت انصراف دلوقتي هيتقفل الحضور ده.';
+  }
+
+  @override
+  String get attEarlyCheckOutConfirm => 'أيوه، سجّل انصراف';
+
+  @override
+  String get attEarlyCheckOutCancel => 'لأ، خليني حاضر';
+
+  @override
   String get attLocationUnavailable => 'تعذّر تحديد موقعك. فعّل GPS.';
 
   @override

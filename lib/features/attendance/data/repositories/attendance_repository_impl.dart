@@ -6,6 +6,7 @@ import 'package:delegate_app/features/attendance/domain/entities/attendance.dart
 import 'package:delegate_app/features/attendance/domain/entities/attendance_pagination_result.dart';
 import 'package:delegate_app/features/attendance/domain/repositories/attendance_repository.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
+import 'package:delegate_app/features/attendance/domain/attendance_action_messages.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
@@ -91,9 +92,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }) async {
     try {
       if (!await _hasConnection()) {
-        throw const ServerFailure(
-          'لا يوجد اتصال بالإنترنت. يرجى التأكد من اتصالك بالشبكة لتسجيل الحضور.',
-        );
+        throw const ServerFailure(kCheckInOfflineMessage);
       }
 
       // --- Anti-Fraud Geofencing ---
@@ -137,9 +136,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }) async {
     try {
       if (!await _hasConnection()) {
-        throw const ServerFailure(
-          'لا يوجد اتصال بالإنترنت. يرجى التأكد من اتصالك بالشبكة لتسجيل الانصراف.',
-        );
+        throw const ServerFailure(kCheckOutOfflineMessage);
       }
 
       // --- Geofencing for Check-Out ---

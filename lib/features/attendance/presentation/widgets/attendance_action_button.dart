@@ -7,11 +7,15 @@ class AttendanceActionButton extends StatelessWidget {
   final bool isLoading;
   final VoidCallback? onTap;
 
+  /// Shown under the spinner while [isLoading] (e.g. «جارٍ تحديد موقعك…»).
+  final String? loadingLabel;
+
   const AttendanceActionButton({
     super.key,
     required this.isCheckedIn,
     required this.isLoading,
     required this.onTap,
+    this.loadingLabel,
   });
 
   @override
@@ -42,7 +46,22 @@ class AttendanceActionButton extends StatelessWidget {
         ),
         child: Center(
           child: isLoading
-              ? const CircularProgressIndicator()
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(),
+                    if (loadingLabel != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        loadingLabel!,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                )
               : Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

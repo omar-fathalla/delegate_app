@@ -2780,6 +2780,36 @@ abstract class AppLocalizations {
   /// **'Finding your location and checking branches…'**
   String get attLocatingYou;
 
+  /// No description provided for @attLocatingShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding your location…'**
+  String get attLocatingShort;
+
+  /// No description provided for @attEarlyCheckOutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check out already?'**
+  String get attEarlyCheckOutTitle;
+
+  /// No description provided for @attEarlyCheckOutBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You checked in {minutes} min ago. Checking out now will close this attendance.'**
+  String attEarlyCheckOutBody(int minutes);
+
+  /// No description provided for @attEarlyCheckOutConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, check out'**
+  String get attEarlyCheckOutConfirm;
+
+  /// No description provided for @attEarlyCheckOutCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay checked in'**
+  String get attEarlyCheckOutCancel;
+
   /// No description provided for @attLocationUnavailable.
   ///
   /// In en, this message translates to:

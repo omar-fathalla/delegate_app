@@ -1485,6 +1485,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get attLocatingYou => 'Finding your location and checking branches…';
 
   @override
+  String get attLocatingShort => 'Finding your location…';
+
+  @override
+  String get attEarlyCheckOutTitle => 'Check out already?';
+
+  @override
+  String attEarlyCheckOutBody(int minutes) {
+    return 'You checked in $minutes min ago. Checking out now will close this attendance.';
+  }
+
+  @override
+  String get attEarlyCheckOutConfirm => 'Yes, check out';
+
+  @override
+  String get attEarlyCheckOutCancel => 'Stay checked in';
+
+  @override
   String get attLocationUnavailable =>
       'Couldn\'t get your location. Turn on GPS.';
 

@@ -1585,6 +1585,16 @@
     }
   },
   "attLocatingYou": "Finding your location and checking branches…",
+  "attLocatingShort": "Finding your location…",
+  "attEarlyCheckOutTitle": "Check out already?",
+  "attEarlyCheckOutBody": "You checked in {minutes} min ago. Checking out now will close this attendance.",
+  "@attEarlyCheckOutBody": {
+    "placeholders": {
+      "minutes": {"type": "int"}
+    }
+  },
+  "attEarlyCheckOutConfirm": "Yes, check out",
+  "attEarlyCheckOutCancel": "Stay checked in",
   "attLocationUnavailable": "Couldn't get your location. Turn on GPS.",
   "attInsideBranchWithDistance": "You are within range of {branch} ({meters} m)",
   "@attInsideBranchWithDistance": {

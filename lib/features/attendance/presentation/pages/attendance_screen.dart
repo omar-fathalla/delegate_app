@@ -11,6 +11,8 @@ import 'package:delegate_app/features/attendance/domain/entities/attendance.dart
 import 'package:delegate_app/features/attendance/domain/monthly_attendance_stats.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
+import 'package:delegate_app/features/attendance/presentation/attendance_action_lock.dart';
+import 'package:delegate_app/features/attendance/presentation/widgets/early_checkout_confirm_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
@@ -326,6 +328,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   double? _distanceToNearest;
   bool _isInsideGeofence = false;
   bool _isCheckingLocation = false;
+  final AttendanceActionLock _actionLock = AttendanceActionLock();
   String? _locationStatusMessage;
 
   bool get _isGeofenceMode {
@@ -726,21 +729,27 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         borderRadius: BorderRadius.circular(16)),
                     extendedPadding:
                         const EdgeInsetsDirectional.only(start: 16, end: 20),
-                    onPressed: (state is AttendanceLoading || isSyncing)
+                    onPressed: (_actionLock.isBusy ||
+                            state is AttendanceLoading ||
+                            isSyncing)
                         ? null
                         : () {
-                            if (_isGeofenceMode) {
-                              _handleGeofenceAction(
-                                isCheckedIn: isCheckedIn,
-                                activeAttendance: activeAttendance,
-                              );
-                            } else {
-                              _showQRScanner(
-                                context,
-                                isCheckedIn,
-                                activeAttendance,
-                              );
-                            }
+                            _actionLock.run(
+                              bloc: _attendanceBloc,
+                              onChanged: () {
+                                if (mounted) setState(() {});
+                              },
+                              action: () => _isGeofenceMode
+                                  ? _handleGeofenceAction(
+                                      isCheckedIn: isCheckedIn,
+                                      activeAttendance: activeAttendance,
+                                    )
+                                  : _showQRScanner(
+                                      context,
+                                      isCheckedIn,
+                                      activeAttendance,
+                                    ),
+                            );
                           },
                     backgroundColor: isCheckedIn
                         ? Theme.of(context).colorScheme.primaryContainer
@@ -749,7 +758,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 ? Theme.of(context).colorScheme.primaryContainer
                                 : Theme.of(context).colorScheme.secondaryContainer)
                             : Theme.of(context).colorScheme.primaryContainer),
-                    icon: Icon(
+                    icon: _actionLock.isBusy
+                        ? SizedBox.square(
+                            key: const Key('attendanceFabBusy'),
+                            dimension: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: isCheckedIn || !_isGeofenceMode || _isInsideGeofence
+                                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                                  : Theme.of(context).colorScheme.onSecondaryContainer,
+                            ),
+                          )
+                        : Icon(
                       isCheckedIn
                           ? Symbols.logout_rounded
                           : (_isGeofenceMode
@@ -768,12 +788,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               : Theme.of(context).colorScheme.onPrimaryContainer),
                     ),
                     label: Text(
-                      _buildFabLabel(
-                        context,
-                        isCheckedIn: isCheckedIn,
-                        activeAttendance: activeAttendance,
-                        l10n: l10n,
-                      ),
+                      _actionLock.isBusy
+                          ? l10n.attLocatingShort
+                          : _buildFabLabel(
+                              context,
+                              isCheckedIn: isCheckedIn,
+                              activeAttendance: activeAttendance,
+                              l10n: l10n,
+                            ),
                       style: m3ButtonLabel(context).copyWith(
                         color: isCheckedIn
                             ? Theme.of(context).colorScheme.onPrimaryContainer
@@ -2305,6 +2327,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         );
       } else if (currentActive.branchName == branchName ||
           currentActive.branchName == null) {
+        if (!await confirmEarlyCheckOutIfNeeded(
+          parentContext,
+          checkInTime: currentActive.checkInTime,
+          now: now,
+        )) {
+          return;
+        }
         attendanceBloc.add(
           CheckOutRequested(
             attendanceId: currentActive.id,
@@ -2336,7 +2365,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
 
-  void _showQRScanner(
+  Future<void> _showQRScanner(
     BuildContext context,
     bool isCheckedIn,
     Attendance? activeAttendance,
@@ -2346,7 +2375,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final parentContext = context;
     final action = isCheckedIn ? l10n.checkOut : l10n.checkIn;
 
-    showModalBottomSheet<String>(
+    return showModalBottomSheet<String>(
       context: context,
       sheetAnimationStyle: m3SheetAnimation,
       isScrollControlled: true,
@@ -2394,6 +2423,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               );
             } else if (currentActive.branchName == scannedBranch ||
                 currentActive.branchName == null) {
+              if (!await confirmEarlyCheckOutIfNeeded(
+                parentContext,
+                checkInTime: currentActive.checkInTime,
+                now: now,
+              )) {
+                return;
+              }
               attendanceBloc.add(
                 CheckOutRequested(
                   attendanceId: currentActive.id,

@@ -1,5 +1,6 @@
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:bloc/bloc.dart';
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
@@ -46,12 +47,16 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     ReviewService? reviewService,
   })  : _reviewService = reviewService,
         super(AttendanceInitial()) {
-    on<CheckInRequested>(_onCheckIn);
-    on<CheckOutRequested>(_onCheckOut);
+    // droppable: a second check-in/out while one is running is ignored.
+    on<CheckInRequested>(_onCheckIn, transformer: droppable());
+    on<CheckOutRequested>(_onCheckOut, transformer: droppable());
     on<HistoryRequested>(_onGetHistory);
     on<LoadMoreHistoryRequested>(_onLoadMoreHistory);
     on<SyncRequested>(_onSync);
-    on<CheckOutAndCheckInRequested>(_onCheckOutAndCheckIn);
+    on<CheckOutAndCheckInRequested>(
+      _onCheckOutAndCheckIn,
+      transformer: droppable(),
+    );
   }
 
   Future<void> _onCheckIn(

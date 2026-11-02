@@ -1,4 +1,5 @@
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
+import 'package:delegate_app/features/attendance/domain/attendance_action_messages.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -123,41 +124,45 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     String? personalPhotoURL,
   }) async {
     try {
-      // Guard against duplicate active check-in in Firestore
+      final trustedNow = _trustedNow();
+      final pendingKey = _pendingCheckInKey(userId, trustedNow);
+      final pendingId = _pendingCheckInIds[pendingKey];
+
+      // Guard against duplicate active check-in, decided on the server only.
+      // If the server can't be reached nothing is written.
+      AttendanceModel? existingActive;
       try {
-        final existingActive = await findActiveAttendance(
+        existingActive = await findActiveAttendance(
           userId,
           organizationId,
-        ).timeout(const Duration(seconds: 4));
+        ).timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('Active check-in verification failed: $e');
+        throw const ServerFailure(kCheckInOfflineMessage);
+      }
 
-        if (existingActive != null) {
-          DateTime now;
-          try {
-            now = sl<TrustedTimeService>().now;
-          } catch (_) {
-            now = DateTime.now();
-          }
+      if (existingActive != null) {
+        // A previous attempt that timed out has landed: that IS this check-in.
+        if (pendingId != null && existingActive.id == pendingId) {
+          _pendingCheckInIds.remove(pendingKey);
+          return existingActive;
+        }
 
-          final isSameDay = existingActive.checkInTime.year == now.year &&
-              existingActive.checkInTime.month == now.month &&
-              existingActive.checkInTime.day == now.day;
+        final isSameDay = existingActive.checkInTime.year == trustedNow.year &&
+            existingActive.checkInTime.month == trustedNow.month &&
+            existingActive.checkInTime.day == trustedNow.day;
 
-          if (isSameDay) {
-            if (existingActive.branchName == branchName) {
-              throw const ServerFailure(
-                'أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.',
-              );
-            } else {
-              throw ServerFailure(
-                'لديك تسجيل حضور نشط في فرع ${existingActive.branchName == null ? "آخر" : BranchDisplayCache.instance.displayName(existingActive.branchName!)}. يرجى تسجيل الانصراف أولاً.',
-              );
-            }
+        if (isSameDay) {
+          if (existingActive.branchName == branchName) {
+            throw const ServerFailure(
+              'أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.',
+            );
+          } else {
+            throw ServerFailure(
+              'لديك تسجيل حضور نشط في فرع ${existingActive.branchName == null ? "آخر" : BranchDisplayCache.instance.displayName(existingActive.branchName!)}. يرجى تسجيل الانصراف أولاً.',
+            );
           }
         }
-      } on Failure {
-        rethrow;
-      } catch (e) {
-        debugPrint('Active check-in verification warning: $e');
       }
 
       final Map<String, dynamic> checkInPayload = {
@@ -189,9 +194,21 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         checkInPayload['personalPhotoURL'] = trimmedPhoto;
       }
 
-      final docRef = await _attendanceCollection(organizationId)
-          .add(checkInPayload)
-          .timeout(const Duration(seconds: 15));
+      // Idempotent write: a retry after an unconfirmed attempt reuses the same
+      // document ID, so a queued (offline-persisted) write can never become a
+      // second check-in.
+      final docId =
+          pendingId ?? _attendanceCollection(organizationId).doc().id;
+      _pendingCheckInIds[pendingKey] = docId;
+      final docRef = _attendanceCollection(organizationId).doc(docId);
+      try {
+        await docRef.set(checkInPayload).timeout(const Duration(seconds: 15));
+      } on TimeoutException {
+        if (!await _existsOnServer(docRef)) {
+          throw const ServerFailure(kCheckInUnknownMessage);
+        }
+      }
+      _pendingCheckInIds.remove(pendingKey);
 
       DateTime currentTime;
       try {
@@ -251,22 +268,39 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     double long,
   ) async {
     try {
-      final lastCheckInSnapshot = await _attendanceCollection(
-        organizationId,
-      ).doc(attendanceId).get().timeout(const Duration(seconds: 15));
+      final checkInRef = _attendanceCollection(organizationId).doc(attendanceId);
+      // Deterministic ID: repeating the same check-out can't add a 2nd record.
+      final outRef = _attendanceCollection(organizationId)
+          .doc('${attendanceId}_out');
+
+      // Decide on the server only, never on the offline cache.
+      final DocumentSnapshot<Map<String, dynamic>> lastCheckInSnapshot;
+      try {
+        lastCheckInSnapshot = await checkInRef
+            .get(const GetOptions(source: Source.server))
+            .timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('Check-out server read failed: $e');
+        throw const ServerFailure(kCheckOutOfflineMessage);
+      }
 
       if (!lastCheckInSnapshot.exists) {
         throw const ServerFailure('سجل الحضور غير موجود.');
       }
       final lastData = lastCheckInSnapshot.data()!;
+      if (lastData['checkOutTime'] != null) {
+        if (lastData['checkOutDocId'] == outRef.id) {
+          // An earlier attempt that timed out has landed.
+          return _checkedOutModel(attendanceId, organizationId, lastData);
+        }
+        throw const ServerFailure(kAlreadyCheckedOutMessage);
+      }
       final userId = lastData['delegateId'] ?? lastData['userId'];
       final companyId = lastData['companyId'];
 
       // Keep a separate check_out log for history/HR, and denormalize
       // checkOutTime onto the check-in doc so marketing today-views skip
       // the historical follow-up query.
-      final outRef = _attendanceCollection(organizationId).doc();
-      final checkInRef = _attendanceCollection(organizationId).doc(attendanceId);
       final batch = firestore.batch();
       batch.set(outRef, {
         'delegateId': userId,
@@ -284,7 +318,14 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'checkOutLocation': {'latitude': lat, 'longitude': long},
         'checkOutDocId': outRef.id,
       });
-      await batch.commit().timeout(const Duration(seconds: 15));
+      try {
+        await batch.commit().timeout(const Duration(seconds: 15));
+      } on TimeoutException {
+        final confirmed = await _serverDocData(checkInRef);
+        if (confirmed?['checkOutDocId'] != outRef.id) {
+          throw const ServerFailure(kCheckOutUnknownMessage);
+        }
+      }
 
       // Auto-resolve any orphaned unclosed check-in for the same user and branch today
       try {
@@ -371,6 +412,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       throwFirestoreFailure(e, 'فشل في تسجيل الانصراف. حاول مرة أخرى.');
     } on TimeoutException {
       throwTimeoutFailure();
+    } on Failure {
+      rethrow;
     } catch (_) {
       throwUnexpectedFailure('حدث خطأ غير متوقع أثناء تسجيل الانصراف.');
     }
@@ -762,10 +805,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           .where('delegateId', isEqualTo: userId)
           .orderBy('timestamp', descending: true)
           .limit(1)
-          .getResilient(
-            timeout: const Duration(seconds: 5),
-            forceServer: true,
-          );
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 6));
 
       if (querySnapshot.docs.isEmpty) return null;
 
@@ -821,6 +862,60 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     } catch (_) {
       throwUnexpectedFailure();
     }
+  }
+
+  /// In-flight check-in attempts whose result is unknown (timed out), keyed
+  /// by delegate + day, so a retry reuses the same document ID.
+  static final Map<String, String> _pendingCheckInIds = {};
+
+  @visibleForTesting
+  static void resetPendingAttempts() => _pendingCheckInIds.clear();
+
+  static String _pendingCheckInKey(String userId, DateTime now) =>
+      '$userId|${now.year}-${now.month}-${now.day}';
+
+  DateTime _trustedNow() {
+    try {
+      return sl<TrustedTimeService>().now;
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
+  Future<Map<String, dynamic>?> _serverDocData(
+    DocumentReference<Map<String, dynamic>> ref,
+  ) async {
+    try {
+      final snap = await ref
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 6));
+      return snap.exists ? snap.data() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> _existsOnServer(
+    DocumentReference<Map<String, dynamic>> ref,
+  ) async =>
+      await _serverDocData(ref) != null;
+
+  AttendanceModel _checkedOutModel(
+    String attendanceId,
+    String organizationId,
+    Map<String, dynamic> data,
+  ) {
+    final out = data['checkOutTime'];
+    return AttendanceModel(
+      id: attendanceId,
+      userId: (data['delegateId'] ?? data['userId'] ?? '').toString(),
+      organizationId: organizationId,
+      checkInTime: (data['timestamp'] as Timestamp).toDate(),
+      checkOutTime: out is Timestamp ? out.toDate() : _trustedNow(),
+      latitude: (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
+      branchName: data['branchName'],
+    );
   }
 
   Future<void> _autoCheckOutExpiredSession({
