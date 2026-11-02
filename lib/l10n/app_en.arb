@@ -1554,8 +1554,8 @@
       "count": {}
     }
   },
-  "attAutoClosedNote": "Checked out automatically 9 hours after the shift started, since no check-out was recorded",
-  "autoClosed9h": "Auto-closed (9h)",
+  "attAutoClosedNote": "Checked out automatically 11.5 hours after the shift started, since no check-out was recorded",
+  "autoClosedAuto": "Auto-closed (11.5h)",
   "checkOut2": "Check out",
   "attCheckingLocation": "Checking location…",
   "checkIn2": "Check in",

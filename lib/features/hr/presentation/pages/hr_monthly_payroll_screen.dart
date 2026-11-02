@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -364,11 +365,11 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
               final diff = outTime.difference(inTime).inMinutes;
               if (diff > 0) totalMins += diff;
             } else {
-              // قاعدة الـ 9 ساعات: إغلاق تلقائي واحتساب 9 ساعات عمل كاملة (540 دقيقة)
+              // قاعدة الإغلاق التلقائي: احتساب مدة الإغلاق التلقائي كاملة (11.5 ساعة)
               final isPastDay = inTime.isBefore(DateTime(now.year, now.month, now.day));
-              final isElapsed9Hours = now.difference(inTime) >= const Duration(hours: 9);
-              if (isPastDay || isElapsed9Hours) {
-                totalMins += (9 * 60);
+              final isElapsedAutoClose = now.difference(inTime) >= kAttendanceAutoCloseAfter;
+              if (isPastDay || isElapsedAutoClose) {
+                totalMins += kAttendanceAutoCloseAfter.inMinutes;
               }
             }
           }

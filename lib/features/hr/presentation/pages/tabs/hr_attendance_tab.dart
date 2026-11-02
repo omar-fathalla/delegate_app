@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -101,7 +102,7 @@ class HRAttendanceRecord {
       return checkOutTime!.difference(checkInTime!);
     }
     if (isAutoCheckOut) {
-      return const Duration(hours: 9);
+      return kAttendanceAutoCloseAfter;
     }
     // إذا كان المندوب على رأس العمل اليوم ولم ينصرف بعد
     final now = DateTime.now();
@@ -135,7 +136,7 @@ class HRAttendanceRecord {
       }
       return 'لم يسجل انصراف';
     }
-    final effectiveOut = checkOutTime ?? checkInTime!.add(const Duration(hours: 9));
+    final effectiveOut = checkOutTime ?? checkInTime!.add(kAttendanceAutoCloseAfter);
     final d = effectiveOut.difference(checkInTime!);
     final hours = d.inHours;
     final minutes = d.inMinutes.remainder(60);
@@ -543,16 +544,16 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
           }
         }
 
-        // قاعدة الـ 9 ساعات: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (9 ساعات) أو كان تاريخاً سابقاً
+        // قاعدة الإغلاق التلقائي: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (11.5 ساعة) أو كان تاريخاً سابقاً
         if (checkIn != null && checkOut == null) {
           final now = DateTime.now();
           final isPastDate = _selectedDate.isBefore(DateTime(now.year, now.month, now.day));
-          final isElapsed9Hours = now.difference(checkIn) >= const Duration(hours: 9);
+          final isElapsedAutoClose = now.difference(checkIn) >= kAttendanceAutoCloseAfter;
 
-          if (isPastDate || isElapsed9Hours) {
-            checkOut = checkIn.add(const Duration(hours: 9));
+          if (isPastDate || isElapsedAutoClose) {
+            checkOut = checkIn.add(kAttendanceAutoCloseAfter);
             isAutoCheckOut = true;
-            autoCheckOutReason = 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي';
+            autoCheckOutReason = kAttendanceAutoCloseReasonAr;
           }
         }
 
@@ -3373,7 +3374,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     if (record.isAutoCheckOut) ...[
                       const SizedBox(width: 6),
                       Tooltip(
-                        message: 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً',
+                        message: 'تم إغلاق الانصراف تلقائياً بعد مرور 11.5 ساعة على بداية الوردية لعدم تسجيل الانصراف يدوياً',
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -3387,7 +3388,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                               Icon(Icons.auto_mode_rounded, size: 12, color: Colors.amber[800]),
                               const SizedBox(width: 3),
                               Text(
-                                'إغلاق تلقائي (9 س)',
+                                'إغلاق تلقائي (11.5 س)',
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: Colors.amber[900],
                                   fontWeight: FontWeight.bold,
@@ -4090,7 +4091,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
               // 2. الانصراف (Check-out)
               Tooltip(
                 message: record.isAutoCheckOut
-                    ? 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً ($checkOutStr)'
+                    ? 'تم إغلاق الانصراف تلقائياً بعد مرور 11.5 ساعة على بداية الوردية لعدم تسجيل الانصراف يدوياً ($checkOutStr)'
                     : (record.checkOutTime != null
                         ? 'وقت الانصراف: $checkOutStr'
                         : 'لم يسجل انصراف بعد'),
@@ -4132,7 +4133,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                           border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
                         ),
                         child: Text(
-                          'تلقائي (9 س)',
+                          'تلقائي (11.5 س)',
                           style: TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.bold,

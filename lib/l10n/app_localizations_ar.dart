@@ -1430,10 +1430,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get attAutoClosedNote =>
-      'أُغلق الانصراف تلقائيًا بعد 9 ساعات من بداية الوردية لعدم تسجيله يدويًا';
+      'أُغلق الانصراف تلقائيًا بعد 11.5 ساعة من بداية الوردية لعدم تسجيله يدويًا';
 
   @override
-  String get autoClosed9h => 'أُغلق تلقائيًا (9 س)';
+  String get autoClosedAuto => 'أُغلق تلقائيًا (11.5 س)';
 
   @override
   String get checkOut2 => 'تسجيل الانصراف';

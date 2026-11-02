@@ -2687,14 +2687,14 @@ abstract class AppLocalizations {
   /// No description provided for @attAutoClosedNote.
   ///
   /// In en, this message translates to:
-  /// **'Checked out automatically 9 hours after the shift started, since no check-out was recorded'**
+  /// **'Checked out automatically 11.5 hours after the shift started, since no check-out was recorded'**
   String get attAutoClosedNote;
 
-  /// No description provided for @autoClosed9h.
+  /// No description provided for @autoClosedAuto.
   ///
   /// In en, this message translates to:
-  /// **'Auto-closed (9h)'**
-  String get autoClosed9h;
+  /// **'Auto-closed (11.5h)'**
+  String get autoClosedAuto;
 
   /// No description provided for @checkOut2.
   ///

@@ -126,24 +126,24 @@ void main() {
         'checkInTime': tCheckInTimestamp,
         'checkOutTime': tCheckOutTimestamp,
         'isAutoCheckOut': true,
-        'autoCheckOutReason': 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+        'autoCheckOutReason': 'نهاية شيفت العمل (11.5 ساعة) - إغلاق تلقائي',
       };
 
       final model = AttendanceModel.fromJson(json, tId);
       expect(model.isAutoCheckOut, true);
-      expect(model.autoCheckOutReason, 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي');
+      expect(model.autoCheckOutReason, 'نهاية شيفت العمل (11.5 ساعة) - إغلاق تلقائي');
       expect(model.isEffectiveAutoCheckOut, true);
       expect(model.effectiveCheckOutTime, tCheckOutDateTime);
       expect(model.isActive, false);
 
       final toJson = model.toJson();
       expect(toJson['isAutoCheckOut'], true);
-      expect(toJson['autoCheckOutReason'], 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي');
+      expect(toJson['autoCheckOutReason'], 'نهاية شيفت العمل (11.5 ساعة) - إغلاق تلقائي');
     });
 
-    test('should dynamically calculate 9h auto checkout when session exceeded 9 hours without checkout', () {
-      // Checked in 10 hours ago
-      final tenHoursAgo = DateTime.now().subtract(const Duration(hours: 10));
+    test('should dynamically calculate 11.5h auto checkout when session exceeded 11.5 hours without checkout', () {
+      // Checked in 12 hours ago
+      final tenHoursAgo = DateTime.now().subtract(const Duration(hours: 12));
       final Map<String, dynamic> json = {
         'userId': tUserId,
         'organizationId': 'org1',
@@ -156,12 +156,12 @@ void main() {
       expect(model.isEffectiveAutoCheckOut, true);
       expect(model.isActive, false);
       expect(
-        model.effectiveCheckOutTime!.difference(tenHoursAgo).inHours,
-        9,
+        model.effectiveCheckOutTime!.difference(tenHoursAgo).inMinutes,
+        690,
       );
     });
 
-    test('should remain active when checked in within 9 hours without checkout', () {
+    test('should remain active when checked in within 11.5 hours without checkout', () {
       // Checked in 2 hours ago
       final twoHoursAgo = DateTime.now().subtract(const Duration(hours: 2));
       final Map<String, dynamic> json = {

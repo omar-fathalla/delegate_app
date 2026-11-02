@@ -1429,10 +1429,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get attAutoClosedNote =>
-      'Checked out automatically 9 hours after the shift started, since no check-out was recorded';
+      'Checked out automatically 11.5 hours after the shift started, since no check-out was recorded';
 
   @override
-  String get autoClosed9h => 'Auto-closed (9h)';
+  String get autoClosedAuto => 'Auto-closed (11.5h)';
 
   @override
   String get checkOut2 => 'Check out';

@@ -178,7 +178,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         }
       },
       (result) {
-        // Check for any active check-in (within 9h and not checked out)
+        // Check for any active check-in (within the 11.5h auto-close window and not checked out)
         Attendance? activeAttendance;
         try {
           activeAttendance = result.items.firstWhere(

@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -890,11 +891,11 @@ class DelegateTrackingService {
             ? checkInTs.toDate()
             : (checkInTs is String ? DateTime.tryParse(checkInTs) : null);
 
-        // إذا كان المندوب قد انصرف أو انتهت ورديته (9 ساعات كاملة)، لا نضيفه للمتابعة الحية
+        // إذا كان المندوب قد انصرف أو انتهت ورديته (11.5 ساعة كاملة)، لا نضيفه للمتابعة الحية
         final outTime = latestCheckOuts[delegateId];
         if (checkInTime != null) {
           if (outTime != null && outTime.isAfter(checkInTime)) continue;
-          if (now.difference(checkInTime) >= const Duration(hours: 9)) continue;
+          if (now.difference(checkInTime) >= kAttendanceAutoCloseAfter) continue;
         }
 
         await initializeTrackingSession(

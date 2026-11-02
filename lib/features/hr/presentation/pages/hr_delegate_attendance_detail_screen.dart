@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
@@ -73,7 +74,7 @@ class DelegateAttendanceSession {
     return checkInTime.year == now.year &&
         checkInTime.month == now.month &&
         checkInTime.day == now.day &&
-        now.difference(checkInTime) < const Duration(hours: 9);
+        now.difference(checkInTime) < kAttendanceAutoCloseAfter;
   }
 
   /// Formatted duration string e.g. "8 س و 15 د"
@@ -370,15 +371,15 @@ class _HRDelegateAttendanceDetailScreenState
       String? autoCheckOutReason = checkOutData?['autoCheckOutReason']?.toString() ??
           checkInData['autoCheckOutReason']?.toString();
 
-      // قاعدة الـ 9 ساعات: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (9 ساعات) أو كان تاريخاً سابقاً
+      // قاعدة الإغلاق التلقائي: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (11.5 ساعة) أو كان تاريخاً سابقاً
       if (checkOutTime == null) {
         final now = DateTime.now();
         final isPastDay = checkInTime.isBefore(DateTime(now.year, now.month, now.day));
-        final isElapsed9Hours = now.difference(checkInTime) >= const Duration(hours: 9);
-        if (isPastDay || isElapsed9Hours) {
-          checkOutTime = checkInTime.add(const Duration(hours: 9));
+        final isElapsedAutoClose = now.difference(checkInTime) >= kAttendanceAutoCloseAfter;
+        if (isPastDay || isElapsedAutoClose) {
+          checkOutTime = checkInTime.add(kAttendanceAutoCloseAfter);
           isAutoCheckOut = true;
-          autoCheckOutReason = 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي';
+          autoCheckOutReason = kAttendanceAutoCloseReasonAr;
         }
       }
 
@@ -2113,7 +2114,7 @@ class _HRDelegateAttendanceDetailScreenState
                                         ),
                                         if (s.isAutoCheckOut)
                                           Tooltip(
-                                            message: 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً',
+                                            message: 'تم إغلاق الانصراف تلقائياً بعد مرور 11.5 ساعة على بداية الوردية لعدم تسجيل الانصراف يدوياً',
                                             child: Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
                                               decoration: BoxDecoration(
@@ -2122,7 +2123,7 @@ class _HRDelegateAttendanceDetailScreenState
                                                 border: Border.all(color: Colors.deepPurple.withValues(alpha: 0.3)),
                                               ),
                                               child: Text(
-                                                'تلقائي (9 س)',
+                                                'تلقائي (11.5 س)',
                                                 style: TextStyle(
                                                   fontSize: 9.5,
                                                   fontWeight: FontWeight.bold,
@@ -3440,7 +3441,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                             Icon(Icons.auto_mode_rounded, size: 18, color: Colors.deepPurple.shade900),
                             const SizedBox(width: 8),
                             Text(
-                              'تم إغلاق الانصراف تلقائياً (نظام الـ 9 ساعات)',
+                              'تم إغلاق الانصراف تلقائياً (نظام الـ 11.5 ساعة)',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -3452,7 +3453,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           session.autoCheckOutReason ??
-                              'تم إغلاق الجلسة أوتوماتيكياً لاكتمال مدة الشفت (9 ساعات) دون تسجيل انصراف يدوي من المندوب.',
+                              'تم إغلاق الجلسة أوتوماتيكياً لاكتمال مدة الشفت (11.5 ساعة) دون تسجيل انصراف يدوي من المندوب.',
                           style: TextStyle(fontSize: 12, color: Colors.deepPurple.shade900),
                         ),
                       ],

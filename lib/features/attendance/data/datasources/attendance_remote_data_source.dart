@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -645,8 +646,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           ),
         );
       } else {
-        // إذا مر أكثر من 9 ساعات على وقت تسجيل الحضور ولم يسجل انصراف، يتم إغلاقه ديناميكياً
-        final isExpired = DateTime.now().difference(checkInTime) >= const Duration(hours: 9);
+        // إذا مر أكثر من 11.5 ساعة على وقت تسجيل الحضور ولم يسجل انصراف، يتم إغلاقه ديناميكياً
+        final isExpired = DateTime.now().difference(checkInTime) >= kAttendanceAutoCloseAfter;
         if (isExpired) {
           history.add(
             AttendanceModel(
@@ -654,12 +655,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
               userId: userId,
               organizationId: targetOrgId,
               checkInTime: checkInTime,
-              checkOutTime: checkInTime.add(const Duration(hours: 9)),
+              checkOutTime: checkInTime.add(kAttendanceAutoCloseAfter),
               latitude: lat,
               longitude: lng,
               branchName: branchName,
               isAutoCheckOut: true,
-              autoCheckOutReason: 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+              autoCheckOutReason: kAttendanceAutoCloseReasonAr,
             ),
           );
         } else {
@@ -719,13 +720,13 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           nowTime = DateTime.now();
         }
 
-        if (nowTime.difference(checkInTime) >= const Duration(hours: 9)) {
-          // انتهت مدة الشفت (9 ساعات) - إغلاق الجلسة تلقائياً في الخلفية وتحرير المندوب
+        if (nowTime.difference(checkInTime) >= kAttendanceAutoCloseAfter) {
+          // انتهت مدة الشفت (11.5 ساعة) - إغلاق الجلسة تلقائياً في الخلفية وتحرير المندوب
           unawaited(
             _autoCheckOutExpiredSession(
               checkInDoc: doc,
               organizationId: organizationId,
-              autoCheckOutTime: checkInTime.add(const Duration(hours: 9)),
+              autoCheckOutTime: checkInTime.add(kAttendanceAutoCloseAfter),
             ),
           );
           return null;
@@ -778,7 +779,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'location': {'latitude': lat, 'longitude': lng},
         'relatedCheckInId': checkInDoc.id,
         'isAutoCheckOut': true,
-        'autoCheckOutReason': 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+        'autoCheckOutReason': kAttendanceAutoCloseReasonAr,
         'branchName': ?branchName,
       });
       autoBatch.update(checkInDoc.reference, {
@@ -786,7 +787,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'checkOutLocation': {'latitude': lat, 'longitude': lng},
         'checkOutDocId': autoOutRef.id,
         'isAutoCheckOut': true,
-        'autoCheckOutReason': 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+        'autoCheckOutReason': kAttendanceAutoCloseReasonAr,
       });
       await autoBatch.commit();
 

@@ -1951,7 +1951,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                         ),
                                         child: Tooltip(
                                           message: AppLocalizations.of(context)!.attAutoClosedNote,
-                                          child: Text(AppLocalizations.of(context)!.autoClosed9h,
+                                          child: Text(AppLocalizations.of(context)!.autoClosedAuto,
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
