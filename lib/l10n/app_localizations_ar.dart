@@ -2710,4 +2710,19 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get catOther => 'أخرى';
+
+  @override
+  String get themeModeTitle => 'المظهر';
+
+  @override
+  String get themeModeSystem => 'تلقائي (حسب الموبايل)';
+
+  @override
+  String get themeModeSystemHint => 'يتبع إعداد الوضع الداكن في جهازك';
+
+  @override
+  String get themeModeLight => 'فاتح';
+
+  @override
+  String get themeModeDark => 'داكن';
 }

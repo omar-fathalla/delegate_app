@@ -7,6 +7,7 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 
 import 'package:delegate_app/main.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/config/theme/color_schemes.dart';
@@ -106,24 +107,13 @@ class SettingsScreen extends StatelessWidget {
                           ),
                           _buildSettingsTile(
                             context: context,
-                            icon: Icons.dark_mode_rounded,
-                            title: l10n.darkMode,
-                            subtitle:
-                                context.watch<ThemeCubit>().state.isDarkMode
-                                    ? l10n.switchOn
-                                    : l10n.switchOff,
-                            trailing: Switch(
-                              value:
-                                  context.watch<ThemeCubit>().state.isDarkMode,
-                              onChanged: (val) =>
-                                  context.read<ThemeCubit>().toggleTheme(),
-                              activeTrackColor: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.5),
-                              activeThumbColor: Theme.of(
-                                context,
-                              ).colorScheme.primary,
+                            icon: Symbols.dark_mode_rounded,
+                            title: l10n.themeModeTitle,
+                            subtitle: _themeModeLabel(
+                              l10n,
+                              context.watch<ThemeCubit>().state.themeMode,
                             ),
+                            onTap: () => _showThemeModeSheet(context),
                           ),
                         ],
                       ),
@@ -307,6 +297,62 @@ class SettingsScreen extends StatelessWidget {
           fontSize: 14,
           fontWeight: FontWeight.bold,
           color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    );
+  }
+
+  String _themeModeLabel(AppLocalizations l10n, ThemeMode mode) =>
+      switch (mode) {
+        ThemeMode.system => l10n.themeModeSystem,
+        ThemeMode.light => l10n.themeModeLight,
+        ThemeMode.dark => l10n.themeModeDark,
+      };
+
+  Future<void> _showThemeModeSheet(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cubit = context.read<ThemeCubit>();
+    return showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: BlocBuilder<ThemeCubit, ThemeState>(
+          bloc: cubit,
+          builder: (_, state) => RadioGroup<ThemeMode>(
+            groupValue: state.themeMode,
+            onChanged: (m) {
+              if (m == null) return;
+              cubit.setThemeMode(m);
+              Navigator.of(sheetContext).pop();
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  child: Text(
+                    l10n.themeModeTitle,
+                    style: Theme.of(sheetContext).textTheme.titleLarge,
+                  ),
+                ),
+                for (final (m, icon) in [
+                  (ThemeMode.system, Symbols.brightness_auto_rounded),
+                  (ThemeMode.light, Symbols.light_mode_rounded),
+                  (ThemeMode.dark, Symbols.dark_mode_rounded),
+                ])
+                  RadioListTile<ThemeMode>(
+                    key: ValueKey('theme_mode_${m.name}'),
+                    value: m,
+                    secondary: Icon(icon, fill: state.themeMode == m ? 1 : 0),
+                    title: Text(_themeModeLabel(l10n, m)),
+                    subtitle: m == ThemeMode.system
+                        ? Text(l10n.themeModeSystemHint)
+                        : null,
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
         ),
       ),
     );

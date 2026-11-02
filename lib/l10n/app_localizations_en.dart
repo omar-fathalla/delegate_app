@@ -2707,4 +2707,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get catOther => 'Other';
+
+  @override
+  String get themeModeTitle => 'Appearance';
+
+  @override
+  String get themeModeSystem => 'System default';
+
+  @override
+  String get themeModeSystemHint => 'Follows your phone\'s dark theme setting';
+
+  @override
+  String get themeModeLight => 'Light';
+
+  @override
+  String get themeModeDark => 'Dark';
 }

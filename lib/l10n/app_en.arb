@@ -2270,5 +2270,10 @@
   },
   "catUnauthorizedPhoto": "Photography without permission",
   "catDataMissing": "Missing data / features not enabled",
-  "catOther": "Other"
+  "catOther": "Other",
+  "themeModeTitle": "Appearance",
+  "themeModeSystem": "System default",
+  "themeModeSystemHint": "Follows your phone's dark theme setting",
+  "themeModeLight": "Light",
+  "themeModeDark": "Dark"
 }

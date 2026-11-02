@@ -1755,5 +1755,10 @@
   "deductedWithValue": "المخصوم: {value}",
   "catUnauthorizedPhoto": "تصوير بدون إذن رسمي",
   "catDataMissing": "عدم تفعيل خصائص / بيانات ناقصة",
-  "catOther": "أخرى"
+  "catOther": "أخرى",
+  "themeModeTitle": "المظهر",
+  "themeModeSystem": "تلقائي (حسب الموبايل)",
+  "themeModeSystemHint": "يتبع إعداد الوضع الداكن في جهازك",
+  "themeModeLight": "فاتح",
+  "themeModeDark": "داكن"
 }

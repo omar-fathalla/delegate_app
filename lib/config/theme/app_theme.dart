@@ -256,10 +256,46 @@ class AppTheme {
 
   static ThemeData darkTheme([Color? seedColor]) {
     final color = seedColor ?? AppColorSchemes.seedColors[0];
-    final colorScheme = ColorScheme.fromSeed(
+    var colorScheme = ColorScheme.fromSeed(
       seedColor: color,
       brightness: Brightness.dark,
     );
+    // Approved M3 dark values (Material Design 3 review, HCT tones fitted
+    // from the light palette). fromSeed alone drops primary chroma, so pin
+    // every role explicitly. Neutral surfaces apply to every seed.
+    colorScheme = colorScheme.copyWith(
+      surface: const Color(0xFF141313),
+      surfaceDim: const Color(0xFF141313),
+      surfaceBright: const Color(0xFF3A3939),
+      surfaceContainerLowest: const Color(0xFF0F0E0E),
+      surfaceContainerLow: const Color(0xFF1C1B1C),
+      surfaceContainer: const Color(0xFF201F20),
+      surfaceContainerHigh: const Color(0xFF2B2A2A),
+      surfaceContainerHighest: const Color(0xFF363435),
+      onSurface: const Color(0xFFE6E1E1),
+      onSurfaceVariant: const Color(0xFFCAC5CB),
+      // ignore: deprecated_member_use
+      surfaceVariant: const Color(0xFF48464B),
+      outline: const Color(0xFF938F95),
+      outlineVariant: const Color(0xFF48464B),
+      inverseSurface: const Color(0xFFE6E1E1),
+      onInverseSurface: const Color(0xFF313030),
+      error: const Color(0xFFFFB4AB),
+      onError: const Color(0xFF690005),
+      errorContainer: const Color(0xFF93000A),
+      onErrorContainer: const Color(0xFFFFDAD6),
+    );
+    if (color.toARGB32() == 0xFF6750A4) {
+      colorScheme = colorScheme.copyWith(
+        primary: const Color(0xFFCFBCFF),
+        onPrimary: const Color(0xFF381E72),
+        primaryContainer: const Color(0xFF4F378A),
+        onPrimaryContainer: const Color(0xFFE9DDFF),
+        inversePrimary: const Color(0xFF6750A4),
+        secondaryContainer: const Color(0xFF4A4458),
+        onSecondaryContainer: const Color(0xFFE8DEF8),
+      );
+    }
     final baseTextTheme = GoogleFonts.cairoTextTheme().apply(
       bodyColor: colorScheme.onSurface,
       displayColor: colorScheme.onSurface,
