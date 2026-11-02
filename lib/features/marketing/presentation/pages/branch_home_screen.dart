@@ -210,8 +210,16 @@ class _BranchHomeViewState extends State<_BranchHomeView>
   void didChangeDependencies() {
     super.didChangeDependencies();
     // TickerMode (routes) + the shell's isActive (tabs) → see LiveTabVisibility.
-    _lastLiveVisible = liveTabVisible;
-    _syncLiveListener();
+    // A pushed route flips TickerMode (verified in round5_test). Route the
+    // change through onLiveVisibilityChanged after the frame so returning
+    // from a route also gets the stale-data reload (shouldReloadOnShow).
+    if (liveTabVisible != _lastLiveVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) onLiveVisibilityChanged();
+      });
+    } else {
+      _syncLiveListener();
+    }
   }
 
   bool _isSelectedDateToday() {
