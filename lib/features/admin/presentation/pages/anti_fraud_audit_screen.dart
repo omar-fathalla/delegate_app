@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/utils/cache_first_query.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -65,6 +66,19 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   final Map<String, List<_CompanyContact>> _companyContactsCache = {};
   bool _isExporting = false;
   List<Map<String, dynamic>> _currentFilteredLogs = [];
+
+  /// Read-reduction Phase 2: listeners are created once per query and
+  /// reused across rebuilds. Calling `.snapshots()` inside `build()` gave
+  /// StreamBuilder a new stream on every setState (filter chips, search),
+  /// which re-subscribed and re-billed the whole result set each time.
+  /// Keyed by slot + scope (the only inputs to these queries).
+  final Map<String, Stream<QuerySnapshot>> _memoStreams = {};
+
+  Stream<QuerySnapshot> _memoStream(String slot, Query query) {
+    final key = '$slot|$_isCompanyScoped|$_isOrgScoped|'
+        '${widget.delegate.companyUID}|${widget.delegate.organizationUID}';
+    return _memoStreams[key] ??= query.snapshots();
+  }
 
   bool get _isCompanyScoped =>
       widget.delegate.companyUID.isNotEmpty &&
@@ -224,7 +238,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
 
   Future<void> _loadBranches() async {
     try {
-      final snap = await FirebaseFirestore.instance.collection('branches').get();
+      final snap = await cacheFirstGet(
+          FirebaseFirestore.instance.collection('branches'),
+          cacheKey: 'anti_fraud/branches');
       final list = snap.docs.map((d) {
         final data = d.data();
         final name = (data['branchName'] as String?) ??
@@ -316,7 +332,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
 
   Future<void> _loadCompanies() async {
     try {
-      final snap = await FirebaseFirestore.instance.collectionGroup('companies').get();
+      final snap = await cacheFirstGet(
+          FirebaseFirestore.instance.collectionGroup('companies'),
+          cacheKey: 'anti_fraud/companies');
       final map = <String, String>{};
       for (final doc in snap.docs) {
         final data = doc.data();
@@ -1444,7 +1462,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     }
 
     final body = StreamBuilder<QuerySnapshot>(
-      stream: auditQuery.snapshots(),
+      stream: _memoStream('audit', auditQuery),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -3748,7 +3766,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream: requestsQuery.snapshots(),
+      stream: _memoStream('unbind', requestsQuery),
       builder: (context, requestsSnapshot) {
         if (requestsSnapshot.connectionState == ConnectionState.waiting && !requestsSnapshot.hasData) {
           return const Center(
