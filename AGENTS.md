@@ -109,5 +109,13 @@
   - **Dropdown Triggers**: Height `44px`, corner radius `14px`, background `colorScheme.surfaceContainerLow`, outline border `colorScheme.outlineVariant`. In RTL: leading Google icon on the right, label in the center (`Expanded`), and `Icons.expand_more_rounded` on the far left.
   - **No Unicode Emojis or Non-Material Symbols**: Never embed unicode symbols like `⬇`, `⬆`, or custom glyphs in labels; use official Google Material rounded icons (`Icons.*_rounded`) exclusively.
 
+## Cursor Cloud specific instructions
+
+- Flutter **3.41.2** (Dart 3.11.0) matches `pubspec.yaml` (`sdk: ^3.11.0`) and `.github/workflows/deploy-ios.yml`. Cloud Agent setup installs it at `/opt/flutter` and links `flutter` and `dart` into `/usr/local/bin`, because login shells do not load `~/.bashrc`.
+- `package-lock.json` is gitignored. Install Node dependencies with `npm install` at the repo root (Firestore rules tests) and `npm install --prefix functions` (Node 22). Do not use `npm ci`.
+- Web dev server (desktop is the primary UI): `flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8090`. After splash, an unauthenticated session lands on the Arabic login screen (`تسجيل الدخول`). Leave port **8080** for the Firestore emulator used by `npm run test:rules`.
+- `flutter analyze` reports existing non-blocking issues and exits 1 (unused element, dangling doc comment). `flutter test` is the functional check. Do not run `flutter build apk`, `appbundle`, or `ipa` unless the user asks.
+- Cloud Functions: `npm test` inside `functions/`.
+
 
 
