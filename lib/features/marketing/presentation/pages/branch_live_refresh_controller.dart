@@ -110,6 +110,23 @@ class BranchLiveRefreshController {
   }
 }
 
+/// Max age of the last successful load before a tab that becomes visible
+/// again reloads (the live listener skips its first snapshot, so changes made
+/// while hidden would otherwise not show).
+const Duration kReloadOnShowAfter = Duration(seconds: 30);
+
+/// True when a tab flipping hidden → visible should reload.
+bool shouldReloadOnShow({
+  required bool wasVisible,
+  required bool isVisible,
+  required DateTime? lastSync,
+  required DateTime now,
+  Duration maxAge = kReloadOnShowAfter,
+}) =>
+    !wasVisible &&
+    isVisible &&
+    (lastSync == null || now.difference(lastSync) > maxAge);
+
 /// True when a screen that was following "today" should jump to the new day
 /// (midnight passed while open, or the app resumes on a later day).
 bool shouldRollOverToToday({

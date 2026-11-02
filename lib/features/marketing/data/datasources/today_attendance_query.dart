@@ -85,6 +85,10 @@ Set<String> legacyBranchNameVariants(String branch) {
         for (final o in perWord[i]) i == 0 ? o : '$c $o',
     ];
     if (combos.length > kMaxLegacyVariantsPerBranch) {
+      debugPrint(
+        'legacyBranchNameVariants: "$trimmed" has ${combos.length}+ '
+        'spellings, truncated to $kMaxLegacyVariantsPerBranch',
+      );
       combos = combos.sublist(0, kMaxLegacyVariantsPerBranch);
     }
   }
@@ -167,17 +171,22 @@ Future<TodayAttendanceFetch> fetchTodayAttendanceDocs({
     final terms = <String>{
       for (final b in legacyTargets) ...legacyBranchNameVariants(b),
     };
-    for (final chunk in chunkList(terms.toList(), kBranchWhereInChunkSize)) {
-      queries++;
-      final snap = await firestore
-          .collection(collection)
-          .where('organizationId', isEqualTo: organizationId)
-          .where('branchName', whereIn: chunk)
-          .where('timestamp', isGreaterThanOrEqualTo: startTs)
-          .where('timestamp', isLessThan: endTs)
-          .limit(kTodayAttendanceQueryLimit)
-          // Bounded fallback: default source (no forceServer) per plan §1.5.
-          .get();
+    // Chunks are independent → run them in parallel.
+    final chunks = chunkList(terms.toList(), kBranchWhereInChunkSize);
+    queries += chunks.length;
+    final snaps = await Future.wait([
+      for (final chunk in chunks)
+        firestore
+            .collection(collection)
+            .where('organizationId', isEqualTo: organizationId)
+            .where('branchName', whereIn: chunk)
+            .where('timestamp', isGreaterThanOrEqualTo: startTs)
+            .where('timestamp', isLessThan: endTs)
+            .limit(kTodayAttendanceQueryLimit)
+            // Bounded fallback: default source (no forceServer) per plan §1.5.
+            .get(),
+    ]);
+    for (final snap in snaps) {
       for (final d in snap.docs) {
         byId[d.id] = d;
       }

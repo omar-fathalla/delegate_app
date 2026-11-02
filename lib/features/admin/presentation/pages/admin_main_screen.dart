@@ -61,9 +61,18 @@ class AdminMainScreen extends StatefulWidget {
 }
 
 class _AdminMainScreenState extends State<AdminMainScreen> {
-  int _currentIndex = const bool.fromEnvironment('REAL_TEST_START_BRANCH_TAB')
+  int _tabIndex = const bool.fromEnvironment('REAL_TEST_START_BRANCH_TAB')
       ? 2
       : 0;
+  int get _currentIndex => _tabIndex;
+
+  /// Every tab change goes through here (all handlers call
+  /// `setState(() => _currentIndex = …)`), so the branch tab's isActive is
+  /// updated in the handler rather than during build.
+  set _currentIndex(int value) {
+    _tabIndex = value;
+    _branchTabActive.value = value == 2 && isBranchesMarketingManager;
+  }
   late final List<Widget> _screens;
   Widget? _branchHomeCache;
 
@@ -72,6 +81,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
   @override
   void initState() {
     super.initState();
+    _branchTabActive.value = _tabIndex == 2 && isBranchesMarketingManager;
     final delegate = widget.delegate;
     if (isSuperAdmin) {
       _screens = [
@@ -198,7 +208,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         isActive: _branchTabActive,
       );
     }
-    _branchTabActive.value = _currentIndex == 2 && _branchHomeCache != null;
     return [
       for (var i = 0; i < _screens.length; i++)
         if (i == 2)

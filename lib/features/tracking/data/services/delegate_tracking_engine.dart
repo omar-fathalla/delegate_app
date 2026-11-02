@@ -100,7 +100,7 @@ class DelegateTrackingEngine {
     await _startBackgroundPositionStream();
 
     // ج. إرسال أول نبضة قياس فوري
-    await triggerTelemetryPing();
+    await triggerTelemetryPing(force: true);
 
     // د. تشغيل المؤقت الدوري للحفاظ على تحديث حالة البطارية والاتصال أثناء التوقف
     _periodicTimer?.cancel();
@@ -132,7 +132,8 @@ class DelegateTrackingEngine {
             _positionStreamSubscription?.pause();
           } else {
             _positionStreamSubscription?.resume();
-            unawaited(triggerTelemetryPing());
+            // Supervisor re-enabled tracking: send now, skip the 90 s gate.
+            unawaited(triggerTelemetryPing(force: true));
           }
         }
       }, onError: (err) {
@@ -301,7 +302,9 @@ class DelegateTrackingEngine {
   }
 
   /// 2. إرسال نبضة قياس حي عند الطلب أو دورياً
-  Future<void> triggerTelemetryPing() async {
+  /// [force] bypasses the 50 m / 90 s gate (first ping of a session,
+  /// supervisor re-enable, manual ping). The periodic heartbeat stays gated.
+  Future<void> triggerTelemetryPing({bool force = false}) async {
     final delegateId = _activeDelegateId;
     if (delegateId == null || !_isTracking || !_remoteTrackingEnabled) return;
 
@@ -323,7 +326,11 @@ class DelegateTrackingEngine {
         ),
       );
 
-      await handlePositionIfDue(position);
+      if (force) {
+        await _handleIncomingPosition(position);
+      } else {
+        await handlePositionIfDue(position);
+      }
     } catch (e) {
       debugPrint('⚠️ [DelegateTrackingEngine] Telemetry ping error: $e');
     }

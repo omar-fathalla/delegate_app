@@ -83,7 +83,26 @@ class _BranchHomeViewState extends State<_BranchHomeView>
   ValueListenable<bool>? get liveActiveListenable => widget.isActive;
 
   @override
-  void onLiveVisibilityChanged() => _syncLiveListener();
+  void onLiveVisibilityChanged() {
+    final visible = liveTabVisible;
+    final reload = shouldReloadOnShow(
+      wasVisible: _lastLiveVisible,
+      isVisible: visible,
+      lastSync: _lastSyncTime,
+      now: DateTime.now(),
+    );
+    _lastLiveVisible = visible;
+    if (reload && mounted && _favoriteBranches.isNotEmpty) {
+      // Back on the tab: catch up on check-ins made while hidden (the
+      // listener skips its initial snapshot). _loadAllBranches re-syncs the
+      // listener itself.
+      _loadAllBranches(context, _favoriteBranches);
+      return;
+    }
+    _syncLiveListener();
+  }
+
+  bool _lastLiveVisible = true;
 
   /// Whether the user is following "today" (vs. browsing a past date), so a
   /// day change (midnight or resume on a later day) rolls over to the new day.
@@ -191,6 +210,7 @@ class _BranchHomeViewState extends State<_BranchHomeView>
   void didChangeDependencies() {
     super.didChangeDependencies();
     // TickerMode (routes) + the shell's isActive (tabs) → see LiveTabVisibility.
+    _lastLiveVisible = liveTabVisible;
     _syncLiveListener();
   }
 

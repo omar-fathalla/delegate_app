@@ -35,7 +35,19 @@ class MarketingMainScreen extends StatefulWidget {
 }
 
 class _MarketingMainScreenState extends State<MarketingMainScreen> {
-  int _currentIndex = 0;
+  int _tabIndex = 0;
+  int get _currentIndex => _tabIndex;
+
+  /// Index of BranchHomeScreen in the current tab list (-1 if absent);
+  /// recorded in build, used by the setter below.
+  int _branchTabIndex = -1;
+
+  /// All tab handlers assign through this setter, so isActive is updated in
+  /// the handler rather than during build.
+  set _currentIndex(int value) {
+    _tabIndex = value;
+    _branchTabActive.value = _branchTabIndex >= 0 && value == _branchTabIndex;
+  }
 
   /// True only while the branch-attendance tab is selected (read-reduction:
   /// stops its live listener/timers when another tab is shown).
@@ -182,8 +194,17 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
             ),
           ];
 
-    _branchTabActive.value =
-        screens.indexWhere((w) => w is BranchHomeScreen) == _currentIndex;
+    // Only records the index; the notifier is driven by the tab handlers.
+    // If the list itself changed (role) and the flag is out of sync, fix it
+    // after the frame instead of notifying listeners mid-build.
+    _branchTabIndex = screens.indexWhere((w) => w is BranchHomeScreen);
+    final branchActive =
+        _branchTabIndex >= 0 && _branchTabIndex == _currentIndex;
+    if (_branchTabActive.value != branchActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _currentIndex = _currentIndex;
+      });
+    }
 
     PopupMenuItem<String> buildPopupItem({
       required String value,
