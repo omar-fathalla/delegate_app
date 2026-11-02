@@ -26,17 +26,17 @@ class AppSnackBar {
       SnackBar(
         content: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.error_outline_rounded,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onError,
               size: 20,
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 text,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onError,
                   fontWeight: FontWeight.w600,
                   fontSize: 13.5,
                 ),
@@ -59,17 +59,17 @@ class AppSnackBar {
       SnackBar(
         content: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.check_circle_rounded,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onPrimary,
               size: 20,
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 text,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimary,
                   fontWeight: FontWeight.w600,
                   fontSize: 13.5,
                 ),

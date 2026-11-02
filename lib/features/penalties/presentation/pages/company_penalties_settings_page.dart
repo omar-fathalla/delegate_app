@@ -1029,10 +1029,18 @@ class _CompanyPenaltiesSettingsPageState
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [
-                            colorScheme.errorContainer,
-                            colorScheme.surfaceContainerHighest,
-                          ],
+                          // Dark: no large errorContainer fill (M3 dark
+                          // guidance); light is unchanged.
+                          colors: Theme.of(context).brightness ==
+                                  Brightness.dark
+                              ? [
+                                  colorScheme.surfaceContainer,
+                                  colorScheme.surfaceContainerHigh,
+                                ]
+                              : [
+                                  colorScheme.errorContainer,
+                                  colorScheme.surfaceContainerHighest,
+                                ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),

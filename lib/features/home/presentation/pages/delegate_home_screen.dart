@@ -450,7 +450,29 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SyncStatusBanner(),
-              M3StaggeredItem(index: 0, child: _buildWelcomeHeroCard(context)),
+              M3StaggeredItem(
+                index: 0,
+                child: Builder(
+                  builder: (context) {
+                    // Dark: hero uses primaryContainer/onPrimaryContainer so
+                    // a large light-purple block doesn't glare. Light unchanged.
+                    final t = Theme.of(context);
+                    if (t.brightness != Brightness.dark) {
+                      return _buildWelcomeHeroCard(context);
+                    }
+                    final cs = t.colorScheme;
+                    return Theme(
+                      data: t.copyWith(
+                        colorScheme: cs.copyWith(
+                          primary: cs.primaryContainer,
+                          onPrimary: cs.onPrimaryContainer,
+                        ),
+                      ),
+                      child: Builder(builder: _buildWelcomeHeroCard),
+                    );
+                  },
+                ),
+              ),
               const SizedBox(height: 16),
               M3StaggeredItem(
                   index: 1, child: _buildMonthlyAttendanceSummaryCard(context)),
@@ -1923,10 +1945,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                                 ),
                                 child: Text(
                                   AppLocalizations.of(context)!.pendingCountBadge(pendingCount),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: colorScheme.onTertiaryContainer,
                                   ),
                                 ),
                               ),
