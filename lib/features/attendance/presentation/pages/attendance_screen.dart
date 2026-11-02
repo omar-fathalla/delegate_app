@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
+import 'package:delegate_app/features/attendance/domain/monthly_attendance_stats.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
@@ -58,6 +60,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   List<String> _dayKeys = [];
   String _chainFilter = 'all'; // 'all' or normalized chain name
   int _allAttendedDaysCount = 0;
+
+  /// All sessions of [_monthSessionsFor] (whole month, not the loaded page).
+  /// Month figures and chain chips are computed from this when available.
+  List<Attendance>? _monthSessions;
+  DateTime? _monthSessionsFor;
+  int _monthSessionsRequestId = 0;
   List<String> _availableChains = [];
   Map<String, int> _chainDaysCount = {};
   int _approvedLeavesThisMonth = 0;
@@ -241,7 +249,40 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     return _formatChainName(raw, branchName: branchName, isArabic: isArabic);
   }
 
+  bool get _hasMonthSessionsForSelected =>
+      _monthSessions != null &&
+      _monthSessionsFor != null &&
+      _monthSessionsFor!.year == _selectedMonth.year &&
+      _monthSessionsFor!.month == _selectedMonth.month;
+
+  /// Loads every session of the selected month so the month summary and
+  /// chain chips never depend on how many history pages were scrolled.
+  Future<void> _loadMonthSessions() async {
+    if (!sl.isRegistered<GetHistoryForMonth>()) return;
+    final month = DateTime(_selectedMonth.year, _selectedMonth.month);
+    final requestId = ++_monthSessionsRequestId;
+    try {
+      final result = await sl<GetHistoryForMonth>()(
+        GetHistoryForMonthParams(
+          userId: widget.delegate.uid,
+          month: month,
+          nationalityID: widget.delegate.nationalityID,
+          phoneNumber: widget.delegate.phoneNumber,
+        ),
+      );
+      if (!mounted || requestId != _monthSessionsRequestId) return;
+      result.fold((_) {}, (sessions) {
+        setState(() {
+          _monthSessions = sessions;
+          _monthSessionsFor = month;
+          _recomputeFilteredHistory();
+        });
+      });
+    } catch (_) {}
+  }
+
   Future<void> _loadApprovedLeaves() async {
+    unawaited(_loadMonthSessions());
     try {
       final snap = await FirebaseFirestore.instance
           .collection('leave_requests')
@@ -475,7 +516,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       registerChain(orgName);
     }
 
-    for (final item in _rawHistory) {
+    // Whole-month sessions when loaded; otherwise the loaded page as a
+    // temporary preview until the month query returns.
+    final statsSource =
+        _hasMonthSessionsForSelected ? _monthSessions! : _rawHistory;
+    for (final item in statsSource) {
       if (item.checkInTime.month == _selectedMonth.month &&
           item.checkInTime.year == _selectedMonth.year) {
         final dayKey = DateFormat('yyyy-MM-dd').format(item.checkInTime);
@@ -758,54 +803,28 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
   int _calculateAbsentDays() {
-    final totalDaysInMonth = DateUtils.getDaysInMonth(
-      _selectedMonth.year,
-      _selectedMonth.month,
-    );
-    final trustedNow = _getTrustedNow();
-    final isCurrentMonth = _selectedMonth.year == trustedNow.year &&
-        _selectedMonth.month == trustedNow.month;
-    final isPastMonth = _selectedMonth.isBefore(
-      DateTime(trustedNow.year, trustedNow.month, 1),
-    );
-    final isFutureMonth = _selectedMonth.isAfter(
-      DateTime(trustedNow.year, trustedNow.month, 1),
-    );
-
-    final attendedDays = _allAttendedDaysCount;
-
-    if (isPastMonth) {
-      return (26 - attendedDays - _approvedLeavesThisMonth).clamp(0, 26);
-    } else if (isCurrentMonth) {
-      final currentDay = trustedNow.day;
-
-      // Active days for new delegates (using earliest registration date across all chains)
-      DateTime earliestCreatedAt = widget.delegate.createdAt;
-      try {
-        if (sl.isRegistered<AuthLocalDataSource>()) {
-          final all = sl<AuthLocalDataSource>().getCachedAllDelegatesData();
-          for (final d in all) {
-            if (d.createdAt.isBefore(earliestCreatedAt)) {
-              earliestCreatedAt = d.createdAt;
-            }
+    // Earliest registration date across all chains (new delegates).
+    DateTime earliestCreatedAt = widget.delegate.createdAt;
+    try {
+      if (sl.isRegistered<AuthLocalDataSource>()) {
+        final all = sl<AuthLocalDataSource>().getCachedAllDelegatesData();
+        for (final d in all) {
+          if (d.createdAt.isBefore(earliestCreatedAt)) {
+            earliestCreatedAt = d.createdAt;
           }
         }
-      } catch (_) {}
-
-      int activeDays = currentDay;
-      if (earliestCreatedAt.year == _selectedMonth.year &&
-          earliestCreatedAt.month == _selectedMonth.month &&
-          earliestCreatedAt.day > 1) {
-        activeDays = (currentDay - earliestCreatedAt.day + 1)
-            .clamp(1, totalDaysInMonth);
       }
-      final offDaysSoFar = (activeDays / 7).floor().clamp(0, 4);
-      final elapsedWorkDays = (activeDays - offDaysSoFar - _approvedLeavesThisMonth).clamp(0, 26);
-      return (elapsedWorkDays - attendedDays).clamp(0, 26);
-    } else if (isFutureMonth) {
-      return 0;
-    }
-    return 0;
+    } catch (_) {}
+
+    final sessions =
+        _hasMonthSessionsForSelected ? _monthSessions! : _rawHistory;
+    return MonthlyAttendanceStats.compute(
+      sessions: sessions,
+      month: _selectedMonth,
+      now: _getTrustedNow(),
+      approvedLeaveDays: _approvedLeavesThisMonth,
+      createdAt: earliestCreatedAt,
+    ).absentDays;
   }
 
   /// Unified Material Design 3 Header Card consolidating:

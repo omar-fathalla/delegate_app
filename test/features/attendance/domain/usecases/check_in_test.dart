@@ -76,6 +76,16 @@ class MockAttendanceRepository implements AttendanceRepository {
   }
 
   @override
+  Future<Either<Failure, List<Attendance>>> getHistoryForMonth(
+    String userId, {
+    required DateTime month,
+    String? nationalityID,
+    String? phoneNumber,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Either<Failure, AttendancePaginationResult>> getHistoryPaginated(
     String userId,
     String organizationId, {

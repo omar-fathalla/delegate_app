@@ -50,6 +50,16 @@ abstract class AttendanceRemoteDataSource {
     DocumentSnapshot? startAfter,
   });
 
+  /// Fetches ALL attendance sessions whose check-in falls in [month]
+  /// (device-local calendar month) across all affiliated organizations.
+  /// Used for the monthly summary so figures never depend on pagination.
+  Future<List<AttendanceModel>> getHistoryForMonth(
+    String userId, {
+    required DateTime month,
+    String? nationalityID,
+    String? phoneNumber,
+  });
+
   /// Fetches recent attendance sessions across all affiliated organizations (for the home brief).
   Future<List<AttendanceModel>> getRecentSessionsAcrossOrgs(
     String userId, {
@@ -417,53 +427,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     DocumentSnapshot? startAfter,
   }) async {
     try {
-      final Set<String> identifiers = {userId};
-
-      if (nationalityID != null && nationalityID.trim().isNotEmpty) {
-        final cleanNat = nationalityID.trim();
-        identifiers.add(cleanNat);
-
-        // Resolve any other delegate UIDs registered under this National ID
-        try {
-          final natSnap = await firestore
-              .collectionGroup('delegates')
-              .where('nationalityID', isEqualTo: cleanNat)
-              .limit(10)
-              .getResilient(
-                timeout: const Duration(seconds: 4),
-                forceServer: true,
-              );
-          for (final doc in natSnap.docs) {
-            identifiers.add(doc.id);
-          }
-        } catch (_) {}
-      }
-
-      if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
-        final cleanPhone = phoneNumber.trim();
-        final normalizedPhone = _normalizePhone(cleanPhone);
-        identifiers.add(cleanPhone);
-        if (normalizedPhone.isNotEmpty) {
-          identifiers.add(normalizedPhone);
-        }
-
-        // Resolve any other delegate UIDs registered under this phone number
-        try {
-          final phoneSnap = await firestore
-              .collectionGroup('delegates')
-              .where('phoneNumber', isEqualTo: normalizedPhone)
-              .limit(10)
-              .getResilient(
-                timeout: const Duration(seconds: 4),
-                forceServer: true,
-              );
-          for (final doc in phoneSnap.docs) {
-            identifiers.add(doc.id);
-          }
-        } catch (_) {}
-      }
-
-      final queryList = identifiers.where((id) => id.isNotEmpty).take(30).toList();
+      final queryList = await _resolveHistoryIdentifiers(
+        userId,
+        nationalityID: nationalityID,
+        phoneNumber: phoneNumber,
+      );
       final cleanOrgId = organizationId.trim();
 
       Query<Map<String, dynamic>> query = _attendanceCollection(organizationId);
@@ -525,6 +493,107 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       debugPrint('Error in getHistoryPaginated: $e\n$stack');
       return PaginationResponse(items: [], lastDoc: null, hasReachedMax: true);
     }
+  }
+
+  /// Resolves every delegateId under which this person's logs may be stored
+  /// (own uid, national ID, phone, and other delegate docs sharing them).
+  Future<List<String>> _resolveHistoryIdentifiers(
+    String userId, {
+    String? nationalityID,
+    String? phoneNumber,
+  }) async {
+    final Set<String> identifiers = {userId};
+
+    if (nationalityID != null && nationalityID.trim().isNotEmpty) {
+      final cleanNat = nationalityID.trim();
+      identifiers.add(cleanNat);
+
+      // Resolve any other delegate UIDs registered under this National ID
+      try {
+        final natSnap = await firestore
+            .collectionGroup('delegates')
+            .where('nationalityID', isEqualTo: cleanNat)
+            .limit(10)
+            .getResilient(
+              timeout: const Duration(seconds: 4),
+              forceServer: true,
+            );
+        for (final doc in natSnap.docs) {
+          identifiers.add(doc.id);
+        }
+      } catch (_) {}
+    }
+
+    if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+      final cleanPhone = phoneNumber.trim();
+      final normalizedPhone = _normalizePhone(cleanPhone);
+      identifiers.add(cleanPhone);
+      if (normalizedPhone.isNotEmpty) {
+        identifiers.add(normalizedPhone);
+      }
+
+      // Resolve any other delegate UIDs registered under this phone number
+      try {
+        final phoneSnap = await firestore
+            .collectionGroup('delegates')
+            .where('phoneNumber', isEqualTo: normalizedPhone)
+            .limit(10)
+            .getResilient(
+              timeout: const Duration(seconds: 4),
+              forceServer: true,
+            );
+        for (final doc in phoneSnap.docs) {
+          identifiers.add(doc.id);
+        }
+      } catch (_) {}
+    }
+
+    return identifiers.where((id) => id.isNotEmpty).take(30).toList();
+  }
+
+  @override
+  Future<List<AttendanceModel>> getHistoryForMonth(
+    String userId, {
+    required DateTime month,
+    String? nationalityID,
+    String? phoneNumber,
+  }) async {
+    final queryList = await _resolveHistoryIdentifiers(
+      userId,
+      nationalityID: nationalityID,
+      phoneNumber: phoneNumber,
+    );
+    final monthStart = DateTime(month.year, month.month);
+    final monthEnd = DateTime(month.year, month.month + 1);
+    // Check-outs of the month's last overnight session land after monthEnd,
+    // so widen the upper bound by one day; sessions are filtered by check-in.
+    final upper = monthEnd.add(const Duration(days: 1));
+
+    final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    DocumentSnapshot? cursor;
+    const pageSize = 300;
+    while (true) {
+      Query<Map<String, dynamic>> query = _attendanceCollection('')
+          .where('delegateId', whereIn: queryList)
+          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
+          .where('timestamp', isLessThan: Timestamp.fromDate(upper))
+          .orderBy('timestamp', descending: true)
+          .limit(pageSize);
+      if (cursor != null) query = query.startAfterDocument(cursor);
+      final snap = await query.getResilient(
+        timeout: const Duration(seconds: 10),
+        forceServer: true,
+      );
+      docs.addAll(snap.docs);
+      if (snap.docs.length < pageSize) break;
+      cursor = snap.docs.last;
+    }
+
+    return _pairAttendanceDocs(docs, userId, '')
+        .where((a) =>
+            !a.checkInTime.isBefore(monthStart) &&
+            a.checkInTime.isBefore(monthEnd))
+        .toList();
   }
 
   @override

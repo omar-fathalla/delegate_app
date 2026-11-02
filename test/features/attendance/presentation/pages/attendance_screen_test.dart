@@ -8,6 +8,8 @@ import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_paginated.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
+import 'package:delegate_app/features/attendance/domain/monthly_attendance_stats.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
@@ -64,6 +66,24 @@ class MockAttendanceRepository implements AttendanceRepository {
 
   List<Attendance> mockPaginatedItems = const [];
 
+  /// When set, the paginated history returns only the newest [pageLimit]
+  /// sessions (simulates the first page before any scroll).
+  int? pageLimit;
+
+  @override
+  Future<Either<Failure, List<Attendance>>> getHistoryForMonth(
+    String userId, {
+    required DateTime month,
+    String? nationalityID,
+    String? phoneNumber,
+  }) async {
+    return Right(mockPaginatedItems
+        .where((a) =>
+            a.checkInTime.year == month.year &&
+            a.checkInTime.month == month.month)
+        .toList());
+  }
+
   @override
   Future<Either<Failure, List<Attendance>>> getHistory(
     String userId,
@@ -93,6 +113,19 @@ class MockAttendanceRepository implements AttendanceRepository {
         : mockPaginatedItems
             .where((a) => a.organizationId == organizationId)
             .toList();
+    if (pageLimit != null && filtered.length > pageLimit!) {
+      final sorted = [...filtered]
+        ..sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
+      return Right(
+        AttendancePaginationResult(
+          items: sorted.take(pageLimit!).toList(),
+          // Reported as the end so the screen doesn't auto-load more; the
+          // month summary must still see all sessions via the month query.
+          hasReachedMax: true,
+          lastDoc: null,
+        ),
+      );
+    }
     return Right(
       AttendancePaginationResult(
         items: filtered,
@@ -138,6 +171,7 @@ void main() {
     sl.registerFactory(() => CheckOut(mockAttendanceRepository));
     sl.registerFactory(() => GetHistory(mockAttendanceRepository));
     sl.registerFactory(() => GetHistoryPaginated(mockAttendanceRepository));
+    sl.registerFactory(() => GetHistoryForMonth(mockAttendanceRepository));
     sl.registerFactory(() => SyncAttendance(mockAttendanceRepository));
 
     // Register Bloc
@@ -414,6 +448,100 @@ void main() {
 
       expect(find.text('الفرع: جناكليس'), findsOneWidget);
       expect(find.text('الفرع: City Square'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Month summary uses the whole month, not the first history page (>20 sessions)',
+    (WidgetTester tester) async {
+      final now = DateTime.now();
+      final prevMonth = DateTime(now.year, now.month - 1);
+      final daysInPrev = DateTime(prevMonth.year, prevMonth.month + 1, 0).day;
+      final sessionDays = daysInPrev < 25 ? daysInPrev : 25;
+      final items = [
+        for (var d = 1; d <= sessionDays; d++)
+          Attendance(
+            id: 'm$d',
+            userId: '1',
+            organizationId: 'org1',
+            branchName: 'Branch',
+            checkInTime: DateTime(prevMonth.year, prevMonth.month, d, 11),
+            checkOutTime: DateTime(prevMonth.year, prevMonth.month, d, 17),
+          ),
+      ];
+      mockAttendanceRepository.mockPaginatedItems = items;
+      mockAttendanceRepository.pageLimit = 20;
+
+      final oldDelegate = Delegate(
+      uid: '1',
+      firstName: 'Test',
+      middleName: 'User',
+      lastName: 'Name',
+      fullName: 'Test User Name',
+      nationalityID: '1234567890',
+      motherName: 'Mother Name',
+      city: 'City',
+      phoneNumber: '1234567890',
+      gender: DelegateGender.male,
+      position: DelegatePosition.promoter,
+      birthDate: DateTime(1990, 1, 1),
+      organizationUID: 'org1',
+      organizationName: 'Org Name',
+      companyUID: 'comp1',
+      companyName: 'Comp Name',
+      status: DelegateStatus.active,
+      delegatePublicId: 'DEL-123',
+      allReceiptCodes: const [],
+      createdAt: DateTime(2020, 1, 1),
+      createdBy: 'admin',
+      hasPendingUpdate: false,
+      isDeductedFromCompany: false,
+      isPrinted: false,
+      isProfileComplete: true,
+      numberOfDocuments: 0,
+      paymentAmount: 0,
+      version: 1,
+      documents: const [],
+    );      // Same shared calculation the home summary uses.
+      final expected = MonthlyAttendanceStats.compute(
+        sessions: items,
+        month: prevMonth,
+        now: now,
+        createdAt: oldDelegate.createdAt,
+      );
+      expect(expected.presentDays, sessionDays);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: AttendanceScreen(delegate: oldDelegate, viewOnly: true),
+        ),
+      );
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pump(const Duration(seconds: 3));
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      await tester.tap(
+        find.widgetWithIcon(IconButton, Symbols.chevron_left_rounded),
+      );
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pump(const Duration(seconds: 1));
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      expect(find.byKey(ValueKey(expected.presentDays)), findsWidgets);
+      expect(find.byKey(ValueKey(expected.absentDays)), findsWidgets);
+      // The first page alone (20 sessions) would have given a lower count.
+      expect(find.byKey(const ValueKey(20)), findsNothing);
     },
   );
 }

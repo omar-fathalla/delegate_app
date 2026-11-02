@@ -180,6 +180,31 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }
 
   @override
+  Future<Either<Failure, List<Attendance>>> getHistoryForMonth(
+    String userId, {
+    required DateTime month,
+    String? nationalityID,
+    String? phoneNumber,
+  }) async {
+    try {
+      if (!await _hasConnection()) {
+        throw const ServerFailure('لا يوجد اتصال بالإنترنت (وضع عدم الاتصال)');
+      }
+      final items = await remoteDataSource.getHistoryForMonth(
+        userId,
+        month: month,
+        nationalityID: nationalityID,
+        phoneNumber: phoneNumber,
+      );
+      return Right(items);
+    } on Failure catch (e) {
+      return Left(e);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<Attendance>>> getHistory(
     String userId,
     String organizationId, {

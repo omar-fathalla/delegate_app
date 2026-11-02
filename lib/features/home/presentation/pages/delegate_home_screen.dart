@@ -15,7 +15,8 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
-import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
+import 'package:delegate_app/features/attendance/domain/monthly_attendance_stats.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
@@ -1164,14 +1165,15 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       approvedLeaves = count;
     } catch (_) {}
 
-    // 3. Remote fetch cross-organization attendance for unified monthly stats
+    // 3. Remote fetch: every session of the current month across all
+    // affiliated organizations (not a paginated slice), shared with the
+    // Attendance tab so both screens always show the same figures.
     try {
-      if (sl.isRegistered<GetHistory>()) {
-        final getHistory = sl<GetHistory>();
-        final result = await getHistory(
-          GetHistoryParams(
+      if (sl.isRegistered<GetHistoryForMonth>()) {
+        final result = await sl<GetHistoryForMonth>()(
+          GetHistoryForMonthParams(
             userId: widget.delegate.uid,
-            organizationId: '', // Empty means all affiliated organizations
+            month: _getTrustedNow(),
             nationalityID: widget.delegate.nationalityID,
             phoneNumber: widget.delegate.phoneNumber,
           ),
@@ -1188,25 +1190,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
   void _computeStats(List<Attendance> history, {int? approvedLeavesCount}) {
     final trustedNow = _getTrustedNow();
-    final currentMonth = trustedNow.month;
-    final currentYear = trustedNow.year;
-    final currentDay = trustedNow.day;
-    final totalDaysInMonth = DateUtils.getDaysInMonth(currentYear, currentMonth);
 
-    // Filter unique days attended in current month across ALL affiliated organizations
-    final daySet = <String>{};
-    for (final item in history) {
-      if (item.checkInTime.month == currentMonth &&
-          item.checkInTime.year == currentYear &&
-          item.userId == widget.delegate.uid) {
-        final dayKey =
-            '${item.checkInTime.year}-${item.checkInTime.month}-${item.checkInTime.day}';
-        daySet.add(dayKey);
-      }
-    }
-    final attended = daySet.length;
-
-    // Active days for new delegates (using earliest registration date across all chains)
+    // Earliest registration date across all chains (new delegates).
     DateTime earliestCreatedAt = widget.delegate.createdAt;
     try {
       if (sl.isRegistered<AuthLocalDataSource>()) {
@@ -1219,20 +1204,16 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       }
     } catch (_) {}
 
-    int activeDays = currentDay;
-    if (earliestCreatedAt.year == currentYear &&
-        earliestCreatedAt.month == currentMonth &&
-        earliestCreatedAt.day > 1) {
-      activeDays = (currentDay - earliestCreatedAt.day + 1)
-          .clamp(1, totalDaysInMonth);
-    }
-
     final leavesThisMonth = approvedLeavesCount ?? _approvedLeavesThisMonth;
-    // 4 off days per month (~1 every 7 days)
-    final offSoFar = (activeDays / 7).floor().clamp(0, 4);
-    // Working days elapsed excludes regular off days and approved leave days
-    final elapsedWorkDays = (activeDays - offSoFar - leavesThisMonth).clamp(0, 26);
-    final absent = (elapsedWorkDays - attended).clamp(0, 26);
+    final stats = MonthlyAttendanceStats.compute(
+      sessions: history,
+      month: trustedNow,
+      now: trustedNow,
+      approvedLeaveDays: leavesThisMonth,
+      createdAt: earliestCreatedAt,
+    );
+    final attended = stats.presentDays;
+    final absent = stats.absentDays;
 
     if (mounted) {
       setState(() {

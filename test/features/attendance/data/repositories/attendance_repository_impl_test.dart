@@ -107,6 +107,16 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
   }
 
   @override
+  Future<List<AttendanceModel>> getHistoryForMonth(
+    String userId, {
+    required DateTime month,
+    String? nationalityID,
+    String? phoneNumber,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<PaginationResponse<AttendanceModel>> getHistoryPaginated(
     String userId,
     String organizationId, {
