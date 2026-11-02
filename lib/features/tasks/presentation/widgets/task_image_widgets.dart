@@ -131,6 +131,12 @@ class TaskImagePickerField extends StatefulWidget {
   final TaskImageStorage? storage;
   final ImagePicker? picker;
 
+  /// Test/preview seams used when the screen builds the field itself.
+  @visibleForTesting
+  static TaskImageStorage? debugStorageOverride;
+  @visibleForTesting
+  static ImagePicker? debugPickerOverride;
+
   @override
   State<TaskImagePickerField> createState() => _TaskImagePickerFieldState();
 }
@@ -175,7 +181,7 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
     );
     if (source == null) return;
     // image_picker resizes and re-encodes as JPEG: this is the compression.
-    final picked = await (widget.picker ?? ImagePicker()).pickImage(
+    final picked = await (widget.picker ?? TaskImagePickerField.debugPickerOverride ?? ImagePicker()).pickImage(
       source: source,
       maxWidth: 1600,
       maxHeight: 1600,
@@ -202,7 +208,7 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
     });
     widget.onUploadingChanged?.call(true);
     try {
-      final result = await (widget.storage ?? TaskImageStorage()).upload(
+      final result = await (widget.storage ?? TaskImagePickerField.debugStorageOverride ?? TaskImageStorage()).upload(
         organizationId: widget.organizationId,
         file: file,
         onProgress: (p) {
