@@ -64,4 +64,21 @@ void main() {
       expect(PayrollDayRules.isAnnualDayLeave({'type': 'sick'}), isFalse);
     });
   });
+
+  group('categorize', () {
+    test('annual day leave is annual (paid within balance)', () {
+      expect(PayrollDayRules.categorize({'type': 'annual'}), PayrollLeaveCategory.annual);
+    });
+    test('sick, emergency and unpaid leave are unpaid', () {
+      for (final t in ['sick', 'emergency', 'unpaid']) {
+        expect(PayrollDayRules.categorize({'type': t}), PayrollLeaveCategory.unpaid, reason: t);
+      }
+    });
+    test('delay, early leave, hourly and other types are never leave days', () {
+      for (final t in ['delay', 'early_leave', 'absence', 'something_else']) {
+        expect(PayrollDayRules.categorize({'type': t}), PayrollLeaveCategory.notALeaveDay, reason: t);
+      }
+      expect(PayrollDayRules.categorize({'type': 'sick', 'isHourly': true}), PayrollLeaveCategory.notALeaveDay);
+    });
+  });
 }
