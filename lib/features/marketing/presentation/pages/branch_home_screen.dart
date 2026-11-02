@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branch_live_refresh_controller.dart';
 import 'dart:async';
@@ -30,10 +31,16 @@ class BranchHomeScreen extends StatelessWidget {
   final Delegate marketingUser;
   final bool showAppBar;
 
+  /// True while this screen's tab is selected in the hosting shell. Drives
+  /// the live listener and its timers (IndexedStack offstage tabs don't get
+  /// TickerMode disabled). Null = always active (pushed route).
+  final ValueListenable<bool>? isActive;
+
   const BranchHomeScreen({
     super.key,
     required this.marketingUser,
     this.showAppBar = false,
+    this.isActive,
   });
 
   @override
@@ -49,6 +56,7 @@ class BranchHomeScreen extends StatelessWidget {
       child: _BranchHomeView(
         marketingUser: marketingUser,
         showAppBar: showAppBar,
+        isActive: isActive,
       ),
     );
   }
@@ -57,17 +65,30 @@ class BranchHomeScreen extends StatelessWidget {
 class _BranchHomeView extends StatefulWidget {
   final Delegate marketingUser;
   final bool showAppBar;
+  final ValueListenable<bool>? isActive;
 
   const _BranchHomeView({
     required this.marketingUser,
     this.showAppBar = false,
+    this.isActive,
   });
 
   @override
   State<_BranchHomeView> createState() => _BranchHomeViewState();
 }
 
-class _BranchHomeViewState extends State<_BranchHomeView> {
+class _BranchHomeViewState extends State<_BranchHomeView>
+    with LiveTabVisibility<_BranchHomeView> {
+  @override
+  ValueListenable<bool>? get liveActiveListenable => widget.isActive;
+
+  @override
+  void onLiveVisibilityChanged() => _syncLiveListener();
+
+  /// Whether the user is following "today" (vs. browsing a past date), so a
+  /// day change (midnight or resume on a later day) rolls over to the new day.
+  bool _followToday = true;
+
   List<String> _favoriteBranches = [];
   bool _prefsLoaded = false;
   DateTime _selectedDate = DateTime.now();
@@ -103,7 +124,6 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   /// Today-only attendance listener (refresh signal) and its state.
   BranchLiveRefreshController? _live;
   String? _liveSignature;
-  bool _tabVisible = true;
   bool _appResumed = true;
 
   @override
@@ -126,7 +146,12 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       if (!RealTestMetrics.enabled &&
           !ReadReductionFlags.instance.branchLiveListener) {
         _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-          if (mounted && _favoriteBranches.isNotEmpty) {
+          // Only for today's view on a visible tab (past dates don't change).
+          if (mounted &&
+              _favoriteBranches.isNotEmpty &&
+              _isSelectedDateToday() &&
+              liveTabVisible &&
+              _appResumed) {
             _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
             _syncFloorVerificationsFromCloud();
           }
@@ -137,6 +162,17 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       _lifecycleListener = AppLifecycleListener(
         onResume: () {
           _appResumed = true;
+          if (mounted &&
+              shouldRollOverToToday(
+                followToday: _followToday,
+                selected: _selectedDate,
+                now: DateTime.now(),
+              )) {
+            // Resumed on a later day while following today → same path as
+            // the midnight timer (moves the date, reloads, re-subscribes).
+            _onLocalMidnight();
+            return;
+          }
           if (mounted && _favoriteBranches.isNotEmpty) {
             _loadAllBranches(context, _favoriteBranches);
             _syncFloorVerificationsFromCloud();
@@ -154,8 +190,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Offstage tabs (IndexedStack) get TickerMode disabled → pause listener.
-    _tabVisible = TickerMode.valuesOf(context).enabled;
+    // TickerMode (routes) + the shell's isActive (tabs) → see LiveTabVisibility.
     _syncLiveListener();
   }
 
@@ -176,7 +211,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     final shouldRun = !RealTestMetrics.enabled &&
         ReadReductionFlags.instance.branchLiveListener &&
         mounted &&
-        _tabVisible &&
+        liveTabVisible &&
         _appResumed &&
         _favoriteBranches.isNotEmpty &&
         _isSelectedDateToday() &&
@@ -218,10 +253,13 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   void _onLocalMidnight() {
     if (!mounted) return;
     final now = DateTime.now();
-    final rolledOver = _selectedDate.year != now.year ||
-        _selectedDate.month != now.month ||
-        _selectedDate.day != now.day;
-    if (rolledOver) setState(() => _selectedDate = now);
+    if (shouldRollOverToToday(
+      followToday: _followToday,
+      selected: _selectedDate,
+      now: now,
+    )) {
+      setState(() => _selectedDate = now);
+    }
     _liveSignature = null; // force a fresh subscription + midnight timer
     if (_favoriteBranches.isNotEmpty) {
       _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
@@ -554,6 +592,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     bool forceRefresh = false,
   }) {
     if (favorites.isEmpty) return;
+    _followToday = _isSelectedDateToday();
     context.read<MarketingBloc>().add(
       LoadAllFavoriteBranchesAttendance(
         favoriteBranches: favorites,

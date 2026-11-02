@@ -37,6 +37,16 @@ class MarketingMainScreen extends StatefulWidget {
 class _MarketingMainScreenState extends State<MarketingMainScreen> {
   int _currentIndex = 0;
 
+  /// True only while the branch-attendance tab is selected (read-reduction:
+  /// stops its live listener/timers when another tab is shown).
+  final ValueNotifier<bool> _branchTabActive = ValueNotifier<bool>(false);
+
+  @override
+  void dispose() {
+    _branchTabActive.dispose();
+    super.dispose();
+  }
+
   void _onMenuSelected(String value) {
     final delegate = widget.delegate;
     final isPromotionOnly = delegate.role == UserRole.marketingPromotion;
@@ -156,7 +166,10 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                 setState(() => _currentIndex = tabIndex);
               },
             ),
-            BranchHomeScreen(marketingUser: delegate),
+            BranchHomeScreen(
+              marketingUser: delegate,
+              isActive: _branchTabActive,
+            ),
             BlocProvider(
               create: (_) => di.sl<PhotoPermissionBloc>(),
               child: MarketingPermissionsScreen(marketingDelegate: delegate),
@@ -168,6 +181,9 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
               },
             ),
           ];
+
+    _branchTabActive.value =
+        screens.indexWhere((w) => w is BranchHomeScreen) == _currentIndex;
 
     PopupMenuItem<String> buildPopupItem({
       required String value,

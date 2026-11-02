@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 /// Read-reduction Phase 1 (review fixes): timers around the branch screen's
 /// today-only attendance listener, kept out of the widget so they can be
@@ -72,10 +73,11 @@ class BranchLiveRefreshController {
       },
     );
     if (!branchKeyBackfilled()) {
-      _safetyNet = Timer.periodic(
-        safetyNetInterval,
-        (_) => onReload(force: false),
-      );
+      _safetyNet = Timer.periodic(safetyNetInterval, (_) {
+        // The 3 min error poll already reloads (forced); don't double up.
+        if (_errorFallback != null) return;
+        onReload(force: false);
+      });
     }
     _scheduleMidnight();
   }
@@ -105,5 +107,73 @@ class BranchLiveRefreshController {
     _safetyNet = null;
     _midnight?.cancel();
     _midnight = null;
+  }
+}
+
+/// True when a screen that was following "today" should jump to the new day
+/// (midnight passed while open, or the app resumes on a later day).
+bool shouldRollOverToToday({
+  required bool followToday,
+  required DateTime selected,
+  required DateTime now,
+}) =>
+    followToday &&
+    (selected.year != now.year ||
+        selected.month != now.month ||
+        selected.day != now.day);
+
+/// Tab-visibility for screens hosted in an `IndexedStack`.
+///
+/// `TickerMode` alone is not enough: Flutter's `IndexedStack` hides children
+/// with `Visibility(maintainAnimation: true)`, which inserts no `TickerMode`,
+/// so an offstage tab still reports "enabled". Hosting shells therefore pass
+/// an explicit [liveActiveListenable] (true only while the tab is selected);
+/// `TickerMode` is still honoured for routes/offstage widgets that set it.
+mixin LiveTabVisibility<T extends StatefulWidget> on State<T> {
+  ValueListenable<bool>? _attached;
+  bool _tickerEnabled = true;
+
+  /// Supplied by the hosting shell; null means "always active" (e.g. pushed
+  /// as its own route).
+  ValueListenable<bool>? get liveActiveListenable;
+
+  /// Called whenever [liveTabVisible] may have changed.
+  void onLiveVisibilityChanged();
+
+  bool get liveTabVisible => (_attached?.value ?? true) && _tickerEnabled;
+
+  void _attach() {
+    final next = liveActiveListenable;
+    if (identical(next, _attached)) return;
+    _attached?.removeListener(onLiveVisibilityChanged);
+    _attached = next;
+    _attached?.addListener(onLiveVisibilityChanged);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _attach();
+  }
+
+  @override
+  void didUpdateWidget(covariant T oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final before = liveTabVisible;
+    _attach();
+    if (before != liveTabVisible) onLiveVisibilityChanged();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+  }
+
+  @override
+  void dispose() {
+    _attached?.removeListener(onLiveVisibilityChanged);
+    _attached = null;
+    super.dispose();
   }
 }

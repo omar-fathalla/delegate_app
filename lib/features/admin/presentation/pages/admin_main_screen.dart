@@ -66,6 +66,9 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       : 0;
   late final List<Widget> _screens;
   Widget? _branchHomeCache;
+
+  /// True only while the cached branch-attendance tab (index 2) is selected.
+  final ValueNotifier<bool> _branchTabActive = ValueNotifier<bool>(false);
   @override
   void initState() {
     super.initState();
@@ -181,6 +184,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
 
   @override
   void dispose() {
+    _branchTabActive.dispose();
     super.dispose();
   }
 
@@ -189,9 +193,12 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     // Lazily mount BranchHomeScreen the first time tab index 2 is selected
     // (or when REAL_TEST starts on that tab).
     if (_currentIndex == 2) {
-      _branchHomeCache ??=
-          BranchHomeScreen(marketingUser: widget.delegate);
+      _branchHomeCache ??= BranchHomeScreen(
+        marketingUser: widget.delegate,
+        isActive: _branchTabActive,
+      );
     }
+    _branchTabActive.value = _currentIndex == 2 && _branchHomeCache != null;
     return [
       for (var i = 0; i < _screens.length; i++)
         if (i == 2)
