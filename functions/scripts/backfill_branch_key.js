@@ -6,7 +6,9 @@
  *
  * Local Admin-SDK script. NOT deployed. Idempotent (never overwrites an
  * existing branchKey). Pages by document id (500/page) with a checkpoint
- * file so an interrupted run resumes where it stopped.
+ * file so an interrupted --commit run resumes where it stopped. Dry-runs
+ * start fresh unless --resume; --no-resume forces a fresh --commit scan.
+ * A completed run deletes its checkpoint.
  *
  * DEFAULT IS DRY-RUN: reads only, logs counts + samples, writes nothing.
  * Writing requires BOTH `--commit` and, outside the emulator,
@@ -55,7 +57,8 @@ function parseArgs(argv) {
     maxPages: Infinity,
     checkpoint: path.join(process.cwd(), "backfill-branch-key.checkpoint.json"),
     report: path.join(process.cwd(), "backfill-branch-key-report.json"),
-    resume: true,
+    // null → default: resume only for --commit runs (dry-runs start fresh).
+    resume: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -68,11 +71,13 @@ function parseArgs(argv) {
     else if (a === "--checkpoint") out.checkpoint = argv[++i];
     else if (a === "--report") out.report = argv[++i];
     else if (a === "--no-resume") out.resume = false;
+    else if (a === "--resume") out.resume = true;
     else if (a === "--help" || a === "-h") out.help = true;
     else throw new Error(`Unknown argument ${a}`);
   }
   // --dry-run anywhere wins over --commit.
   if (argv.includes("--dry-run")) out.commit = false;
+  if (out.resume === null) out.resume = out.commit;
   return out;
 }
 
@@ -117,7 +122,10 @@ async function run(db, admin, opts, log = console.log) {
     let q = db.collection(opts.collection).orderBy(idField).limit(opts.pageSize);
     if (cursor) q = q.startAfter(cursor);
     const snap = await q.get();
-    if (snap.empty) break;
+    if (snap.empty) {
+      report.completed = true;
+      break;
+    }
     report.pages++;
     const batch = opts.commit ? db.batch() : null;
     let writes = 0;
@@ -155,7 +163,15 @@ async function run(db, admin, opts, log = console.log) {
       }));
     }
     log(`page ${report.pages}: scanned=${report.scanned} wouldUpdate=${report.wouldUpdate} updated=${report.updated}`);
-    if (snap.size < opts.pageSize) break;
+    if (snap.size < opts.pageSize) {
+      report.completed = true;
+      break;
+    }
+  }
+  // Finished the whole collection: drop the checkpoint so the next run
+  // (e.g. a verification dry-run) scans everything instead of reporting 0.
+  if (report.completed && opts.checkpoint && fs.existsSync(opts.checkpoint)) {
+    fs.unlinkSync(opts.checkpoint);
   }
   report.finishedAt = new Date().toISOString();
   return report;

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:delegate_app/core/services/badge_counts_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -1635,6 +1637,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
         'resolvedBy': widget.hrDelegate.uid,
         'resolvedByName': widget.hrDelegate.fullName,
       });
+      unawaited(BadgeCountsService.instance.invalidateCollection('leave_requests'));
 
       // إرسال إشعار للمندوب
       await FirebaseFirestore.instance.collection('notifications').add({
@@ -1720,6 +1723,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
         'resolvedBy': widget.hrDelegate.uid,
         'resolvedByName': widget.hrDelegate.fullName,
       });
+      unawaited(BadgeCountsService.instance.invalidateCollection('leave_requests'));
 
       await FirebaseFirestore.instance.collection('notifications').add({
         'delegateUid': delegateUid,

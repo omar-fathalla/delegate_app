@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:delegate_app/core/services/badge_counts_service.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -351,6 +353,7 @@ class DeviceBindingService {
       'resolvedBy': adminUid,
       'resolvedByName': adminName,
     });
+    unawaited(BadgeCountsService.instance.invalidateCollection('device_unbind_requests'));
 
     // 3. إرسال إشعار للمندوب
     try {
@@ -389,6 +392,7 @@ class DeviceBindingService {
       'resolvedBy': adminUid,
       'resolvedByName': adminName,
     });
+    unawaited(BadgeCountsService.instance.invalidateCollection('device_unbind_requests'));
 
     // 2. إرسال إشعار للمندوب
     try {
