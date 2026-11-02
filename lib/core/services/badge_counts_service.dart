@@ -98,8 +98,16 @@ class BadgeCountsService {
   }
 
   /// Forces a refresh (e.g. after approving a request), ignoring the throttle.
+  /// A count already in flight is discarded so its stale value never lands.
   Future<void> invalidate(String collection, String companyUID) =>
       _refresh(_entry(BadgeCountKey(collection, companyUID)), force: true);
+
+  /// Refreshes every known badge for [collection] (any company scope).
+  /// Call after approve/reject when the caller doesn't know the badge scope.
+  Future<void> invalidateCollection(String collection) => Future.wait([
+    for (final e in _entries.values.toList())
+      if (e.key.collection == collection) _refresh(e, force: true),
+  ]);
 
   _BadgeEntry _entry(BadgeCountKey key) =>
       _entries.putIfAbsent(key, () => _BadgeEntry(key));
@@ -114,19 +122,25 @@ class BadgeCountsService {
     if (!force && last != null && _clock().difference(last) < minInterval) {
       return Future.value();
     }
-    return entry.inFlight ??= () async {
+    if (!force && entry.inFlight != null) return entry.inFlight!;
+    // Generation counter: a forced refresh supersedes any in-flight load, and
+    // only the newest load may publish its result.
+    final gen = ++entry.generation;
+    final future = () async {
       try {
         final count = await _loader(entry.key);
-        if (count != null) {
+        if (count != null && gen == entry.generation) {
           entry.loadedAt = _clock();
           entry.value.value = count;
         }
       } catch (e) {
         debugPrint('BadgeCountsService ${entry.key}: $e');
       } finally {
-        entry.inFlight = null;
+        if (gen == entry.generation) entry.inFlight = null;
       }
     }();
+    entry.inFlight = future;
+    return future;
   }
 
   @visibleForTesting
@@ -147,4 +161,5 @@ class _BadgeEntry {
   Timer? timer;
   int listeners = 0;
   Future<void>? inFlight;
+  int generation = 0;
 }

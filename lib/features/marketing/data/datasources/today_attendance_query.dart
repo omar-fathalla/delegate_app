@@ -56,9 +56,11 @@ Set<String> legacyBranchNameVariants(String branch) {
 ///
 /// 1. When `use_branch_key_query` is on: one `branchKey` value per branch
 ///    (`organizationId == org`, `branchKey in`, timestamp in [dayStart, dayEnd)).
-/// 2. Fallback (kept for old records without `branchKey`): branches that got
-///    0 docs from step 1 are re-queried with the bounded legacy
-///    `branchName in [variants]` query, unless `branch_key_backfilled` is on.
+/// 2. Fallback (kept for old records without `branchKey`): while
+///    `branch_key_backfilled` is off, the bounded legacy
+///    `branchName in [variants]` query ALSO runs for every branch and the
+///    results are merged by doc id (a branch can mix keyed docs from new app
+///    versions and unkeyed docs from old ones on the same day).
 ///    A `failed-precondition` (index not built yet) also falls back.
 /// 3. When the flag is off, only the bounded legacy query runs.
 Future<TodayAttendanceFetch> fetchTodayAttendanceDocs({
@@ -85,7 +87,6 @@ Future<TodayAttendanceFetch> fetchTodayAttendanceDocs({
 
   Set<String> legacyTargets;
   if (f.useBranchKeyQuery) {
-    final foundKeys = <String>{};
     var indexMissing = false;
     for (final chunk in chunkList(
       keyToBranches.keys.toList(),
@@ -104,8 +105,6 @@ Future<TodayAttendanceFetch> fetchTodayAttendanceDocs({
             .getResilient(forceServer: true);
         for (final d in snap.docs) {
           byId[d.id] = d;
-          final k = d.data()['branchKey'];
-          if (k is String) foundKeys.add(k);
         }
       } on FirebaseException catch (e) {
         if (e.code != 'failed-precondition') rethrow;
@@ -115,14 +114,13 @@ Future<TodayAttendanceFetch> fetchTodayAttendanceDocs({
         indexMissing = true;
       }
     }
-    legacyTargets = indexMissing
+    // Until the backfill is confirmed, old app versions may still write
+    // docs without `branchKey` even for branches that already have keyed
+    // docs today, so the bounded legacy query always runs for every branch
+    // and results are merged by doc id.
+    legacyTargets = (indexMissing || !f.branchKeyBackfilled)
         ? branchNames.toSet()
-        : f.branchKeyBackfilled
-        ? <String>{}
-        : {
-            for (final e in keyToBranches.entries)
-              if (!foundKeys.contains(e.key)) ...e.value,
-          };
+        : <String>{};
   } else {
     legacyTargets = branchNames.toSet();
   }
@@ -204,8 +202,10 @@ Stream<int> watchTodayBranchAttendanceChanges({
                     controller.add(snap.docChanges.length);
                   }
                 },
-                onError: (Object e) {
+                onError: (Object e, StackTrace st) {
                   debugPrint('branch attendance listener error: $e');
+                  // Surface it so the screen can fall back to polling.
+                  if (!controller.isClosed) controller.addError(e, st);
                 },
               ),
         );

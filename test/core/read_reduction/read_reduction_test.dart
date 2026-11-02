@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/config/read_reduction_flags.dart';
@@ -93,9 +92,9 @@ void main() {
         );
         expect(keyed, {'a', 'b'});
         // Legacy variants never matched a stored 'ى' spelling when the branch
-      // is configured with 'ي'; branchKey does. Otherwise identical.
-      expect(legacy, {'b'});
-      expect(keyed.containsAll(legacy), isTrue);
+        // is configured with 'ي'; branchKey does. Otherwise identical.
+        expect(legacy, {'b'});
+        expect(keyed.containsAll(legacy), isTrue);
       },
     );
 
@@ -113,7 +112,8 @@ void main() {
         collection: _coll,
       );
       expect(r.docs.map((d) => d.id).toSet(), {'old', 'new'});
-      expect(r.legacyBranches, {'فرع الدقي'});
+      // Until backfilled, the legacy query runs for every branch.
+      expect(r.legacyBranches, {'فرع المعادي', 'فرع الدقي'});
     });
 
     test('no fallback once backfill flag is on', () async {

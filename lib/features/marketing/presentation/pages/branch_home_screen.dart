@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/features/marketing/presentation/pages/branch_live_refresh_controller.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -99,8 +101,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   DateTime? _lastSyncTime;
 
   /// Today-only attendance listener (refresh signal) and its state.
-  StreamSubscription<int>? _liveSub;
-  Timer? _liveDebounce;
+  BranchLiveRefreshController? _live;
   String? _liveSignature;
   bool _tabVisible = true;
   bool _appResumed = true;
@@ -167,7 +168,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
 
   String get _orgIdForQueries => widget.marketingUser.organizationUID.isNotEmpty
       ? widget.marketingUser.organizationUID
-      : 'PiioBFgxaHAeuRdjlDgj';
+      : kDefaultOrganizationId;
 
   /// Starts, restarts or stops the today-only listener so it only runs while
   /// the tab is visible, the app is in the foreground and today is selected.
@@ -185,34 +186,53 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             '${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}'
         : null;
     if (signature == _liveSignature) return;
-    _liveSub?.cancel();
-    _liveSub = null;
-    _liveDebounce?.cancel();
+    _live?.stop();
+    _live = null;
     _liveSignature = signature;
     if (signature == null) return;
     final start =
         DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
-    _liveSub = watchTodayBranchAttendanceChanges(
-      firestore: di.sl<FirebaseFirestore>(),
-      branchNames: List.of(_favoriteBranches),
-      organizationId: _orgIdForQueries,
-      dayStart: start,
-      dayEnd: start.add(const Duration(days: 1)),
-    ).listen((_) {
-      // Coalesce bursts of check-ins into one reload.
-      _liveDebounce?.cancel();
-      _liveDebounce = Timer(const Duration(seconds: 3), () {
+    final branches = List.of(_favoriteBranches);
+    final orgId = _orgIdForQueries;
+    final firestore = di.sl<FirebaseFirestore>();
+    _live = BranchLiveRefreshController(
+      watch: () => watchTodayBranchAttendanceChanges(
+        firestore: firestore,
+        branchNames: branches,
+        organizationId: orgId,
+        dayStart: start,
+        dayEnd: start.add(const Duration(days: 1)),
+      ),
+      branchKeyBackfilled: () => ReadReductionFlags.instance.branchKeyBackfilled,
+      onReload: ({required bool force}) {
         if (mounted && _favoriteBranches.isNotEmpty) {
-          _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+          _loadAllBranches(context, _favoriteBranches, forceRefresh: force);
         }
-      });
-    });
+      },
+      onMidnight: _onLocalMidnight,
+    )..start();
+  }
+
+  /// Day roll-over while the screen stays open on "today": move to the new
+  /// day, reload, and let [_syncLiveListener] re-subscribe for the new range.
+  void _onLocalMidnight() {
+    if (!mounted) return;
+    final now = DateTime.now();
+    final rolledOver = _selectedDate.year != now.year ||
+        _selectedDate.month != now.month ||
+        _selectedDate.day != now.day;
+    if (rolledOver) setState(() => _selectedDate = now);
+    _liveSignature = null; // force a fresh subscription + midnight timer
+    if (_favoriteBranches.isNotEmpty) {
+      _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+    } else {
+      _syncLiveListener();
+    }
   }
 
   @override
   void dispose() {
-    _liveSub?.cancel();
-    _liveDebounce?.cancel();
+    _live?.stop();
     _autoRefreshTimer?.cancel();
     _lifecycleListener?.dispose();
     _searchController.dispose();
@@ -539,11 +559,12 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         favoriteBranches: favorites,
         organizationId: widget.marketingUser.organizationUID.isNotEmpty
             ? widget.marketingUser.organizationUID
-            : 'PiioBFgxaHAeuRdjlDgj',
+            : kDefaultOrganizationId,
         date: _selectedDate,
         forceRefresh: forceRefresh,
       ),
-    );    // Favorites / selected date may have changed → (re)start or stop listener.
+    );
+    // Favorites / selected date may have changed → (re)start or stop listener.
     _syncLiveListener();
   }
 
@@ -2310,7 +2331,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             ? widget.marketingUser.organizationUID
             : (record['organizationId'] as String? ??
                 delegateData?['organizationUID'] as String? ??
-                'PiioBFgxaHAeuRdjlDgj');
+                kDefaultOrganizationId);
 
         if ((supPhone == null || supPhone.isEmpty) &&
             companyUID.isNotEmpty &&
@@ -2692,7 +2713,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       safeData.putIfAbsent('companyUID', () => record['companyUID'] ?? '');
       final effectiveOrg = widget.marketingUser.organizationUID.isNotEmpty
           ? widget.marketingUser.organizationUID
-          : (record['organizationId'] as String? ?? 'PiioBFgxaHAeuRdjlDgj');
+          : (record['organizationId'] as String? ?? kDefaultOrganizationId);
       safeData['organizationUID'] = effectiveOrg;
       safeData.putIfAbsent('status', () => 'Active');
       safeData.putIfAbsent('role', () => 'delegate');
@@ -3224,13 +3245,13 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
       // Ensure Fathalla Market exists and is placed at the top as default
       final hasFathalla = orgs.any((o) =>
           (o['name'] ?? '').toLowerCase().contains('fathalla') ||
-          o['uid'] == 'PiioBFgxaHAeuRdjlDgj');
+          o['uid'] == kDefaultOrganizationId);
       if (!hasFathalla) {
-        orgs.insert(0, {'uid': 'PiioBFgxaHAeuRdjlDgj', 'name': 'fathalla market'});
+        orgs.insert(0, {'uid': kDefaultOrganizationId, 'name': 'fathalla market'});
       } else {
         final fIndex = orgs.indexWhere((o) =>
             (o['name'] ?? '').toLowerCase().contains('fathalla') ||
-            o['uid'] == 'PiioBFgxaHAeuRdjlDgj');
+            o['uid'] == kDefaultOrganizationId);
         if (fIndex > 0) {
           final item = orgs.removeAt(fIndex);
           orgs.insert(0, item);
@@ -3298,7 +3319,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     }
 
     // 4. If target is Fathalla Market:
-    if (tOrgName.contains('fathalla') || targetOrgUID == 'PiioBFgxaHAeuRdjlDgj') {
+    if (tOrgName.contains('fathalla') || targetOrgUID == kDefaultOrganizationId) {
       if (bOrgUID.isEmpty && bOrgName.isEmpty) {
         final isOtherOrg = bName.contains('جملة') ||
             bName.contains('زهران') ||
@@ -3343,7 +3364,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     final q = _searchController.text.trim().toLowerCase();
 
     String targetOrgName = 'fathalla market';
-    String targetOrgUID = 'PiioBFgxaHAeuRdjlDgj';
+    String targetOrgUID = kDefaultOrganizationId;
 
     if (isSuperAdminOrTechSupport) {
       if (_selectedOrgUID != null) {
@@ -3357,7 +3378,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     } else {
       // For all regular users: strictly locked to fathalla market
       targetOrgName = 'fathalla market';
-      targetOrgUID = 'PiioBFgxaHAeuRdjlDgj';
+      targetOrgUID = kDefaultOrganizationId;
     }
 
     final orgBranches = _allBranches.where((b) {

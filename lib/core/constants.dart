@@ -8,6 +8,10 @@
 /// IMPORTANT: This should only be set to true after full verification.
 const bool isProduction = true;
 
+/// Default organization (Fathalla Market) used when a user record has no
+/// `organizationUID`. Single source for the previously hardcoded id.
+const String kDefaultOrganizationId = 'PiioBFgxaHAeuRdjlDgj';
+
 /// The name of the collection to store attendance logs.
 /// Switches based on [isProduction].
 const String kAttendanceCollection = isProduction

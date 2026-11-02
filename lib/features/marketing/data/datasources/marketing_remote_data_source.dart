@@ -363,7 +363,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       // attendance_logs writes use `organizationId` (see AttendanceRemoteDataSource).
       String queryOrgId = organizationId.trim();
       if (queryOrgId.isEmpty) {
-        queryOrgId = 'PiioBFgxaHAeuRdjlDgj'; // Fathalla Market default
+        queryOrgId = kDefaultOrganizationId; // Fathalla Market default
       }
       final todayStartTs = Timestamp.fromDate(todayStart);
       final todayEndTs = Timestamp.fromDate(todayEnd);
