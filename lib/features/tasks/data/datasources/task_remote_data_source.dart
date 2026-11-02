@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/tasks/data/models/task_model.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
@@ -47,8 +49,12 @@ abstract class TaskRemoteDataSource {
 
 class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   final FirebaseFirestore firestore;
+  final FirebaseStorage? _storage;
 
-  TaskRemoteDataSourceImpl({required this.firestore});
+  TaskRemoteDataSourceImpl({required this.firestore, FirebaseStorage? storage})
+    : _storage = storage;
+
+  FirebaseStorage get storage => _storage ?? FirebaseStorage.instance;
 
   CollectionReference _taskCollection(String organizationId) => firestore
       .collection('organizations')
@@ -71,6 +77,8 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       createdByName: task.createdByName,
       dueDate: task.dueDate,
       createdAt: task.createdAt,
+      imageUrl: task.imageUrl,
+      imagePath: task.imagePath,
     );
     await docRef.set(taskWithId.toFirestore());
     return taskWithId;
@@ -249,13 +257,44 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
 
   @override
   Future<void> updateTask(String organizationId, TaskModel task) async {
-    await _taskCollection(
-      organizationId,
-    ).doc(task.uid).update(task.toFirestore());
+    final ref = _taskCollection(organizationId).doc(task.uid);
+    final data = task.toFirestore();
+    String? oldImagePath;
+    if (task.editedAt != null) {
+      // Sender edit: an image that was removed or replaced must disappear
+      // from the doc and from Storage.
+      final before = await ref.get();
+      final beforeData = before.data() as Map<String, dynamic>?;
+      oldImagePath = beforeData?['imagePath'] as String?;
+      if (task.imageUrl == null) {
+        data['imageUrl'] = FieldValue.delete();
+        data['imagePath'] = FieldValue.delete();
+      }
+    }
+    await ref.update(data);
+    if (oldImagePath != null && oldImagePath != task.imagePath) {
+      await _deleteImageQuietly(oldImagePath);
+    }
   }
 
   @override
   Future<void> deleteTask(String organizationId, String taskId) async {
-    await _taskCollection(organizationId).doc(taskId).delete();
+    final ref = _taskCollection(organizationId).doc(taskId);
+    String? imagePath;
+    try {
+      final snap = await ref.get();
+      imagePath = (snap.data() as Map<String, dynamic>?)?['imagePath'] as String?;
+    } catch (_) {}
+    // Hard delete, as before: the delegate's stream drops it immediately.
+    await ref.delete();
+    if (imagePath != null) await _deleteImageQuietly(imagePath);
+  }
+
+  Future<void> _deleteImageQuietly(String path) async {
+    try {
+      await storage.ref(path).delete();
+    } catch (e) {
+      debugPrint('Task image delete failed: $e');
+    }
   }
 }

@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/tasks/presentation/widgets/task_image_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -372,6 +373,7 @@ class _TaskCard extends StatelessWidget {
               'task': task,
               'isAdmin': true,
               'organizationId': adminDelegate.organizationUID,
+              'currentUserId': adminDelegate.uid,
             },
           );
           if (context.mounted) {
@@ -420,6 +422,10 @@ class _TaskCard extends StatelessWidget {
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.outline,
                       ),
+                    ),
+                    TaskCardMeta(
+                      hasImage: task.hasImage,
+                      isEdited: task.isEdited,
                     ),
                   ],
                 ),

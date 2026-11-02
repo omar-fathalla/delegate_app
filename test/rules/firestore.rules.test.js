@@ -557,4 +557,67 @@ describe("firestore tightened rules", () => {
     await assertSucceeds(db.collection("attendance_logs").where("companyId", "==", "c1").get());
   });
 
+
+  describe("task images and sender-only edit/delete", () => {
+    const seedSent = async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc("organizations/o1/tasks/sent").set({
+          companyId: "c1",
+          assignedTo: "del-1",
+          createdBy: "comp",
+          title: "Sent",
+          description: "Body",
+          status: "pending",
+          imageUrl: "https://example.com/a.jpg",
+          imagePath: "organizations/o1/task_images/comp/a.jpg",
+        });
+      });
+    };
+
+    test("sender can create a task with an image in their own folder", async () => {
+      const comp = dbFor("comp");
+      await assertSucceeds(comp.doc("organizations/o1/tasks/new1").set({
+        companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
+        imageUrl: "https://example.com/x.jpg",
+        imagePath: "organizations/o1/task_images/comp/x.jpg",
+      }));
+      await assertFails(comp.doc("organizations/o1/tasks/new2").set({
+        companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
+        imagePath: "organizations/o1/task_images/hr/x.jpg",
+      }));
+    });
+
+    test("only the sender edits content; other staff can still change status", async () => {
+      await seedSent();
+      const comp = dbFor("comp");
+      const hr = dbFor("hr");
+      await assertSucceeds(comp.doc("organizations/o1/tasks/sent").update({
+        description: "Edited", editedAt: new Date(),
+      }));
+      await assertFails(hr.doc("organizations/o1/tasks/sent").update({description: "Hijack"}));
+      await assertFails(hr.doc("organizations/o1/tasks/sent").update({imageUrl: "https://evil"}));
+      await assertSucceeds(hr.doc("organizations/o1/tasks/sent").update({status: "inProgress"}));
+    });
+
+    test("delegate reads the image and updates status but cannot edit or delete", async () => {
+      await seedSent();
+      const delegate = dbFor("del-1", DELEGATE);
+      await assertSucceeds(delegate.doc("organizations/o1/tasks/sent").get());
+      await assertSucceeds(delegate.doc("organizations/o1/tasks/sent").update({
+        status: "completed", completedBy: "del-1", notes: "done",
+      }));
+      await assertFails(delegate.doc("organizations/o1/tasks/sent").update({description: "x"}));
+      await assertFails(delegate.doc("organizations/o1/tasks/sent").update({imageUrl: "x"}));
+      await assertFails(delegate.doc("organizations/o1/tasks/sent").delete());
+    });
+
+    test("only the sender (or global staff) deletes", async () => {
+      await seedSent();
+      await assertFails(dbFor("hr").doc("organizations/o1/tasks/sent").delete());
+      await assertFails(dbFor("comp2").doc("organizations/o1/tasks/sent").delete());
+      await assertSucceeds(dbFor("comp").doc("organizations/o1/tasks/sent").delete());
+      await seedSent();
+      await assertSucceeds(dbFor("super").doc("organizations/o1/tasks/sent").delete());
+    });
+  });
 });

@@ -186,6 +186,7 @@ final appRouter = GoRouter(
             task: extras['task'] as TaskEntity,
             isAdmin: extras['isAdmin'] as bool,
             organizationId: extras['organizationId'] as String,
+            currentUserId: extras['currentUserId'] as String?,
           ),
         );
       },

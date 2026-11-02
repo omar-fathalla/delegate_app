@@ -19,6 +19,27 @@ service firebase.storage {
       allow read, write: if isAuthenticated();
     }
 
+    // ==================== TASK IMAGES ====================
+    // Images a supervisor attaches to a task. Only the uploader writes or
+    // deletes their own files (<5 MB, image/*); any signed-in member of the
+    // organization (staff users doc or delegate token) can read.
+    // NOTE: Storage ORs overlapping matches, so this only restricts access
+    // once the /organizations/{orgId}/{allPaths=**} and /{allPaths=**}
+    // catch-alls below are narrowed. Until then they still allow any
+    // authenticated user.
+    match /organizations/{orgId}/task_images/{uploaderUid}/{fileName} {
+      allow read: if isAuthenticated() && (
+        request.auth.token.get('orgId', '') == orgId
+        || orgId in request.auth.token.get('orgIds', [])
+        || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('organizationUID', '') == orgId
+      );
+      allow create, update: if isAuthenticated()
+        && request.auth.uid == uploaderUid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isAuthenticated() && request.auth.uid == uploaderUid;
+    }
+
     // ==================== ORGANIZATION FILES ====================
     match /organizations/{orgId}/{allPaths=**} {
       allow read, write: if isAuthenticated();

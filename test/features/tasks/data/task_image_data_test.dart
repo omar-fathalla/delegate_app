@@ -1,0 +1,90 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/features/tasks/data/datasources/task_remote_data_source.dart';
+import 'package:delegate_app/features/tasks/data/models/task_model.dart';
+import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _MockStorage extends Mock implements FirebaseStorage {}
+
+class _MockRef extends Mock implements Reference {}
+
+void main() {
+  late FakeFirebaseFirestore db;
+  late _MockStorage storage;
+  late _MockRef ref;
+  late TaskRemoteDataSourceImpl ds;
+
+  final base = TaskModel(
+    uid: 't1',
+    title: 'T',
+    description: 'D',
+    priority: TaskPriority.low,
+    status: TaskStatus.pending,
+    assignedTo: 'del-1',
+    assignedToName: 'Del',
+    companyId: 'c1',
+    createdBy: 'sup-1',
+    createdByName: 'Sup',
+    dueDate: DateTime(2026, 11, 3),
+    createdAt: DateTime(2026, 11, 2),
+    imageUrl: 'https://x/a.jpg',
+    imagePath: 'organizations/o1/task_images/sup-1/a.jpg',
+  );
+
+  setUp(() {
+    db = FakeFirebaseFirestore();
+    storage = _MockStorage();
+    ref = _MockRef();
+    when(() => storage.ref(any())).thenReturn(ref);
+    when(() => ref.delete()).thenAnswer((_) async {});
+    ds = TaskRemoteDataSourceImpl(firestore: db, storage: storage);
+  });
+
+  test('model round-trips image and edited fields; omits them when null', () async {
+    final edited = TaskModel.fromEntity(base.copyWith(editedAt: DateTime(2026, 11, 2, 10)));
+    await db.doc('organizations/o1/tasks/t1').set(edited.toFirestore());
+    final back = TaskModel.fromFirestore(await db.doc('organizations/o1/tasks/t1').get());
+    expect(back.imageUrl, base.imageUrl);
+    expect(back.imagePath, base.imagePath);
+    expect(back.isEdited, isTrue);
+    final plain = TaskModel.fromEntity(base.copyWith(clearImage: true)).toFirestore();
+    expect(plain.containsKey('imageUrl'), isFalse);
+    expect(plain.containsKey('editedAt'), isFalse);
+  });
+
+  test('createTask stores the image', () async {
+    final created = await ds.createTask('o1', base);
+    final snap = await db.doc('organizations/o1/tasks/${created.uid}').get();
+    expect(snap.data()!['imagePath'], base.imagePath);
+  });
+
+  test('sender edit that removes the image clears fields and deletes the file', () async {
+    await db.doc('organizations/o1/tasks/t1').set(base.toFirestore());
+    final edited = base.copyWith(clearImage: true, editedAt: DateTime.now(), description: 'D2');
+    await ds.updateTask('o1', TaskModel.fromEntity(edited));
+    final data = (await db.doc('organizations/o1/tasks/t1').get()).data()!;
+    expect(data.containsKey('imageUrl'), isFalse);
+    expect(data['description'], 'D2');
+    expect(data['editedAt'], isA<Timestamp>());
+    verify(() => storage.ref(base.imagePath!)).called(1);
+    verify(() => ref.delete()).called(1);
+  });
+
+  test('delegate status update keeps the image and deletes nothing', () async {
+    await db.doc('organizations/o1/tasks/t1').set(base.toFirestore());
+    await ds.updateTask('o1', TaskModel.fromEntity(base.copyWith(status: TaskStatus.completed)));
+    final data = (await db.doc('organizations/o1/tasks/t1').get()).data()!;
+    expect(data['imageUrl'], base.imageUrl);
+    verifyNever(() => ref.delete());
+  });
+
+  test('deleteTask removes the doc and its image', () async {
+    await db.doc('organizations/o1/tasks/t1').set(base.toFirestore());
+    await ds.deleteTask('o1', 't1');
+    expect((await db.doc('organizations/o1/tasks/t1').get()).exists, isFalse);
+    verify(() => ref.delete()).called(1);
+  });
+}

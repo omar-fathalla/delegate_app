@@ -19,6 +19,8 @@ class CreateTaskSubmitted extends CreateTaskEvent {
   final String companyId;
   final String createdBy;
   final String createdByName;
+  final String? imageUrl;
+  final String? imagePath;
 
   const CreateTaskSubmitted({
     required this.organizationId,
@@ -31,6 +33,8 @@ class CreateTaskSubmitted extends CreateTaskEvent {
     required this.companyId,
     required this.createdBy,
     required this.createdByName,
+    this.imageUrl,
+    this.imagePath,
   });
 
   @override
@@ -45,6 +49,8 @@ class CreateTaskSubmitted extends CreateTaskEvent {
     companyId,
     createdBy,
     createdByName,
+    imageUrl,
+    imagePath,
   ];
 }
 

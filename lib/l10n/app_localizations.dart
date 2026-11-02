@@ -4885,6 +4885,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dark'**
   String get themeModeDark;
+
+  /// No description provided for @taskImageAttach.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach image'**
+  String get taskImageAttach;
+
+  /// No description provided for @taskImageFromCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get taskImageFromCamera;
+
+  /// No description provided for @taskImageFromGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get taskImageFromGallery;
+
+  /// No description provided for @taskImageReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace image'**
+  String get taskImageReplace;
+
+  /// No description provided for @taskImageRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove image'**
+  String get taskImageRemove;
+
+  /// No description provided for @taskImageUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading image…'**
+  String get taskImageUploading;
+
+  /// No description provided for @taskImageUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t upload the image. Try again.'**
+  String get taskImageUploadFailed;
+
+  /// No description provided for @taskImageRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get taskImageRetry;
+
+  /// No description provided for @taskImageLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the image'**
+  String get taskImageLoadFailed;
+
+  /// No description provided for @taskImageAttached.
+  ///
+  /// In en, this message translates to:
+  /// **'Attached image'**
+  String get taskImageAttached;
+
+  /// No description provided for @taskImageTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'The image is too large. Choose a smaller one.'**
+  String get taskImageTooLarge;
+
+  /// No description provided for @taskEditedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Edited'**
+  String get taskEditedLabel;
+
+  /// No description provided for @taskEditAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get taskEditAction;
+
+  /// No description provided for @taskDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get taskDeleteAction;
+
+  /// No description provided for @taskMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Task options'**
+  String get taskMoreActions;
+
+  /// No description provided for @taskCloseImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get taskCloseImage;
 }
 
 class _AppLocalizationsDelegate

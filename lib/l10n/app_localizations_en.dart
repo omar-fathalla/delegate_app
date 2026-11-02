@@ -2722,4 +2722,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get themeModeDark => 'Dark';
+
+  @override
+  String get taskImageAttach => 'Attach image';
+
+  @override
+  String get taskImageFromCamera => 'Take photo';
+
+  @override
+  String get taskImageFromGallery => 'Choose from gallery';
+
+  @override
+  String get taskImageReplace => 'Replace image';
+
+  @override
+  String get taskImageRemove => 'Remove image';
+
+  @override
+  String get taskImageUploading => 'Uploading image…';
+
+  @override
+  String get taskImageUploadFailed => 'Couldn\'t upload the image. Try again.';
+
+  @override
+  String get taskImageRetry => 'Retry';
+
+  @override
+  String get taskImageLoadFailed => 'Couldn\'t load the image';
+
+  @override
+  String get taskImageAttached => 'Attached image';
+
+  @override
+  String get taskImageTooLarge =>
+      'The image is too large. Choose a smaller one.';
+
+  @override
+  String get taskEditedLabel => 'Edited';
+
+  @override
+  String get taskEditAction => 'Edit';
+
+  @override
+  String get taskDeleteAction => 'Delete';
+
+  @override
+  String get taskMoreActions => 'Task options';
+
+  @override
+  String get taskCloseImage => 'Close';
 }

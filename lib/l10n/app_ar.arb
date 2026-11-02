@@ -1760,5 +1760,69 @@
   "themeModeSystem": "تلقائي (حسب الموبايل)",
   "themeModeSystemHint": "يتبع إعداد الوضع الداكن في جهازك",
   "themeModeLight": "فاتح",
-  "themeModeDark": "داكن"
+  "themeModeDark": "داكن",
+  "taskImageAttach": "إرفاق صورة",
+  "@taskImageAttach": {
+    "description": "Button to attach an image to a task"
+  },
+  "taskImageFromCamera": "التقاط صورة",
+  "@taskImageFromCamera": {
+    "description": "Pick task image from camera"
+  },
+  "taskImageFromGallery": "اختيار من المعرض",
+  "@taskImageFromGallery": {
+    "description": "Pick task image from gallery"
+  },
+  "taskImageReplace": "تغيير الصورة",
+  "@taskImageReplace": {
+    "description": "Replace attached task image"
+  },
+  "taskImageRemove": "إزالة الصورة",
+  "@taskImageRemove": {
+    "description": "Remove attached task image"
+  },
+  "taskImageUploading": "جارٍ رفع الصورة…",
+  "@taskImageUploading": {
+    "description": "Shown while the task image uploads"
+  },
+  "taskImageUploadFailed": "تعذّر رفع الصورة. حاول مرة أخرى.",
+  "@taskImageUploadFailed": {
+    "description": "Task image upload failed"
+  },
+  "taskImageRetry": "إعادة المحاولة",
+  "@taskImageRetry": {
+    "description": "Retry task image upload"
+  },
+  "taskImageLoadFailed": "تعذّر تحميل الصورة",
+  "@taskImageLoadFailed": {
+    "description": "Task image failed to load"
+  },
+  "taskImageAttached": "صورة مرفقة",
+  "@taskImageAttached": {
+    "description": "Label/semantic for the task image"
+  },
+  "taskImageTooLarge": "حجم الصورة كبير. اختر صورة أصغر.",
+  "@taskImageTooLarge": {
+    "description": "Task image over size limit"
+  },
+  "taskEditedLabel": "معدّلة",
+  "@taskEditedLabel": {
+    "description": "Label on a task the sender edited"
+  },
+  "taskEditAction": "تعديل",
+  "@taskEditAction": {
+    "description": "Edit task menu item"
+  },
+  "taskDeleteAction": "حذف",
+  "@taskDeleteAction": {
+    "description": "Delete task menu item"
+  },
+  "taskMoreActions": "خيارات المهمة",
+  "@taskMoreActions": {
+    "description": "Tooltip for the task overflow menu"
+  },
+  "taskCloseImage": "إغلاق",
+  "@taskCloseImage": {
+    "description": "Close full-screen task image"
+  }
 }

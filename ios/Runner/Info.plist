@@ -49,7 +49,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>We need access to your camera to take a selfie for attendance check-in.</string>
+	<string>We need access to your camera to take a selfie for attendance check-in and to take photos you attach to tasks.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>We need access to your location even in the background to track delegate routes and update task statuses in real-time.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
@@ -59,7 +59,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>We need permission to save the generated QR code to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need access to your photo library to upload profile pictures.</string>
+	<string>We need access to your photo library to upload profile pictures and images you attach to tasks.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

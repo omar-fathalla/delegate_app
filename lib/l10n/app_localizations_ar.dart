@@ -2725,4 +2725,52 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get themeModeDark => 'داكن';
+
+  @override
+  String get taskImageAttach => 'إرفاق صورة';
+
+  @override
+  String get taskImageFromCamera => 'التقاط صورة';
+
+  @override
+  String get taskImageFromGallery => 'اختيار من المعرض';
+
+  @override
+  String get taskImageReplace => 'تغيير الصورة';
+
+  @override
+  String get taskImageRemove => 'إزالة الصورة';
+
+  @override
+  String get taskImageUploading => 'جارٍ رفع الصورة…';
+
+  @override
+  String get taskImageUploadFailed => 'تعذّر رفع الصورة. حاول مرة أخرى.';
+
+  @override
+  String get taskImageRetry => 'إعادة المحاولة';
+
+  @override
+  String get taskImageLoadFailed => 'تعذّر تحميل الصورة';
+
+  @override
+  String get taskImageAttached => 'صورة مرفقة';
+
+  @override
+  String get taskImageTooLarge => 'حجم الصورة كبير. اختر صورة أصغر.';
+
+  @override
+  String get taskEditedLabel => 'معدّلة';
+
+  @override
+  String get taskEditAction => 'تعديل';
+
+  @override
+  String get taskDeleteAction => 'حذف';
+
+  @override
+  String get taskMoreActions => 'خيارات المهمة';
+
+  @override
+  String get taskCloseImage => 'إغلاق';
 }

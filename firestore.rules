@@ -549,29 +549,109 @@ service cloud.firestore {
       }
 
       match /tasks/{taskId} {
+        // Task rules read the caller's users doc once (let) to stay inside
+        // the 1000-expression budget. Role lists mirror the shared helpers.
+        // 0 = none, 1 = global, 2 = org-scoped, 3 = company-scoped staff.
+        function taskStaffLevel(role) {
+          return role in ['super-admin', 'super_admin', 'superadmin', 'superAdmin',
+              'Super-Admin', 'SUPER_ADMIN', 'technical_support', 'technical-support',
+              'technicalSupport', 'technicalsupport', 'tech_support', 'techsupport'] ? 1
+            : role in ['organization-admin', 'organization_admin', 'organizationadmin',
+              'organizationAdmin', 'marketing', 'marketing_promotion',
+              'marketingpromotion', 'marketingPromotion'] ? 2
+            : role in ['company-admin', 'company_admin', 'companyadmin', 'admin',
+              'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr',
+              'human_resources', 'accountant', 'accounting', 'account_admin',
+              'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+              'branches-marketing-manager', 'branchesmarketingmanager'] ? 3
+            : 0;
+        }
+        function taskUserData() {
+          return signedIn()
+            && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+              ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+              : {};
+        }
+        function taskOrgOf(ud) {
+          return ud.get('organizationUID', '') is string && ud.get('organizationUID', '') != ''
+            ? ud.organizationUID : claimString('orgId');
+        }
+        function taskCompanyOf(ud) {
+          return ud.get('companyUID', '') is string && ud.get('companyUID', '') != ''
+            ? ud.companyUID : claimString('companyId');
+        }
+        // Staff level if the caller may act on a task of company `taskCompany`.
+        function taskStaffScope(taskCompany) {
+          let ud = taskUserData();
+          let role = ud.get('role', '') is string ? ud.get('role', '') : '';
+          let level = taskStaffLevel(role);
+          let org = taskOrgOf(ud);
+          let comp = taskCompanyOf(ud);
+          return level == 1 ? 1
+            : level == 2 && org == orgId ? 2
+            : level == 3 && org == orgId && comp != '' && comp == taskCompany ? 3
+            : 0;
+        }
+        function taskSenderKeys() {
+          return ['title', 'description', 'imageUrl', 'imagePath', 'editedAt'];
+        }
+        function taskTouchesSenderKeys() {
+          return request.resource.data.diff(resource.data).affectedKeys().hasAny(taskSenderKeys());
+        }
+        // An attached image must sit under the uploader's own folder.
+        function incomingTaskImageOk() {
+          return !request.resource.data.keys().hasAny(['imagePath'])
+            || (request.resource.data.imagePath is string
+              && request.resource.data.imagePath.matches(
+                '^organizations/' + orgId + '/task_images/' + request.auth.uid + '/[^/]+$'));
+        }
+        // On update the path is only checked when the image changes, so other
+        // staff can still change status on a task that carries an image.
+        function taskImageChangeOk() {
+          return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['imagePath'])
+            || !request.resource.data.keys().hasAny(['imagePath'])
+            || incomingTaskImageOk();
+        }
+        function taskDelegateTarget() {
+          return delegateInOrg(orgId) && (
+            ownsDelegateId(resource.data.assignedTo)
+            || resource.data.assignedTo == 'all'
+            || resource.data.assignedTo == 'all_marketing_promotion'
+            || resource.data.assignedTo == 'all_branch_marketing'
+            || ownsDelegateId(resource.data.createdBy)
+          );
+        }
+        function taskCanUpdate() {
+          let scope = taskStaffScope(resource.data.get('companyId', ''));
+          let isSender = resource.data.get('createdBy', '') == request.auth.uid;
+          return (scope > 0
+              && (scope == 1 || isSender || !taskTouchesSenderKeys())
+              && taskImageChangeOk())
+            || (taskDelegateTarget()
+              && (ownsDelegateId(resource.data.createdBy) || !taskTouchesSenderKeys()));
+        }
+        function taskCanDelete() {
+          let scope = taskStaffScope(resource.data.get('companyId', ''));
+          return (scope > 0 && (scope == 1 || resource.data.get('createdBy', '') == request.auth.uid))
+            || (delegateInOrg(orgId) && ownsDelegateId(resource.data.createdBy));
+        }
+
         allow read: if signedIn() && (
-          isGlobalStaff()
-          || (isOrgScopedStaff() && callerOrg() == orgId)
-          || (isCompanyScopedStaff() && callerOrg() == orgId && companyScoped())
+          taskStaffScope(resource.data.get('companyId', '')) > 0
           || (delegateInOrg(orgId) && (
             resource.data.companyId == claimString('companyId')
             || claimListHas('companyIds', resource.data.companyId)
           ))
         );
-        allow create: if isGlobalStaff()
-          || (isOrgScopedStaff() && callerOrg() == orgId)
-          || (isCompanyScopedStaff() && callerOrg() == orgId && incomingCompanyScoped());
-        allow update, delete: if isGlobalStaff()
-          || (isOrgScopedStaff() && callerOrg() == orgId)
-          || (isCompanyScopedStaff() && callerOrg() == orgId && companyScoped())
-          || (delegateInOrg(orgId) && (
-            ownsDelegateId(resource.data.assignedTo)
-            || delegateOwns(resource.data.assignedTo)
-            || resource.data.assignedTo == 'all'
-            || resource.data.assignedTo == 'all_marketing_promotion'
-            || resource.data.assignedTo == 'all_branch_marketing'
-            || ownsDelegateId(resource.data.createdBy)
-          ));
+        allow create: if signedIn()
+          && taskStaffScope(request.resource.data.get('companyId', '')) > 0
+          && incomingTaskImageOk();
+        // Staff keep status/priority edits; message content and the image
+        // only by the sender (global staff keep moderation access).
+        // Delegates: status/notes only, never the sender's content.
+        allow update: if signedIn() && taskCanUpdate();
+        // Hard delete: the sender (or global staff). Delegates only their own.
+        allow delete: if signedIn() && taskCanDelete();
       }
 
       match /attendance_logs/{logId} {

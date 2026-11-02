@@ -22,6 +22,18 @@ class TaskEntity extends Equatable {
   completedBy; // If assigned to 'all', who completed it? (or just for standard tracking)
   final String? notes;
 
+  /// Download URL of the image the sender attached, if any.
+  final String? imageUrl;
+
+  /// Storage path of [imageUrl], used to delete the file with the task.
+  final String? imagePath;
+
+  /// Set when the sender edits the title, description or image.
+  final DateTime? editedAt;
+
+  bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
+  bool get isEdited => editedAt != null;
+
   const TaskEntity({
     required this.uid,
     required this.title,
@@ -38,6 +50,9 @@ class TaskEntity extends Equatable {
     this.completedAt,
     this.completedBy,
     this.notes,
+    this.imageUrl,
+    this.imagePath,
+    this.editedAt,
   });
 
   TaskEntity copyWith({
@@ -56,6 +71,10 @@ class TaskEntity extends Equatable {
     DateTime? completedAt,
     String? completedBy,
     String? notes,
+    String? imageUrl,
+    String? imagePath,
+    DateTime? editedAt,
+    bool clearImage = false,
   }) {
     return TaskEntity(
       uid: uid ?? this.uid,
@@ -73,6 +92,9 @@ class TaskEntity extends Equatable {
       completedAt: completedAt ?? this.completedAt,
       completedBy: completedBy ?? this.completedBy,
       notes: notes ?? this.notes,
+      imageUrl: clearImage ? null : (imageUrl ?? this.imageUrl),
+      imagePath: clearImage ? null : (imagePath ?? this.imagePath),
+      editedAt: editedAt ?? this.editedAt,
     );
   }
 
@@ -93,5 +115,8 @@ class TaskEntity extends Equatable {
     completedAt,
     completedBy,
     notes,
+    imageUrl,
+    imagePath,
+    editedAt,
   ];
 }
