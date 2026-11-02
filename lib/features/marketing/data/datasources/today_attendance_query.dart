@@ -37,32 +37,70 @@ List<List<T>> chunkList<T>(List<T> list, int size) => [
     list.sublist(i, i + size > list.length ? list.length : i + size),
 ];
 
-/// Legacy `branchName` spelling variants (pre-`branchKey` docs). Kept exactly
-/// as the pre-Phase-1 query built them so old records still match.
+/// Upper bound on generated spellings per branch (keeps the fallback to a
+/// few `whereIn` chunks even for long multi-word names).
+const int kMaxLegacyVariantsPerBranch = 64;
+
+/// Legacy `branchName` spelling variants (pre-`branchKey` docs).
+///
+/// Generated from the [branchKey] normalizer instead of a fixed list, so every
+/// combination is covered (e.g. «الابراهيميه», which mixes a plain alef with a
+/// final ه, was missing from the old 6-variant list):
+/// * a word-initial alef (or the alef right after a leading «ال») can be
+///   ا / أ / إ / آ;
+/// * a word-final ه can be ه / ة; a word-final ي can be ي / ى.
+/// The original trimmed spelling is always included. Capped at
+/// [kMaxLegacyVariantsPerBranch].
 Set<String> legacyBranchNameVariants(String branch) {
   final trimmed = branch.trim();
   if (trimmed.isEmpty) return {};
-  return {
-    trimmed,
-    trimmed.replaceAll(RegExp(r'[أإآ]'), 'ا'),
-    trimmed.replaceAll('ا', 'أ'),
-    trimmed.replaceAll('ه', 'ة'),
-    trimmed.replaceAll('ة', 'ه'),
-    trimmed.replaceAll('ى', 'ي'),
-  };
+  final out = <String>{trimmed, trimmed.replaceAll(RegExp(r'\s+'), ' ')};
+  final key = branchKey(trimmed);
+  final words = key.split(' ');
+  // Per-word list of options; product = variants.
+  final perWord = <List<String>>[];
+  for (final w in words) {
+    var options = <String>[w];
+    List<String> expand(List<String> src, int index, List<String> chars) => [
+      for (final o in src)
+        for (final c in chars)
+          o.substring(0, index) + c + o.substring(index + 1),
+    ];
+    final alefIndex = w.startsWith('ال') && w.length > 2 ? 2 : 0;
+    if (w.length > alefIndex && w[alefIndex] == 'ا') {
+      options = expand(options, alefIndex, const ['ا', 'أ', 'إ', 'آ']);
+    }
+    final last = w.length - 1;
+    if (last > 0 && w[last] == 'ه') {
+      options = expand(options, last, const ['ه', 'ة']);
+    } else if (last > 0 && w[last] == 'ي') {
+      options = expand(options, last, const ['ي', 'ى']);
+    }
+    perWord.add(options);
+  }
+  var combos = <String>[''];
+  for (var i = 0; i < perWord.length; i++) {
+    combos = [
+      for (final c in combos)
+        for (final o in perWord[i]) i == 0 ? o : '$c $o',
+    ];
+    if (combos.length > kMaxLegacyVariantsPerBranch) {
+      combos = combos.sublist(0, kMaxLegacyVariantsPerBranch);
+    }
+  }
+  out.addAll(combos);
+  return out;
 }
 
 /// Today's attendance docs for [branchNames] in [organizationId].
 ///
-/// 1. When `use_branch_key_query` is on: one `branchKey` value per branch
-///    (`organizationId == org`, `branchKey in`, timestamp in [dayStart, dayEnd)).
-/// 2. Fallback (kept for old records without `branchKey`): while
-///    `branch_key_backfilled` is off, the bounded legacy
-///    `branchName in [variants]` query ALSO runs for every branch and the
-///    results are merged by doc id (a branch can mix keyed docs from new app
-///    versions and unkeyed docs from old ones on the same day).
-///    A `failed-precondition` (index not built yet) also falls back.
-/// 3. When the flag is off, only the bounded legacy query runs.
+/// * Before the backfill (`branch_key_backfilled` off) or with
+///   `use_branch_key_query` off: only the bounded legacy
+///   `branchName in [variants]` query runs (it covers old AND new docs).
+/// * Once backfilled: one `branchKey` value per branch
+///   (`organizationId == org`, `branchKey in`, timestamp in [dayStart, dayEnd)).
+///   A `failed-precondition` (index not built yet) falls back to legacy.
+/// Results are deduped by doc id; `whereIn` lists are chunked by 20.
 Future<TodayAttendanceFetch> fetchTodayAttendanceDocs({
   required FirebaseFirestore firestore,
   required List<String> branchNames,
@@ -85,8 +123,12 @@ Future<TodayAttendanceFetch> fetchTodayAttendanceDocs({
     keyToBranches.putIfAbsent(k, () => []).add(b);
   }
 
+  // Until the backfill is confirmed, old app versions may still write docs
+  // without `branchKey`, and the legacy `branchName` query already covers
+  // every doc (new docs carry branchName too). So pre-backfill ONLY the
+  // legacy query runs; the keyed query is used only once backfilled.
   Set<String> legacyTargets;
-  if (f.useBranchKeyQuery) {
+  if (f.useBranchKeyQuery && f.branchKeyBackfilled) {
     var indexMissing = false;
     for (final chunk in chunkList(
       keyToBranches.keys.toList(),
@@ -112,15 +154,11 @@ Future<TodayAttendanceFetch> fetchTodayAttendanceDocs({
           'branchKey query needs index, using legacy query: ${e.message}',
         );
         indexMissing = true;
+        break;
       }
     }
-    // Until the backfill is confirmed, old app versions may still write
-    // docs without `branchKey` even for branches that already have keyed
-    // docs today, so the bounded legacy query always runs for every branch
-    // and results are merged by doc id.
-    legacyTargets = (indexMissing || !f.branchKeyBackfilled)
-        ? branchNames.toSet()
-        : <String>{};
+    legacyTargets = indexMissing ? branchNames.toSet() : <String>{};
+    if (indexMissing) byId.clear();
   } else {
     legacyTargets = branchNames.toSet();
   }

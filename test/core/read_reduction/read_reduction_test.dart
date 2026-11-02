@@ -84,17 +84,16 @@ void main() {
     test(
       'branchKey query matches legacy query and excludes yesterday',
       () async {
-        final keyed = await ids(ReadReductionFlags.fixed());
-        final legacy = await ids(
+        // Keyed path = backfilled; legacy path = default (pre-backfill).
+        final keyed = await ids(
           ReadReductionFlags.fixed({
-            ReadReductionFlags.useBranchKeyQueryKey: false,
+            ReadReductionFlags.branchKeyBackfilledKey: true,
           }),
         );
+        final legacy = await ids(ReadReductionFlags.fixed());
         expect(keyed, {'a', 'b'});
-        // Legacy variants never matched a stored 'ى' spelling when the branch
-        // is configured with 'ي'; branchKey does. Otherwise identical.
-        expect(legacy, {'b'});
-        expect(keyed.containsAll(legacy), isTrue);
+        // Generated variants now also match the stored 'ى' spelling.
+        expect(legacy, keyed);
       },
     );
 

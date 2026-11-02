@@ -46,7 +46,8 @@ void main() {
       final r = await fetch(ReadReductionFlags.fixed());
       expect(r.docs.map((d) => d.id).toList()..sort(), ['newApp', 'oldApp']);
       expect(r.legacyBranches, {'فرع الدقي'});
-      expect(r.queries, 2);
+      // Pre-backfill: only the legacy query (it already covers keyed docs).
+      expect(r.queries, 1);
     });
 
     test('backfilled flag drops the legacy query', () async {

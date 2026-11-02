@@ -12,6 +12,14 @@ import 'delegate_tracking_service.dart';
 const double kTrackingMinMoveMeters = 50;
 const Duration kTrackingMinInterval = Duration(seconds: 90);
 
+/// Heartbeat period (was 5 min). Every heartbeat goes through
+/// [shouldSendTrackingPing] too, so a parked device writes at most every 90 s.
+const Duration kTrackingHeartbeatInterval = kTrackingMinInterval;
+
+/// Timer jitter allowance so a 90 s heartbeat isn't skipped for being a few
+/// ms early (which would silently double the interval to 180 s).
+const Duration kTrackingIntervalSlack = Duration(seconds: 3);
+
 /// True when a GPS stream point should be written: first point, moved at
 /// least [kTrackingMinMoveMeters], or [kTrackingMinInterval] elapsed.
 bool shouldSendTrackingPing({
@@ -21,7 +29,8 @@ bool shouldSendTrackingPing({
 }) {
   if (movedMeters == null || lastSentAt == null) return true;
   if (movedMeters >= kTrackingMinMoveMeters) return true;
-  return now.difference(lastSentAt) >= kTrackingMinInterval;
+  return now.difference(lastSentAt) >=
+      kTrackingMinInterval - kTrackingIntervalSlack;
 }
 
 class DelegateTrackingEngine {
@@ -73,7 +82,7 @@ class DelegateTrackingEngine {
   /// 1. بدء جلسة التتبع الميداني في هاتف المندوب
   Future<void> startTrackingSession({
     required String delegateId,
-    Duration interval = const Duration(minutes: 5),
+    Duration interval = kTrackingHeartbeatInterval,
   }) async {
     if (_isTracking && _activeDelegateId == delegateId) return;
 
@@ -177,26 +186,7 @@ class DelegateTrackingEngine {
       ).listen(
         (position) async {
           if (!_isTracking || !_remoteTrackingEnabled) return;
-          // Read-reduction Phase 2: every tracking write is re-read by each
-          // supervisor listening to delegate_tracking. Only send when the
-          // device moved >= 50 m or 90 s passed since the last sent ping.
-          final last = _lastRecordedPosition;
-          final movedMeters = last == null
-              ? null
-              : Geolocator.distanceBetween(
-                  last.latitude,
-                  last.longitude,
-                  position.latitude,
-                  position.longitude,
-                );
-          if (!shouldSendTrackingPing(
-            movedMeters: movedMeters,
-            lastSentAt: _lastPingTime,
-            now: DateTime.now(),
-          )) {
-            return;
-          }
-          await _handleIncomingPosition(position);
+          await handlePositionIfDue(position);
         },
         onError: (err) {
           debugPrint('⚠️ [DelegateTrackingEngine] Position stream error: $err');
@@ -205,6 +195,41 @@ class DelegateTrackingEngine {
     } catch (e) {
       debugPrint('⚠️ [DelegateTrackingEngine] Failed to start background stream: $e');
     }
+  }
+
+  /// Read-reduction: single gate for EVERY tracking write (GPS stream,
+  /// heartbeat timer and [triggerTelemetryPing]). Every write is re-read by
+  /// each supervisor listening to delegate_tracking, so only send when the
+  /// device moved >= 50 m or ~90 s passed since the last sent ping.
+  /// Returns whether the position was sent.
+  @visibleForTesting
+  Future<bool> handlePositionIfDue(Position position, {DateTime? now}) async {
+    final last = _lastRecordedPosition;
+    final movedMeters = last == null
+        ? null
+        : Geolocator.distanceBetween(
+            last.latitude,
+            last.longitude,
+            position.latitude,
+            position.longitude,
+          );
+    if (!shouldSendTrackingPing(
+      movedMeters: movedMeters,
+      lastSentAt: _lastPingTime,
+      now: now ?? DateTime.now(),
+    )) {
+      return false;
+    }
+    await _handleIncomingPosition(position);
+    return true;
+  }
+
+  /// Test hook: mark a session active without GPS/Firestore side effects.
+  @visibleForTesting
+  void debugActivate(String delegateId) {
+    _activeDelegateId = delegateId;
+    _isTracking = true;
+    _remoteTrackingEnabled = true;
   }
 
   /// معالجة نقطة الموقع الواردة من تيار الـ GPS
@@ -298,7 +323,7 @@ class DelegateTrackingEngine {
         ),
       );
 
-      await _handleIncomingPosition(position);
+      await handlePositionIfDue(position);
     } catch (e) {
       debugPrint('⚠️ [DelegateTrackingEngine] Telemetry ping error: $e');
     }
