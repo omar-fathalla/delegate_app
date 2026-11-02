@@ -450,29 +450,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SyncStatusBanner(),
-              M3StaggeredItem(
-                index: 0,
-                child: Builder(
-                  builder: (context) {
-                    // Dark: hero uses primaryContainer/onPrimaryContainer so
-                    // a large light-purple block doesn't glare. Light unchanged.
-                    final t = Theme.of(context);
-                    if (t.brightness != Brightness.dark) {
-                      return _buildWelcomeHeroCard(context);
-                    }
-                    final cs = t.colorScheme;
-                    return Theme(
-                      data: t.copyWith(
-                        colorScheme: cs.copyWith(
-                          primary: cs.primaryContainer,
-                          onPrimary: cs.onPrimaryContainer,
-                        ),
-                      ),
-                      child: Builder(builder: _buildWelcomeHeroCard),
-                    );
-                  },
-                ),
-              ),
+              M3StaggeredItem(index: 0, child: _buildWelcomeHeroCard(context)),
               const SizedBox(height: 16),
               M3StaggeredItem(
                   index: 1, child: _buildMonthlyAttendanceSummaryCard(context)),
@@ -511,6 +489,17 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     );
   }
 
+  /// Foreground for the home hero. Uses the screen's [context] theme
+  /// directly so it is correct in both modes: onPrimary on the light
+  /// primary hero, onPrimaryContainer on the dark primaryContainer hero.
+  Color _heroOn(BuildContext context, [double? light, double? dark]) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final base = isDark ? cs.onPrimaryContainer : cs.onPrimary;
+    final a = isDark ? dark : light;
+    return a == null ? base : base.withValues(alpha: a);
+  }
+
   Widget _buildWelcomeHeroCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -519,7 +508,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.primary,
+        // Dark: primaryContainer (no glare); light unchanged.
+        color: theme.brightness == Brightness.dark
+            ? colorScheme.primaryContainer
+            : colorScheme.primary,
         borderRadius: BorderRadius.circular(28),
       ),
       child: Column(
@@ -536,7 +528,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     Text(AppLocalizations.of(context)!.homeGreeting(firstNameForLocale(widget.delegate.fullName, widget.delegate.firstName, isArabic: Localizations.localeOf(context).languageCode == 'ar')),
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: colorScheme.onPrimary,
+                        color: _heroOn(context),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -646,8 +638,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       imageUrl: photoUrl,
                       fallbackText: widget.delegate.firstName,
                       radius: 26,
-                      backgroundColor: colorScheme.onPrimary.withValues(alpha: 0.12),
-                      foregroundColor: colorScheme.onPrimary,
+                      backgroundColor: _heroOn(context, 0.12, 0.15),
+                      foregroundColor: _heroOn(context),
                       fallbackIcon: Symbols.person_pin_rounded,
                     ),
                   );
@@ -656,14 +648,14 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             ],
           ),
           const SizedBox(height: 16),
-          Divider(color: colorScheme.onPrimary.withValues(alpha: 0.16), height: 1),
+          Divider(color: _heroOn(context, 0.16, 0.2), height: 1),
           const SizedBox(height: 16),
 
           // Core Duties Summary
           Text(AppLocalizations.of(context)!.homeCoreDuties,
             style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w700,
-              color: colorScheme.onPrimary,
+              color: _heroOn(context),
             ),
           ),
           const SizedBox(height: 8),
@@ -694,14 +686,14 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.8)),
+        Icon(icon, size: 18, color: _heroOn(context, 0.8, 0.8)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
             style: TextStyle(
               fontSize: 13,
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: _heroOn(context),
               height: 1.45,
             ),
           ),
@@ -717,7 +709,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.12),
+        color: _heroOn(context, 0.12, 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -726,7 +718,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           Icon(
             Symbols.badge_rounded,
             size: 16,
-            color: Theme.of(context).colorScheme.onPrimary,
+            color: _heroOn(context),
           ),
           const SizedBox(width: 6),
           Text(
@@ -734,7 +726,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: _heroOn(context),
             ),
           ),
         ],
@@ -754,10 +746,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           vertical: 3,
         ),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.12),
+          color: _heroOn(context, 0.12, 0.12),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.24),
+            color: _heroOn(context, 0.24, 0.4),
           ),
         ),
         child: Row(
@@ -766,7 +758,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             Icon(
               Symbols.domain_rounded,
               size: 16,
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: _heroOn(context),
             ),
             const SizedBox(width: 6),
             Text(
@@ -774,7 +766,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.onPrimary,
+                color: _heroOn(context),
               ),
             ),
             const SizedBox(width: 6),
@@ -783,7 +775,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               height: 5.5,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.onPrimary,
+                color: _heroOn(context),
               ),
             ),
           ],
@@ -797,7 +789,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.12),
+        color: _heroOn(context, 0.12, 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -806,7 +798,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           Icon(
             Symbols.storefront_rounded,
             size: 14,
-            color: Theme.of(context).colorScheme.onPrimary,
+            color: _heroOn(context),
           ),
           const SizedBox(width: 6),
           Text(
@@ -814,7 +806,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: _heroOn(context),
             ),
           ),
         ],
