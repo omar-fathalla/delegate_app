@@ -1,4 +1,3 @@
-import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +8,7 @@ import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import 'package:delegate_app/features/hr/data/models/company_payroll_config_model.dart';
+import 'package:delegate_app/features/hr/domain/services/payroll_day_rules.dart';
 import 'package:delegate_app/features/hr/domain/entities/company_payroll_config.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
@@ -273,19 +273,29 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
           .where('status', isEqualTo: 'approved')
           .get();
 
+      // إجازات غير سنوية معتمدة (تُعامل كما كانت)، وإجازات سنوية تُدفع في حدود الرصيد
       final Map<String, int> leaveDaysByDelegateId = {};
+      final Map<String, int> annualDaysThisMonth = {};
+      final Map<String, int> annualDaysEarlierThisYear = {};
+      final yearStart = DateTime(monthStart.year);
       for (final doc in leavesSnap.docs) {
         final data = doc.data();
-        final sTs = data['startDate'];
-        if (sTs is Timestamp) {
-          final sDate = sTs.toDate();
-          if (sDate.isBefore(monthStart) || sDate.isAfter(monthEnd)) continue;
-        }
         final delId = (data['delegateUid'] ?? '').toString();
+        if (delId.isEmpty) continue;
         final days = (data['daysCount'] as num?)?.toInt() ?? 1;
-        if (delId.isNotEmpty) {
-          leaveDaysByDelegateId[delId] = (leaveDaysByDelegateId[delId] ?? 0) + days;
+        final sTs = data['startDate'];
+        final sDate = sTs is Timestamp ? sTs.toDate() : null;
+        final inMonth = sDate == null || !(sDate.isBefore(monthStart) || sDate.isAfter(monthEnd));
+        if (PayrollDayRules.isAnnualDayLeave(data)) {
+          if (inMonth) {
+            annualDaysThisMonth[delId] = (annualDaysThisMonth[delId] ?? 0) + days;
+          } else if (!sDate.isBefore(yearStart) && sDate.isBefore(monthStart)) {
+            annualDaysEarlierThisYear[delId] = (annualDaysEarlierThisYear[delId] ?? 0) + days;
+          }
+          continue;
         }
+        if (!inMonth) continue;
+        leaveDaysByDelegateId[delId] = (leaveDaysByDelegateId[delId] ?? 0) + days;
       }
 
       // 6. Fetch Attendance logs for the month
@@ -342,6 +352,9 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         final daysMap = attendanceByDelegateAndDay[d.uid] ?? {};
         int attendedDaysCount = 0;
         int totalMins = 0;
+        final walletData = walletConfigByDelegateId[d.uid] ?? {};
+        final delegateShiftHours = (walletData['dailyShiftHours'] as num?)?.toDouble() ??
+            _companyPayrollConfig.defaultDailyShiftHours;
 
         for (final logs in daysMap.values) {
           DateTime? inTime;
@@ -361,33 +374,31 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
 
           if (inTime != null) {
             attendedDaysCount++;
-            if (outTime != null) {
-              final diff = outTime.difference(inTime).inMinutes;
-              if (diff > 0) totalMins += diff;
-            } else {
-              // قاعدة الإغلاق التلقائي: احتساب مدة الإغلاق التلقائي كاملة (11.5 ساعة)
-              final isPastDay = inTime.isBefore(DateTime(now.year, now.month, now.day));
-              final isElapsedAutoClose = now.difference(inTime) >= kAttendanceAutoCloseAfter;
-              if (isPastDay || isElapsedAutoClose) {
-                totalMins += kAttendanceAutoCloseAfter.inMinutes;
-              }
-            }
+            // الأقل من (الفعلي، الوردية المحددة) — بدون أوفر تايم، واليوم المغلق تلقائياً = الوردية
+            totalMins += PayrollDayRules.paidMinutesForDay(
+              checkIn: inTime,
+              checkOut: outTime,
+              now: now,
+              shiftHours: delegateShiftHours,
+            );
           }
         }
 
-        final leaveDays = leaveDaysByDelegateId[d.uid] ?? 0;
+        final paidAnnualDays = PayrollDayRules.paidAnnualLeaveDays(
+          annualLeaveEnabled: d.isAnnualLeaveEnabled,
+          annualQuota: d.annualLeaveQuota,
+          usedEarlierThisYear: annualDaysEarlierThisYear[d.uid] ?? 0,
+          requestedThisMonth: annualDaysThisMonth[d.uid] ?? 0,
+        );
+        final leaveDays = (leaveDaysByDelegateId[d.uid] ?? 0) + paidAnnualDays;
         final absent = (elapsedWorkingDays - attendedDaysCount - leaveDays).clamp(0, elapsedWorkingDays);
 
         // Configuration resolution (Custom Wallet Override vs Company Policy)
-        final walletData = walletConfigByDelegateId[d.uid] ?? {};
         final alloc = (walletData['monthlyAllocation'] as num?)?.toDouble() ?? 0.0;
         final base = (walletData['baseSalary'] as num?)?.toDouble() ?? 0.0;
         final delegateBaseSalary = alloc > 0
             ? alloc
             : (base > 0 ? base : _companyPayrollConfig.defaultMonthlyBaseSalary);
-
-        final delegateShiftHours = (walletData['dailyShiftHours'] as num?)?.toDouble() ??
-            _companyPayrollConfig.defaultDailyShiftHours;
 
         final customRate = (walletData['customHourlyRate'] as num?)?.toDouble();
 
@@ -1686,7 +1697,7 @@ class _CompanyPayrollPolicySheetState
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'يُحدد راتب أساسي ثابت، ويُخصم منه ما يعادل ساعات الغياب أو العجز عن وردية الـ 9 ساعات',
+                                      'يُحدد راتب أساسي ثابت، ويُخصم منه ما يعادل ساعات الغياب أو العجز عن ساعات الوردية المحددة لكل موظف',
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: colorScheme.onSurfaceVariant,
