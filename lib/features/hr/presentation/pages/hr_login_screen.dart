@@ -405,8 +405,9 @@ class _HrLoginScreenState extends State<HrLoginScreen>
               ),
               const SizedBox(height: 16),
 
-              // Remember Me Checkbox
-              Row(
+              // Remember Me Checkbox (merged semantics => labelled "تذكرني")
+              MergeSemantics(
+                child: Row(
                 children: [
                   SizedBox(
                     height: 22,
@@ -433,6 +434,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                     ),
                   ),
                 ],
+              ),
               ),
               const SizedBox(height: 28),
 

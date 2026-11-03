@@ -484,6 +484,19 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                       );
                     }
 
+                    // Web list-detail pane only (onSelectLeave set): 2-column grid.
+                    if (widget.onSelectLeave != null) {
+                      return GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        childAspectRatio: (constraints.maxWidth - 8) / 2 / 116,
+                        children: kpis,
+                      );
+                    }
+
                     return SizedBox(
                       height: 116,
                       child: ListView.separated(
@@ -601,6 +614,39 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           Expanded(child: searchWidget),
                           const SizedBox(width: 12),
                           statusButtonGroup,
+                        ],
+                      );
+                    }
+
+                    // Web list-detail pane only (onSelectLeave set): wrap the tabs.
+                    if (widget.onSelectLeave != null) {
+                      final tabs = <(String, String, IconData)>[
+                        ('pending', 'قيد المراجعة ($pendingCount)', Icons.hourglass_top_rounded),
+                        ('approved', 'المعتمدة ($approvedCount)', Icons.check_circle_rounded),
+                        ('rejected', 'المرفوضة ($rejectedCount)', Icons.cancel_outlined),
+                        ('all', 'الكل (${allLeaves.length})', Icons.list_alt_rounded),
+                      ];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          searchWidget,
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final t in tabs)
+                                ChoiceChip(
+                                  key: ValueKey('leave_tab_${t.$1}'),
+                                  avatar: Icon(t.$3, size: 18),
+                                  showCheckmark: false,
+                                  label: Text(t.$2),
+                                  selected: _selectedStatusFilter == t.$1,
+                                  onSelected: (_) =>
+                                      setState(() => _selectedStatusFilter = t.$1),
+                                ),
+                            ],
+                          ),
                         ],
                       );
                     }

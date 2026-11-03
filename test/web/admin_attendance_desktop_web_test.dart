@@ -129,6 +129,13 @@ void main() {
     expect(_log, contains('date:1'));
   });
 
+  testWidgets('date button has a fixed width (I-11: no header reflow)', (t) async {
+    await _pump(t, const Size(1280, 800), AppTheme.lightTheme(),
+        AttendanceDesktopTableWeb(data: _data()));
+    final r = t.getSize(find.byKey(const ValueKey('attendance_date_button')));
+    expect(r.width, 230);
+  });
+
   testWidgets('desktop table 1600 dark', (t) async {
     await _pump(t, const Size(1600, 900), AppTheme.darkTheme(),
         AttendanceDesktopTableWeb(data: _data()));

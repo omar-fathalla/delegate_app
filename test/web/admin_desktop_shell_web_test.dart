@@ -43,7 +43,7 @@ Future<void> _fonts() async {
   await sym.load();
 }
 
-Future<void> _pump(WidgetTester t, Size size, ThemeData theme) async {
+Future<void> _pump(WidgetTester t, Size size, ThemeData theme, {String? initialPage}) async {
   t.view.physicalSize = size;
   t.view.devicePixelRatio = 1;
   await t.pumpWidget(MaterialApp(
@@ -56,6 +56,8 @@ Future<void> _pump(WidgetTester t, Size size, ThemeData theme) async {
       delegate: _sup,
       screensOverride: [_fake('الرئيسية'), _fake('المناديب'), _fake('الحضور'), _fake('الطلبات')],
       pendingCountOverride: (c) => Stream.value(c == 'leave_requests' ? 3 : 1),
+      initialPage: initialPage,
+      extraBodyOverride: (p) => _fake('صفحة $p'),
     ),
   ));
   await t.pumpAndSettle();
@@ -82,7 +84,8 @@ void main() {
     // Extra supervisor menu items + badges from the exposed sources.
     expect(find.text('المهام'), findsOneWidget);
     expect(find.text('أذونات التصوير'), findsOneWidget);
-    expect(find.text('نظام الغرامات والمخالفات'), findsOneWidget);
+    expect(find.text('سجل المخالفات والغرامات'), findsOneWidget);
+    expect(find.text('طلبات فك وربط الأجهزة'), findsOneWidget);
     expect(find.text('الملف الشخصي'), findsOneWidget);
     expect(find.text('3'), findsWidgets);
     await expectLater(find.byType(AdminDesktopShellWeb), matchesGoldenFile('goldens/admin_desktop_1280_light.png'));
@@ -101,5 +104,42 @@ void main() {
   testWidgets('1600 dark', (t) async {
     await _pump(t, const Size(1600, 900), AppTheme.darkTheme());
     await expectLater(find.byType(AdminDesktopShellWeb), matchesGoldenFile('goldens/admin_desktop_1600_dark.png'));
+  });
+
+  testWidgets('1280: extras open inside the shell with a title (I-4/I-6)', (t) async {
+    await _pump(t, const Size(1280, 800), AppTheme.lightTheme());
+    await t.tap(find.text('المهام'));
+    await t.pumpAndSettle();
+    expect(find.byType(NavigationDrawer), findsOneWidget);
+    expect(find.text('محتوى تجريبي: صفحة tasks'), findsOneWidget);
+    expect(find.text('المهام'), findsNWidgets(2)); // drawer + top-bar title
+    await t.tap(find.text('الإعدادات').first);
+    await t.pumpAndSettle();
+    expect(find.text('محتوى تجريبي: صفحة settings'), findsOneWidget);
+    expect(find.byType(NavigationDrawer), findsOneWidget);
+    await t.tap(find.text('الحضور').first);
+    await t.pumpAndSettle();
+    expect(find.text('محتوى تجريبي: صفحة settings'), findsNothing);
+    expect(find.text('محتوى تجريبي: الحضور'), findsOneWidget);
+  });
+
+  testWidgets('1000 rail: more menu opens extra inside the shell', (t) async {
+    await _pump(t, const Size(1000, 800), AppTheme.lightTheme());
+    await t.tap(find.byKey(const ValueKey('rail_more')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('أذونات التصوير'));
+    await t.pumpAndSettle();
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.text('محتوى تجريبي: صفحة supervisor_photo_permissions'), findsOneWidget);
+  });
+
+  testWidgets('initialPage (?p=) restores extra or tab (I-8)', (t) async {
+    await _pump(t, const Size(1280, 800), AppTheme.lightTheme(), initialPage: 'tasks');
+    expect(find.text('محتوى تجريبي: صفحة tasks'), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+    await _pump(t, const Size(1280, 800), AppTheme.lightTheme(), initialPage: 'bogus');
+    expect(find.text('محتوى تجريبي: الرئيسية'), findsOneWidget);
+    expect(AdminDesktopShellWeb.isKnownPage('requests'), isTrue);
+    expect(AdminDesktopShellWeb.isKnownPage('x'), isFalse);
   });
 }

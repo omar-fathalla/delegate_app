@@ -182,9 +182,15 @@ class _FilterBar extends StatelessWidget {
               icon: const Icon(Symbols.chevron_right_rounded),
               onPressed: () => d.onDateChanged(d.selectedDate.subtract(const Duration(days: 1))),
             ),
-            TextButton.icon(
+            // Fixed width so the Wrap does not reflow when the date label changes.
+            SizedBox(
+              key: const ValueKey('attendance_date_button'),
+              width: 230,
+              child: TextButton.icon(
               icon: const Icon(Symbols.calendar_month_rounded),
               label: Text(DateFormat('EEEE d MMMM yyyy', 'ar').format(d.selectedDate),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: tt.titleSmall?.copyWith(color: cs.onSurface)),
               onPressed: () async {
                 final picked = await showDatePicker(
@@ -195,6 +201,7 @@ class _FilterBar extends StatelessWidget {
                 );
                 if (picked != null) d.onDateChanged(picked);
               },
+            ),
             ),
             IconButton(
               tooltip: 'اليوم التالي',

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart';
 import 'package:delegate_app/features/auth/presentation/pages/splash_screen.dart';
@@ -91,7 +92,12 @@ final appRouter = GoRouter(
       path: '/admin/home',
       pageBuilder: (context, state) {
         final delegate = state.extra is Delegate ? state.extra as Delegate : null;
+        // Web desktop shell page (`?p=`); kept across the splash after a reload.
+        final page = state.uri.queryParameters['p'];
         if (delegate == null) {
+          if (kIsWeb && AdminDesktopShellWeb.isKnownPage(page)) {
+            AdminDesktopShellWeb.pendingPage = page;
+          }
           return AppMotionPage.fadeThrough(
             state: state,
             child: const SplashScreen(),
@@ -101,9 +107,17 @@ final appRouter = GoRouter(
           state: state,
           // Web-only desktop shell (>= 840dp); mobile/narrow keep AdminMainScreen.
           child: Builder(
-            builder: (context) => AdminDesktopShellWeb.shouldUse(context, delegate)
-                ? AdminDesktopShellWeb(delegate: delegate)
-                : AdminMainScreen(delegate: delegate),
+            builder: (context) {
+              if (!AdminDesktopShellWeb.shouldUse(context, delegate)) {
+                return AdminMainScreen(delegate: delegate);
+              }
+              final initial = AdminDesktopShellWeb.isKnownPage(page)
+                  ? page
+                  : AdminDesktopShellWeb.pendingPage;
+              AdminDesktopShellWeb.pendingPage = null;
+              return AdminDesktopShellWeb(
+                  delegate: delegate, initialPage: initial);
+            },
           ),
         );
       },

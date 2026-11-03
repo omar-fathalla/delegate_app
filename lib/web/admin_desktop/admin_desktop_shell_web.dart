@@ -4,6 +4,7 @@
 // Composes the existing shared tab screens without modifying them.
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +17,14 @@ import 'package:delegate_app/web/admin_desktop/admin_desktop_list_detail_web.dar
 import 'package:delegate_app/web/admin_desktop/admin_desktop_attendance_web.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
+import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
+import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/supervisor_permissions_screen.dart';
+import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
+import 'package:delegate_app/features/penalties/presentation/pages/admin_penalties_list_page.dart';
+import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_device_unbind_requests_screen.dart';
+import 'package:delegate_app/features/profile/presentation/pages/user_profile_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 
 /// M3 window-size breakpoints (dp).
@@ -32,12 +41,41 @@ class AdminDesktopShellWeb extends StatefulWidget {
   /// Test hook: replaces [AdminMainScreen.pendingCountStream].
   final Stream<int> Function(String collection)? pendingCountOverride;
 
+  /// Page restored from the URL (`/admin/home?p=<page>`): a tab key
+  /// (home, delegates, attendance, requests), an extra value or 'settings'.
+  final String? initialPage;
+
+  /// Test hook: replaces the extra/settings page bodies.
+  final Widget Function(String page)? extraBodyOverride;
+
   const AdminDesktopShellWeb({
     super.key,
     required this.delegate,
     this.screensOverride,
     this.pendingCountOverride,
+    this.initialPage,
+    this.extraBodyOverride,
   });
+
+  /// Tab keys used in the `p` query parameter.
+  static const tabKeys = ['home', 'delegates', 'attendance', 'requests'];
+
+  /// Extra pages shown inside the shell's content area.
+  static const extraKeys = [
+    'tasks',
+    'supervisor_photo_permissions',
+    'penalties_management',
+    'device_unbind_requests',
+    'profile',
+    'settings',
+  ];
+
+  /// `p` captured by the router while the splash restores the session after
+  /// a reload (the splash navigates to `/admin/home` without the query).
+  static String? pendingPage;
+
+  static bool isKnownPage(String? p) =>
+      p != null && (tabKeys.contains(p) || extraKeys.contains(p));
 
   /// Only plain supervisors get the desktop shell; other admin roles keep
   /// their existing layout.
@@ -75,11 +113,23 @@ class _Extra {
 
 class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
   int _index = 0;
+
+  /// Extra page shown in the content area instead of the tabs (null = tabs).
+  String? _extra;
   late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
+    final p = widget.initialPage;
+    if (AdminDesktopShellWeb.isKnownPage(p)) {
+      final t = AdminDesktopShellWeb.tabKeys.indexOf(p!);
+      if (t >= 0) {
+        _index = t;
+      } else {
+        _extra = p;
+      }
+    }
     final d = widget.delegate;
     _screens = widget.screensOverride ??
         [
@@ -103,16 +153,76 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
         _Extra('supervisor_photo_permissions', Symbols.photo_library_rounded,
             ar ? 'أذونات التصوير' : 'Photo Permissions'),
         _Extra('penalties_management', Symbols.gavel_rounded,
-            ar ? 'نظام الغرامات والمخالفات' : 'Penalties'),
+            ar ? 'سجل المخالفات والغرامات' : 'Penalties'),
         _Extra('device_unbind_requests', Symbols.phonelink_lock_rounded,
-            ar ? 'طلبات فك ربط الأجهزة' : 'Device unbind requests',
+            ar ? 'طلبات فك وربط الأجهزة' : 'Device unbind requests',
             'device_unbind_requests'),
         _Extra('profile', Symbols.person_rounded,
             ar ? 'الملف الشخصي' : 'Profile'),
       ];
 
-  void _openExtra(String value) =>
-      AdminMainScreen.openSupervisorMenuTarget(context, widget.delegate, value);
+  /// Shows an extra page inside the shell (drawer stays visible) and keeps it
+  /// in the URL so a reload restores it. Mobile keeps
+  /// [AdminMainScreen.openSupervisorMenuTarget] (push).
+  void _openExtra(String value) {
+    setState(() => _extra = value);
+    _syncUrl(value);
+  }
+
+  void _selectTab(int i) {
+    setState(() {
+      _index = i;
+      _extra = null;
+    });
+    _syncUrl(AdminDesktopShellWeb.tabKeys[i]);
+  }
+
+  void _syncUrl(String page) {
+    if (!kIsWeb) return;
+    SystemNavigator.routeInformationUpdated(
+      uri: Uri(path: '/admin/home', queryParameters: {'p': page}),
+      replace: true,
+    );
+  }
+
+  String _extraTitle(String page, AppLocalizations l10n, bool ar) {
+    if (page == 'settings') return l10n.settings;
+    for (final e in _extras(ar)) {
+      if (e.value == page) return e.label;
+    }
+    return page;
+  }
+
+  Widget _extraBody(String page) {
+    final o = widget.extraBodyOverride;
+    if (o != null) return o(page);
+    final d = widget.delegate;
+    switch (page) {
+      case 'tasks':
+        return AdminTasksScreen(adminDelegate: d);
+      case 'supervisor_photo_permissions':
+        return MultiBlocProvider(
+          providers: [
+            BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
+            BlocProvider(create: (_) => di.sl<BranchBloc>()),
+          ],
+          child: SupervisorPermissionsScreen(
+              supervisorDelegate: d, showAppBar: false),
+        );
+      case 'penalties_management':
+        return BlocProvider(
+          create: (_) => di.sl<PenaltyBloc>(),
+          child: AdminPenaltiesListPage(adminDelegate: d),
+        );
+      case 'device_unbind_requests':
+        return HRDeviceUnbindRequestsScreen(hrDelegate: d, showAppBar: false);
+      case 'profile':
+        return UserProfileScreen(delegate: d);
+      case 'settings':
+        return SettingsScreen(delegate: d, showAppBar: false);
+    }
+    return const SizedBox.shrink();
+  }
 
   Stream<int> _pending(String collection) =>
       widget.pendingCountOverride?.call(collection) ??
@@ -165,10 +275,7 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
     );
   }
 
-  void _openSettings() => Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) =>
-            SettingsScreen(delegate: widget.delegate, showAppBar: true),
-      ));
+  void _openSettings() => _openExtra('settings');
 
   bool _isAr(BuildContext c) => Localizations.localeOf(c).languageCode == 'ar';
 
@@ -196,7 +303,11 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
           Expanded(
             child: Column(
               children: [
-                _buildTopBar(context, dests[_index].label),
+                _buildTopBar(
+                    context,
+                    _extra != null
+                        ? _extraTitle(_extra!, l10n, ar)
+                        : dests[_index].label),
                 Expanded(
                   child: Align(
                     alignment: Alignment.topCenter,
@@ -211,10 +322,21 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
                             color: cs.surfaceContainerLow,
                             child: ScrollConfiguration(
                               behavior: const _DesktopScrollBehavior(),
-                              child: IndexedStack(
-                                index: _index,
-                                children: _screens,
-                              ),
+                              child: Stack(children: [
+                                // Tabs stay alive underneath the extra page.
+                                Offstage(
+                                  offstage: _extra != null,
+                                  child: IndexedStack(
+                                    index: _index,
+                                    children: _screens,
+                                  ),
+                                ),
+                                if (_extra != null)
+                                  KeyedSubtree(
+                                    key: ValueKey('extra_$_extra'),
+                                    child: _extraBody(_extra!),
+                                  ),
+                              ]),
                             ),
                           ),
                         ),
@@ -282,9 +404,9 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
         backgroundColor: cs.surfaceContainer,
         indicatorColor: cs.secondaryContainer,
         labelType: NavigationRailLabelType.all,
-        selectedIndex: _index,
+        selectedIndex: _extra == null ? _index : null,
         groupAlignment: -1,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: _selectTab,
         destinations: [
           for (final d in dests)
             NavigationRailDestination(
@@ -336,6 +458,14 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
     );
   }
 
+  int? _drawerSelected(int tabCount) {
+    final e = _extra;
+    if (e == null) return _index;
+    if (e == 'settings') return tabCount + _extras(true).length;
+    final i = _extras(true).indexWhere((x) => x.value == e);
+    return i < 0 ? null : tabCount + i;
+  }
+
   Widget _buildDrawer(
       BuildContext context, List<_Dest> dests, AppLocalizations l10n) {
     final cs = Theme.of(context).colorScheme;
@@ -345,11 +475,11 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
         backgroundColor: cs.surfaceContainer,
         indicatorColor: cs.secondaryContainer,
         elevation: 0,
-        selectedIndex: _index < dests.length ? _index : null,
+        selectedIndex: _drawerSelected(dests.length),
         onDestinationSelected: (i) {
           final extras = _extras(_isAr(context));
           if (i < dests.length) {
-            setState(() => _index = i);
+            _selectTab(i);
           } else if (i < dests.length + extras.length) {
             _openExtra(extras[i - dests.length].value);
           } else if (i == dests.length + extras.length) {
