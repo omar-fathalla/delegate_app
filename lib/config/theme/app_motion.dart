@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/config/read_reduction_flags.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -471,11 +472,18 @@ class M3FadeThroughIndexedStack extends StatefulWidget {
   final List<Widget> children;
   final Duration duration;
 
+  /// When true (default, unless Remote Config `lazy_tabs` is off), a child is
+  /// only built after its index has been shown once, then kept alive. This
+  /// stops hidden tabs from mounting and starting Firestore reads/listeners
+  /// the user never opens (read-reduction Phase 1.1).
+  final bool? lazy;
+
   const M3FadeThroughIndexedStack({
     super.key,
     required this.index,
     required this.children,
     this.duration = AppMotionDurations.medium2, // 90 + 210
+    this.lazy,
   });
 
   @override
@@ -489,12 +497,14 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
   late final AnimationController _controller;
   late int _currentIndex;
   late int _previousIndex;
+  final Set<int> _visited = <int>{};
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.index;
     _previousIndex = widget.index;
+    _visited.add(widget.index);
     _controller = AnimationController(
       vsync: this,
       duration: widget.duration,
@@ -511,6 +521,7 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
       final reduced = MediaQuery.of(context).disableAnimations;
       _controller.duration =
           reduced ? AppMotionDurations.short3 : widget.duration;
+      _visited.add(widget.index);
       _controller.forward(from: 0.0);
     }
   }
@@ -519,6 +530,21 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Widget _stack(int index) {
+    final lazy = widget.lazy ?? ReadReductionFlags.instance.lazyTabs;
+    return IndexedStack(
+      index: index,
+      children: lazy
+          ? [
+              for (var i = 0; i < widget.children.length; i++)
+                _visited.contains(i)
+                    ? widget.children[i]
+                    : const SizedBox.shrink(),
+            ]
+          : widget.children,
+    );
   }
 
   @override
@@ -531,7 +557,7 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
         if (reduced) {
           return Opacity(
             opacity: t,
-            child: IndexedStack(index: _currentIndex, children: widget.children),
+            child: _stack(_currentIndex),
           );
         }
         final outgoing = t < _outFrac && _previousIndex != _currentIndex;
@@ -551,10 +577,7 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
           opacity: opacity.clamp(0.0, 1.0),
           child: Transform.scale(
             scale: scale,
-            child: IndexedStack(
-              index: outgoing ? _previousIndex : _currentIndex,
-              children: widget.children,
-            ),
+            child: _stack(outgoing ? _previousIndex : _currentIndex),
           ),
         );
       },

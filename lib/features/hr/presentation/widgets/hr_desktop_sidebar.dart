@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/badge_counts_service.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
@@ -372,14 +372,10 @@ class HRDesktopSidebar extends StatelessWidget {
 
     // إضافة شارة العداد الحي إذا كان العنصر مرتبطاً بطلبات معلقة
     if (item.badgeCollection != null) {
-      iconWidget = StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection(item.badgeCollection!)
-            .where('companyUID', isEqualTo: delegate.companyUID)
-            .where('status', isEqualTo: 'pending')
-            .snapshots(),
+      iconWidget = StreamBuilder<int>(
+        stream: BadgeCountsService.instance.watch(item.badgeCollection!, delegate.companyUID),
         builder: (context, snapshot) {
-          final count = snapshot.data?.docs.length ?? 0;
+          final count = snapshot.data ?? 0;
           return Badge(
             isLabelVisible: count > 0,
             label: Text(

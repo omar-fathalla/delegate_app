@@ -8,6 +8,31 @@ import 'delegate_tracking_service.dart';
 /// محرك البث الميداني الحقيقي بهاتف المندوب (Real-time Field Telemetry & Tracking Engine)
 /// يعمل بنظام البث المستمر في الخلفية (Background Location Stream + Foreground Service)
 /// مع المزامنة اللحظية لأوامر المشرف والمؤقت الدوري الذكي
+/// Minimum movement / interval between stream-driven tracking writes.
+const double kTrackingMinMoveMeters = 50;
+const Duration kTrackingMinInterval = Duration(seconds: 90);
+
+/// Heartbeat period (was 5 min). Every heartbeat goes through
+/// [shouldSendTrackingPing] too, so a parked device writes at most every 90 s.
+const Duration kTrackingHeartbeatInterval = kTrackingMinInterval;
+
+/// Timer jitter allowance so a 90 s heartbeat isn't skipped for being a few
+/// ms early (which would silently double the interval to 180 s).
+const Duration kTrackingIntervalSlack = Duration(seconds: 3);
+
+/// True when a GPS stream point should be written: first point, moved at
+/// least [kTrackingMinMoveMeters], or [kTrackingMinInterval] elapsed.
+bool shouldSendTrackingPing({
+  required double? movedMeters,
+  required DateTime? lastSentAt,
+  required DateTime now,
+}) {
+  if (movedMeters == null || lastSentAt == null) return true;
+  if (movedMeters >= kTrackingMinMoveMeters) return true;
+  return now.difference(lastSentAt) >=
+      kTrackingMinInterval - kTrackingIntervalSlack;
+}
+
 class DelegateTrackingEngine {
   final DelegateTrackingService _trackingService;
   final Battery _battery;
@@ -57,7 +82,7 @@ class DelegateTrackingEngine {
   /// 1. بدء جلسة التتبع الميداني في هاتف المندوب
   Future<void> startTrackingSession({
     required String delegateId,
-    Duration interval = const Duration(minutes: 5),
+    Duration interval = kTrackingHeartbeatInterval,
   }) async {
     if (_isTracking && _activeDelegateId == delegateId) return;
 
@@ -75,7 +100,7 @@ class DelegateTrackingEngine {
     await _startBackgroundPositionStream();
 
     // ج. إرسال أول نبضة قياس فوري
-    await triggerTelemetryPing();
+    await triggerTelemetryPing(force: true);
 
     // د. تشغيل المؤقت الدوري للحفاظ على تحديث حالة البطارية والاتصال أثناء التوقف
     _periodicTimer?.cancel();
@@ -107,7 +132,8 @@ class DelegateTrackingEngine {
             _positionStreamSubscription?.pause();
           } else {
             _positionStreamSubscription?.resume();
-            unawaited(triggerTelemetryPing());
+            // Supervisor re-enabled tracking: send now, skip the 90 s gate.
+            unawaited(triggerTelemetryPing(force: true));
           }
         }
       }, onError: (err) {
@@ -161,7 +187,7 @@ class DelegateTrackingEngine {
       ).listen(
         (position) async {
           if (!_isTracking || !_remoteTrackingEnabled) return;
-          await _handleIncomingPosition(position);
+          await handlePositionIfDue(position);
         },
         onError: (err) {
           debugPrint('⚠️ [DelegateTrackingEngine] Position stream error: $err');
@@ -170,6 +196,41 @@ class DelegateTrackingEngine {
     } catch (e) {
       debugPrint('⚠️ [DelegateTrackingEngine] Failed to start background stream: $e');
     }
+  }
+
+  /// Read-reduction: single gate for EVERY tracking write (GPS stream,
+  /// heartbeat timer and [triggerTelemetryPing]). Every write is re-read by
+  /// each supervisor listening to delegate_tracking, so only send when the
+  /// device moved >= 50 m or ~90 s passed since the last sent ping.
+  /// Returns whether the position was sent.
+  @visibleForTesting
+  Future<bool> handlePositionIfDue(Position position, {DateTime? now}) async {
+    final last = _lastRecordedPosition;
+    final movedMeters = last == null
+        ? null
+        : Geolocator.distanceBetween(
+            last.latitude,
+            last.longitude,
+            position.latitude,
+            position.longitude,
+          );
+    if (!shouldSendTrackingPing(
+      movedMeters: movedMeters,
+      lastSentAt: _lastPingTime,
+      now: now ?? DateTime.now(),
+    )) {
+      return false;
+    }
+    await _handleIncomingPosition(position);
+    return true;
+  }
+
+  /// Test hook: mark a session active without GPS/Firestore side effects.
+  @visibleForTesting
+  void debugActivate(String delegateId) {
+    _activeDelegateId = delegateId;
+    _isTracking = true;
+    _remoteTrackingEnabled = true;
   }
 
   /// معالجة نقطة الموقع الواردة من تيار الـ GPS
@@ -241,7 +302,9 @@ class DelegateTrackingEngine {
   }
 
   /// 2. إرسال نبضة قياس حي عند الطلب أو دورياً
-  Future<void> triggerTelemetryPing() async {
+  /// [force] bypasses the 50 m / 90 s gate (first ping of a session,
+  /// supervisor re-enable, manual ping). The periodic heartbeat stays gated.
+  Future<void> triggerTelemetryPing({bool force = false}) async {
     final delegateId = _activeDelegateId;
     if (delegateId == null || !_isTracking || !_remoteTrackingEnabled) return;
 
@@ -263,7 +326,11 @@ class DelegateTrackingEngine {
         ),
       );
 
-      await _handleIncomingPosition(position);
+      if (force) {
+        await _handleIncomingPosition(position);
+      } else {
+        await handlePositionIfDue(position);
+      }
     } catch (e) {
       debugPrint('⚠️ [DelegateTrackingEngine] Telemetry ping error: $e');
     }

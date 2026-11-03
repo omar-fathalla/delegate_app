@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/badge_counts_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -40,7 +41,6 @@ import 'package:delegate_app/features/marketing_search/presentation/pages/market
 import 'package:delegate_app/features/marketing/presentation/pages/branches_marketing_home_screen.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_session_control_screen.dart';
 import 'package:delegate_app/features/tracking/presentation/pages/delegate_tracking_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
@@ -60,12 +60,8 @@ class AdminMainScreen extends StatefulWidget {
   /// Exposed read-only for the web desktop shell.
   static Stream<int> pendingCountStream(Delegate delegate, String collection) {
     if (delegate.companyUID.isEmpty) return Stream<int>.value(0);
-    return FirebaseFirestore.instance
-        .collection(collection)
-        .where('companyUID', isEqualTo: delegate.companyUID)
-        .where('status', isEqualTo: 'pending')
-        .snapshots()
-        .map((s) => s.docs.length);
+    // Shared with the mobile badges: throttled count() via BadgeCountsService.
+    return BadgeCountsService.instance.watch(collection, delegate.companyUID);
   }
 
   /// Supervisor extra-menu targets shared by the mobile popup menu and the
@@ -131,14 +127,27 @@ class AdminMainScreen extends StatefulWidget {
 }
 
 class _AdminMainScreenState extends State<AdminMainScreen> {
-  int _currentIndex = const bool.fromEnvironment('REAL_TEST_START_BRANCH_TAB')
+  int _tabIndex = const bool.fromEnvironment('REAL_TEST_START_BRANCH_TAB')
       ? 2
       : 0;
+  int get _currentIndex => _tabIndex;
+
+  /// Every tab change goes through here (all handlers call
+  /// `setState(() => _currentIndex = …)`), so the branch tab's isActive is
+  /// updated in the handler rather than during build.
+  set _currentIndex(int value) {
+    _tabIndex = value;
+    _branchTabActive.value = value == 2 && isBranchesMarketingManager;
+  }
   late final List<Widget> _screens;
   Widget? _branchHomeCache;
+
+  /// True only while the cached branch-attendance tab (index 2) is selected.
+  final ValueNotifier<bool> _branchTabActive = ValueNotifier<bool>(false);
   @override
   void initState() {
     super.initState();
+    _branchTabActive.value = _tabIndex == 2 && isBranchesMarketingManager;
     final delegate = widget.delegate;
     if (isSuperAdmin) {
       _screens = [
@@ -245,6 +254,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
 
   @override
   void dispose() {
+    _branchTabActive.dispose();
     super.dispose();
   }
 
@@ -253,8 +263,10 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     // Lazily mount BranchHomeScreen the first time tab index 2 is selected
     // (or when REAL_TEST starts on that tab).
     if (_currentIndex == 2) {
-      _branchHomeCache ??=
-          BranchHomeScreen(marketingUser: widget.delegate);
+      _branchHomeCache ??= BranchHomeScreen(
+        marketingUser: widget.delegate,
+        isActive: _branchTabActive,
+      );
     }
     return [
       for (var i = 0; i < _screens.length; i++)

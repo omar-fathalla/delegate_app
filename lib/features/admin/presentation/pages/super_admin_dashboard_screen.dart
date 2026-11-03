@@ -118,10 +118,15 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       delegatesQuery = delegatesQuery.where('organizationUID', isEqualTo: widget.delegate.organizationUID);
     }
 
-    _delegatesSubscription = delegatesQuery.snapshots().listen((snapshot) {
+    // Read-reduction Phase 2: one-shot read instead of a live
+    // collectionGroup('delegates') listener. The listener re-read a delegate
+    // doc for every profile edit anywhere in the org while this tab was
+    // open. The KPIs parse each doc's `documents` array, so count() cannot
+    // replace this read; pull-to-refresh still reloads it.
+    _delegatesSubscription = delegatesQuery.get().asStream().listen((snapshot) {
       _processDelegatesSnapshot(snapshot.docs);
     }, onError: (e) {
-      debugPrint('Error in delegates realtime stream: $e');
+      debugPrint('Error loading delegates for dashboard: $e');
     });
   }
 

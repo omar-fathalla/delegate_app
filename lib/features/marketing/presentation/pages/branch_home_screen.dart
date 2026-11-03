@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/features/marketing/presentation/pages/branch_live_refresh_controller.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,16 +23,24 @@ import 'package:delegate_app/features/marketing/data/models/floor_verification_m
 import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/marketing/data/services/real_test_metrics.dart';
+import 'package:delegate_app/core/config/read_reduction_flags.dart';
+import 'package:delegate_app/features/marketing/data/datasources/today_attendance_query.dart';
 
 /// الشاشة الرئيسية للفروع - تعرض جميع الفروع المفضلة في نفس الصفحة
 class BranchHomeScreen extends StatelessWidget {
   final Delegate marketingUser;
   final bool showAppBar;
 
+  /// True while this screen's tab is selected in the hosting shell. Drives
+  /// the live listener and its timers (IndexedStack offstage tabs don't get
+  /// TickerMode disabled). Null = always active (pushed route).
+  final ValueListenable<bool>? isActive;
+
   const BranchHomeScreen({
     super.key,
     required this.marketingUser,
     this.showAppBar = false,
+    this.isActive,
   });
 
   @override
@@ -45,6 +56,7 @@ class BranchHomeScreen extends StatelessWidget {
       child: _BranchHomeView(
         marketingUser: marketingUser,
         showAppBar: showAppBar,
+        isActive: isActive,
       ),
     );
   }
@@ -53,17 +65,49 @@ class BranchHomeScreen extends StatelessWidget {
 class _BranchHomeView extends StatefulWidget {
   final Delegate marketingUser;
   final bool showAppBar;
+  final ValueListenable<bool>? isActive;
 
   const _BranchHomeView({
     required this.marketingUser,
     this.showAppBar = false,
+    this.isActive,
   });
 
   @override
   State<_BranchHomeView> createState() => _BranchHomeViewState();
 }
 
-class _BranchHomeViewState extends State<_BranchHomeView> {
+class _BranchHomeViewState extends State<_BranchHomeView>
+    with LiveTabVisibility<_BranchHomeView> {
+  @override
+  ValueListenable<bool>? get liveActiveListenable => widget.isActive;
+
+  @override
+  void onLiveVisibilityChanged() {
+    final visible = liveTabVisible;
+    final reload = shouldReloadOnShow(
+      wasVisible: _lastLiveVisible,
+      isVisible: visible,
+      lastSync: _lastSyncTime,
+      now: DateTime.now(),
+    );
+    _lastLiveVisible = visible;
+    if (reload && mounted && _favoriteBranches.isNotEmpty) {
+      // Back on the tab: catch up on check-ins made while hidden (the
+      // listener skips its initial snapshot). _loadAllBranches re-syncs the
+      // listener itself.
+      _loadAllBranches(context, _favoriteBranches);
+      return;
+    }
+    _syncLiveListener();
+  }
+
+  bool _lastLiveVisible = true;
+
+  /// Whether the user is following "today" (vs. browsing a past date), so a
+  /// day change (midnight or resume on a later day) rolls over to the new day.
+  bool _followToday = true;
+
   List<String> _favoriteBranches = [];
   bool _prefsLoaded = false;
   DateTime _selectedDate = DateTime.now();
@@ -96,6 +140,11 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   /// Timestamp of the last successful sync with server
   DateTime? _lastSyncTime;
 
+  /// Today-only attendance listener (refresh signal) and its state.
+  BranchLiveRefreshController? _live;
+  String? _liveSignature;
+  bool _appResumed = true;
+
   @override
   void initState() {
     super.initState();
@@ -109,31 +158,147 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       _floorVerifications = _floorService.getLocalVerifications(_selectedDate);
       _syncFloorVerificationsFromCloud();
 
-      // Auto-refresh heartbeat every 30 seconds for live zero-drop data delivery
+      // Read-reduction Phase 1: a today-only snapshot listener replaces the
+      // 30 s forceServer timer. The timer only runs if `branch_live_listener`
+      // is switched off in Remote Config (kill switch).
       // Disabled during REAL_TEST_METRICS so cold/warm measurements are not polluted.
-      if (!RealTestMetrics.enabled) {
+      if (!RealTestMetrics.enabled &&
+          !ReadReductionFlags.instance.branchLiveListener) {
         _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-          if (mounted && _favoriteBranches.isNotEmpty) {
+          // Only for today's view on a visible tab (past dates don't change).
+          if (mounted &&
+              _favoriteBranches.isNotEmpty &&
+              _isSelectedDateToday() &&
+              liveTabVisible &&
+              _appResumed) {
             _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
             _syncFloorVerificationsFromCloud();
           }
         });
       }
 
-      // Revalidate immediately when app resumes from background
+      // Revalidate once on resume; pause the listener in the background.
       _lifecycleListener = AppLifecycleListener(
         onResume: () {
+          _appResumed = true;
+          if (mounted &&
+              shouldRollOverToToday(
+                followToday: _followToday,
+                selected: _selectedDate,
+                now: DateTime.now(),
+              )) {
+            // Resumed on a later day while following today → same path as
+            // the midnight timer (moves the date, reloads, re-subscribes).
+            _onLocalMidnight();
+            return;
+          }
           if (mounted && _favoriteBranches.isNotEmpty) {
-            _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+            _loadAllBranches(context, _favoriteBranches);
             _syncFloorVerificationsFromCloud();
           }
+          _syncLiveListener();
+        },
+        onPause: () {
+          _appResumed = false;
+          _syncLiveListener();
         },
       );
     } catch (_) {}
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // TickerMode (routes) + the shell's isActive (tabs) → see LiveTabVisibility.
+    // A pushed route flips TickerMode (verified in round5_test). Route the
+    // change through onLiveVisibilityChanged after the frame so returning
+    // from a route also gets the stale-data reload (shouldReloadOnShow).
+    if (liveTabVisible != _lastLiveVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) onLiveVisibilityChanged();
+      });
+    } else {
+      _syncLiveListener();
+    }
+  }
+
+  bool _isSelectedDateToday() {
+    final now = DateTime.now();
+    return _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
+  }
+
+  String get _orgIdForQueries => widget.marketingUser.organizationUID.isNotEmpty
+      ? widget.marketingUser.organizationUID
+      : kDefaultOrganizationId;
+
+  /// Starts, restarts or stops the today-only listener so it only runs while
+  /// the tab is visible, the app is in the foreground and today is selected.
+  void _syncLiveListener() {
+    final shouldRun = !RealTestMetrics.enabled &&
+        ReadReductionFlags.instance.branchLiveListener &&
+        mounted &&
+        liveTabVisible &&
+        _appResumed &&
+        _favoriteBranches.isNotEmpty &&
+        _isSelectedDateToday() &&
+        di.sl.isRegistered<FirebaseFirestore>();
+    final signature = shouldRun
+        ? '$_orgIdForQueries|${(List.of(_favoriteBranches)..sort()).join(',')}|'
+            '${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}'
+        : null;
+    if (signature == _liveSignature) return;
+    _live?.stop();
+    _live = null;
+    _liveSignature = signature;
+    if (signature == null) return;
+    final start =
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final branches = List.of(_favoriteBranches);
+    final orgId = _orgIdForQueries;
+    final firestore = di.sl<FirebaseFirestore>();
+    _live = BranchLiveRefreshController(
+      watch: () => watchTodayBranchAttendanceChanges(
+        firestore: firestore,
+        branchNames: branches,
+        organizationId: orgId,
+        dayStart: start,
+        dayEnd: start.add(const Duration(days: 1)),
+      ),
+      branchKeyBackfilled: () => ReadReductionFlags.instance.branchKeyBackfilled,
+      onReload: ({required bool force}) {
+        if (mounted && _favoriteBranches.isNotEmpty) {
+          _loadAllBranches(context, _favoriteBranches, forceRefresh: force);
+        }
+      },
+      onMidnight: _onLocalMidnight,
+    )..start();
+  }
+
+  /// Day roll-over while the screen stays open on "today": move to the new
+  /// day, reload, and let [_syncLiveListener] re-subscribe for the new range.
+  void _onLocalMidnight() {
+    if (!mounted) return;
+    final now = DateTime.now();
+    if (shouldRollOverToToday(
+      followToday: _followToday,
+      selected: _selectedDate,
+      now: now,
+    )) {
+      setState(() => _selectedDate = now);
+    }
+    _liveSignature = null; // force a fresh subscription + midnight timer
+    if (_favoriteBranches.isNotEmpty) {
+      _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+    } else {
+      _syncLiveListener();
+    }
+  }
+
+  @override
   void dispose() {
+    _live?.stop();
     _autoRefreshTimer?.cancel();
     _lifecycleListener?.dispose();
     _searchController.dispose();
@@ -455,16 +620,19 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     bool forceRefresh = false,
   }) {
     if (favorites.isEmpty) return;
+    _followToday = _isSelectedDateToday();
     context.read<MarketingBloc>().add(
       LoadAllFavoriteBranchesAttendance(
         favoriteBranches: favorites,
         organizationId: widget.marketingUser.organizationUID.isNotEmpty
             ? widget.marketingUser.organizationUID
-            : 'PiioBFgxaHAeuRdjlDgj',
+            : kDefaultOrganizationId,
         date: _selectedDate,
         forceRefresh: forceRefresh,
       ),
     );
+    // Favorites / selected date may have changed → (re)start or stop listener.
+    _syncLiveListener();
   }
 
   Future<void> _selectDate() async {
@@ -2230,7 +2398,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             ? widget.marketingUser.organizationUID
             : (record['organizationId'] as String? ??
                 delegateData?['organizationUID'] as String? ??
-                'PiioBFgxaHAeuRdjlDgj');
+                kDefaultOrganizationId);
 
         if ((supPhone == null || supPhone.isEmpty) &&
             companyUID.isNotEmpty &&
@@ -2612,7 +2780,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       safeData.putIfAbsent('companyUID', () => record['companyUID'] ?? '');
       final effectiveOrg = widget.marketingUser.organizationUID.isNotEmpty
           ? widget.marketingUser.organizationUID
-          : (record['organizationId'] as String? ?? 'PiioBFgxaHAeuRdjlDgj');
+          : (record['organizationId'] as String? ?? kDefaultOrganizationId);
       safeData['organizationUID'] = effectiveOrg;
       safeData.putIfAbsent('status', () => 'Active');
       safeData.putIfAbsent('role', () => 'delegate');
@@ -3144,13 +3312,13 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
       // Ensure Fathalla Market exists and is placed at the top as default
       final hasFathalla = orgs.any((o) =>
           (o['name'] ?? '').toLowerCase().contains('fathalla') ||
-          o['uid'] == 'PiioBFgxaHAeuRdjlDgj');
+          o['uid'] == kDefaultOrganizationId);
       if (!hasFathalla) {
-        orgs.insert(0, {'uid': 'PiioBFgxaHAeuRdjlDgj', 'name': 'fathalla market'});
+        orgs.insert(0, {'uid': kDefaultOrganizationId, 'name': 'fathalla market'});
       } else {
         final fIndex = orgs.indexWhere((o) =>
             (o['name'] ?? '').toLowerCase().contains('fathalla') ||
-            o['uid'] == 'PiioBFgxaHAeuRdjlDgj');
+            o['uid'] == kDefaultOrganizationId);
         if (fIndex > 0) {
           final item = orgs.removeAt(fIndex);
           orgs.insert(0, item);
@@ -3218,7 +3386,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     }
 
     // 4. If target is Fathalla Market:
-    if (tOrgName.contains('fathalla') || targetOrgUID == 'PiioBFgxaHAeuRdjlDgj') {
+    if (tOrgName.contains('fathalla') || targetOrgUID == kDefaultOrganizationId) {
       if (bOrgUID.isEmpty && bOrgName.isEmpty) {
         final isOtherOrg = bName.contains('جملة') ||
             bName.contains('زهران') ||
@@ -3263,7 +3431,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     final q = _searchController.text.trim().toLowerCase();
 
     String targetOrgName = 'fathalla market';
-    String targetOrgUID = 'PiioBFgxaHAeuRdjlDgj';
+    String targetOrgUID = kDefaultOrganizationId;
 
     if (isSuperAdminOrTechSupport) {
       if (_selectedOrgUID != null) {
@@ -3277,7 +3445,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     } else {
       // For all regular users: strictly locked to fathalla market
       targetOrgName = 'fathalla market';
-      targetOrgUID = 'PiioBFgxaHAeuRdjlDgj';
+      targetOrgUID = kDefaultOrganizationId;
     }
 
     final orgBranches = _allBranches.where((b) {

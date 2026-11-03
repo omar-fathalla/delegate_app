@@ -30,6 +30,26 @@ class DelegateTrackingScreen extends StatefulWidget {
 
 class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
   late final DelegateTrackingService _trackingService;
+
+  /// Read-reduction Phase 2: the sessions listener is created once per
+  /// company/org scope and reused across rebuilds. Creating it inside
+  /// `build()` re-subscribed (and re-billed every doc) on each setState.
+  Stream<List<DelegateTrackingSession>>? _sessionsStream;
+  String? _sessionsStreamScope;
+
+  Stream<List<DelegateTrackingSession>> _sessionsStreamFor({
+    required String companyId,
+    required String orgId,
+  }) {
+    final scope = '$companyId|$orgId';
+    final existing = _sessionsStream;
+    if (existing != null && _sessionsStreamScope == scope) return existing;
+    _sessionsStreamScope = scope;
+    return _sessionsStream = _trackingService.streamTrackingSessions(
+      companyId: companyId.isNotEmpty ? companyId : null,
+      organizationId: companyId.isEmpty ? orgId : null,
+    );
+  }
   final TextEditingController _searchController = TextEditingController();
 
   String _searchQuery = '';
@@ -347,10 +367,7 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
       )
           : null,
       body: StreamBuilder<List<DelegateTrackingSession>>(
-        stream: _trackingService.streamTrackingSessions(
-          companyId: companyId.isNotEmpty ? companyId : null,
-          organizationId: companyId.isEmpty ? orgId : null,
-        ),
+        stream: _sessionsStreamFor(companyId: companyId, orgId: orgId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {

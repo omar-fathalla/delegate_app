@@ -99,6 +99,7 @@ void main() {
     }
 
     setUp(() async {
+      MarketingRemoteDataSourceImpl.debugClearCompanyNameCache();
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       DelegateProfileCache.clearSession();

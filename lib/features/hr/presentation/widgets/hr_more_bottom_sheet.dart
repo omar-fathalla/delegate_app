@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/badge_counts_service.dart';
 import 'package:flutter/material.dart';
 
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -314,14 +314,10 @@ class HRMoreBottomSheet extends StatelessWidget {
     );
 
     if (item.badgeCollection != null) {
-      icon = StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection(item.badgeCollection!)
-            .where('companyUID', isEqualTo: hrDelegate.companyUID)
-            .where('status', isEqualTo: 'pending')
-            .snapshots(),
+      icon = StreamBuilder<int>(
+        stream: BadgeCountsService.instance.watch(item.badgeCollection!, hrDelegate.companyUID),
         builder: (context, snapshot) {
-          final count = snapshot.data?.docs.length ?? 0;
+          final count = snapshot.data ?? 0;
           return Badge(
             isLabelVisible: count > 0,
             label: Text(

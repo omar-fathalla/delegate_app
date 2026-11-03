@@ -260,15 +260,34 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 /// Fetches delegate tasks in real-time and displays them in a [TaskSummaryCard].
-class _DelegateTaskSummary extends StatelessWidget {
+class _DelegateTaskSummary extends StatefulWidget {
   final Delegate delegate;
 
   const _DelegateTaskSummary({required this.delegate});
 
   @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
+  State<_DelegateTaskSummary> createState() => _DelegateTaskSummaryState();
+}
+
+class _DelegateTaskSummaryState extends State<_DelegateTaskSummary> {
+  /// Read-reduction Phase 2: created once (not in build) and capped at the
+  /// 50 most recent tasks, so parent rebuilds don't re-subscribe/re-bill.
+  late Stream<QuerySnapshot> _tasksStream = _buildStream();
+
+  Delegate get delegate => widget.delegate;
+
+  @override
+  void didUpdateWidget(covariant _DelegateTaskSummary oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.delegate.uid != widget.delegate.uid ||
+        oldWidget.delegate.companyUID != widget.delegate.companyUID ||
+        oldWidget.delegate.organizationUID != widget.delegate.organizationUID) {
+      _tasksStream = _buildStream();
+    }
+  }
+
+  Stream<QuerySnapshot> _buildStream() {
+    return FirebaseFirestore.instance
           .collection('organizations')
           .doc(delegate.organizationUID)
           .collection('tasks')
@@ -282,7 +301,14 @@ class _DelegateTaskSummary extends StatelessWidget {
             ),
           )
           .orderBy('createdAt', descending: true)
-          .snapshots(),
+          .limit(50)
+          .snapshots();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _tasksStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {

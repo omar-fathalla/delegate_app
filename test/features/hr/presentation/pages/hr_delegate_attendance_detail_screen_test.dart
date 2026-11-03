@@ -61,32 +61,48 @@ void main() {
 
     test('DelegateAttendanceSession handles null checkOutTime and ongoing status', () {
       final now = DateTime.now();
-      // Stay on today's date even when the test runs just after midnight.
-      final checkInToday = now.hour >= 2
-          ? now.subtract(const Duration(hours: 2))
-          : DateTime(now.year, now.month, now.day);
 
+      // 2 h ago: ongoing regardless of time of day (crosses midnight before 02:00).
       final sessionToday = DelegateAttendanceSession(
         id: 'sess_today',
-        checkInTime: checkInToday,
+        checkInTime: now.subtract(const Duration(hours: 2)),
         checkOutTime: null,
         branchName: 'Smoha',
       );
-
       expect(sessionToday.duration, isNull);
+      expect(sessionToday.isOngoingAt(now), isTrue);
       expect(sessionToday.isOngoing, isTrue);
       expect(sessionToday.formattedDuration, equals('قيد العمل الآن'));
 
-      final pastDate = DateTime(2026, 1, 1, 10, 0);
       final sessionPast = DelegateAttendanceSession(
         id: 'sess_past',
-        checkInTime: pastDate,
+        checkInTime: DateTime(2026, 1, 1, 10, 0),
         checkOutTime: null,
         branchName: 'Smoha',
       );
-
       expect(sessionPast.isOngoing, isFalse);
       expect(sessionPast.formattedDuration, equals('غير مسجل'));
+    });
+
+    test('open session older than 11.5 h is not ongoing', () {
+      final now = DateTime(2026, 11, 3, 14, 0);
+      final session = DelegateAttendanceSession(
+        id: 'sess_12h',
+        checkInTime: now.subtract(const Duration(hours: 12)),
+        checkOutTime: null,
+        branchName: 'Smoha',
+      );
+      expect(session.isOngoingAt(now), isFalse);
+    });
+
+    test('night shift: 23:00 yesterday is ongoing at 01:00', () {
+      final session = DelegateAttendanceSession(
+        id: 'sess_night',
+        checkInTime: DateTime(2026, 11, 2, 23, 0),
+        checkOutTime: null,
+        branchName: 'Smoha',
+      );
+      expect(session.isOngoingAt(DateTime(2026, 11, 3, 1, 0)), isTrue);
     });
 
     test('HRDelegateAttendanceDetailScreen constructor holds valid delegate and month references', () {

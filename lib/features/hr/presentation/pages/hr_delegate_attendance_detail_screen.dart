@@ -1,7 +1,6 @@
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -9,6 +8,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/utils/branch_key.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
@@ -67,14 +67,14 @@ class DelegateAttendanceSession {
     return checkOutTime!.difference(checkInTime);
   }
 
-  /// Whether the session is currently ongoing (today without checkout and within 9 hours)
-  bool get isOngoing {
+  /// Whether the session is currently ongoing: no checkout and checked in
+  /// less than [kAttendanceOngoingMaxDuration] ago (works across midnight).
+  bool get isOngoing => isOngoingAt(DateTime.now());
+
+  bool isOngoingAt(DateTime now) {
     if (checkOutTime != null || isAutoCheckOut) return false;
-    final now = DateTime.now();
-    return checkInTime.year == now.year &&
-        checkInTime.month == now.month &&
-        checkInTime.day == now.day &&
-        now.difference(checkInTime) < kAttendanceAutoCloseAfter;
+    final elapsed = now.difference(checkInTime);
+    return !elapsed.isNegative && elapsed < kAttendanceOngoingMaxDuration;
   }
 
   /// Formatted duration string e.g. "8 س و 15 د"
@@ -813,6 +813,10 @@ class _HRDelegateAttendanceDetailScreenState
       'lastAdjustedAt': FieldValue.serverTimestamp(),
       'adjustmentReason': reason,
       if (notes.isNotEmpty) 'adjustmentNotes': notes,
+      // Read-reduction Phase 1: keep branchKey on HR-edited check-ins.
+      // 'غير محدد' is the UI placeholder for a missing branch; never key it.
+      if (session.branchName != 'غير محدد')
+        ...branchKeyField(session.branchName),
       // Denormalize checkout onto check-in (fix2) when HR sets/adjusts out time.
       if (hasCheckOut && newOutTime != null) 'checkOutTime': Timestamp.fromDate(newOutTime),
       if (!hasCheckOut) 'checkOutTime': FieldValue.delete(),
@@ -845,6 +849,9 @@ class _HRDelegateAttendanceDetailScreenState
           'type': 'check_out',
           'relatedCheckInId': session.id,
           'branchName': session.branchName,
+          // 'غير محدد' is the UI placeholder for a missing branch; never key it.
+          if (session.branchName != 'غير محدد')
+            ...branchKeyField(session.branchName),
           'deviceInfo': 'تسجيل يدوي بواسطة الموارد البشرية',
           if (session.latitude != null && session.longitude != null)
             'location': {

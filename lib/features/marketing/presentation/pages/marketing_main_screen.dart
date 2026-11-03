@@ -35,7 +35,29 @@ class MarketingMainScreen extends StatefulWidget {
 }
 
 class _MarketingMainScreenState extends State<MarketingMainScreen> {
-  int _currentIndex = 0;
+  int _tabIndex = 0;
+  int get _currentIndex => _tabIndex;
+
+  /// Index of BranchHomeScreen in the current tab list (-1 if absent);
+  /// recorded in build, used by the setter below.
+  int _branchTabIndex = -1;
+
+  /// All tab handlers assign through this setter, so isActive is updated in
+  /// the handler rather than during build.
+  set _currentIndex(int value) {
+    _tabIndex = value;
+    _branchTabActive.value = _branchTabIndex >= 0 && value == _branchTabIndex;
+  }
+
+  /// True only while the branch-attendance tab is selected (read-reduction:
+  /// stops its live listener/timers when another tab is shown).
+  final ValueNotifier<bool> _branchTabActive = ValueNotifier<bool>(false);
+
+  @override
+  void dispose() {
+    _branchTabActive.dispose();
+    super.dispose();
+  }
 
   void _onMenuSelected(String value) {
     final delegate = widget.delegate;
@@ -156,7 +178,10 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                 setState(() => _currentIndex = tabIndex);
               },
             ),
-            BranchHomeScreen(marketingUser: delegate),
+            BranchHomeScreen(
+              marketingUser: delegate,
+              isActive: _branchTabActive,
+            ),
             BlocProvider(
               create: (_) => di.sl<PhotoPermissionBloc>(),
               child: MarketingPermissionsScreen(marketingDelegate: delegate),
@@ -168,6 +193,18 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
               },
             ),
           ];
+
+    // Only records the index; the notifier is driven by the tab handlers.
+    // If the list itself changed (role) and the flag is out of sync, fix it
+    // after the frame instead of notifying listeners mid-build.
+    _branchTabIndex = screens.indexWhere((w) => w is BranchHomeScreen);
+    final branchActive =
+        _branchTabIndex >= 0 && _branchTabIndex == _currentIndex;
+    if (_branchTabActive.value != branchActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _currentIndex = _currentIndex;
+      });
+    }
 
     PopupMenuItem<String> buildPopupItem({
       required String value,

@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/badge_counts_service.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_screen.dart';
@@ -196,18 +196,8 @@ class SuperAdminHRSystemScreen extends StatelessWidget {
 
   Stream<int> _pendingLeavesStream() {
     try {
-      var query = FirebaseFirestore.instance.collection('leave_requests');
-      if (delegate.companyUID.isNotEmpty) {
-        return query
-            .where('companyUID', isEqualTo: delegate.companyUID)
-            .where('status', isEqualTo: 'pending')
-            .snapshots()
-            .map((snap) => snap.docs.length);
-      }
-      return query
-          .where('status', isEqualTo: 'pending')
-          .snapshots()
-          .map((snap) => snap.docs.length);
+      return BadgeCountsService.instance
+          .watch('leave_requests', delegate.companyUID);
     } catch (_) {
       return const Stream.empty();
     }
