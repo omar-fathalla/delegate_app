@@ -20,20 +20,7 @@
   <meta name="google-site-verification" content="G3UJkFXDDb0OWlsPWsGSI0b5aAnUZk7OlheK2jovx88" />
 
   <!-- Google Maps JavaScript API for Flutter Web (defer: no render blocking; runs before DOMContentLoaded) -->
-  <script>
-    // Maps guard: resolves when google.maps is usable (script is deferred).
-    window.mapsReady = new Promise(function (resolve) {
-      var tries = 0;
-      function check() {
-        if (window.google && window.google.maps && window.google.maps.Map) { resolve(true); return; }
-        if (++tries > 600) { resolve(false); return; } // ~30s cap
-        setTimeout(check, 50);
-      }
-      window.__mapsScriptLoaded = check;
-      check();
-    });
-  </script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB4gLHxxHshJVbpOR5oq69lLotyfd6mwKs&libraries=drawing,marker" defer onload="window.__mapsScriptLoaded &amp;&amp; window.__mapsScriptLoaded()"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB4gLHxxHshJVbpOR5oq69lLotyfd6mwKs&libraries=drawing,marker" defer></script>
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">

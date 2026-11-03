@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:bloc/bloc.dart';
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
@@ -46,6 +47,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   /// again or signing the user back in.
   bool _explicitLogout = false;
 
+  /// Bumped per auto-login run and on cancel; a run whose generation is stale
+  /// must not log out or emit.
+  int _autoLoginGen = 0;
+
   AuthBloc({
     required this.loginUseCase,
     required this.checkAutoLoginUseCase,
@@ -64,7 +69,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             ((d) => DeviceBindingService.verifyOrBindDevice(delegate: d)),
         super(AuthInitial()) {
     on<LoginRequested>(_onLoginRequested);
-    on<CheckAutoLoginRequested>(_onCheckAutoLogin);
+    // restartable: a Retry while a check is in flight cancels the old
+    // handler (its emits become no-ops) and runs a fresh one.
+    on<CheckAutoLoginRequested>(_onCheckAutoLogin, transformer: restartable());
+    on<AutoLoginCancelled>(_onAutoLoginCancelled);
     on<LogoutRequested>(_onLogoutRequested);
     on<OrganizationSelected>(_onOrganizationSelected);
     on<AnonymousSessionDetected>(_onAnonymousSessionDetected);
@@ -282,6 +290,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await _signOutAnonymousSession(emit);
       return;
     }
+    final gen = ++_autoLoginGen;
     Delegate? cached;
     final _AutoLoginDecision decision;
     try {
@@ -289,6 +298,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         (d) => cached = d,
       ).timeout(autoLoginTimeout);
     } on TimeoutException {
+      if (gen != _autoLoginGen) return;
       // Network hang: never log out or unbind on a timeout. Keep the cached
       // session if we have one; otherwise send the user to login.
       final d = cached;
@@ -299,10 +309,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
       return;
     }
+    if (gen != _autoLoginGen) return;
     if (decision.logout) {
       await logoutUseCase(const LogoutParams());
     }
     emit(decision.state);
+  }
+
+  Future<void> _onAutoLoginCancelled(
+    AutoLoginCancelled event,
+    Emitter<AuthState> emit,
+  ) async {
+    _autoLoginGen++; // any in-flight auto-login result is now ignored
+    try {
+      await logoutUseCase(const LogoutParams());
+    } catch (_) {}
+    emit(const AuthUnauthenticated());
   }
 
   /// Overall cap on auto-login (cache read + session check + device check).

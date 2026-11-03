@@ -193,7 +193,10 @@ class _SplashScreenState extends State<SplashScreen>
                         onRetry: _retry,
                         onSignIn: () {
                           _stallTimer?.cancel();
-                          context.go('/login');
+                          // Listener navigates to /login on Unauthenticated.
+                          context.read<AuthBloc>().add(
+                                const AutoLoginCancelled(),
+                              );
                         },
                       )
                     else

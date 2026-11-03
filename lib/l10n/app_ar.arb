@@ -1261,5 +1261,13 @@
     "splashSignIn": "تسجيل الدخول",
     "@splashSignIn": {
         "description": "Splash go-to-login button"
+    },
+    "mapUnavailable": "الخريطة غير متاحة",
+    "@mapUnavailable": {
+        "description": "Map gate timeout message"
+    },
+    "mapRetry": "إعادة المحاولة",
+    "@mapRetry": {
+        "description": "Map gate retry button"
     }
 }

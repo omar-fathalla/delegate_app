@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/pages/splash_screen.dart';
@@ -69,11 +71,24 @@ void main() {
     await tester.pump(const Duration(seconds: 13));
   });
 
-  testWidgets('sign-in button goes to /login', (tester) async {
+  testWidgets('sign-in button dispatches AutoLoginCancelled', (tester) async {
     await pumpSplash(tester);
     await tester.pump(const Duration(seconds: 13));
     await tester.tap(find.byKey(const Key('splash_sign_in')));
+    await tester.pump();
+    verify(() => bloc.add(any(that: isA<AutoLoginCancelled>()))).called(1);
+  });
+
+  testWidgets('goes to /login when cancel emits Unauthenticated',
+      (tester) async {
+    final ctrl = StreamController<AuthState>();
+    whenListen(bloc, ctrl.stream, initialState: AuthLoading());
+    await pumpSplash(tester);
+    await tester.pump(const Duration(seconds: 13));
+    await tester.tap(find.byKey(const Key('splash_sign_in')));
+    ctrl.add(const AuthUnauthenticated());
     await tester.pumpAndSettle();
     expect(find.text('LOGIN_PAGE'), findsOneWidget);
+    await ctrl.close();
   });
 }

@@ -166,4 +166,59 @@ void main() {
       verify(() => logout(any())).called(1);
     });
   });
+
+  group('cancel and concurrency', () {
+    test('AutoLoginCancelled clears session; late result never authenticates',
+        () async {
+      AuthBloc.autoLoginTimeout = const Duration(seconds: 5);
+      final gate = Completer<SessionVerificationResult>();
+      when(() => checkAutoLogin(any()))
+          .thenAnswer((_) async => Right(tDelegate));
+      final bloc = build(session: (_) => gate.future);
+      final states = <AuthState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(CheckAutoLoginRequested());
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      bloc.add(const AutoLoginCancelled());
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      gate.complete(const SessionVerificationResult.valid());
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await sub.cancel();
+      await bloc.close();
+      expect(states.last, const AuthUnauthenticated());
+      expect(states.whereType<AuthAuthenticated>(), isEmpty);
+      verify(() => logout(any())).called(1);
+    });
+
+    test('retry while in flight runs only the latest check (restartable)',
+        () async {
+      AuthBloc.autoLoginTimeout = const Duration(seconds: 5);
+      final first = Completer<SessionVerificationResult>();
+      var calls = 0;
+      when(() => checkAutoLogin(any()))
+          .thenAnswer((_) async => Right(tDelegate));
+      final bloc = build(
+        session: (_) {
+          calls++;
+          return calls == 1
+              ? first.future
+              : Future.value(const SessionVerificationResult.valid());
+        },
+      );
+      final states = <AuthState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(CheckAutoLoginRequested());
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      bloc.add(CheckAutoLoginRequested());
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      // Stale first run resolves "invalid" late: must not log out or emit.
+      first.complete(const SessionVerificationResult.invalid(reason: 'late'));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await sub.cancel();
+      await bloc.close();
+      expect(states.whereType<AuthAuthenticated>().length, 1);
+      expect(states.last, AuthAuthenticated(delegate: tDelegate));
+      verifyNever(() => logout(any()));
+    });
+  });
 }

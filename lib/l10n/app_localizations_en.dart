@@ -932,4 +932,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get splashSignIn => 'Sign in';
+
+  @override
+  String get mapUnavailable => 'Map unavailable';
+
+  @override
+  String get mapRetry => 'Retry';
 }

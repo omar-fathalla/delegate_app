@@ -930,4 +930,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get splashSignIn => 'تسجيل الدخول';
+
+  @override
+  String get mapUnavailable => 'الخريطة غير متاحة';
+
+  @override
+  String get mapRetry => 'إعادة المحاولة';
 }

@@ -1261,5 +1261,13 @@
     "splashSignIn": "Sign in",
     "@splashSignIn": {
         "description": "Splash go-to-login button"
+    },
+    "mapUnavailable": "Map unavailable",
+    "@mapUnavailable": {
+        "description": "Map gate timeout message"
+    },
+    "mapRetry": "Retry",
+    "@mapRetry": {
+        "description": "Map gate retry button"
     }
 }

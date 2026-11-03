@@ -1837,6 +1837,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign in'**
   String get splashSignIn;
+
+  /// Map gate timeout message
+  ///
+  /// In en, this message translates to:
+  /// **'Map unavailable'**
+  String get mapUnavailable;
+
+  /// Map gate retry button
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get mapRetry;
 }
 
 class _AppLocalizationsDelegate
