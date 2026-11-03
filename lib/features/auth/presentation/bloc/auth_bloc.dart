@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:bloc/bloc.dart';
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
+import 'package:delegate_app/core/config/debug_stall.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
@@ -33,12 +35,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final Future<void> Function()? signOutAuth;
   final Stream<bool>? anonymousSessionRestored;
 
+  /// Test seams; default to the real services.
+  final Future<SessionVerificationResult> Function(Delegate delegate)
+      sessionCheck;
+  final Future<DeviceVerificationResult> Function(Delegate delegate)
+      deviceCheck;
+
   StreamSubscription<bool>? _anonymousAuthSub;
 
   /// True after the user confirms logout, until the next successful sign-in.
   /// Blocks cache restore and the anonymous-session handler from navigating
   /// again or signing the user back in.
   bool _explicitLogout = false;
+
+  /// Bumped per auto-login run and on cancel; a run whose generation is stale
+  /// must not log out or emit.
+  int _autoLoginGen = 0;
 
   AuthBloc({
     required this.loginUseCase,
@@ -49,9 +61,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     this.isAnonymousSession,
     this.signOutAuth,
     this.anonymousSessionRestored,
-  }) : super(AuthInitial()) {
+    Future<SessionVerificationResult> Function(Delegate delegate)?
+        sessionCheck,
+    Future<DeviceVerificationResult> Function(Delegate delegate)? deviceCheck,
+  })  : sessionCheck = sessionCheck ??
+            ((d) => SessionManagementService.checkSessionStatus(delegate: d)),
+        deviceCheck = deviceCheck ??
+            ((d) => DeviceBindingService.verifyOrBindDevice(delegate: d)),
+        super(AuthInitial()) {
     on<LoginRequested>(_onLoginRequested);
-    on<CheckAutoLoginRequested>(_onCheckAutoLogin);
+    // restartable: a Retry while a check is in flight cancels the old
+    // handler (its emits become no-ops) and runs a fresh one.
+    on<CheckAutoLoginRequested>(_onCheckAutoLogin, transformer: restartable());
+    on<AutoLoginCancelled>(_onAutoLoginCancelled);
     on<LogoutRequested>(_onLogoutRequested);
     on<OrganizationSelected>(_onOrganizationSelected);
     on<AnonymousSessionDetected>(_onAnonymousSessionDetected);
@@ -264,53 +286,99 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(const AuthUnauthenticated(fromLogout: true));
       return;
     }
+    final gen = ++_autoLoginGen;
     emit(AuthLoading());
     if (isAnonymousSession?.call() == true) {
       await _signOutAnonymousSession(emit);
       return;
     }
+    if (debugStallActive) {
+      // DEV-only (?debugStall=1): hang auto-login so the splash stall UI can
+      // be exercised. Compiled out of prod (AppEnv.isDev is const false).
+      await Completer<void>().future;
+    }
+    Delegate? cached;
+    final _AutoLoginDecision decision;
+    try {
+      decision = await _resolveAutoLogin(
+        (d) => cached = d,
+        gen,
+      ).timeout(autoLoginTimeout);
+    } on TimeoutException {
+      if (gen != _autoLoginGen) return;
+      // Network hang: never log out or unbind on a timeout. Keep the cached
+      // session if we have one; otherwise send the user to login.
+      final d = cached;
+      emit(
+        d != null
+            ? AuthAuthenticated(delegate: d)
+            : const AuthUnauthenticated(),
+      );
+      return;
+    }
+    if (gen != _autoLoginGen) return;
+    if (decision.logout) {
+      await logoutUseCase(const LogoutParams());
+    }
+    emit(decision.state);
+  }
+
+  Future<void> _onAutoLoginCancelled(
+    AutoLoginCancelled event,
+    Emitter<AuthState> emit,
+  ) async {
+    _autoLoginGen++; // any in-flight auto-login result is now ignored
+    try {
+      await logoutUseCase(const LogoutParams());
+    } catch (_) {}
+    emit(const AuthUnauthenticated());
+  }
+
+  /// Overall cap on auto-login (cache read + session check + device check).
+  static Duration autoLoginTimeout = const Duration(seconds: 10);
+
+  /// Computes the auto-login outcome without emitting or logging out, so a
+  /// late result after [autoLoginTimeout] has no side effects.
+  Future<_AutoLoginDecision> _resolveAutoLogin(
+    void Function(Delegate) onCached,
+    int gen,
+  ) async {
     final result = await checkAutoLoginUseCase(NoParams());
+    final delegate = result.fold((_) => null, (d) => d);
+    if (delegate == null) {
+      return const _AutoLoginDecision(AuthUnauthenticated());
+    }
+    onCached(delegate);
 
-    await result.fold(
-      (failure) async {
-        emit(const AuthUnauthenticated());
-      },
-      (delegate) async {
-        if (delegate != null) {
-          // 1. فحص إبطال الجلسة أو الخروج الإجباري من الإدارة
-          final sessionCheck =
-              await SessionManagementService.checkSessionStatus(
-                delegate: delegate,
-              );
-          if (!sessionCheck.isValid) {
-            await logoutUseCase(const LogoutParams());
-            emit(AuthUnauthenticated(message: sessionCheck.reason));
-            return;
-          }
+    // 1. فحص إبطال الجلسة أو الخروج الإجباري من الإدارة
+    final session = await sessionCheck(delegate);
+    if (!session.isValid) {
+      return _AutoLoginDecision(
+        AuthUnauthenticated(message: session.reason),
+        logout: true,
+      );
+    }
 
-          // 2. فحص بصمة الجهاز للتسجيل التلقائي
-          final deviceCheck = await DeviceBindingService.verifyOrBindDevice(
-            delegate: delegate,
-          );
-          if (deviceCheck.isMismatched) {
-            await logoutUseCase(const LogoutParams());
-            emit(
-              AuthDeviceMismatchState(
-                delegate: delegate,
-                boundDeviceModel: deviceCheck.boundDeviceModel,
-                currentDeviceModel: deviceCheck.currentDeviceModel,
-                message: deviceCheck.message ?? 'هذا الحساب مقترن بجهاز آخر',
-              ),
-            );
-            return;
-          }
+    // 2. فحص بصمة الجهاز للتسجيل التلقائي
+    // A stale (timed-out, cancelled or restarted) run must not touch the
+    // device binding.
+    if (gen != _autoLoginGen) {
+      return _AutoLoginDecision(AuthAuthenticated(delegate: delegate));
+    }
+    final device = await deviceCheck(delegate);
+    if (device.isMismatched) {
+      return _AutoLoginDecision(
+        AuthDeviceMismatchState(
+          delegate: delegate,
+          boundDeviceModel: device.boundDeviceModel,
+          currentDeviceModel: device.currentDeviceModel,
+          message: device.message ?? 'هذا الحساب مقترن بجهاز آخر',
+        ),
+        logout: true,
+      );
+    }
 
-          emit(AuthAuthenticated(delegate: delegate));
-        } else {
-          emit(const AuthUnauthenticated());
-        }
-      },
-    );
+    return _AutoLoginDecision(AuthAuthenticated(delegate: delegate));
   }
 
   Future<void> _onLogoutRequested(
@@ -359,4 +427,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     emit(AuthAuthenticated(delegate: delegate));
   }
+}
+
+class _AutoLoginDecision {
+  final AuthState state;
+  final bool logout;
+  const _AutoLoginDecision(this.state, {this.logout = false});
 }

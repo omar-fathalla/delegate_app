@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:delegate_app/core/utils/google_maps_loader.dart';
 import '../../../../core/services/google_places_service.dart';
 
 class LocationPickResult {
@@ -247,55 +248,57 @@ class _FullscreenMapPickerDialogState extends State<FullscreenMapPickerDialog> {
       body: Stack(
         children: [
           // ── The Google Map ──────────────────────────────────────────
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _currentLocation,
-              zoom: 16,
-            ),
-            mapType: _currentMapType,
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<OneSequenceGestureRecognizer>(
-                () => EagerGestureRecognizer(),
+          GoogleMapsReadyGate(
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: _currentLocation,
+                zoom: 16,
               ),
-            },
-            scrollGesturesEnabled: true,
-            zoomGesturesEnabled: true,
-            rotateGesturesEnabled: true,
-            tiltGesturesEnabled: true,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            compassEnabled: true,
-            onMapCreated: (controller) => _mapController = controller,
-            onTap: (pos) {
-              setState(() => _currentLocation = pos);
-              _resolveAddress(pos);
-            },
-            markers: {
-              Marker(
-                markerId: const MarkerId('selected_branch_pin'),
-                position: _currentLocation,
-                draggable: true,
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueViolet,
+              mapType: _currentMapType,
+              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                Factory<OneSequenceGestureRecognizer>(
+                  () => EagerGestureRecognizer(),
                 ),
-                onDragEnd: (newPos) {
-                  setState(() => _currentLocation = newPos);
-                  _resolveAddress(newPos);
-                },
-              ),
-            },
-            circles: {
-              Circle(
-                circleId: const CircleId('branch_geofence'),
-                center: _currentLocation,
-                radius: _currentRadius,
-                fillColor: colorScheme.primary.withValues(alpha: 0.22),
-                strokeColor: colorScheme.primary.withValues(alpha: 0.7),
-                strokeWidth: 2,
-              ),
-            },
+              },
+              scrollGesturesEnabled: true,
+              zoomGesturesEnabled: true,
+              rotateGesturesEnabled: true,
+              tiltGesturesEnabled: true,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: true,
+              onMapCreated: (controller) => _mapController = controller,
+              onTap: (pos) {
+                setState(() => _currentLocation = pos);
+                _resolveAddress(pos);
+              },
+              markers: {
+                Marker(
+                  markerId: const MarkerId('selected_branch_pin'),
+                  position: _currentLocation,
+                  draggable: true,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueViolet,
+                  ),
+                  onDragEnd: (newPos) {
+                    setState(() => _currentLocation = newPos);
+                    _resolveAddress(newPos);
+                  },
+                ),
+              },
+              circles: {
+                Circle(
+                  circleId: const CircleId('branch_geofence'),
+                  center: _currentLocation,
+                  radius: _currentRadius,
+                  fillColor: colorScheme.primary.withValues(alpha: 0.22),
+                  strokeColor: colorScheme.primary.withValues(alpha: 0.7),
+                  strokeWidth: 2,
+                ),
+              },
+            ),
           ),
 
           // ── Top Search Bar & Suggestions ─────────────────────────────

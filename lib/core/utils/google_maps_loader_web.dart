@@ -79,3 +79,35 @@ bool isGoogleMapsAvailable() {
   }
 }
 
+
+/// Retry after a failed load: replace the Maps <script> with a fresh copy that
+/// uses the same src (same key) already in the page, so the browser fetches it
+/// again. No-op when Maps is already available or no script tag exists.
+void reloadGoogleMapsScript() {
+  if (isGoogleMapsAvailable()) return;
+  try {
+    final doc = globalContext.getProperty('document'.toJS) as JSObject?;
+    if (doc == null) return;
+    final old = doc.callMethod(
+      'querySelector'.toJS,
+      'script[src*="maps.googleapis.com/maps/api/js"]'.toJS,
+    ) as JSObject?;
+    if (old == null) {
+      _scriptInjected = false;
+      _ensureScriptInjected();
+      return;
+    }
+    final src = old.getProperty('src'.toJS);
+    if (src == null || src.isUndefined || src.isNull) return;
+    final fresh =
+        doc.callMethod('createElement'.toJS, 'script'.toJS) as JSObject?;
+    if (fresh == null) return;
+    fresh.setProperty('src'.toJS, src);
+    fresh.setProperty('async'.toJS, true.toJS);
+    old.callMethod('remove'.toJS);
+    final head = doc.callMethod('querySelector'.toJS, 'head'.toJS) as JSObject?;
+    head?.callMethod('appendChild'.toJS, fresh);
+  } catch (_) {
+    // Graceful fallback: the gate just waits again.
+  }
+}

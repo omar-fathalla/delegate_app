@@ -24,6 +24,12 @@ class LoginRequested extends AuthEvent {
 
 class CheckAutoLoginRequested extends AuthEvent {}
 
+/// Splash «تسجيل الدخول»: abandon any in-flight auto-login, clear the local
+/// session and cache (no device unbind), then go to login.
+class AutoLoginCancelled extends AuthEvent {
+  const AutoLoginCancelled();
+}
+
 class AnonymousSessionDetected extends AuthEvent {
   const AnonymousSessionDetected();
 }

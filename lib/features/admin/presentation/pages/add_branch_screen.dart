@@ -14,6 +14,7 @@ import '../../../../core/services/google_places_service.dart';
 import '../../data/models/branch_model.dart';
 import '../bloc/branch_bloc.dart';
 import '../widgets/fullscreen_map_picker_dialog.dart';
+import 'package:delegate_app/core/utils/google_maps_loader.dart';
 import 'branch_details_screen.dart';
 
 class AddBranchScreen extends StatelessWidget {
@@ -1228,75 +1229,77 @@ class _AddBranchViewState extends State<_AddBranchView> {
       },
       child: Stack(
         children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _selectedActionPoint ?? _initialLocation,
-              zoom: 16,
-            ),
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<OneSequenceGestureRecognizer>(
-                () => EagerGestureRecognizer(),
+          GoogleMapsReadyGate(
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: _selectedActionPoint ?? _initialLocation,
+                zoom: 16,
               ),
-            },
-            scrollGesturesEnabled: true,
-            zoomGesturesEnabled: true,
-            rotateGesturesEnabled: true,
-            tiltGesturesEnabled: true,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            compassEnabled: true,
-            onMapCreated: (controller) {
-              _mapController = controller;
-              if (!_isMapReady) {
-                setState(() => _isMapReady = true);
-              }
-              if (widget.branchToEdit != null && _selectedActionPoint != null) {
-                controller.animateCamera(
-                  CameraUpdate.newCameraPosition(
-                    CameraPosition(
-                      target: _selectedActionPoint!,
-                      zoom: 16.5,
-                    ),
-                  ),
-                );
-              }
-            },
-            onTap: (LatLng position) {
-              setState(() {
-                _selectedActionPoint = position;
-              });
-            },
-            markers: _selectedActionPoint != null
-                ? {
-                    Marker(
-                      markerId: const MarkerId('branch_location'),
-                      position: _selectedActionPoint!,
-                      draggable: true,
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueViolet,
+              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                Factory<OneSequenceGestureRecognizer>(
+                  () => EagerGestureRecognizer(),
+                ),
+              },
+              scrollGesturesEnabled: true,
+              zoomGesturesEnabled: true,
+              rotateGesturesEnabled: true,
+              tiltGesturesEnabled: true,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: true,
+              onMapCreated: (controller) {
+                _mapController = controller;
+                if (!_isMapReady) {
+                  setState(() => _isMapReady = true);
+                }
+                if (widget.branchToEdit != null && _selectedActionPoint != null) {
+                  controller.animateCamera(
+                    CameraUpdate.newCameraPosition(
+                      CameraPosition(
+                        target: _selectedActionPoint!,
+                        zoom: 16.5,
                       ),
-                      onDragEnd: (newPosition) {
-                        setState(() {
-                          _selectedActionPoint = newPosition;
-                        });
-                      },
                     ),
-                  }
-                : {},
-            circles: _selectedActionPoint != null
-                ? {
-                    Circle(
-                      circleId: const CircleId('geofence_area'),
-                      center: _selectedActionPoint!,
-                      radius: radius,
-                      fillColor: colorScheme.primary.withValues(alpha: 0.22),
-                      strokeColor: colorScheme.primary.withValues(alpha: 0.65),
-                      strokeWidth: 2,
-                    ),
-                  }
-                : {},
+                  );
+                }
+              },
+              onTap: (LatLng position) {
+                setState(() {
+                  _selectedActionPoint = position;
+                });
+              },
+              markers: _selectedActionPoint != null
+                  ? {
+                      Marker(
+                        markerId: const MarkerId('branch_location'),
+                        position: _selectedActionPoint!,
+                        draggable: true,
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueViolet,
+                        ),
+                        onDragEnd: (newPosition) {
+                          setState(() {
+                            _selectedActionPoint = newPosition;
+                          });
+                        },
+                      ),
+                    }
+                  : {},
+              circles: _selectedActionPoint != null
+                  ? {
+                      Circle(
+                        circleId: const CircleId('geofence_area'),
+                        center: _selectedActionPoint!,
+                        radius: radius,
+                        fillColor: colorScheme.primary.withValues(alpha: 0.22),
+                        strokeColor: colorScheme.primary.withValues(alpha: 0.65),
+                        strokeWidth: 2,
+                      ),
+                    }
+                  : {},
+            ),
           ),
 
           // ── Floating Zoom Buttons on Top-End ──

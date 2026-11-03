@@ -1249,5 +1249,25 @@
     "walletsManagement": "Wallets Management",
     "@walletsManagement": {
         "description": "Wallets management label"
+    },
+    "splashConnectionFailed": "Couldn't connect",
+    "@splashConnectionFailed": {
+        "description": "Splash stall message"
+    },
+    "splashRetry": "Retry",
+    "@splashRetry": {
+        "description": "Splash retry button"
+    },
+    "splashSignIn": "Sign in",
+    "@splashSignIn": {
+        "description": "Splash go-to-login button"
+    },
+    "mapUnavailable": "Map unavailable",
+    "@mapUnavailable": {
+        "description": "Map gate timeout message"
+    },
+    "mapRetry": "Retry",
+    "@mapRetry": {
+        "description": "Map gate retry button"
     }
 }

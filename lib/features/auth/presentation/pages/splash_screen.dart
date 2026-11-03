@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
@@ -6,10 +8,14 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
+
+  /// After this long with no navigation, show the retry / sign-in fallback.
+  static Duration stallTimeout = const Duration(seconds: 12);
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -20,6 +26,21 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _scaleAnimation;
+  Timer? _stallTimer;
+  bool _stalled = false;
+
+  void _startAutoLogin() {
+    _stallTimer?.cancel();
+    _stallTimer = Timer(SplashScreen.stallTimeout, () {
+      if (mounted) setState(() => _stalled = true);
+    });
+    context.read<AuthBloc>().add(CheckAutoLoginRequested());
+  }
+
+  void _retry() {
+    setState(() => _stalled = false);
+    _startAutoLogin();
+  }
 
   @override
   void initState() {
@@ -32,10 +53,7 @@ class _SplashScreenState extends State<SplashScreen>
       parent: _controller,
       curve: AppMotionCurves.standardDecelerate,
     );
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: AppMotionCurves.expressiveDefaultSpatial,
@@ -46,12 +64,13 @@ class _SplashScreenState extends State<SplashScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _controller.forward();
       // Trigger auto-login check using global AuthBloc
-      context.read<AuthBloc>().add(CheckAutoLoginRequested());
+      _startAutoLogin();
     });
   }
 
   @override
   void dispose() {
+    _stallTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -61,6 +80,11 @@ class _SplashScreenState extends State<SplashScreen>
     final colorScheme = Theme.of(context).colorScheme;
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
+        if (state is AuthAuthenticated ||
+            state is AuthDeviceMismatchState ||
+            (state is AuthUnauthenticated && !state.fromLogout)) {
+          _stallTimer?.cancel();
+        }
         if (state is AuthAuthenticated) {
           final delegate = state.delegate;
           if (delegate.role == UserRole.superAdmin ||
@@ -164,7 +188,19 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                     ),
                     const Spacer(),
-                    CircularProgressIndicator(color: colorScheme.primary),
+                    if (_stalled)
+                      _StalledActions(
+                        onRetry: _retry,
+                        onSignIn: () {
+                          _stallTimer?.cancel();
+                          // Listener navigates to /login on Unauthenticated.
+                          context.read<AuthBloc>().add(
+                                const AutoLoginCancelled(),
+                              );
+                        },
+                      )
+                    else
+                      CircularProgressIndicator(color: colorScheme.primary),
                     const SizedBox(height: 48),
                   ],
                 ),
@@ -172,6 +208,53 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StalledActions extends StatelessWidget {
+  final VoidCallback onRetry;
+  final VoidCallback onSignIn;
+
+  const _StalledActions({required this.onRetry, required this.onSignIn});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.wifi_off_rounded, color: colorScheme.error),
+          const SizedBox(height: 8),
+          Text(
+            l10n?.splashConnectionFailed ?? 'تعذّر الاتصال',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              FilledButton.icon(
+                key: const Key('splash_retry'),
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(l10n?.splashRetry ?? 'إعادة المحاولة'),
+              ),
+              OutlinedButton(
+                key: const Key('splash_sign_in'),
+                onPressed: onSignIn,
+                child: Text(l10n?.splashSignIn ?? 'تسجيل الدخول'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

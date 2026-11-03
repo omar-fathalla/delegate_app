@@ -17,12 +17,16 @@ class TrackingLiveMapView extends StatefulWidget {
   final VoidCallback? onRefresh;
   final String? initialSelectedDelegateId;
 
+  /// Test seam; defaults to the real service.
+  final DelegateTrackingService? trackingService;
+
   const TrackingLiveMapView({
     super.key,
     required this.sessions,
     required this.onToggleTracking,
     this.onRefresh,
     this.initialSelectedDelegateId,
+    this.trackingService,
   });
 
   @override
@@ -33,7 +37,8 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
   GoogleMapController? _mapController;
   DelegateTrackingSession? _selectedSession;
 
-  final DelegateTrackingService _trackingService = DelegateTrackingService();
+  late final DelegateTrackingService _trackingService =
+      widget.trackingService ?? DelegateTrackingService();
   StreamSubscription<List<TrackingBreadcrumb>>? _breadcrumbsSubscription;
   List<TrackingBreadcrumb> _activeBreadcrumbs = [];
   bool _isLoadingTrail = false;
@@ -699,65 +704,6 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
 
-    // التحقق الآمن من جاهزية وتحميل خدمة الخرائط في بيئة الويب
-    if (!isGoogleMapsAvailable) {
-      return Center(
-        child: Container(
-          margin: const EdgeInsets.all(24),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.05),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.map_outlined,
-                size: 52,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'خدمة الخرائط قيد التحميل...',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'يرجى التأكد من اتصال الإنترنت وإعادة تحميل الصفحة.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 20),
-              FilledButton.tonalIcon(
-                onPressed: () {
-                  _checkMapsAvailability();
-                  setState(() {});
-                },
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('إعادة المحاولة'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
 
     // مزامنة المندوب المختار مع البيانات الحية المحدثة
     DelegateTrackingSession? activeSession = _selectedSession;
@@ -922,34 +868,36 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
 
     return Stack(
       children: [
-        GoogleMap(
-          initialCameraPosition: CameraPosition(
-            target: initialCenter,
-            zoom: 15.0,
-          ),
-          circles: circles,
-          markers: markers,
-          polylines: polylines,
-          myLocationEnabled: true,
-          myLocationButtonEnabled: false,
-          zoomControlsEnabled: false,
-          mapToolbarEnabled: false,
-          onMapCreated: (controller) {
-            _mapController = controller;
-            if (_selectedSession != null) {
-              _focusOnDelegate(_selectedSession!);
-              if (_activeBreadcrumbs.isNotEmpty) {
-                _fitTrailBounds(_activeBreadcrumbs);
+        GoogleMapsReadyGate(
+          child: GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: initialCenter,
+              zoom: 15.0,
+            ),
+            circles: circles,
+            markers: markers,
+            polylines: polylines,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            onMapCreated: (controller) {
+              _mapController = controller;
+              if (_selectedSession != null) {
+                _focusOnDelegate(_selectedSession!);
+                if (_activeBreadcrumbs.isNotEmpty) {
+                  _fitTrailBounds(_activeBreadcrumbs);
+                }
+              } else {
+                _fitMapBounds();
               }
-            } else {
-              _fitMapBounds();
-            }
-          },
-          onTap: (_) {
-            if (_selectedSession != null) {
-              _selectSession(null);
-            }
-          },
+            },
+            onTap: (_) {
+              if (_selectedSession != null) {
+                _selectSession(null);
+              }
+            },
+          ),
         ),
 
         // أزرار التحكم الطافية (إعادة الضبط والتحديث)
