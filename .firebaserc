@@ -1,7 +1,23 @@
 {
   "projects": {
-    "default": "practice-firebase-72df1"
+    "default": "practice-firebase-72df1",
+    "dev": "tashil-dev"
   },
-  "targets": {},
+  "targets": {
+    "practice-firebase-72df1": {
+      "hosting": {
+        "web": [
+          "tashil-hr-test"
+        ]
+      }
+    },
+    "tashil-dev": {
+      "hosting": {
+        "web": [
+          "tashil-dev"
+        ]
+      }
+    }
+  },
   "etags": {}
 }
