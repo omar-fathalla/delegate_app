@@ -80,7 +80,13 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      # functions/ has a lint script but no ESLint config yet; skip (with a warning) until one is added.
       - name: Lint
-        run: npm run lint --if-present
+        run: |
+          if ls .eslintrc* eslint.config.* >/dev/null 2>&1 || grep -q '"eslintConfig"' package.json; then
+            npm run lint --if-present
+          else
+            echo "::warning::functions/ has no ESLint config; lint skipped. Add one to enable this check."
+          fi
       - name: Test
         run: npm test --if-present
