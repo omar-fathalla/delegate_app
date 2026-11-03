@@ -1,7 +1,8 @@
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
-const String _mapsApiKey = 'AIzaSyB4gLHxxHshJVbpOR5oq69lLotyfd6mwKs';
+import 'package:delegate_app/core/config/app_env.dart';
+
 bool _scriptInjected = false;
 
 /// Ensures the Google Maps JavaScript SDK script tag is injected into the DOM.
@@ -28,7 +29,7 @@ void _ensureScriptInjected() {
 
     script.setProperty(
       'src'.toJS,
-      'https://maps.googleapis.com/maps/api/js?key=$_mapsApiKey&libraries=drawing,marker'.toJS,
+      'https://maps.googleapis.com/maps/api/js?key=${AppEnv.mapsJsApiKey}&libraries=drawing,marker'.toJS,
     );
     script.setProperty('async'.toJS, true.toJS);
     script.setProperty('defer'.toJS, true.toJS);
