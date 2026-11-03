@@ -142,4 +142,22 @@ void main() {
     expect(AdminDesktopShellWeb.isKnownPage('requests'), isTrue);
     expect(AdminDesktopShellWeb.isKnownPage('x'), isFalse);
   });
+
+  testWidgets('restored page writes ?p= back; home clears it (N-2)', (t) async {
+    final urls = <String>[];
+    AdminDesktopShellWeb.debugOnSyncUrl = (u) => urls.add(u.toString());
+    addTearDown(() => AdminDesktopShellWeb.debugOnSyncUrl = null);
+    // Same path for a reload and a deep link opened in a new tab: both
+    // arrive as initialPage after the splash.
+    await _pump(t, const Size(1280, 800), AppTheme.lightTheme(), initialPage: 'tasks');
+    expect(urls, ['/admin/home?p=tasks']);
+    await t.pumpWidget(const SizedBox());
+    urls.clear();
+    await _pump(t, const Size(1280, 800), AppTheme.lightTheme(), initialPage: 'requests');
+    expect(urls, ['/admin/home?p=requests']);
+    await t.tap(find.text('الرئيسية').first);
+    await t.pumpAndSettle();
+    expect(urls.last, '/admin/home');
+    expect(AdminDesktopShellWeb.urlFor('home').toString(), '/admin/home');
+  });
 }

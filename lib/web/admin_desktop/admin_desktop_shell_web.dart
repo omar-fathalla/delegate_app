@@ -2,7 +2,7 @@
 // Used only when kIsWeb && width >= kAdminDesktopMinWidth (see
 // AdminDesktopShellWeb.shouldUse). Mobile and narrow web keep AdminMainScreen.
 // Composes the existing shared tab screens without modifying them.
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:material_symbols_icons/symbols.dart';
@@ -74,6 +74,15 @@ class AdminDesktopShellWeb extends StatefulWidget {
   /// a reload (the splash navigates to `/admin/home` without the query).
   static String? pendingPage;
 
+  /// Test hook: receives every URL the shell writes.
+  @visibleForTesting
+  static void Function(Uri uri)? debugOnSyncUrl;
+
+  /// Home is plain /admin/home; other tabs and extras keep ?p=.
+  static Uri urlFor(String page) => page == 'home'
+      ? Uri(path: '/admin/home')
+      : Uri(path: '/admin/home', queryParameters: {'p': page});
+
   static bool isKnownPage(String? p) =>
       p != null && (tabKeys.contains(p) || extraKeys.contains(p));
 
@@ -129,6 +138,11 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
       } else {
         _extra = p;
       }
+      // Reload / deep link: the splash lands on plain /admin/home, so put
+      // ?p= back once the restored page is on screen.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncUrl(p);
+      });
     }
     final d = widget.delegate;
     _screens = widget.screensOverride ??
@@ -178,11 +192,10 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
   }
 
   void _syncUrl(String page) {
+    final uri = AdminDesktopShellWeb.urlFor(page);
+    AdminDesktopShellWeb.debugOnSyncUrl?.call(uri);
     if (!kIsWeb) return;
-    SystemNavigator.routeInformationUpdated(
-      uri: Uri(path: '/admin/home', queryParameters: {'p': page}),
-      replace: true,
-    );
+    SystemNavigator.routeInformationUpdated(uri: uri, replace: true);
   }
 
   String _extraTitle(String page, AppLocalizations l10n, bool ar) {
