@@ -236,26 +236,29 @@ void main() {
   });
 
   group('logout', () {
-    test('signs out, clears push registration, and drops the cached delegate', () async {
-      mockLocalDataSource.cachedDelegate = tDelegateModel;
-      final clearedUsers = <String>[];
-      final loggingOut = AuthRepositoryImpl(
-        remoteDataSource: mockRemoteDataSource,
-        localDataSource: mockLocalDataSource,
-        clearPushRegistration: (userId) async {
-          clearedUsers.add(userId);
-        },
-      );
+    test(
+      'signs out, clears push registration, and drops the cached delegate',
+      () async {
+        mockLocalDataSource.cachedDelegate = tDelegateModel;
+        final clearedUsers = <String>[];
+        final loggingOut = AuthRepositoryImpl(
+          remoteDataSource: mockRemoteDataSource,
+          localDataSource: mockLocalDataSource,
+          clearPushRegistration: (userId) async {
+            clearedUsers.add(userId);
+          },
+        );
 
-      final result = await loggingOut.logout(userId: 'delegate-1');
+        final result = await loggingOut.logout(userId: 'delegate-1');
 
-      expect(result, const Right(null));
-      expect(mockRemoteDataSource.signOutCount, 1);
-      expect(clearedUsers, ['delegate-1']);
-      expect(mockLocalDataSource.clearCallCount, 1);
-      expect(mockLocalDataSource.cachedDelegate, isNull);
-      expect(mockLocalDataSource.cachedAllDelegates, isEmpty);
-    });
+        expect(result, const Right(null));
+        expect(mockRemoteDataSource.signOutCount, 1);
+        expect(clearedUsers, ['delegate-1']);
+        expect(mockLocalDataSource.clearCallCount, 1);
+        expect(mockLocalDataSource.cachedDelegate, isNull);
+        expect(mockLocalDataSource.cachedAllDelegates, isEmpty);
+      },
+    );
 
     test('still clears local state when Firebase sign-out throws', () async {
       mockLocalDataSource.cachedDelegate = tDelegateModel;
@@ -277,6 +280,29 @@ void main() {
       expect(pushCalls, 1);
       expect(mockLocalDataSource.clearCallCount, 1);
       expect(mockLocalDataSource.cachedDelegate, isNull);
+    });
+  });
+
+  group('N-1 staff lookup', () {
+    test('empty result carries phone_not_registered', () async {
+      mockRemoteDataSource.getDelegatesByPhoneStub = (_) async => [];
+      final result = await repository.getDelegatesByPhone(tPhoneNumber);
+      final f = (result as Left).value as AuthFailure;
+      expect(f.code, AuthFailure.phoneNotRegisteredCode);
+    });
+
+    test('overall timeout maps to the network error', () async {
+      final repo = AuthRepositoryImpl(
+        remoteDataSource: mockRemoteDataSource,
+        localDataSource: mockLocalDataSource,
+        staffLookupTimeout: const Duration(milliseconds: 20),
+      );
+      mockRemoteDataSource.getDelegatesByPhoneStub = (_) =>
+          Future.delayed(const Duration(seconds: 1), () => <DelegateModel>[]);
+      final result = await repo.getDelegatesByPhone(tPhoneNumber);
+      final f = (result as Left).value as AuthFailure;
+      expect(f.code, 'network');
+      expect(f.message, 'تعذّر الاتصال، تأكد من الإنترنت');
     });
   });
 }

@@ -22,9 +22,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(AuthInitial());
-    registerFallbackValue(
-      const LoginRequested(phoneNumber: '', password: ''),
-    );
+    registerFallbackValue(const LoginRequested(phoneNumber: '', password: ''));
   });
 
   setUp(() async {
@@ -45,8 +43,9 @@ void main() {
     }
     if (!sl.isRegistered<LocaleProvider>()) {
       sl.registerLazySingleton(() => LocaleProvider(sl<SharedPreferences>()));
+      // `localeProvider` is a late final global: assign it once per file.
+      localeProvider = sl<LocaleProvider>();
     }
-    localeProvider = sl<LocaleProvider>();
   });
 
   testWidgets('HR portal login dispatches LoginMode.staff', (tester) async {
@@ -87,5 +86,42 @@ void main() {
     expect(event.mode, LoginMode.staff);
     expect(event.phoneNumber, '01000000000');
     expect(event.password, 'secret');
+  });
+
+  testWidgets('unknown phone shows the generic invalid-credentials snackbar', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final original = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (details.exceptionAsString().contains('overflowed')) return;
+      original?.call(details);
+    };
+    addTearDown(() => FlutterError.onError = original);
+    const error = AuthError(
+      message: 'رقم الهاتف أو كلمة المرور غير صحيحة',
+      code: 'invalid_credentials',
+    );
+    when(() => bloc.stream).thenAnswer((_) => Stream<AuthState>.value(error));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('ar'),
+        home: BlocProvider<AuthBloc>.value(
+          value: bloc,
+          child: const HrLoginScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    final l10n = await AppLocalizations.delegate.load(const Locale('ar'));
+    expect(find.text(l10n.invalidLoginCredentials), findsOneWidget);
   });
 }

@@ -7,9 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 class MockAuthRepository implements AuthRepository {
   Future<Either<Failure, List<Delegate>>> Function(String)?
-    getDelegatesByPhoneStub;
+  getDelegatesByPhoneStub;
   Future<Either<Failure, List<Delegate>>> Function(String, String)?
-    loginDelegateStub;
+  loginDelegateStub;
   Future<Either<Failure, void>> Function(Delegate)? cacheDelegateStub;
   Future<Either<Failure, void>> Function(List<Delegate>)? cacheAllDelegatesStub;
   Future<Either<Failure, bool>> Function(String, String)?
@@ -208,160 +208,168 @@ void main() {
     },
   );
 
-  test('should not fall back to staff login when the delegate account is inactive', () async {
-    mockAuthRepository.loginDelegateStub = (_, _) async => const Left(
-      DelegateAccountInactiveFailure('inactive'),
-    );
-    final result = await usecase(
-      const LoginParams(phoneNumber: tMobile, password: tPassword),
-    );
-    expect(result, isA<Left<Failure, List<Delegate>>>());
-    result.fold(
-      (failure) => expect(failure, isA<DelegateAccountInactiveFailure>()),
-      (_) => fail('inactive delegate must not sign in'),
-    );
-    expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
-  });
+  test(
+    'should not fall back to staff login when the delegate account is inactive',
+    () async {
+      mockAuthRepository.loginDelegateStub = (_, _) async =>
+          const Left(DelegateAccountInactiveFailure('inactive'));
+      final result = await usecase(
+        const LoginParams(phoneNumber: tMobile, password: tPassword),
+      );
+      expect(result, isA<Left<Failure, List<Delegate>>>());
+      result.fold(
+        (failure) => expect(failure, isA<DelegateAccountInactiveFailure>()),
+        (_) => fail('inactive delegate must not sign in'),
+      );
+      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
+    },
+  );
 
-  test('should not fall back to staff login when the device does not match', () async {
-    mockAuthRepository.loginDelegateStub = (_, _) async => const Left(
-      AuthFailure(
-        'هذا الحساب مقترن بجهاز آخر. تم إرسال طلب تغيير الجهاز إلى إدارة الشركة.',
-        'device_mismatch',
-      ),
-    );
-    final result = await usecase(
-      const LoginParams(phoneNumber: tMobile, password: tPassword),
-    );
-    expect(result, isA<Left<Failure, List<Delegate>>>());
-    result.fold(
-      (failure) => expect((failure as AuthFailure).code, 'device_mismatch'),
-      (_) => fail('a mismatched device must not sign in'),
-    );
-    expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
-  });
+  test(
+    'should not fall back to staff login when the device does not match',
+    () async {
+      mockAuthRepository.loginDelegateStub = (_, _) async => const Left(
+        AuthFailure(
+          'هذا الحساب مقترن بجهاز آخر. تم إرسال طلب تغيير الجهاز إلى إدارة الشركة.',
+          'device_mismatch',
+        ),
+      );
+      final result = await usecase(
+        const LoginParams(phoneNumber: tMobile, password: tPassword),
+      );
+      expect(result, isA<Left<Failure, List<Delegate>>>());
+      result.fold(
+        (failure) => expect((failure as AuthFailure).code, 'device_mismatch'),
+        (_) => fail('a mismatched device must not sign in'),
+      );
+      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
+    },
+  );
 
-  test('should return failure when delegate login fails before staff lookup', () async {
-    const tFailure = ServerFailure('Server Failure');
-    mockAuthRepository.loginDelegateStub = (_, _) async => const Left(tFailure);
-    final result = await usecase(
-      const LoginParams(phoneNumber: tMobile, password: tPassword),
-    );
-    expect(result, const Left(tFailure));
-    expect(mockAuthRepository.loginDelegateCallCount, 1);
-    expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
-  });
+  test(
+    'should return failure when delegate login fails before staff lookup',
+    () async {
+      const tFailure = ServerFailure('Server Failure');
+      mockAuthRepository.loginDelegateStub = (_, _) async =>
+          const Left(tFailure);
+      final result = await usecase(
+        const LoginParams(phoneNumber: tMobile, password: tPassword),
+      );
+      expect(result, const Left(tFailure));
+      expect(mockAuthRepository.loginDelegateCallCount, 1);
+      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
+    },
+  );
 
   group('User provided test cases', () {
-    test('staff login verifies the looked-up email with Firebase Auth', () async {
-      final adminDelegate = Delegate(
-        uid: '1',
-        firstName: 'Test',
-        middleName: 'User',
-        lastName: 'Name',
-        fullName: 'Test User Name',
-        nationalityID: '4816361Aa',
-        motherName: 'Mother Name',
-        city: 'City',
-        phoneNumber: '01508899965',
-        gender: DelegateGender.male,
-        position: DelegatePosition.supervisor,
-        birthDate: DateTime(1990, 1, 1),
-        organizationUID: 'org1',
-        organizationName: 'Org Name',
-        companyUID: 'comp1',
-        companyName: 'Comp Name',
-        status: DelegateStatus.active,
-        delegatePublicId: 'DEL-123',
-        allReceiptCodes: const [],
-        createdAt: DateTime.now(),
-        createdBy: 'admin',
-        hasPendingUpdate: false,
-        isDeductedFromCompany: false,
-        isPrinted: false,
-        isProfileComplete: true,
-        numberOfDocuments: 0,
-        paymentAmount: 0,
-        version: 1,
-        documents: const [],
-      );
+    test(
+      'staff login verifies the looked-up email with Firebase Auth',
+      () async {
+        final adminDelegate = Delegate(
+          uid: '1',
+          firstName: 'Test',
+          middleName: 'User',
+          lastName: 'Name',
+          fullName: 'Test User Name',
+          nationalityID: '4816361Aa',
+          motherName: 'Mother Name',
+          city: 'City',
+          phoneNumber: '01508899965',
+          gender: DelegateGender.male,
+          position: DelegatePosition.supervisor,
+          birthDate: DateTime(1990, 1, 1),
+          organizationUID: 'org1',
+          organizationName: 'Org Name',
+          companyUID: 'comp1',
+          companyName: 'Comp Name',
+          status: DelegateStatus.active,
+          delegatePublicId: 'DEL-123',
+          allReceiptCodes: const [],
+          createdAt: DateTime.now(),
+          createdBy: 'admin',
+          hasPendingUpdate: false,
+          isDeductedFromCompany: false,
+          isPrinted: false,
+          isProfileComplete: true,
+          numberOfDocuments: 0,
+          paymentAmount: 0,
+          version: 1,
+          documents: const [],
+        );
 
-      final staffDelegate = Delegate(
-        uid: adminDelegate.uid,
-        firstName: adminDelegate.firstName,
-        middleName: adminDelegate.middleName,
-        lastName: adminDelegate.lastName,
-        fullName: adminDelegate.fullName,
-        nationalityID: '__firebase_auth__:staff@example.com',
-        email: 'staff@example.com',
-        motherName: adminDelegate.motherName,
-        city: adminDelegate.city,
-        phoneNumber: adminDelegate.phoneNumber,
-        gender: adminDelegate.gender,
-        position: adminDelegate.position,
-        birthDate: adminDelegate.birthDate,
-        organizationUID: adminDelegate.organizationUID,
-        organizationName: adminDelegate.organizationName,
-        companyUID: adminDelegate.companyUID,
-        companyName: adminDelegate.companyName,
-        status: adminDelegate.status,
-        delegatePublicId: adminDelegate.delegatePublicId,
-        allReceiptCodes: adminDelegate.allReceiptCodes,
-        createdAt: adminDelegate.createdAt,
-        createdBy: adminDelegate.createdBy,
-        hasPendingUpdate: adminDelegate.hasPendingUpdate,
-        isDeductedFromCompany: adminDelegate.isDeductedFromCompany,
-        isPrinted: adminDelegate.isPrinted,
-        isProfileComplete: adminDelegate.isProfileComplete,
-        numberOfDocuments: adminDelegate.numberOfDocuments,
-        paymentAmount: adminDelegate.paymentAmount,
-        version: adminDelegate.version,
-        documents: adminDelegate.documents,
-        role: UserRole.superAdmin,
-      );
-      mockAuthRepository.loginDelegateStub = (_, _) async => const Left(
-        DelegateCredentialsFailure('not a delegate'),
-      );
-      mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
-          Right([staffDelegate]);
-      String? verifiedEmail;
-      String? verifiedPassword;
-      mockAuthRepository.verifyAdminPasswordStub = (email, password) async {
-        verifiedEmail = email;
-        verifiedPassword = password;
-        return Right(password == 'correct-password');
-      };
+        final staffDelegate = Delegate(
+          uid: adminDelegate.uid,
+          firstName: adminDelegate.firstName,
+          middleName: adminDelegate.middleName,
+          lastName: adminDelegate.lastName,
+          fullName: adminDelegate.fullName,
+          nationalityID: '__firebase_auth__:staff@example.com',
+          email: 'staff@example.com',
+          motherName: adminDelegate.motherName,
+          city: adminDelegate.city,
+          phoneNumber: adminDelegate.phoneNumber,
+          gender: adminDelegate.gender,
+          position: adminDelegate.position,
+          birthDate: adminDelegate.birthDate,
+          organizationUID: adminDelegate.organizationUID,
+          organizationName: adminDelegate.organizationName,
+          companyUID: adminDelegate.companyUID,
+          companyName: adminDelegate.companyName,
+          status: adminDelegate.status,
+          delegatePublicId: adminDelegate.delegatePublicId,
+          allReceiptCodes: adminDelegate.allReceiptCodes,
+          createdAt: adminDelegate.createdAt,
+          createdBy: adminDelegate.createdBy,
+          hasPendingUpdate: adminDelegate.hasPendingUpdate,
+          isDeductedFromCompany: adminDelegate.isDeductedFromCompany,
+          isPrinted: adminDelegate.isPrinted,
+          isProfileComplete: adminDelegate.isProfileComplete,
+          numberOfDocuments: adminDelegate.numberOfDocuments,
+          paymentAmount: adminDelegate.paymentAmount,
+          version: adminDelegate.version,
+          documents: adminDelegate.documents,
+          role: UserRole.superAdmin,
+        );
+        mockAuthRepository.loginDelegateStub = (_, _) async =>
+            const Left(DelegateCredentialsFailure('not a delegate'));
+        mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
+            Right([staffDelegate]);
+        String? verifiedEmail;
+        String? verifiedPassword;
+        mockAuthRepository.verifyAdminPasswordStub = (email, password) async {
+          verifiedEmail = email;
+          verifiedPassword = password;
+          return Right(password == 'correct-password');
+        };
 
-      final result = await usecase(
-        const LoginParams(
-          phoneNumber: '01500000000',
-          password: 'correct-password',
-        ),
-      );
+        final result = await usecase(
+          const LoginParams(
+            phoneNumber: '01500000000',
+            password: 'correct-password',
+          ),
+        );
 
-      expect(verifiedEmail, 'staff@example.com');
-      expect(verifiedPassword, 'correct-password');
-      expect(result.isRight(), isTrue);
-      result.fold(
-        (l) => fail('Should be right'),
-        (r) => expect(r.first.role, UserRole.superAdmin),
-      );
+        expect(verifiedEmail, 'staff@example.com');
+        expect(verifiedPassword, 'correct-password');
+        expect(result.isRight(), isTrue);
+        result.fold(
+          (l) => fail('Should be right'),
+          (r) => expect(r.first.role, UserRole.superAdmin),
+        );
 
-      final denied = await usecase(
-        const LoginParams(
-          phoneNumber: '01500000000',
-          password: 'wrong-password',
-        ),
-      );
-      expect(denied.isLeft(), isTrue);
-      denied.fold(
-        (failure) {
+        final denied = await usecase(
+          const LoginParams(
+            phoneNumber: '01500000000',
+            password: 'wrong-password',
+          ),
+        );
+        expect(denied.isLeft(), isTrue);
+        denied.fold((failure) {
           expect(failure, isA<AuthFailure>());
           expect((failure as AuthFailure).code, 'invalid_credentials');
-        },
-        (_) => fail('wrong password must not sign in'),
-      );
-    });
+        }, (_) => fail('wrong password must not sign in'));
+      },
+    );
 
     test('Delegate login with 01281769997 and 29712200201981', () async {
       final promoterDelegate = Delegate(
@@ -416,23 +424,40 @@ void main() {
 
   group('LoginMode routing', () {
     test('delegate mode never falls through to the staff path', () async {
-      mockAuthRepository.getDelegatesByPhoneStub = (_) async => Right([tDelegate]);
-      final result = await usecase(const LoginParams(
-        phoneNumber: tMobile, password: tPassword, mode: LoginMode.delegate));
+      mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
+          Right([tDelegate]);
+      final result = await usecase(
+        const LoginParams(
+          phoneNumber: tMobile,
+          password: tPassword,
+          mode: LoginMode.delegate,
+        ),
+      );
       expect(result.isLeft(), isTrue);
-      result.fold((f) => expect(f, isA<DelegateCredentialsFailure>()), (_) => fail('left'));
+      result.fold(
+        (f) => expect(f, isA<DelegateCredentialsFailure>()),
+        (_) => fail('left'),
+      );
       expect(mockAuthRepository.loginDelegateCallCount, 1);
       expect(mockAuthRepository.getDelegatesByPhoneCallCount, 0);
     });
 
     test('staff mode skips delegateLoginV2 entirely', () async {
       mockAuthRepository.getDelegatesByPhoneStub = (_) async => const Right([]);
-      final result = await usecase(const LoginParams(
-        phoneNumber: tMobile, password: 'Secret123', mode: LoginMode.staff));
+      final result = await usecase(
+        const LoginParams(
+          phoneNumber: tMobile,
+          password: 'Secret123',
+          mode: LoginMode.staff,
+        ),
+      );
       expect(mockAuthRepository.loginDelegateCallCount, 0);
       expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
       result.fold((f) {
-        expect((f as AuthFailure).message, 'رقم الهاتف أو كلمة المرور غير صحيحة');
+        expect(
+          (f as AuthFailure).message,
+          'رقم الهاتف أو كلمة المرور غير صحيحة',
+        );
       }, (_) => fail('left'));
     });
   });
@@ -440,65 +465,122 @@ void main() {
   group('staff sign-in errors reach the screen (I-5)', () {
     for (final code in ['rate_limited', 'network']) {
       test('$code from Firebase Auth stops the staff chain', () async {
-        mockAuthRepository.getDelegatesByPhoneStub =
-            (_) async => Right([_staffFrom(tDelegate)]);
-        mockAuthRepository.verifyAdminPasswordStub =
-            (_, _) async => Left(AuthFailure('x', code));
-        final result = await usecase(const LoginParams(
-            phoneNumber: tMobile, password: 'p', mode: LoginMode.staff));
-        result.fold((f) => expect((f as AuthFailure).code, code),
-            (_) => fail('expected failure'));
+        mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
+            Right([_staffFrom(tDelegate)]);
+        mockAuthRepository.verifyAdminPasswordStub = (_, _) async =>
+            Left(AuthFailure('x', code));
+        final result = await usecase(
+          const LoginParams(
+            phoneNumber: tMobile,
+            password: 'p',
+            mode: LoginMode.staff,
+          ),
+        );
+        result.fold(
+          (f) => expect((f as AuthFailure).code, code),
+          (_) => fail('expected failure'),
+        );
       });
     }
 
-    test('wrong password stays the generic invalid-credentials failure',
+    test(
+      'wrong password stays the generic invalid-credentials failure',
+      () async {
+        mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
+            Right([_staffFrom(tDelegate)]);
+        mockAuthRepository.verifyAdminPasswordStub = (_, _) async =>
+            const Right(false);
+        final result = await usecase(
+          const LoginParams(
+            phoneNumber: tMobile,
+            password: 'p',
+            mode: LoginMode.staff,
+          ),
+        );
+        result.fold((f) {
+          expect((f as AuthFailure).code, 'invalid_credentials');
+          expect(f.message, 'رقم الهاتف أو كلمة المرور غير صحيحة');
+        }, (_) => fail('expected failure'));
+      },
+    );
+  });
+
+  group('unknown phone never reveals registration (N-1)', () {
+    const generic = 'رقم الهاتف أو كلمة المرور غير صحيحة';
+    for (final mode in [LoginMode.staff, LoginMode.auto]) {
+      test(
+        '$mode: unknown phone gives the generic invalid_credentials',
         () async {
-      mockAuthRepository.getDelegatesByPhoneStub =
-          (_) async => Right([_staffFrom(tDelegate)]);
-      mockAuthRepository.verifyAdminPasswordStub =
-          (_, _) async => const Right(false);
-      final result = await usecase(const LoginParams(
-          phoneNumber: tMobile, password: 'p', mode: LoginMode.staff));
-      result.fold((f) {
-        expect((f as AuthFailure).code, 'invalid_credentials');
-        expect(f.message, 'رقم الهاتف أو كلمة المرور غير صحيحة');
-      }, (_) => fail('expected failure'));
-    });
+          mockAuthRepository.getDelegatesByPhoneStub = (_) async => const Left(
+            AuthFailure(
+              'رقم الهاتف غير مسجل في النظام.',
+              AuthFailure.phoneNotRegisteredCode,
+            ),
+          );
+          final result = await usecase(
+            LoginParams(phoneNumber: tMobile, password: 'p', mode: mode),
+          );
+          result.fold((f) {
+            expect((f as AuthFailure).code, 'invalid_credentials');
+            expect(f.message, generic);
+          }, (_) => fail('expected failure'));
+          if (mode == LoginMode.staff) {
+            expect(mockAuthRepository.loginDelegateCallCount, 0);
+          }
+        },
+      );
+
+      test(
+        '$mode: found phone + wrong password gives the same message',
+        () async {
+          mockAuthRepository.getDelegatesByPhoneStub = (_) async =>
+              Right([_staffFrom(tDelegate)]);
+          mockAuthRepository.verifyAdminPasswordStub = (_, _) async =>
+              const Right(false);
+          final result = await usecase(
+            LoginParams(phoneNumber: tMobile, password: 'p', mode: mode),
+          );
+          result.fold((f) {
+            expect((f as AuthFailure).code, 'invalid_credentials');
+          }, (_) => fail('expected failure'));
+        },
+      );
+    }
   });
 }
 
 Delegate _staffFrom(Delegate base) {
-      return Delegate(
-        uid: base.uid,
-        firstName: base.firstName,
-        middleName: base.middleName,
-        lastName: base.lastName,
-        fullName: base.fullName,
-        nationalityID: '__firebase_auth__:staff@example.com',
-        email: 'staff@example.com',
-        motherName: base.motherName,
-        city: base.city,
-        phoneNumber: base.phoneNumber,
-        gender: base.gender,
-        position: base.position,
-        birthDate: base.birthDate,
-        organizationUID: base.organizationUID,
-        organizationName: base.organizationName,
-        companyUID: base.companyUID,
-        companyName: base.companyName,
-        status: base.status,
-        delegatePublicId: base.delegatePublicId,
-        allReceiptCodes: base.allReceiptCodes,
-        createdAt: base.createdAt,
-        createdBy: base.createdBy,
-        hasPendingUpdate: base.hasPendingUpdate,
-        isDeductedFromCompany: base.isDeductedFromCompany,
-        isPrinted: base.isPrinted,
-        isProfileComplete: base.isProfileComplete,
-        numberOfDocuments: base.numberOfDocuments,
-        paymentAmount: base.paymentAmount,
-        version: base.version,
-        documents: base.documents,
-        role: UserRole.superAdmin,
-      );
+  return Delegate(
+    uid: base.uid,
+    firstName: base.firstName,
+    middleName: base.middleName,
+    lastName: base.lastName,
+    fullName: base.fullName,
+    nationalityID: '__firebase_auth__:staff@example.com',
+    email: 'staff@example.com',
+    motherName: base.motherName,
+    city: base.city,
+    phoneNumber: base.phoneNumber,
+    gender: base.gender,
+    position: base.position,
+    birthDate: base.birthDate,
+    organizationUID: base.organizationUID,
+    organizationName: base.organizationName,
+    companyUID: base.companyUID,
+    companyName: base.companyName,
+    status: base.status,
+    delegatePublicId: base.delegatePublicId,
+    allReceiptCodes: base.allReceiptCodes,
+    createdAt: base.createdAt,
+    createdBy: base.createdBy,
+    hasPendingUpdate: base.hasPendingUpdate,
+    isDeductedFromCompany: base.isDeductedFromCompany,
+    isPrinted: base.isPrinted,
+    isProfileComplete: base.isProfileComplete,
+    numberOfDocuments: base.numberOfDocuments,
+    paymentAmount: base.paymentAmount,
+    version: base.version,
+    documents: base.documents,
+    role: UserRole.superAdmin,
+  );
 }

@@ -1,13 +1,11 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 class DelegateLoginResponse {
   final String token;
   final List<String> delegateIds;
 
-  const DelegateLoginResponse({
-    required this.token,
-    required this.delegateIds,
-  });
+  const DelegateLoginResponse({required this.token, required this.delegateIds});
 }
 
 class DelegateLoginException implements Exception {
@@ -88,7 +86,10 @@ class FirebaseStaffPhoneLookupApi implements StaffPhoneLookupApi {
       final data = Map<String, dynamic>.from(raw);
       final email = data['email'];
       final uid = data['uid'];
-      if (email is! String || !email.contains('@') || uid is! String || uid.isEmpty) {
+      if (email is! String ||
+          !email.contains('@') ||
+          uid is! String ||
+          uid.isEmpty) {
         throw const StaffPhoneLookupException('unavailable');
       }
       String text(String key) {
@@ -108,23 +109,34 @@ class FirebaseStaffPhoneLookupApi implements StaffPhoneLookupApi {
         companyName: text('companyName'),
       );
     } on FirebaseFunctionsException catch (error) {
-      final details = error.details;
-      final detailed = details is Map ? details['reason'] : null;
-      if (detailed == 'not_found') return null;
-      if (detailed == 'rate_limited') {
-        throw const StaffPhoneLookupException('rate_limited');
-      }
-      if (detailed == 'invalid_phone' || detailed == 'missing_phone') {
-        throw const StaffPhoneLookupException('invalid_phone');
-      }
-      if (error.code == 'not-found' ||
-          error.code == 'unimplemented' ||
-          error.code == 'unavailable' ||
-          error.code == 'internal') {
-        throw const StaffPhoneLookupException('unavailable');
-      }
+      return mapLookupError(error.code, error.details);
+    }
+  }
+
+  /// Null = unknown phone. Throws for anything else.
+  @visibleForTesting
+  static StaffPhoneProfile? mapLookupError(String code, Object? details) {
+    final detailed = details is Map ? details['reason'] : null;
+    // Unknown phone. On web `details` is often not a Dart Map, so the
+    // HttpsError code alone must be enough.
+    if (detailed == 'not_found' || code == 'not-found' || code == 'not_found') {
+      return null;
+    }
+    if (code == 'resource-exhausted') {
+      throw const StaffPhoneLookupException('rate_limited');
+    }
+    if (detailed == 'rate_limited') {
+      throw const StaffPhoneLookupException('rate_limited');
+    }
+    if (detailed == 'invalid_phone' || detailed == 'missing_phone') {
+      throw const StaffPhoneLookupException('invalid_phone');
+    }
+    if (code == 'unimplemented' ||
+        code == 'unavailable' ||
+        code == 'internal') {
       throw const StaffPhoneLookupException('unavailable');
     }
+    throw const StaffPhoneLookupException('unavailable');
   }
 }
 
@@ -160,7 +172,10 @@ class FirebaseDelegateLoginApi implements DelegateLoginApi {
       }
       return DelegateLoginResponse(
         token: token,
-        delegateIds: ids.map((id) => id.toString()).where((id) => id.isNotEmpty).toList(),
+        delegateIds: ids
+            .map((id) => id.toString())
+            .where((id) => id.isNotEmpty)
+            .toList(),
       );
     } on FirebaseFunctionsException catch (error) {
       throw DelegateLoginException(_reasonFor(error), error.message);

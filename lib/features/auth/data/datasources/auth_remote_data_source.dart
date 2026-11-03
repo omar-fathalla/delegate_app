@@ -70,8 +70,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
     }
 
-    final details = await (currentDeviceDetails ??
-        DeviceBindingService.getCurrentDeviceDetails)();
+    final details =
+        await (currentDeviceDetails ??
+            DeviceBindingService.getCurrentDeviceDetails)();
     final deviceId = (details['deviceId'] ?? '').trim();
     final deviceModel = (details['deviceModel'] ?? '').trim();
 
@@ -101,7 +102,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final normalizedPhone = _normalizePhone(phoneNumber);
       final models = await _loadDelegateModelsByPhone(normalizedPhone);
       final allowed = response.delegateIds.toSet();
-      final matched = models.where((model) => allowed.contains(model.uid)).toList();
+      final matched = models
+          .where((model) => allowed.contains(model.uid))
+          .toList();
       if (matched.isEmpty) {
         await _signOutQuietly();
         throw const AuthFailure(
@@ -149,10 +152,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'invalid_device',
         );
       case 'invalid_phone':
-        return const AuthFailure(
-          'يرجى إدخال رقم موبايل صحيح',
-          'invalid_phone',
-        );
+        return const AuthFailure('يرجى إدخال رقم موبايل صحيح', 'invalid_phone');
       case 'invalid_national_id':
         return const AuthFailure(
           'يرجى إدخال الرقم القومي',
@@ -184,7 +184,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           .get(const GetOptions(source: Source.server))
           .timeout(const Duration(seconds: 12));
     } catch (serverError) {
-      debugPrint('$debugLabel server query error ($serverError). Trying serverAndCache fallback.');
+      debugPrint(
+        '$debugLabel server query error ($serverError). Trying serverAndCache fallback.',
+      );
       try {
         final fallbackSnap = await query
             .get(const GetOptions(source: Source.serverAndCache))
@@ -193,7 +195,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       } catch (e) {
         debugPrint('$debugLabel fallback error: $e');
         try {
-          final cacheSnap = await query.get(const GetOptions(source: Source.cache));
+          final cacheSnap = await query.get(
+            const GetOptions(source: Source.cache),
+          );
           if (cacheSnap.docs.isNotEmpty) {
             return cacheSnap;
           }
@@ -218,7 +222,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
-  Future<List<DelegateModel>> _loadDelegateModelsByPhone(String normalizedPhone) async {
+  Future<List<DelegateModel>> _loadDelegateModelsByPhone(
+    String normalizedPhone,
+  ) async {
     final variants = egyptianPhoneVariants(normalizedPhone);
     final byPath = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
 
@@ -227,7 +233,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         firestore.collectionGroup('delegates').where(field, whereIn: variants),
         'delegate login $field',
       );
-      for (final doc in snap?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[]) {
+      for (final doc
+          in snap?.docs ??
+              const <QueryDocumentSnapshot<Map<String, dynamic>>>[]) {
         byPath[doc.reference.path] = doc;
       }
     }
@@ -253,10 +261,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       // Path: organizations/{orgUID}/companies/{compUID}/delegates/{delegateUID}
       final pathSegments = doc.reference.path.split('/');
-      final pathOrgUID = (pathSegments.length >= 2 && pathSegments[0] == 'organizations')
+      final pathOrgUID =
+          (pathSegments.length >= 2 && pathSegments[0] == 'organizations')
           ? pathSegments[1]
           : '';
-      final pathCompUID = (pathSegments.length >= 4 && pathSegments[2] == 'companies')
+      final pathCompUID =
+          (pathSegments.length >= 4 && pathSegments[2] == 'companies')
           ? pathSegments[3]
           : '';
 
@@ -272,7 +282,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         final existing = delegatesMap[key]!;
         if (existing.status != DelegateStatus.approved &&
             existing.status != DelegateStatus.active &&
-            (model.status == DelegateStatus.approved || model.status == DelegateStatus.active)) {
+            (model.status == DelegateStatus.approved ||
+                model.status == DelegateStatus.active)) {
           delegatesMap[key] = model;
         }
       } else {
@@ -288,7 +299,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     DateTime? earliestCreatedAt;
     for (final d in delegatesMap.values) {
-      if (earliestCreatedAt == null || d.createdAt.isBefore(earliestCreatedAt)) {
+      if (earliestCreatedAt == null ||
+          d.createdAt.isBefore(earliestCreatedAt)) {
         earliestCreatedAt = d.createdAt;
       }
     }
@@ -296,7 +308,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     for (final key in delegatesMap.keys.toList()) {
       var current = delegatesMap[key]!;
       if (allOrgNames.length > 1) {
-        final mergedNames = {...current.allOrganizationNames, ...allOrgNames}.toList();
+        final mergedNames = {
+          ...current.allOrganizationNames,
+          ...allOrgNames,
+        }.toList();
         current = current.copyWith(allOrganizationNames: mergedNames);
       }
       if (earliestCreatedAt != null && current.createdAt != earliestCreatedAt) {
@@ -332,11 +347,19 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e) {
       final errStr = e.toString().toLowerCase();
       if (errStr.contains('timeout')) {
-        throw const ServerFailure('انتهت مهلة الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.');
-      } else if (errStr.contains('socket') || errStr.contains('network') || errStr.contains('unavailable')) {
-        throw const ServerFailure('تعذر الاتصال بالإنترنت. يرجى التأكد من تشغيل البيانات أو الواي فاي والمحاولة ثانية.');
+        throw const ServerFailure(
+          'انتهت مهلة الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.',
+        );
+      } else if (errStr.contains('socket') ||
+          errStr.contains('network') ||
+          errStr.contains('unavailable')) {
+        throw const ServerFailure(
+          'تعذر الاتصال بالإنترنت. يرجى التأكد من تشغيل البيانات أو الواي فاي والمحاولة ثانية.',
+        );
       }
-      throw const ServerFailure('تعذر تسجيل الدخول حالياً. يرجى التأكد من صحة رقم الهاتف والمحاولة ثانية.');
+      throw const ServerFailure(
+        'تعذر تسجيل الدخول حالياً. يرجى التأكد من صحة رقم الهاتف والمحاولة ثانية.',
+      );
     }
   }
 
@@ -348,10 +371,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     try {
       final credential = await firebaseAuth
-          .signInWithEmailAndPassword(
-            email: cleanEmail,
-            password: cleanPass,
-          )
+          .signInWithEmailAndPassword(email: cleanEmail, password: cleanPass)
           .timeout(const Duration(seconds: 12));
       return credential.user != null;
     } on FirebaseAuthException catch (e) {
@@ -362,10 +382,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // screen keeps its generic invalid-credentials message.
       return false;
     } on TimeoutException {
-      throw const AuthFailure(
-        'تعذّر الاتصال، تأكد من الإنترنت',
-        'network',
-      );
+      throw const AuthFailure('تعذّر الاتصال، تأكد من الإنترنت', 'network');
     } catch (e) {
       debugPrint('FirebaseAuth admin signIn error: $e');
       return false;
@@ -433,23 +450,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       final profile = await api.lookup(phoneNumber);
       if (profile == null) return const [];
-      final model = _staffModelFromData(
-        profile.uid,
-        {
-          'role': profile.role,
-          'email': profile.email,
-          'displayName': profile.displayName,
-          'organizationUID': profile.organizationUID,
-          'organizationName': profile.organizationName,
-          'companyUID': profile.companyUID,
-          'companyName': profile.companyName,
-        },
-        normalizedPhone,
-      );
+      final model = _staffModelFromData(profile.uid, {
+        'role': profile.role,
+        'email': profile.email,
+        'displayName': profile.displayName,
+        'organizationUID': profile.organizationUID,
+        'organizationName': profile.organizationName,
+        'companyUID': profile.companyUID,
+        'companyName': profile.companyName,
+      }, normalizedPhone);
       if (model == null) return const [];
       return [model];
     } on StaffPhoneLookupException catch (error) {
+      // Only a genuine outage may reach the legacy users query.
       if (error.reason == 'unavailable') return null;
+      if (error.reason == 'rate_limited') {
+        throw const AuthFailure('محاولات كثيرة، حاول لاحقاً', 'rate_limited');
+      }
       if (error.reason == 'not_found') return const [];
       return const [];
     }
@@ -518,28 +535,32 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   ) {
     final userRole = userData['role'] as String? ?? '';
     final normRole = userRole.toLowerCase().replaceAll('-', '_');
-    final isSuperAdmin =
-        normRole == 'super_admin' || normRole == 'superadmin';
-    final isTechSupport = normRole == 'technical_support' ||
+    final isSuperAdmin = normRole == 'super_admin' || normRole == 'superadmin';
+    final isTechSupport =
+        normRole == 'technical_support' ||
         normRole == 'technicalsupport' ||
         normRole == 'tech_support' ||
         normRole == 'techsupport';
-    final isAccountant = normRole == 'accountant' ||
+    final isAccountant =
+        normRole == 'accountant' ||
         normRole == 'accounting' ||
         normRole == 'account_admin';
     final isOrgAdmin =
         normRole == 'organization_admin' || normRole == 'organizationadmin';
-    final isCompanyAdmin = normRole == 'company_admin' ||
+    final isCompanyAdmin =
+        normRole == 'company_admin' ||
         normRole == 'companyadmin' ||
         normRole == 'admin';
     final isSupervisor = isSupervisorRole(userRole);
     final isMarketing = normRole == 'marketing';
-    final isMarketingPromotion = normRole == 'marketing_promotion' ||
-        normRole == 'marketingpromotion';
-    final isBranchesMarketing = normRole == 'branches_marketing' ||
+    final isMarketingPromotion =
+        normRole == 'marketing_promotion' || normRole == 'marketingpromotion';
+    final isBranchesMarketing =
+        normRole == 'branches_marketing' ||
         normRole == 'branches_marketing_manager' ||
         normRole == 'branchesmarketingmanager';
-    final isHR = normRole == 'hr' ||
+    final isHR =
+        normRole == 'hr' ||
         normRole == 'company_hr' ||
         normRole == 'company-hr' ||
         normRole == 'human_resources';
@@ -563,25 +584,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final mappedRole = isHR
         ? UserRole.hr
         : isAccountant
-            ? UserRole.accountant
-            : isMarketing
-                ? UserRole.marketing
-                : isMarketingPromotion
-                    ? UserRole.marketingPromotion
-                    : isOrgAdmin
-                        ? UserRole.organizationAdmin
-                        : isTechSupport
-                            ? UserRole.technicalSupport
-                            : isSuperAdmin
-                                ? UserRole.superAdmin
-                                : isBranchesMarketing
-                                    ? UserRole.branchesMarketingManager
-                                    : UserRole.admin;
+        ? UserRole.accountant
+        : isMarketing
+        ? UserRole.marketing
+        : isMarketingPromotion
+        ? UserRole.marketingPromotion
+        : isOrgAdmin
+        ? UserRole.organizationAdmin
+        : isTechSupport
+        ? UserRole.technicalSupport
+        : isSuperAdmin
+        ? UserRole.superAdmin
+        : isBranchesMarketing
+        ? UserRole.branchesMarketingManager
+        : UserRole.admin;
 
-    final displayName = _stringField(
-      userData,
-      const ['displayName', 'fullName', 'name'],
-    );
+    final displayName = _stringField(userData, const [
+      'displayName',
+      'fullName',
+      'name',
+    ]);
     final resolvedName = displayName.isEmpty ? 'Admin' : displayName;
 
     return DelegateModel(
@@ -597,22 +619,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       gender: DelegateGender.male,
       position: DelegatePosition.supervisor,
       birthDate: DateTime.now(),
-      organizationUID: _stringField(
-        userData,
-        const ['organizationUID', 'organizationId', 'orgId'],
-      ),
-      organizationName: _stringField(
-        userData,
-        const ['organizationName', 'organization_name'],
-      ),
-      companyUID: _stringField(
-        userData,
-        const ['companyUID', 'companyId'],
-      ),
-      companyName: _stringField(
-        userData,
-        const ['companyName', 'company_name'],
-      ),
+      organizationUID: _stringField(userData, const [
+        'organizationUID',
+        'organizationId',
+        'orgId',
+      ]),
+      organizationName: _stringField(userData, const [
+        'organizationName',
+        'organization_name',
+      ]),
+      companyUID: _stringField(userData, const ['companyUID', 'companyId']),
+      companyName: _stringField(userData, const [
+        'companyName',
+        'company_name',
+      ]),
       status: DelegateStatus.approved,
       delegatePublicId: '',
       allReceiptCodes: const [],
@@ -642,8 +662,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   /// True for `supervisor` and company supervisor spellings such as
   /// `company_supervisor`, `companySupervisor`, and `company-supervisor`.
   static bool isSupervisorRole(String role) {
-    final norm =
-        role.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+    final norm = role
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
     return norm == 'supervisor' ||
         norm == 'company_supervisor' ||
         norm == 'companysupervisor';
@@ -666,13 +689,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         norm == 'techsupport') {
       return 90;
     }
-    if (norm == 'accountant' || norm == 'accounting' || norm == 'account_admin') {
+    if (norm == 'accountant' ||
+        norm == 'accounting' ||
+        norm == 'account_admin') {
       return 85;
     }
     if (norm == 'organization_admin' || norm == 'organizationadmin') return 80;
-    if (norm == 'hr' ||
-        norm == 'company_hr' ||
-        norm == 'human_resources') {
+    if (norm == 'hr' || norm == 'company_hr' || norm == 'human_resources') {
       return 75;
     }
     if (norm == 'company_admin' || norm == 'companyadmin' || norm == 'admin') {

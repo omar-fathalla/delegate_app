@@ -15,10 +15,14 @@ class AuthRepositoryImpl implements AuthRepository {
   /// Best-effort FCM token and topic cleanup. Must not throw.
   final Future<void> Function(String userId)? clearPushRegistration;
 
+  /// Overall cap on the staff phone lookup, legacy fallback included.
+  final Duration staffLookupTimeout;
+
   AuthRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
     this.clearPushRegistration,
+    this.staffLookupTimeout = const Duration(seconds: 15),
   });
 
   @override
@@ -60,9 +64,18 @@ class AuthRepositoryImpl implements AuthRepository {
     String phoneNumber,
   ) async {
     try {
-      final delegates = await remoteDataSource.getDelegatesByPhone(phoneNumber);
+      final delegates = await remoteDataSource
+          .getDelegatesByPhone(phoneNumber)
+          .timeout(staffLookupTimeout);
       if (delegates.isEmpty) {
-        return const Left(AuthFailure('رقم الهاتف غير مسجل في النظام. يرجى مراجعة مشرف شركتك أو الدعم الفني.'));
+        // Message unchanged for mobile/auto. Login maps the code to the
+        // generic invalid-credentials text in staff mode.
+        return const Left(
+          AuthFailure(
+            'رقم الهاتف غير مسجل في النظام. يرجى مراجعة مشرف شركتك أو الدعم الفني.',
+            AuthFailure.phoneNotRegisteredCode,
+          ),
+        );
       }
 
       // Filter out suspended/rejected delegates
@@ -75,10 +88,18 @@ class AuthRepositoryImpl implements AuthRepository {
           .toList();
 
       if (validDelegates.isEmpty) {
-        return const Left(AuthFailure('تم تجميد هذا الحساب من قبل الإدارة. يرجى التواصل مع مسؤول المنظمة.'));
+        return const Left(
+          AuthFailure(
+            'تم تجميد هذا الحساب من قبل الإدارة. يرجى التواصل مع مسؤول المنظمة.',
+          ),
+        );
       }
 
       return Right(validDelegates);
+    } on TimeoutException {
+      return const Left(
+        AuthFailure('تعذّر الاتصال، تأكد من الإنترنت', 'network'),
+      );
     } on Failure catch (failure) {
       return Left(failure);
     } catch (e) {

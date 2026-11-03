@@ -49,6 +49,15 @@ class _FakeStaffLookup implements StaffPhoneLookupApi {
   }
 }
 
+class _MappedLookup implements StaffPhoneLookupApi {
+  _MappedLookup(this.code);
+  final String code;
+
+  @override
+  Future<StaffPhoneProfile?> lookup(String phone) async =>
+      FirebaseStaffPhoneLookupApi.mapLookupError(code, null);
+}
+
 class _FakeDelegateLoginApi implements DelegateLoginApi {
   _FakeDelegateLoginApi(this.response, {this.error});
 
@@ -176,22 +185,25 @@ void main() {
       expect(result.first.email, 'hr@example.com');
     });
 
-    test('does not fall back to users when the callable says not found', () async {
-      await fakeFirestore.collection('users').doc('staff-1').set({
-        'role': 'hr',
-        'email': 'hr@example.com',
-        'phoneNumber': '01000000000',
-      });
-      final source = AuthRemoteDataSourceImpl(
-        firestore: fakeFirestore,
-        firebaseAuth: mockFirebaseAuth,
-        staffPhoneLookupApi: _FakeStaffLookup(null),
-      );
+    test(
+      'does not fall back to users when the callable says not found',
+      () async {
+        await fakeFirestore.collection('users').doc('staff-1').set({
+          'role': 'hr',
+          'email': 'hr@example.com',
+          'phoneNumber': '01000000000',
+        });
+        final source = AuthRemoteDataSourceImpl(
+          firestore: fakeFirestore,
+          firebaseAuth: mockFirebaseAuth,
+          staffPhoneLookupApi: _FakeStaffLookup(null),
+        );
 
-      final result = await source.getDelegatesByPhone('01000000000');
+        final result = await source.getDelegatesByPhone('01000000000');
 
-      expect(result, isEmpty);
-    });
+        expect(result, isEmpty);
+      },
+    );
 
     test('should return empty list when phone number is not found', () async {
       final result = await dataSource.getDelegatesByPhone('09999999999');
@@ -199,60 +211,66 @@ void main() {
       expect(result, isEmpty);
     });
 
-    test('should normalize phone number with +20 prefix against users', () async {
-      await fakeFirestore.collection('users').doc('staff-sara').set({
-        'phoneNumber': '01234567890',
-        'role': 'company-admin',
-        'email': 'sara@example.com',
-        'displayName': 'سارة',
-      });
+    test(
+      'should normalize phone number with +20 prefix against users',
+      () async {
+        await fakeFirestore.collection('users').doc('staff-sara').set({
+          'phoneNumber': '01234567890',
+          'role': 'company-admin',
+          'email': 'sara@example.com',
+          'displayName': 'سارة',
+        });
 
-      final result = await dataSource.getDelegatesByPhone('+201234567890');
+        final result = await dataSource.getDelegatesByPhone('+201234567890');
 
-      expect(result, isNotEmpty);
-      expect(result.first.firstName, 'سارة');
-      expect(result.first.email, 'sara@example.com');
-    });
+        expect(result, isNotEmpty);
+        expect(result.first.firstName, 'سارة');
+        expect(result.first.email, 'sara@example.com');
+      },
+    );
 
-    test('should find admin in users collection without anonymous sign-in', () async {
-      await fakeFirestore
-          .collection('organizations')
-          .doc('org1')
-          .collection('companies')
-          .doc('comp1')
-          .collection('delegates')
-          .doc('same-phone')
-          .set({
-            'firstName': 'مندوب',
-            'phoneNumber': '01500000000',
-            'nationalityID': '11111111111111',
-            'status': 'active',
-          });
-      await fakeFirestore.collection('users').doc('admin1').set({
-        'phoneNumber': '01500000000',
-        'role': 'company-admin',
-        'email': 'admin@example.com',
-        'displayName': 'مدير',
-        'organizationUID': 'org1',
-        'organizationName': 'منظمة تسهيل',
-        'companyUID': 'comp1',
-        'companyName': 'شركة تسهيل',
-      });
-      final source = AuthRemoteDataSourceImpl(
-        firestore: fakeFirestore,
-        firebaseAuth: _NoAnonymousAuth(),
-      );
+    test(
+      'should find admin in users collection without anonymous sign-in',
+      () async {
+        await fakeFirestore
+            .collection('organizations')
+            .doc('org1')
+            .collection('companies')
+            .doc('comp1')
+            .collection('delegates')
+            .doc('same-phone')
+            .set({
+              'firstName': 'مندوب',
+              'phoneNumber': '01500000000',
+              'nationalityID': '11111111111111',
+              'status': 'active',
+            });
+        await fakeFirestore.collection('users').doc('admin1').set({
+          'phoneNumber': '01500000000',
+          'role': 'company-admin',
+          'email': 'admin@example.com',
+          'displayName': 'مدير',
+          'organizationUID': 'org1',
+          'organizationName': 'منظمة تسهيل',
+          'companyUID': 'comp1',
+          'companyName': 'شركة تسهيل',
+        });
+        final source = AuthRemoteDataSourceImpl(
+          firestore: fakeFirestore,
+          firebaseAuth: _NoAnonymousAuth(),
+        );
 
-      final result = await source.getDelegatesByPhone('01500000000');
+        final result = await source.getDelegatesByPhone('01500000000');
 
-      expect(result, isNotEmpty);
-      expect(result.first.position, DelegatePosition.supervisor);
-      expect(result.first.email, 'admin@example.com');
-      expect(
-        result.first.nationalityID,
-        '__firebase_auth__:admin@example.com',
-      );
-    });
+        expect(result, isNotEmpty);
+        expect(result.first.position, DelegatePosition.supervisor);
+        expect(result.first.email, 'admin@example.com');
+        expect(
+          result.first.nationalityID,
+          '__firebase_auth__:admin@example.com',
+        );
+      },
+    );
 
     test('loads a super-admin user from the real document', () async {
       await fakeFirestore.collection('users').doc('auth-uid').set({
@@ -290,10 +308,13 @@ void main() {
       expect(result.single.role, UserRole.superAdmin);
     });
 
-    test('does not invent a staff account when the phone has no document', () async {
-      final result = await dataSource.getDelegatesByPhone('01500000099');
-      expect(result, isEmpty);
-    });
+    test(
+      'does not invent a staff account when the phone has no document',
+      () async {
+        final result = await dataSource.getDelegatesByPhone('01500000099');
+        expect(result, isEmpty);
+      },
+    );
   });
 
   group('staff password login', () {
@@ -322,33 +343,36 @@ void main() {
       expect(auth.currentUser!.isAnonymous, isFalse);
     });
 
-    test('a wrong password fails even when Firestore stores that password', () async {
-      await fakeFirestore.collection('users').doc('auth-uid').set({
-        'phoneNumber': '01500000001',
-        'role': 'super-admin',
-        'email': 'super@example.com',
-        'password': 'stored-in-firestore',
-      });
-      final auth = _EmailPasswordAuth(acceptedPassword: 'auth-secret');
-      final source = AuthRemoteDataSourceImpl(
-        firestore: fakeFirestore,
-        firebaseAuth: auth,
-      );
+    test(
+      'a wrong password fails even when Firestore stores that password',
+      () async {
+        await fakeFirestore.collection('users').doc('auth-uid').set({
+          'phoneNumber': '01500000001',
+          'role': 'super-admin',
+          'email': 'super@example.com',
+          'password': 'stored-in-firestore',
+        });
+        final auth = _EmailPasswordAuth(acceptedPassword: 'auth-secret');
+        final source = AuthRemoteDataSourceImpl(
+          firestore: fakeFirestore,
+          firebaseAuth: auth,
+        );
 
-      final stored = await source.verifyPhonePassword(
-        '01500000001',
-        'stored-in-firestore',
-      );
-      final wrong = await source.verifyAdminPassword(
-        'super@example.com',
-        'wrong-password',
-      );
+        final stored = await source.verifyPhonePassword(
+          '01500000001',
+          'stored-in-firestore',
+        );
+        final wrong = await source.verifyAdminPassword(
+          'super@example.com',
+          'wrong-password',
+        );
 
-      expect(stored, isFalse);
-      expect(wrong, isFalse);
-      expect(auth.currentUser, isNull);
-      expect(auth.emails, ['super@example.com', 'super@example.com']);
-    });
+        expect(stored, isFalse);
+        expect(wrong, isFalse);
+        expect(auth.currentUser, isNull);
+        expect(auth.emails, ['super@example.com', 'super@example.com']);
+      },
+    );
 
     test('does not sign in when the user document has no email', () async {
       await fakeFirestore.collection('users').doc('auth-uid').set({
@@ -373,84 +397,93 @@ void main() {
   });
 
   group('loginDelegate', () {
-    test('signs in with the custom token and returns only authorized profiles', () async {
-      final auth = _NoAnonymousAuth();
-      final api = _FakeDelegateLoginApi(
-        const DelegateLoginResponse(token: 'custom-token', delegateIds: ['d1']),
-      );
-      final source = AuthRemoteDataSourceImpl(
-        firestore: fakeFirestore,
-        firebaseAuth: auth,
-        delegateLoginApi: api,
-        currentDeviceDetails: () async => {
-          'deviceId': 'install-device-1',
-          'deviceModel': 'Test Phone',
-        },
-      );
-      await fakeFirestore
-          .collection('organizations')
-          .doc('org1')
-          .collection('companies')
-          .doc('comp1')
-          .collection('delegates')
-          .doc('d1')
-          .set({
-            'firstName': 'أحمد',
-            'phoneNumber': '01000000000',
-            'nationalityID': '12345678901234',
-            'status': 'active',
-          });
-      await fakeFirestore
-          .collection('organizations')
-          .doc('org1')
-          .collection('companies')
-          .doc('comp1')
-          .collection('delegates')
-          .doc('other')
-          .set({
-            'firstName': 'غير مصرح',
-            'phoneNumber': '01000000000',
-            'nationalityID': '99999999999999',
-            'status': 'active',
-          });
+    test(
+      'signs in with the custom token and returns only authorized profiles',
+      () async {
+        final auth = _NoAnonymousAuth();
+        final api = _FakeDelegateLoginApi(
+          const DelegateLoginResponse(
+            token: 'custom-token',
+            delegateIds: ['d1'],
+          ),
+        );
+        final source = AuthRemoteDataSourceImpl(
+          firestore: fakeFirestore,
+          firebaseAuth: auth,
+          delegateLoginApi: api,
+          currentDeviceDetails: () async => {
+            'deviceId': 'install-device-1',
+            'deviceModel': 'Test Phone',
+          },
+        );
+        await fakeFirestore
+            .collection('organizations')
+            .doc('org1')
+            .collection('companies')
+            .doc('comp1')
+            .collection('delegates')
+            .doc('d1')
+            .set({
+              'firstName': 'أحمد',
+              'phoneNumber': '01000000000',
+              'nationalityID': '12345678901234',
+              'status': 'active',
+            });
+        await fakeFirestore
+            .collection('organizations')
+            .doc('org1')
+            .collection('companies')
+            .doc('comp1')
+            .collection('delegates')
+            .doc('other')
+            .set({
+              'firstName': 'غير مصرح',
+              'phoneNumber': '01000000000',
+              'nationalityID': '99999999999999',
+              'status': 'active',
+            });
 
-      final result = await source.loginDelegate(
-        phoneNumber: '+201000000000',
-        nationalId: '12345678901234',
-      );
+        final result = await source.loginDelegate(
+          phoneNumber: '+201000000000',
+          nationalId: '12345678901234',
+        );
 
-      expect(api.calls, 1);
-      expect(api.nationalId, '12345678901234');
-      expect(api.deviceId, 'install-device-1');
-      expect(result, hasLength(1));
-      expect(result.single.uid, 'd1');
-      expect(result.single.firstName, 'أحمد');
-      expect(auth.currentUser, isNotNull);
-      expect(auth.currentUser!.isAnonymous, isFalse);
-    });
+        expect(api.calls, 1);
+        expect(api.nationalId, '12345678901234');
+        expect(api.deviceId, 'install-device-1');
+        expect(result, hasLength(1));
+        expect(result.single.uid, 'd1');
+        expect(result.single.firstName, 'أحمد');
+        expect(auth.currentUser, isNotNull);
+        expect(auth.currentUser!.isAnonymous, isFalse);
+      },
+    );
 
-    test('does not sign in anonymously when the national ID is rejected', () async {
-      final auth = _NoAnonymousAuth();
-      final api = _FakeDelegateLoginApi(
-        const DelegateLoginResponse(token: 'unused', delegateIds: []),
-        error: const DelegateLoginException('bad_credentials'),
-      );
-      final source = AuthRemoteDataSourceImpl(
-        firestore: fakeFirestore,
-        firebaseAuth: auth,
-        delegateLoginApi: api,
-        currentDeviceDetails: () async => {'deviceId': 'install-device-1'},
-      );
+    test(
+      'does not sign in anonymously when the national ID is rejected',
+      () async {
+        final auth = _NoAnonymousAuth();
+        final api = _FakeDelegateLoginApi(
+          const DelegateLoginResponse(token: 'unused', delegateIds: []),
+          error: const DelegateLoginException('bad_credentials'),
+        );
+        final source = AuthRemoteDataSourceImpl(
+          firestore: fakeFirestore,
+          firebaseAuth: auth,
+          delegateLoginApi: api,
+          currentDeviceDetails: () async => {'deviceId': 'install-device-1'},
+        );
 
-      expect(
-        () => source.loginDelegate(
-          phoneNumber: '01000000000',
-          nationalId: '00000000000000',
-        ),
-        throwsA(isA<DelegateCredentialsFailure>()),
-      );
-      expect(auth.currentUser, isNull);
-    });
+        expect(
+          () => source.loginDelegate(
+            phoneNumber: '01000000000',
+            nationalId: '00000000000000',
+          ),
+          throwsA(isA<DelegateCredentialsFailure>()),
+        );
+        expect(auth.currentUser, isNull);
+      },
+    );
 
     test('does not sign in when the server rejects the device', () async {
       final auth = _NoAnonymousAuth();
@@ -480,5 +513,82 @@ void main() {
       );
       expect(auth.currentUser, isNull);
     });
+  });
+
+  group('staffPhoneLookup error mapping (N-1)', () {
+    test('not-found / not_found map to unknown phone with any details', () {
+      for (final code in ['not-found', 'not_found']) {
+        for (final details in <Object?>[
+          null,
+          'x',
+          {'reason': 'other'},
+        ]) {
+          expect(
+            FirebaseStaffPhoneLookupApi.mapLookupError(code, details),
+            isNull,
+          );
+        }
+      }
+    });
+
+    test('resource-exhausted maps to rate_limited', () {
+      expect(
+        () => FirebaseStaffPhoneLookupApi.mapLookupError(
+          'resource-exhausted',
+          null,
+        ),
+        throwsA(
+          isA<StaffPhoneLookupException>().having(
+            (e) => e.reason,
+            'reason',
+            'rate_limited',
+          ),
+        ),
+      );
+    });
+
+    test('unimplemented still maps to unavailable', () {
+      expect(
+        () => FirebaseStaffPhoneLookupApi.mapLookupError('unimplemented', null),
+        throwsA(
+          isA<StaffPhoneLookupException>().having(
+            (e) => e.reason,
+            'reason',
+            'unavailable',
+          ),
+        ),
+      );
+    });
+
+    test('not-found never reaches the legacy users fallback', () async {
+      await fakeFirestore.collection('users').doc('staff-1').set({
+        'role': 'hr',
+        'email': 'hr@example.com',
+        'phoneNumber': '01000000000',
+      });
+      final source = AuthRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        firebaseAuth: mockFirebaseAuth,
+        staffPhoneLookupApi: _MappedLookup('not-found'),
+      );
+      expect(await source.getDelegatesByPhone('01000000000'), isEmpty);
+    });
+
+    test(
+      'rate_limited from the callable becomes AuthFailure rate_limited',
+      () async {
+        final source = AuthRemoteDataSourceImpl(
+          firestore: fakeFirestore,
+          firebaseAuth: mockFirebaseAuth,
+          staffPhoneLookupApi: _MappedLookup('resource-exhausted'),
+        );
+        expect(
+          () => source.getDelegatesByPhone('01000000000'),
+          throwsA(
+            isA<AuthFailure>().having((f) => f.code, 'code', 'rate_limited'),
+          ),
+        );
+      },
+    );
   });
 }

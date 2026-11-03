@@ -20,6 +20,10 @@ class CacheFailure extends Failure {
 class AuthFailure extends Failure {
   const AuthFailure([super.message = '', this.code]);
 
+  /// The phone has no account. Shown as-is on mobile/auto; staff mode maps
+  /// it to the generic invalid-credentials message.
+  static const phoneNotRegisteredCode = 'phone_not_registered';
+
   /// Stable code the login screens translate. Null keeps [message] as-is.
   final String? code;
 

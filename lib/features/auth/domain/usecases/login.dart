@@ -30,12 +30,36 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
     }, (delegates) => _finish(delegates, params));
   }
 
-  Future<Either<Failure, List<Delegate>>> _loginStaff(LoginParams params) async {
+  /// Modes where an unregistered phone shows the generic message instead of
+  /// revealing that the phone is unknown (web and mobile).
+  static const genericUnknownPhoneModes = {
+    LoginMode.staff,
+    LoginMode.auto,
+    LoginMode.delegate,
+  };
+
+  Failure _hideUnknownPhone(Failure failure, LoginParams params) {
+    if (failure is AuthFailure &&
+        failure.code == AuthFailure.phoneNotRegisteredCode &&
+        genericUnknownPhoneModes.contains(params.mode)) {
+      return const AuthFailure(
+        'رقم الهاتف أو كلمة المرور غير صحيحة',
+        'invalid_credentials',
+      );
+    }
+    return failure;
+  }
+
+  Future<Either<Failure, List<Delegate>>> _loginStaff(
+    LoginParams params,
+  ) async {
     // Staff phone lookup reads only `users`. Delegate documents are not
     // consulted, and only a Firebase Auth email marker can continue.
     final result = await repository.getDelegatesByPhone(params.phoneNumber);
 
-    return result.fold((failure) => Left(failure), (delegates) async {
+    return result.fold((failure) => Left(_hideUnknownPhone(failure, params)), (
+      delegates,
+    ) async {
       final matched = <Delegate>[];
 
       for (final delegate in delegates) {
@@ -87,7 +111,8 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
   /// can say so. Any other failure still counts as "no match".
   AuthFailure? _blockingFailure(Either<Failure, bool> result) {
     return result.fold((f) {
-      if (f is AuthFailure && (f.code == 'rate_limited' || f.code == 'network')) {
+      if (f is AuthFailure &&
+          (f.code == 'rate_limited' || f.code == 'network')) {
         return f;
       }
       return null;
