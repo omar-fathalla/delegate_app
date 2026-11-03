@@ -65,14 +65,14 @@ class DelegateAttendanceSession {
     return checkOutTime!.difference(checkInTime);
   }
 
-  /// Whether the session is currently ongoing (today without checkout and within 9 hours)
-  bool get isOngoing {
+  /// Whether the session is currently ongoing: no checkout and checked in
+  /// less than [kAttendanceOngoingMaxDuration] ago (works across midnight).
+  bool get isOngoing => isOngoingAt(DateTime.now());
+
+  bool isOngoingAt(DateTime now) {
     if (checkOutTime != null || isAutoCheckOut) return false;
-    final now = DateTime.now();
-    return checkInTime.year == now.year &&
-        checkInTime.month == now.month &&
-        checkInTime.day == now.day &&
-        now.difference(checkInTime) < const Duration(hours: 9);
+    final elapsed = now.difference(checkInTime);
+    return !elapsed.isNegative && elapsed < kAttendanceOngoingMaxDuration;
   }
 
   /// Formatted duration string e.g. "8 س و 15 د"
