@@ -45,15 +45,30 @@ jobs:
           sudo apt-get clean || true
           echo "After cleanup:" && df -h /
 
-      # Delete old artifacts to free up storage quota
-      - name: Delete old artifacts
+      # Fail early unless pubspec's build number (+N) is above the last released one.
+      # The last released versionCode is read from pubspec.yaml at the newest v* tag that does not contain HEAD
+      # (release tags are created on the release SHA after a successful build per docs/release/RELEASE_RUNBOOK.md).
+      - name: Check versionCode was bumped
         run: |
-          # Delete artifacts older than 7 days using GitHub CLI
-          gh api repos/${{ github.repository }}/actions/artifacts \
-            --paginate -q '.artifacts[] | select(.name | startswith("app-release")) | "\(.id)"' \
-            | xargs -I {} gh api --method DELETE repos/${{ github.repository }}/actions/artifacts/{} || true
-        env:
-          GH_TOKEN: ${{ github.token }}
+          CURRENT=$(grep -m1 "^version:" pubspec.yaml | sed 's/^version:[[:space:]]*//' | tr -d '\r ')
+          CURRENT_CODE="${CURRENT##*+}"
+          if ! [[ "$CURRENT_CODE" =~ ^[0-9]+$ ]]; then
+            echo "::error::pubspec.yaml version '$CURRENT' has no numeric +N build number"; exit 1
+          fi
+          # Ignore tags that already contain HEAD (tagged release, or a re-run / Play upload retry).
+          LAST_TAG=$(git tag -l 'v*' --sort=-v:refname --no-contains HEAD | head -n1)
+          if [ -z "$LAST_TAG" ]; then
+            echo "::error::No v* release tag found; cannot verify versionCode. Tag the last release first."; exit 1
+          fi
+          LAST=$(git show "${LAST_TAG}:pubspec.yaml" | grep -m1 "^version:" | sed 's/^version:[[:space:]]*//' | tr -d '\r ')
+          LAST_CODE="${LAST##*+}"
+          if ! [[ "$LAST_CODE" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not read build number from pubspec.yaml at ${LAST_TAG} ('$LAST')"; exit 1
+          fi
+          echo "Current: $CURRENT (code $CURRENT_CODE). Last release ${LAST_TAG}: $LAST (code $LAST_CODE)"
+          if [ "$CURRENT_CODE" -le "$LAST_CODE" ]; then
+            echo "::error::versionCode $CURRENT_CODE must be greater than $LAST_CODE (released in ${LAST_TAG}). Bump pubspec.yaml in a reviewed PR."; exit 1
+          fi
 
       # 1. إعداد جافا (الإصدار 21 كما هو في إعداداتك)
       - name: Set up JDK 21
