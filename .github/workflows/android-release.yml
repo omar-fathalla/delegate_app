@@ -46,8 +46,8 @@ jobs:
           echo "After cleanup:" && df -h /
 
       # Fail early unless pubspec's build number (+N) is above the last released one.
-      # The last released versionCode is read from pubspec.yaml at the newest v* tag
-      # (release tags are created on the release SHA per docs/release/RELEASE_RUNBOOK.md).
+      # The last released versionCode is read from pubspec.yaml at the newest v* tag that does not contain HEAD
+      # (release tags are created on the release SHA after a successful build per docs/release/RELEASE_RUNBOOK.md).
       - name: Check versionCode was bumped
         run: |
           CURRENT=$(grep -m1 "^version:" pubspec.yaml | sed 's/^version:[[:space:]]*//' | tr -d '\r ')
@@ -55,7 +55,8 @@ jobs:
           if ! [[ "$CURRENT_CODE" =~ ^[0-9]+$ ]]; then
             echo "::error::pubspec.yaml version '$CURRENT' has no numeric +N build number"; exit 1
           fi
-          LAST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          # Ignore tags that already contain HEAD (tagged release, or a re-run / Play upload retry).
+          LAST_TAG=$(git tag -l 'v*' --sort=-v:refname --no-contains HEAD | head -n1)
           if [ -z "$LAST_TAG" ]; then
             echo "::error::No v* release tag found; cannot verify versionCode. Tag the last release first."; exit 1
           fi

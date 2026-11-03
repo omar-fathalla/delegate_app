@@ -7,8 +7,9 @@
 | Release tag | v |
 | Previous SHA | |
 | Previous tag | v |
-| Hosting site / release ID (before) | tashil-hr-test / |
-| Hosting release ID (after) | |
+| Hosting site | tashil-hr-test (HR web, hr.sw-point.com), project practice-firebase-72df1 |
+| Hosting version ID (before) | |
+| Hosting version ID (after) | |
 | Firestore ruleset ID (before → after) | → |
 | Storage ruleset ID (before → after) | → |
 | Firestore indexes changed | |
@@ -23,7 +24,7 @@
 git revert -m 1 <release merge SHA>   # via PR into main, never force-push
 
 # Hosting
-firebase hosting:clone tashil-hr-test:<previous release/channel> tashil-hr-test:live --project <project>
+firebase hosting:clone tashil-hr-test@<previous version id> tashil-hr-test:live --project practice-firebase-72df1
 
 # Firestore / Storage rules (redeploy from the previous tag)
 git checkout v<previous> -- firestore.rules storage.rules
@@ -33,7 +34,9 @@ firebase deploy --only firestore:rules,storage --project <project>
 firebase deploy --only functions:<name> --project <project>
 
 # Android
-# Play Console: halt the rollout, then release a higher versionCode built from v<previous>
+# Play Console: halt the staged rollout if running.
+# Then: revert PR into main + versionCode bump above the current one,
+# released through the normal flow (User Test OK on the SHA, Mohamed's go).
 ```
 
 ## Notes
