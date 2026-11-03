@@ -36,7 +36,15 @@ import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 class AdminHomeScreen extends StatelessWidget {
   final Delegate adminDelegate;
 
-  const AdminHomeScreen({super.key, required this.adminDelegate});
+  /// Optional alternate layout (used by the web-only desktop shell). When null
+  /// the default mobile layout is used, unchanged.
+  final AdminHomeLayoutBuilder? layoutBuilder;
+
+  const AdminHomeScreen({
+    super.key,
+    required this.adminDelegate,
+    this.layoutBuilder,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -50,24 +58,52 @@ class AdminHomeScreen extends StatelessWidget {
             companyUID: adminDelegate.companyUID,
           ),
         ),
-      child: _AdminHomeBody(adminDelegate: adminDelegate),
+      child: _AdminHomeBody(
+        adminDelegate: adminDelegate,
+        layoutBuilder: layoutBuilder,
+      ),
     );
   }
 }
 
+/// Data handed to an [AdminHomeLayoutBuilder]; built by the same state that
+/// owns the dashboard bloc and organisations loading.
+class AdminHomeSectionsData {
+  final Delegate delegate;
+  final List<String> organizations;
+  final bool isCompanySupervisor;
+  final Future<void> Function() onRefresh;
+
+  const AdminHomeSectionsData({
+    required this.delegate,
+    required this.organizations,
+    required this.isCompanySupervisor,
+    required this.onRefresh,
+  });
+}
+
+typedef AdminHomeLayoutBuilder = Widget Function(
+  BuildContext context,
+  AdminHomeSectionsData data,
+);
+
+
 class _AdminHomeBody extends StatefulWidget {
   final Delegate adminDelegate;
+  final AdminHomeLayoutBuilder? layoutBuilder;
 
-  const _AdminHomeBody({required this.adminDelegate});
+  const _AdminHomeBody({required this.adminDelegate, this.layoutBuilder});
 
   @override
   State<_AdminHomeBody> createState() => _AdminHomeBodyState();
 }
 
-class _AdminHomeBodyState extends State<_AdminHomeBody> {
+class _AdminHomeBodyState extends State<_AdminHomeBody>
+    with _AdminHomeHelpers {
   static final Map<String, List<String>> _orgsMemoryCache = {};
   List<String> _supervisorOrganizations = [];
 
+  @override
   Delegate get adminDelegate => widget.adminDelegate;
 
   @override
@@ -263,6 +299,70 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
     return clean;
   }
 
+
+  Future<void> _refresh() async {
+    AdminDashboardBloc.clearCache();
+    _loadCachedAndFreshOrganizations(forceRefresh: true);
+    context.read<AdminDashboardBloc>().add(
+      LoadDashboard(
+        organizationUID: adminDelegate.companyUID.isNotEmpty
+            ? ''
+            : adminDelegate.organizationUID,
+        companyUID: adminDelegate.companyUID,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final layoutBuilder = widget.layoutBuilder;
+    if (layoutBuilder != null) {
+      return layoutBuilder(
+        context,
+        AdminHomeSectionsData(
+          delegate: adminDelegate,
+          organizations: _supervisorOrganizations,
+          isCompanySupervisor: _isCompanySupervisor,
+          onRefresh: _refresh,
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        children: [
+          // 1. الكارت الترحيبي والتعريفي الرئيسي بمسؤوليات مشرف الشركة / المدير
+          AdminHomeHeroCard(
+            adminDelegate: adminDelegate,
+            organizations: _supervisorOrganizations,
+          ),
+
+          // 2. كارت ميزة إضافة مناديب السلاسل والمنظمات الأخرى لمشرفي الشركات
+          if (_isCompanySupervisor) ...[
+            const SizedBox(height: 16),
+            AdminHomePromoCard(adminDelegate: adminDelegate),
+          ],
+
+          const SizedBox(height: 20),
+
+          // 3. نظرة عامة اليوم
+          AdminHomeTodayOverview(adminDelegate: adminDelegate),
+
+          // 4. إجراءات سريعة
+          AdminHomeQuickActions(adminDelegate: adminDelegate),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// Shared, side-effect-free helpers used by the home section widgets.
+mixin _AdminHomeHelpers {
+  Delegate get adminDelegate;
+
   Color _getOrgAccentColor(String orgName) {
     final lower = orgName.toLowerCase();
     if (lower.contains('fathalla') || orgName.contains('فتح الله') || orgName.contains('فتح_الله')) {
@@ -283,7 +383,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
     return const Color(0xFF14B8A6); // Teal fallback
   }
 
-  Widget _buildOrgBadgeChip(String orgName, bool isArabic) {
+  Widget _buildOrgBadgeChip(String orgName, bool isArabic, Color fg) {
     final accentColor = _getOrgAccentColor(orgName);
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -311,10 +411,10 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
           Flexible(
             child: Text(
               orgName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: fg,
                 letterSpacing: 0.1,
               ),
               maxLines: 1,
@@ -330,6 +430,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
   Widget _buildSupervisorOrganizationsGrid(
     List<String> organizations,
     bool isArabic,
+    Color fg,
   ) {
     if (organizations.isEmpty) return const SizedBox.shrink();
 
@@ -350,7 +451,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
               for (int c = 0; c < chunks[r].length; c++) ...[
                 if (c > 0) const SizedBox(width: 6),
                 Expanded(
-                  child: _buildOrgBadgeChip(chunks[r][c], isArabic),
+                  child: _buildOrgBadgeChip(chunks[r][c], isArabic, fg),
                 ),
               ],
               for (int empty = 0; empty < (3 - chunks[r].length); empty++) ...[
@@ -378,851 +479,17 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        AdminDashboardBloc.clearCache();
-        _loadCachedAndFreshOrganizations(forceRefresh: true);
-        context.read<AdminDashboardBloc>().add(
-          LoadDashboard(
-            organizationUID: adminDelegate.companyUID.isNotEmpty
-                ? ''
-                : adminDelegate.organizationUID,
-            companyUID: adminDelegate.companyUID,
-          ),
-        );
-      },
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-        children: [
-          // 1. الكارت الترحيبي والتعريفي الرئيسي بمسؤوليات مشرف الشركة / المدير
-          _buildRoleWelcomeBanner(context, theme.colorScheme, isArabic),
-
-          // 2. كارت ميزة إضافة مناديب السلاسل والمنظمات الأخرى لمشرفي الشركات
-          if (_isCompanySupervisor) ...[
-            const SizedBox(height: 16),
-            _buildMultiOrgDelegatesBanner(context, theme.colorScheme, isArabic),
-          ],
-
-          const SizedBox(height: 20),
-
-          // Section title: نظرة عامة اليوم
-          Row(
-            children: [
-              Icon(
-                Icons.insights_rounded,
-                color: theme.colorScheme.primary,
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                l10n.todayOverview,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _formatDate(context),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Summary Cards
-          BlocBuilder<AdminDashboardBloc, AdminDashboardState>(
-            builder: (context, state) {
-              if (state is AdminDashboardLoading) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 60),
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              }
-
-              if (state is AdminDashboardError) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 40),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.error_outline_rounded,
-                          size: 48,
-                          color: theme.colorScheme.error,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          state.message,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.error,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        FilledButton.icon(
-                          onPressed: () {
-                            AdminDashboardBloc.clearCache();
-                            context.read<AdminDashboardBloc>().add(
-                              LoadDashboard(
-                                organizationUID: adminDelegate.companyUID.isNotEmpty
-                                    ? ''
-                                    : adminDelegate.organizationUID,
-                                companyUID: adminDelegate.companyUID,
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: Text(l10n.retry),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              if (state is AdminDashboardLoaded) {
-                final summary = state.summary;
-                final canSeeCompaniesCount =
-                    adminDelegate.role == UserRole.superAdmin ||
-                    adminDelegate.role == UserRole.marketing;
-                return Column(
-                  children: [
-                    // بطاقة "عدد الشركات" تظهر فقط للمدير العام والتسويق
-                    if (canSeeCompaniesCount) ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _CompactSummaryCard(
-                              icon: Icons.business_rounded,
-                              title: 'عدد الشركات',
-                              value: '${summary.totalCompanies}',
-                              color: theme.colorScheme.tertiary,
-                              backgroundColor: theme
-                                  .colorScheme
-                                  .tertiaryContainer
-                                  .withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: _CompactSummaryCard(
-                              icon: Icons.groups_rounded,
-                              title: l10n.totalDelegates,
-                              value: '${summary.totalDelegates}',
-                              color: theme.colorScheme.primary,
-                              backgroundColor: theme.colorScheme.primaryContainer
-                                  .withValues(alpha: 0.5),
-                              onTap: () =>
-                                  _showAttendanceDetailsSheet(context, 'all'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                    ] else ...[
-                      // مشرفين: 3 بطاقات في صف واحد بشكل مضغوط
-                      IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: _CompactSummaryCard(
-                                icon: Icons.groups_rounded,
-                                title: l10n.totalDelegates,
-                                value: '${summary.totalDelegates}',
-                                color: theme.colorScheme.primary,
-                                backgroundColor: theme.colorScheme.primaryContainer
-                                    .withValues(alpha: 0.5),
-                                onTap: () =>
-                                    _showAttendanceDetailsSheet(context, 'all'),
-                                isDense: true,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _CompactSummaryCard(
-                                icon: Icons.check_circle_rounded,
-                                title: l10n.checkedInToday,
-                                value: '${summary.checkedInToday}',
-                                color: theme.colorScheme.secondary,
-                                backgroundColor: theme
-                                    .colorScheme
-                                    .secondaryContainer
-                                    .withValues(alpha: 0.5),
-                                onTap: () => _showAttendanceDetailsSheet(
-                                    context, 'checked_in'),
-                                isDense: true,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _CompactSummaryCard(
-                                icon: Icons.cancel_rounded,
-                                title: l10n.absentToday,
-                                value: '${summary.absentToday}',
-                                color: theme.colorScheme.onSurfaceVariant,
-                                backgroundColor: theme
-                                    .colorScheme
-                                    .surfaceContainerHighest
-                                    .withValues(alpha: 0.7),
-                                onTap: () =>
-                                    _showAttendanceDetailsSheet(context, 'absent'),
-                                isDense: true,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-              }
-
-              return const SizedBox.shrink();
-            },
-          ),
-
-          // ── Quick Actions for Company Admin / Supervisor ──
-          if (adminDelegate.role == UserRole.admin || adminDelegate.role == UserRole.organizationAdmin) ...[
-            const SizedBox(height: 22),
-            Row(
-              children: [
-                Icon(
-                  Icons.bolt_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 24,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'إجراءات سريعة',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // ── 1. Delegate Subscription & Approval Requests (شاشة الاعتمادات وطلبات المناديب) ──
-            Card(
-              elevation: 0,
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color: const Color(0xFFD4AF37).withValues(alpha: 0.45),
-                  width: 1.2,
-                ),
-              ),
-              color: theme.brightness == Brightness.dark
-                  ? const Color(0xFF2B2108)
-                  : const Color(0xFFFFFDF5),
-              child: InkWell(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => DelegateSubscriptionRequestsPage(
-                        currentAdmin: adminDelegate,
-                      ),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFB8860B), Color(0xFF8B6508)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFB8860B).withValues(alpha: 0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.how_to_reg_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    'شاشة الاعتمادات وطلبات المناديب',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14.5,
-                                      color: theme.colorScheme.onSurface,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                StreamBuilder<List<DelegateSubscriptionRequest>>(
-                                  stream: sl<DelegateSubscriptionRepository>().getSubscriptionRequestsStream(
-                                    statusFilter: SubscriptionRequestStatus.pending,
-                                    companyUID: adminDelegate.role == UserRole.admin ? adminDelegate.companyUID : null,
-                                    organizationUID: adminDelegate.role == UserRole.organizationAdmin ? adminDelegate.organizationUID : null,
-                                  ),
-                                  builder: (context, snapshot) {
-                                    final count = snapshot.data?.length ?? 0;
-                                    if (count == 0) return const SizedBox.shrink();
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFD97706),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Text(
-                                        '$count معلقة',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              adminDelegate.role == UserRole.admin
-                                  ? 'متابعة حالة طلبات المناديب: تم الاعتماد، قيد الانتظار، والمرفوضة'
-                                  : 'مراجعة واعتماد طلبات تسجيل واشتراكات المناديب الجديدة',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: theme.colorScheme.onSurfaceVariant,
-                                height: 1.25,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 16,
-                        color: theme.colorScheme.outline,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // ── 2. Camera Field Capture ──
-            if (adminDelegate.role != UserRole.organizationAdmin) ...[
-              Card(
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
-                ),
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
-                child: ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.photo_camera_rounded,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  title: const Text(
-                    'تصوير العروض الميدانية بالكاميرا',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text('التقاط وتوثيق صور العروض الميدانية والمنتجات مباشرة لشركتكم'),
-                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => BlocProvider(
-                          create: (_) => sl<PhotoPermissionBloc>(),
-                          child: DelegateCameraCaptureScreen(delegate: adminDelegate),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-            const SizedBox(height: 10),
-            Card(
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ListTile(
-                leading: Icon(
-                  Icons.camera_alt_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 28,
-                ),
-                title: const Text(
-                  'إدارة أذونات التصوير',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Text(
-                  adminDelegate.role == UserRole.organizationAdmin
-                      ? 'استعراض أذونات التصوير ومتابعة تقارير المناديب (للعلم فقط)'
-                      : 'طلب إذن تصوير جديد، تفعيل/تعطيل الأذونات، ومتابعة تقارير المناديب',
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                onTap: () {
-                  context.push('/photo-permissions/supervisor', extra: adminDelegate);
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-            Card(
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ListTile(
-                leading: Icon(
-                  Icons.photo_library_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 28,
-                ),
-                title: const Text(
-                  'تقارير الصور',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: const Text('استعراض تقارير الصور الشهرية المرفوعة بواسطة مناديب الشركة'),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BlocProvider(
-                        create: (context) => sl<PhotoPermissionBloc>(),
-                        child: MonthlyPhotoReportScreen(
-                          delegate: adminDelegate,
-                          showAppBar: true,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-            Card(
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ListTile(
-                leading: Icon(
-                  Icons.gavel_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 28,
-                ),
-                title: const Text(
-                  'سجل المخالفات والغرامات',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: const Text('متابعة الغرامات والإشعارات الصادرة بحق مناديب الشركة وتفاصيلها'),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BlocProvider(
-                        create: (_) => sl<PenaltyBloc>(),
-                        child: CompanyPenaltiesSettingsPage(
-                          delegate: adminDelegate,
-                          showAppBar: true,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-
-          // ── Quick Actions for Marketing / Super Admin ──
-          if (adminDelegate.role == UserRole.marketing || adminDelegate.role == UserRole.superAdmin) ...[
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Icon(
-                  Icons.dashboard_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 28,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'الإجراءات السريعة',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Quick Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/admin/company-search');
-                    },
-                    icon: const Icon(Icons.search_rounded),
-                    label: const Text('البحث عن الشركات'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      // يمكن إضافة إجراءات أخرى هنا
-                    },
-                    icon: const Icon(Icons.business_rounded),
-                    label: const Text('إدارة الشركات'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// الكارت الترحيبي والتعريفي الرئيسي بمسؤوليات الدور
-  Widget _buildRoleWelcomeBanner(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isArabic,
-  ) {
-    final displayName = adminDelegate.fullName.isNotEmpty
-        ? adminDelegate.fullName
-        : 'مشرف الشركة';
-    final companyName = adminDelegate.companyName.isNotEmpty
-        ? adminDelegate.companyName
-        : (adminDelegate.organizationName.isNotEmpty ? adminDelegate.organizationName : '');
-    final isOrgAdmin = adminDelegate.role == UserRole.organizationAdmin;
-    final isSuperAdmin = adminDelegate.role == UserRole.superAdmin;
-    final isMarketing = adminDelegate.role == UserRole.marketing;
-
-    String roleBadge = isArabic ? 'مشرف الشركة' : 'Company Supervisor';
-    IconData roleIcon = Icons.supervised_user_circle_rounded;
-
-    if (isOrgAdmin) {
-      roleBadge = isArabic ? 'المدير العام للمؤسسة' : 'General Manager';
-      roleIcon = Icons.admin_panel_settings_rounded;
-    } else if (isSuperAdmin) {
-      roleBadge = isArabic ? 'المشرف العام' : 'Super Admin';
-      roleIcon = Icons.security_rounded;
-    } else if (isMarketing) {
-      roleBadge = isArabic ? 'إدارة التسويق' : 'Marketing Admin';
-      roleIcon = Icons.campaign_rounded;
-    }
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primary,
-            colorScheme.primary.withValues(alpha: 0.85),
-            colorScheme.secondary.withValues(alpha: 0.9),
-          ],
-          begin: AlignmentDirectional.topStart,
-          end: AlignmentDirectional.bottomEnd,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // رأس الكارت: الترحيب والاسم وشارة الشركة والوظيفة
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isArabic ? 'أهلاً بك، $displayName' : 'Welcome, $displayName',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    // شارة الشركة / المنظمة
-                    if (companyName.isNotEmpty) ...[
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.business_rounded,
-                            size: 14,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              companyName,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white.withValues(alpha: 0.95),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    // شارة المسمى الوظيفي (على صف بمفرده)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            roleIcon,
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            roleBadge,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // صورة البروفايل بالأفاتار الدائري
-              Builder(
-                builder: (context) {
-                  final photoUrl = widget.adminDelegate.personalPhotoUrl ??
-                      (widget.adminDelegate.documents
-                          .where((d) =>
-                              d.documentKey == DocumentKey.personalPhoto &&
-                              d.documentURL.isNotEmpty)
-                          .firstOrNull
-                          ?.documentURL) ??
-                      FirebaseAuth.instance.currentUser?.photoURL;
-
-                  return Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: AppAvatar(
-                      imageUrl: photoUrl,
-                      fallbackText: widget.adminDelegate.firstName,
-                      radius: 26,
-                      backgroundColor: Colors.white.withValues(alpha: 0.22),
-                      foregroundColor: Colors.white,
-                      fallbackIcon: isOrgAdmin || isSuperAdmin
-                          ? Icons.shield_rounded
-                          : Icons.person_pin_rounded,
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-
-          // رُقاقات سلاسل المنظمات التابع لها مناديب المشرف (صف يأخذ 3 عناصر دائماً)
-          if (_isCompanySupervisor && _supervisorOrganizations.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _buildSupervisorOrganizationsGrid(_supervisorOrganizations, isArabic),
-          ],
-
-          const SizedBox(height: 16),
-          Divider(color: Colors.white.withValues(alpha: 0.25), height: 1),
-          const SizedBox(height: 14),
-
-          // دليل المهام والمسؤوليات
-          Text(
-            isArabic
-                ? (isOrgAdmin
-                    ? '📋 دليل المهام والمسؤوليات للمدير العام:'
-                    : '📋 دليل المهام والمسؤوليات لمشرف الشركة:')
-                : '📋 Your Core Responsibilities:',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          if (isOrgAdmin) ...[
-            _buildDutyBullet(
-              icon: Icons.corporate_fare_rounded,
-              title: isArabic
-                  ? '1. الإشراف العام على العمليات والفروع:'
-                  : '1. Overall Operations & Branch Oversight:',
-              desc: isArabic
-                  ? 'متابعة تقارير الفروع وسير العمل اليومي للمناديب والشركات على مستوى المؤسسة بالكامل.'
-                  : 'Monitor branch performance and delegate attendance across all operating companies.',
-            ),
-            const SizedBox(height: 8),
-            _buildDutyBullet(
-              icon: Icons.gavel_rounded,
-              title: isArabic
-                  ? '2. الاعتماد النهائي للمخالفات والغرامات:'
-                  : '2. Final Approval on Significant Penalties:',
-              desc: isArabic
-                  ? 'مراجعة واعتماد الغرامات والمخالفات الميدانية الكبرى المحالة من إدارة التسويق (> 1000 ج.م).'
-                  : 'Review and grant final authorization on large penalties escalated by marketing (> 1000 EGP).',
-            ),
-            const SizedBox(height: 8),
-            _buildDutyBullet(
-              icon: Icons.analytics_rounded,
-              title: isArabic
-                  ? '3. متابعة تقارير الحضور والإنجاز:'
-                  : '3. Performance & Attendance Analytics:',
-              desc: isArabic
-                  ? 'تحليل مؤشرات الأداء ونسب حضور المناديب والتقارير الشهرية المصورة على مستوى الفروع.'
-                  : 'Analyze key performance metrics, check-in compliance, and monthly photo reports.',
-            ),
-          ] else ...[
-            _buildDutyBullet(
-              icon: Icons.groups_rounded,
-              title: isArabic
-                  ? '1. متابعة حضور وانضباط مناديب الشركة:'
-                  : '1. Delegate Attendance & Compliance Tracking:',
-              desc: isArabic
-                  ? 'الإشراف اليومي على تسجيل حضور وغياب مناديب شركتكم بالفرع ومتابعة نسب التواجد والالتزام بمواعيد العمل.'
-                  : 'Daily oversight of vendor delegates check-ins, attendance rates, and adherence to working hours.',
-            ),
-            const SizedBox(height: 8),
-            _buildDutyBullet(
-              icon: Icons.camera_enhance_rounded,
-              title: isArabic
-                  ? '2. إدارة وتفعيل أذونات التصوير:'
-                  : '2. Manage & Activate Photo Permissions:',
-              desc: isArabic
-                  ? 'تقديم طلبات إذن التصوير، وتفعيل أو تعطيل الأذونات لمناديب الشركة، ومتابعة رفع التقارير الشهرية المصورة.'
-                  : 'Request, activate, or disable photo permits for delegates, and inspect monthly uploaded photo reports.',
-            ),
-            const SizedBox(height: 8),
-            _buildDutyBullet(
-              icon: Icons.gavel_rounded,
-              title: isArabic
-                  ? '3. متابعة وضبط المخالفات والغرامات:'
-                  : '3. Track Penalties & Rule Enforcement:',
-              desc: isArabic
-                  ? 'مراجعة المخالفات والغرامات المسجلة على مناديب الشركة، والتحقق من تفاصيلها لتلافي الخصومات وضمان الالتزام.'
-                  : 'Review penalties recorded on vendor delegates, verify incident details, and prevent fine deductions.',
-            ),
-            const SizedBox(height: 8),
-            _buildDutyBullet(
-              icon: Icons.assignment_turned_in_rounded,
-              title: isArabic
-                  ? '4. توجيه وتكليف مهام العمل:'
-                  : '4. Assign & Supervise Field Tasks:',
-              desc: isArabic
-                  ? 'توزيع المهام الميدانية والتعليمات الترويجية على المناديب ومتابعة نسب الإنجاز عبر تبويب المهام.'
-                  : 'Distribute field assignments to company delegates and monitor task completion status in real time.',
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildDutyBullet({
     required IconData icon,
     required String title,
     required String desc,
+    Color fg = Colors.white,
+    Color? tileColor,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.12),
+        color: tileColor ?? Colors.black.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1230,7 +497,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
         children: [
           Icon(
             icon,
-            color: Colors.white,
+            color: fg,
             size: 18,
           ),
           const SizedBox(width: 8),
@@ -1240,10 +507,10 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: fg,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1251,7 +518,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
                   desc,
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: fg.withValues(alpha: 0.9),
                     height: 1.3,
                   ),
                 ),
@@ -1774,6 +1041,998 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
     return '$dayName, ${now.day} ${months[now.month - 1]} ${now.year}';
   }
 }
+
+
+/// Hero / welcome card (name, company, role badge, avatar). On mobile it also
+/// embeds the chain chips and the duties guide, exactly as before.
+class AdminHomeHeroCard extends StatelessWidget with _AdminHomeHelpers {
+  @override
+  final Delegate adminDelegate;
+  final List<String> organizations;
+
+  /// When false (desktop grid), chips and duties are rendered as separate cards.
+  final bool embedSections;
+
+  const AdminHomeHeroCard({
+    super.key,
+    required this.adminDelegate,
+    required this.organizations,
+    this.embedSections = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    return _buildRoleWelcomeBanner(context, Theme.of(context).colorScheme, isArabic);
+  }
+
+  /// الكارت الترحيبي والتعريفي الرئيسي بمسؤوليات الدور
+  Widget _buildRoleWelcomeBanner(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isArabic,
+  ) {
+    final displayName = adminDelegate.fullName.isNotEmpty
+        ? adminDelegate.fullName
+        : 'مشرف الشركة';
+    final companyName = adminDelegate.companyName.isNotEmpty
+        ? adminDelegate.companyName
+        : (adminDelegate.organizationName.isNotEmpty ? adminDelegate.organizationName : '');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = isDark ? colorScheme.onPrimaryContainer : Colors.white;
+    final isOrgAdmin = adminDelegate.role == UserRole.organizationAdmin;
+    final isSuperAdmin = adminDelegate.role == UserRole.superAdmin;
+    final isMarketing = adminDelegate.role == UserRole.marketing;
+
+    String roleBadge = isArabic ? 'مشرف الشركة' : 'Company Supervisor';
+    IconData roleIcon = Icons.supervised_user_circle_rounded;
+
+    if (isOrgAdmin) {
+      roleBadge = isArabic ? 'المدير العام للمؤسسة' : 'General Manager';
+      roleIcon = Icons.admin_panel_settings_rounded;
+    } else if (isSuperAdmin) {
+      roleBadge = isArabic ? 'المشرف العام' : 'Super Admin';
+      roleIcon = Icons.security_rounded;
+    } else if (isMarketing) {
+      roleBadge = isArabic ? 'إدارة التسويق' : 'Marketing Admin';
+      roleIcon = Icons.campaign_rounded;
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        // Dark mode: primaryContainer surface (light-on-dark); light mode unchanged.
+        color: isDark ? colorScheme.primaryContainer : null,
+        gradient: isDark ? null : LinearGradient(
+          colors: [
+            colorScheme.primary,
+            colorScheme.primary.withValues(alpha: 0.85),
+            colorScheme.secondary.withValues(alpha: 0.9),
+          ],
+          begin: AlignmentDirectional.topStart,
+          end: AlignmentDirectional.bottomEnd,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // رأس الكارت: الترحيب والاسم وشارة الشركة والوظيفة
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isArabic ? 'أهلاً بك، $displayName' : 'Welcome, $displayName',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: fg,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // شارة الشركة / المنظمة
+                    if (companyName.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.business_rounded,
+                            size: 14,
+                            color: fg.withValues(alpha: 0.85),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              companyName,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: fg.withValues(alpha: 0.95),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    // شارة المسمى الوظيفي (على صف بمفرده)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: fg.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: fg.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            roleIcon,
+                            size: 14,
+                            color: fg,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            roleBadge,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: fg,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // صورة البروفايل بالأفاتار الدائري
+              Builder(
+                builder: (context) {
+                  final photoUrl = adminDelegate.personalPhotoUrl ??
+                      (adminDelegate.documents
+                          .where((d) =>
+                              d.documentKey == DocumentKey.personalPhoto &&
+                              d.documentURL.isNotEmpty)
+                          .firstOrNull
+                          ?.documentURL) ??
+                      FirebaseAuth.instance.currentUser?.photoURL;
+
+                  return Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: fg.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: AppAvatar(
+                      imageUrl: photoUrl,
+                      fallbackText: adminDelegate.firstName,
+                      radius: 26,
+                      backgroundColor: fg.withValues(alpha: 0.22),
+                      foregroundColor: fg,
+                      fallbackIcon: isOrgAdmin || isSuperAdmin
+                          ? Icons.shield_rounded
+                          : Icons.person_pin_rounded,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
+
+          if (embedSections) ...[
+            // رُقاقات سلاسل المنظمات التابع لها مناديب المشرف (صف يأخذ 3 عناصر دائماً)
+            if (_isCompanySupervisor && organizations.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              AdminHomeChainChips(organizations: organizations, foreground: fg),
+            ],
+
+            const SizedBox(height: 16),
+            Divider(color: fg.withValues(alpha: 0.25), height: 1),
+            const SizedBox(height: 14),
+
+            AdminHomeDutiesGuide(adminDelegate: adminDelegate, foreground: fg),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Chain (organisation) chips the supervisor's delegates belong to.
+class AdminHomeChainChips extends StatelessWidget with _AdminHomeHelpers {
+  final List<String> organizations;
+  final Color foreground;
+
+  /// false: fixed 3-per-row grid (mobile). true: free-flowing Wrap (desktop).
+  final bool wrap;
+
+  const AdminHomeChainChips({
+    super.key,
+    required this.organizations,
+    required this.foreground,
+    this.wrap = false,
+  });
+
+  @override
+  Delegate get adminDelegate => throw UnimplementedError();
+
+  @override
+  Widget build(BuildContext context) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    if (!wrap) {
+      return _buildSupervisorOrganizationsGrid(organizations, isArabic, foreground);
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final org in organizations)
+          _buildOrgBadgeChip(org, isArabic, foreground),
+      ],
+    );
+  }
+}
+
+/// «دليل المهام والمسؤوليات» list.
+class AdminHomeDutiesGuide extends StatelessWidget with _AdminHomeHelpers {
+  @override
+  final Delegate adminDelegate;
+  final Color foreground;
+  final Color? tileColor;
+
+  /// 1 (mobile) or 2 (desktop) columns of duty tiles.
+  final int columns;
+
+  const AdminHomeDutiesGuide({
+    super.key,
+    required this.adminDelegate,
+    required this.foreground,
+    this.tileColor,
+    this.columns = 1,
+  });
+
+  Widget _buildDuty({
+    required IconData icon,
+    required String title,
+    required String desc,
+  }) =>
+      _buildDutyBullet(
+        icon: icon,
+        title: title,
+        desc: desc,
+        fg: foreground,
+        tileColor: tileColor,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final isOrgAdmin = adminDelegate.role == UserRole.organizationAdmin;
+    final fg = foreground;
+    final bullets = <Widget>[
+          if (isOrgAdmin) ...[
+            _buildDuty(
+              icon: Icons.corporate_fare_rounded,
+              title: isArabic
+                  ? '1. الإشراف العام على العمليات والفروع:'
+                  : '1. Overall Operations & Branch Oversight:',
+              desc: isArabic
+                  ? 'متابعة تقارير الفروع وسير العمل اليومي للمناديب والشركات على مستوى المؤسسة بالكامل.'
+                  : 'Monitor branch performance and delegate attendance across all operating companies.',
+            ),
+            const SizedBox(height: 8),
+            _buildDuty(
+              icon: Icons.gavel_rounded,
+              title: isArabic
+                  ? '2. الاعتماد النهائي للمخالفات والغرامات:'
+                  : '2. Final Approval on Significant Penalties:',
+              desc: isArabic
+                  ? 'مراجعة واعتماد الغرامات والمخالفات الميدانية الكبرى المحالة من إدارة التسويق (> 1000 ج.م).'
+                  : 'Review and grant final authorization on large penalties escalated by marketing (> 1000 EGP).',
+            ),
+            const SizedBox(height: 8),
+            _buildDuty(
+              icon: Icons.analytics_rounded,
+              title: isArabic
+                  ? '3. متابعة تقارير الحضور والإنجاز:'
+                  : '3. Performance & Attendance Analytics:',
+              desc: isArabic
+                  ? 'تحليل مؤشرات الأداء ونسب حضور المناديب والتقارير الشهرية المصورة على مستوى الفروع.'
+                  : 'Analyze key performance metrics, check-in compliance, and monthly photo reports.',
+            ),
+          ] else ...[
+            _buildDuty(
+              icon: Icons.groups_rounded,
+              title: isArabic
+                  ? '1. متابعة حضور وانضباط مناديب الشركة:'
+                  : '1. Delegate Attendance & Compliance Tracking:',
+              desc: isArabic
+                  ? 'الإشراف اليومي على تسجيل حضور وغياب مناديب شركتكم بالفرع ومتابعة نسب التواجد والالتزام بمواعيد العمل.'
+                  : 'Daily oversight of vendor delegates check-ins, attendance rates, and adherence to working hours.',
+            ),
+            const SizedBox(height: 8),
+            _buildDuty(
+              icon: Icons.camera_enhance_rounded,
+              title: isArabic
+                  ? '2. إدارة وتفعيل أذونات التصوير:'
+                  : '2. Manage & Activate Photo Permissions:',
+              desc: isArabic
+                  ? 'تقديم طلبات إذن التصوير، وتفعيل أو تعطيل الأذونات لمناديب الشركة، ومتابعة رفع التقارير الشهرية المصورة.'
+                  : 'Request, activate, or disable photo permits for delegates, and inspect monthly uploaded photo reports.',
+            ),
+            const SizedBox(height: 8),
+            _buildDuty(
+              icon: Icons.gavel_rounded,
+              title: isArabic
+                  ? '3. متابعة وضبط المخالفات والغرامات:'
+                  : '3. Track Penalties & Rule Enforcement:',
+              desc: isArabic
+                  ? 'مراجعة المخالفات والغرامات المسجلة على مناديب الشركة، والتحقق من تفاصيلها لتلافي الخصومات وضمان الالتزام.'
+                  : 'Review penalties recorded on vendor delegates, verify incident details, and prevent fine deductions.',
+            ),
+            const SizedBox(height: 8),
+            _buildDuty(
+              icon: Icons.assignment_turned_in_rounded,
+              title: isArabic
+                  ? '4. توجيه وتكليف مهام العمل:'
+                  : '4. Assign & Supervise Field Tasks:',
+              desc: isArabic
+                  ? 'توزيع المهام الميدانية والتعليمات الترويجية على المناديب ومتابعة نسب الإنجاز عبر تبويب المهام.'
+                  : 'Distribute field assignments to company delegates and monitor task completion status in real time.',
+            ),
+          ],
+    ];
+    final title = <Widget>[
+          // دليل المهام والمسؤوليات
+          Text(
+            isArabic
+                ? (isOrgAdmin
+                    ? '📋 دليل المهام والمسؤوليات للمدير العام:'
+                    : '📋 دليل المهام والمسؤوليات لمشرف الشركة:')
+                : '📋 Your Core Responsibilities:',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: fg,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+    ];
+    if (columns <= 1) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [...title, ...bullets],
+      );
+    }
+    final tiles = bullets.where((w) => w is! SizedBox).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ...title,
+        LayoutBuilder(
+          builder: (context, c) {
+            const gap = 12.0;
+            final w = (c.maxWidth - gap * (columns - 1)) / columns;
+            return Wrap(
+              spacing: gap,
+              runSpacing: 8,
+              children: [for (final t in tiles) SizedBox(width: w, child: t)],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Promo card «متابعة مناديبك في كافة السلاسل…» with «إضافة مندوب».
+class AdminHomePromoCard extends StatelessWidget with _AdminHomeHelpers {
+  @override
+  final Delegate adminDelegate;
+
+  const AdminHomePromoCard({super.key, required this.adminDelegate});
+
+  @override
+  Widget build(BuildContext context) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    return _buildMultiOrgDelegatesBanner(
+      context,
+      Theme.of(context).colorScheme,
+      isArabic,
+    );
+  }
+}
+
+/// «نظرة عامة اليوم»: title, date and the summary cards (AdminDashboardBloc).
+class AdminHomeTodayOverview extends StatelessWidget with _AdminHomeHelpers {
+  @override
+  final Delegate adminDelegate;
+
+  const AdminHomeTodayOverview({super.key, required this.adminDelegate});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+          // Section title: نظرة عامة اليوم
+          Row(
+            children: [
+              Icon(
+                Icons.insights_rounded,
+                color: theme.colorScheme.primary,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                l10n.todayOverview,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _formatDate(context),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Summary Cards
+          BlocBuilder<AdminDashboardBloc, AdminDashboardState>(
+            builder: (context, state) {
+              if (state is AdminDashboardLoading) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 60),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+
+              if (state is AdminDashboardError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 40),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.error_outline_rounded,
+                          size: 48,
+                          color: theme.colorScheme.error,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          state.message,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: () {
+                            AdminDashboardBloc.clearCache();
+                            context.read<AdminDashboardBloc>().add(
+                              LoadDashboard(
+                                organizationUID: adminDelegate.companyUID.isNotEmpty
+                                    ? ''
+                                    : adminDelegate.organizationUID,
+                                companyUID: adminDelegate.companyUID,
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: Text(l10n.retry),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              if (state is AdminDashboardLoaded) {
+                final summary = state.summary;
+                final canSeeCompaniesCount =
+                    adminDelegate.role == UserRole.superAdmin ||
+                    adminDelegate.role == UserRole.marketing;
+                return Column(
+                  children: [
+                    // بطاقة "عدد الشركات" تظهر فقط للمدير العام والتسويق
+                    if (canSeeCompaniesCount) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _CompactSummaryCard(
+                              icon: Icons.business_rounded,
+                              title: 'عدد الشركات',
+                              value: '${summary.totalCompanies}',
+                              color: theme.colorScheme.tertiary,
+                              backgroundColor: theme
+                                  .colorScheme
+                                  .tertiaryContainer
+                                  .withValues(alpha: 0.5),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _CompactSummaryCard(
+                              icon: Icons.groups_rounded,
+                              title: l10n.totalDelegates,
+                              value: '${summary.totalDelegates}',
+                              color: theme.colorScheme.primary,
+                              backgroundColor: theme.colorScheme.primaryContainer
+                                  .withValues(alpha: 0.5),
+                              onTap: () =>
+                                  _showAttendanceDetailsSheet(context, 'all'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                    ] else ...[
+                      // مشرفين: 3 بطاقات في صف واحد بشكل مضغوط
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: _CompactSummaryCard(
+                                icon: Icons.groups_rounded,
+                                title: l10n.totalDelegates,
+                                value: '${summary.totalDelegates}',
+                                color: theme.colorScheme.primary,
+                                backgroundColor: theme.colorScheme.primaryContainer
+                                    .withValues(alpha: 0.5),
+                                onTap: () =>
+                                    _showAttendanceDetailsSheet(context, 'all'),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _CompactSummaryCard(
+                                icon: Icons.check_circle_rounded,
+                                title: l10n.checkedInToday,
+                                value: '${summary.checkedInToday}',
+                                color: theme.colorScheme.secondary,
+                                backgroundColor: theme
+                                    .colorScheme
+                                    .secondaryContainer
+                                    .withValues(alpha: 0.5),
+                                onTap: () => _showAttendanceDetailsSheet(
+                                    context, 'checked_in'),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _CompactSummaryCard(
+                                icon: Icons.cancel_rounded,
+                                title: l10n.absentToday,
+                                value: '${summary.absentToday}',
+                                color: theme.colorScheme.onSurfaceVariant,
+                                backgroundColor: theme
+                                    .colorScheme
+                                    .surfaceContainerHighest
+                                    .withValues(alpha: 0.7),
+                                onTap: () =>
+                                    _showAttendanceDetailsSheet(context, 'absent'),
+                                isDense: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              }
+
+              return const SizedBox.shrink();
+            },
+          ),
+      ],
+    );
+  }
+}
+
+/// Quick actions (subscription requests, camera, permissions, reports, penalties).
+class AdminHomeQuickActions extends StatelessWidget with _AdminHomeHelpers {
+  @override
+  final Delegate adminDelegate;
+
+  const AdminHomeQuickActions({super.key, required this.adminDelegate});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+          // ── Quick Actions for Company Admin / Supervisor ──
+          if (adminDelegate.role == UserRole.admin || adminDelegate.role == UserRole.organizationAdmin) ...[
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Icon(
+                  Icons.bolt_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'إجراءات سريعة',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // ── 1. Delegate Subscription & Approval Requests (شاشة الاعتمادات وطلبات المناديب) ──
+            Card(
+              elevation: 0,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.45),
+                  width: 1.2,
+                ),
+              ),
+              color: theme.brightness == Brightness.dark
+                  ? const Color(0xFF2B2108)
+                  : const Color(0xFFFFFDF5),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => DelegateSubscriptionRequestsPage(
+                        currentAdmin: adminDelegate,
+                      ),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFB8860B), Color(0xFF8B6508)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFB8860B).withValues(alpha: 0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.how_to_reg_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    'شاشة الاعتمادات وطلبات المناديب',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14.5,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                StreamBuilder<List<DelegateSubscriptionRequest>>(
+                                  stream: sl<DelegateSubscriptionRepository>().getSubscriptionRequestsStream(
+                                    statusFilter: SubscriptionRequestStatus.pending,
+                                    companyUID: adminDelegate.role == UserRole.admin ? adminDelegate.companyUID : null,
+                                    organizationUID: adminDelegate.role == UserRole.organizationAdmin ? adminDelegate.organizationUID : null,
+                                  ),
+                                  builder: (context, snapshot) {
+                                    final count = snapshot.data?.length ?? 0;
+                                    if (count == 0) return const SizedBox.shrink();
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFD97706),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '$count معلقة',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              adminDelegate.role == UserRole.admin
+                                  ? 'متابعة حالة طلبات المناديب: تم الاعتماد، قيد الانتظار، والمرفوضة'
+                                  : 'مراجعة واعتماد طلبات تسجيل واشتراكات المناديب الجديدة',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurfaceVariant,
+                                height: 1.25,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: theme.colorScheme.outline,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // ── 2. Camera Field Capture ──
+            if (adminDelegate.role != UserRole.organizationAdmin) ...[
+              Card(
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+                ),
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.photo_camera_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  title: const Text(
+                    'تصوير العروض الميدانية بالكاميرا',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: const Text('التقاط وتوثيق صور العروض الميدانية والمنتجات مباشرة لشركتكم'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => BlocProvider(
+                          create: (_) => sl<PhotoPermissionBloc>(),
+                          child: DelegateCameraCaptureScreen(delegate: adminDelegate),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            const SizedBox(height: 10),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: Icon(
+                  Icons.camera_alt_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 28,
+                ),
+                title: const Text(
+                  'إدارة أذونات التصوير',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  adminDelegate.role == UserRole.organizationAdmin
+                      ? 'استعراض أذونات التصوير ومتابعة تقارير المناديب (للعلم فقط)'
+                      : 'طلب إذن تصوير جديد، تفعيل/تعطيل الأذونات، ومتابعة تقارير المناديب',
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () {
+                  context.push('/photo-permissions/supervisor', extra: adminDelegate);
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: Icon(
+                  Icons.photo_library_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 28,
+                ),
+                title: const Text(
+                  'تقارير الصور',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text('استعراض تقارير الصور الشهرية المرفوعة بواسطة مناديب الشركة'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider(
+                        create: (context) => sl<PhotoPermissionBloc>(),
+                        child: MonthlyPhotoReportScreen(
+                          delegate: adminDelegate,
+                          showAppBar: true,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: Icon(
+                  Icons.gavel_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 28,
+                ),
+                title: const Text(
+                  'سجل المخالفات والغرامات',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text('متابعة الغرامات والإشعارات الصادرة بحق مناديب الشركة وتفاصيلها'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider(
+                        create: (_) => sl<PenaltyBloc>(),
+                        child: CompanyPenaltiesSettingsPage(
+                          delegate: adminDelegate,
+                          showAppBar: true,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+
+          // ── Quick Actions for Marketing / Super Admin ──
+          if (adminDelegate.role == UserRole.marketing || adminDelegate.role == UserRole.superAdmin) ...[
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Icon(
+                  Icons.dashboard_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 28,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'الإجراءات السريعة',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Quick Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/admin/company-search');
+                    },
+                    icon: const Icon(Icons.search_rounded),
+                    label: const Text('البحث عن الشركات'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      // يمكن إضافة إجراءات أخرى هنا
+                    },
+                    icon: const Icon(Icons.business_rounded),
+                    label: const Text('إدارة الشركات'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+      ],
+    );
+  }
+}
+
 
 
 

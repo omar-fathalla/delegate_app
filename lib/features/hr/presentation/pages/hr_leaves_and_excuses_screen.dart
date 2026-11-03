@@ -1,3 +1,4 @@
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -15,10 +16,17 @@ class HRLeavesAndExcusesScreen extends StatefulWidget {
   final Delegate hrDelegate;
   final bool showAppBar;
 
+  /// Optional list-detail hook (web-only desktop shell). When null (mobile),
+  /// tapping a request expands it inline exactly as before.
+  final ValueChanged<HRLeaveSelection>? onSelectLeave;
+  final String? selectedLeaveKey;
+
   const HRLeavesAndExcusesScreen({
     super.key,
     required this.hrDelegate,
     this.showAppBar = true,
+    this.onSelectLeave,
+    this.selectedLeaveKey,
   });
 
   @override
@@ -661,13 +669,16 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     BuildContext context,
     Map<String, dynamic> leave,
     ThemeData theme,
-    ColorScheme colorScheme,
-  ) {
+    ColorScheme colorScheme, {
+    bool forceExpanded = false,
+    bool hideActions = false,
+  }) {
     final docId = (leave['docId'] ?? '').toString();
     final itemKey = docId.isNotEmpty
         ? docId
         : '${leave['delegateUID']}_${leave['createdAt']}';
-    final isExpanded = _expandedLeaveDocIds.contains(itemKey);
+    final isExpanded =
+        forceExpanded || _expandedLeaveDocIds.contains(itemKey);
 
     final status = (leave['status'] ?? 'pending').toString();
     final name = (leave['delegateName'] ?? 'مندوب').toString();
@@ -775,10 +786,31 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
           width: status == 'pending' ? 1.2 : 1.0,
         ),
       ),
-      color: colorScheme.surface,
+      color: !forceExpanded && widget.selectedLeaveKey == itemKey
+          ? colorScheme.secondaryContainer
+          : colorScheme.surface,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
+          final onSelect = widget.onSelectLeave;
+          if (onSelect != null && !forceExpanded) {
+            onSelect(HRLeaveSelection(
+              key: itemKey,
+              delegateName: name,
+              isPending: status == 'pending',
+              approve: () => _approveLeave(leave),
+              reject: () => _rejectLeave(leave),
+              buildDetail: (ctx) => _buildLeaveCard(
+                ctx,
+                leave,
+                Theme.of(ctx),
+                Theme.of(ctx).colorScheme,
+                forceExpanded: true,
+                hideActions: true,
+              ),
+            ));
+            return;
+          }
           setState(() {
             if (_expandedLeaveDocIds.contains(itemKey)) {
               _expandedLeaveDocIds.remove(itemKey);
@@ -1033,7 +1065,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                   ],
 
                   // Pending Actions (Approve / Reject)
-                  if (status == 'pending') ...[
+                  if (status == 'pending' && !hideActions) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -1875,6 +1907,93 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+/// A request selected in the desktop list-detail layout. [approve]/[reject]
+/// call the screen's existing actions unchanged.
+class HRLeaveSelection {
+  final String key;
+  final String delegateName;
+  final bool isPending;
+  final Future<void> Function() approve;
+  final Future<void> Function() reject;
+  final WidgetBuilder buildDetail;
+
+  const HRLeaveSelection({
+    required this.key,
+    required this.delegateName,
+    required this.isPending,
+    required this.approve,
+    required this.reject,
+    required this.buildDetail,
+  });
+}
+
+/// Public detail pane for one leave/excuse request: header with approve
+/// (filled) / reject (outlined), then the request's full details.
+class HRLeaveDetailView extends StatelessWidget {
+  final HRLeaveSelection selection;
+  final VoidCallback? onActionDone;
+
+  const HRLeaveDetailView({
+    super.key,
+    required this.selection,
+    this.onActionDone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  selection.delegateName,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: cs.onSurface,
+                        fontWeight: FontWeight.bold,
+                      ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (selection.isPending) ...[
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await selection.reject();
+                    onActionDone?.call();
+                  },
+                  icon: const Icon(Symbols.close_rounded),
+                  label: const Text('رفض'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: () async {
+                    await selection.approve();
+                    onActionDone?.call();
+                  },
+                  icon: const Icon(Symbols.check_circle_rounded),
+                  label: const Text('اعتماد الإجازة'),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: selection.buildDetail(context),
+          ),
+        ),
+      ],
     );
   }
 }

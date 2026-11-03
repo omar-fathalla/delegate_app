@@ -56,6 +56,76 @@ class AdminMainScreen extends StatefulWidget {
 
   const AdminMainScreen({super.key, required this.delegate});
 
+  /// Pending-count source used by the menu badges (same query as mobile).
+  /// Exposed read-only for the web desktop shell.
+  static Stream<int> pendingCountStream(Delegate delegate, String collection) {
+    if (delegate.companyUID.isEmpty) return Stream<int>.value(0);
+    return FirebaseFirestore.instance
+        .collection(collection)
+        .where('companyUID', isEqualTo: delegate.companyUID)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((s) => s.docs.length);
+  }
+
+  /// Supervisor extra-menu targets shared by the mobile popup menu and the
+  /// web desktop rail/drawer. Returns false for values it does not handle.
+  static bool openSupervisorMenuTarget(
+    BuildContext context,
+    Delegate delegate,
+    String value,
+  ) {
+    switch (value) {
+      case 'penalties_management':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BlocProvider(
+              create: (_) => di.sl<PenaltyBloc>(),
+              child: AdminPenaltiesListPage(adminDelegate: delegate),
+            ),
+          ),
+        );
+        return true;
+      case 'supervisor_photo_permissions':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MultiBlocProvider(
+              providers: [
+                BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
+                BlocProvider(create: (_) => di.sl<BranchBloc>()),
+              ],
+              child: SupervisorPermissionsScreen(
+                supervisorDelegate: delegate,
+                showAppBar: true,
+              ),
+            ),
+          ),
+        );
+        return true;
+      case 'tasks':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AdminTasksScreen(adminDelegate: delegate),
+          ),
+        );
+        return true;
+      case 'profile':
+        context.push('/user-profile', extra: delegate);
+        return true;
+      case 'device_unbind_requests':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => HRDeviceUnbindRequestsScreen(
+              hrDelegate: delegate,
+              showAppBar: true,
+            ),
+          ),
+        );
+        return true;
+    }
+    return false;
+  }
+
   @override
   State<AdminMainScreen> createState() => _AdminMainScreenState();
 }
@@ -321,14 +391,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         );
         break;
       case 'device_unbind_requests':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => HRDeviceUnbindRequestsScreen(
-              hrDelegate: widget.delegate,
-              showAppBar: true,
-            ),
-          ),
-        );
+        AdminMainScreen.openSupervisorMenuTarget(context, widget.delegate, value);
         break;
       case 'super_admin_photos_and_permissions':
         Navigator.of(context).push(
@@ -463,14 +526,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         );
         break;
       case 'penalties_management':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => BlocProvider(
-              create: (_) => di.sl<PenaltyBloc>(),
-              child: AdminPenaltiesListPage(adminDelegate: widget.delegate),
-            ),
-          ),
-        );
+        AdminMainScreen.openSupervisorMenuTarget(context, widget.delegate, value);
         break;
       case 'penalty_rules_catalog':
         Navigator.of(context).push(
@@ -480,27 +536,8 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         );
         break;
       case 'supervisor_photo_permissions':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => MultiBlocProvider(
-              providers: [
-                BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
-                BlocProvider(create: (_) => di.sl<BranchBloc>()),
-              ],
-              child: SupervisorPermissionsScreen(
-                supervisorDelegate: widget.delegate,
-                showAppBar: true,
-              ),
-            ),
-          ),
-        );
-        break;
       case 'tasks':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => AdminTasksScreen(adminDelegate: widget.delegate),
-          ),
-        );
+        AdminMainScreen.openSupervisorMenuTarget(context, widget.delegate, value);
         break;
       case 'search':
         Navigator.of(context).push(
@@ -535,7 +572,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         );
         break;
       case 'profile':
-        context.push('/user-profile', extra: widget.delegate);
+        AdminMainScreen.openSupervisorMenuTarget(context, widget.delegate, value);
         break;
     }
   }
@@ -607,14 +644,10 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       if (widget.delegate.companyUID.isEmpty) {
         return Icon(icon, size: 20);
       }
-      return StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection(collection)
-            .where('companyUID', isEqualTo: widget.delegate.companyUID)
-            .where('status', isEqualTo: 'pending')
-            .snapshots(),
+      return StreamBuilder<int>(
+        stream: AdminMainScreen.pendingCountStream(widget.delegate, collection),
         builder: (context, snapshot) {
-          final count = snapshot.data?.docs.length ?? 0;
+          final count = snapshot.data ?? 0;
           final iconWidget = Icon(icon, size: 20);
           if (count == 0) return iconWidget;
           return Badge(
