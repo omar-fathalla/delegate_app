@@ -7,9 +7,20 @@ import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_s
 import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuses_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
+/// Minimum list-pane width (M3 list-detail spec).
 const double kListPaneWidth = 360;
 
-/// Two panes: fixed 360 list on the start side + flexible detail.
+/// Upper bound so the detail pane keeps most of the space on wide screens.
+const double kListPaneMaxWidth = 520;
+
+/// List pane grows with the available width: 48% of it, clamped to
+/// [kListPaneWidth]..[kListPaneMaxWidth]. At a 1280 window with the 300px
+/// drawer this gives ~430px, enough for two full 190px KPI cards of the
+/// shared requests list (the rest scroll horizontally inside the pane).
+double listPaneWidthFor(double available) =>
+    (available * 0.48).clamp(kListPaneWidth, kListPaneMaxWidth).toDouble();
+
+/// Two panes: responsive list (>= 360) on the start side + flexible detail.
 class AdminListDetailWeb extends StatelessWidget {
   final Widget list;
   final Widget? detail;
@@ -39,35 +50,39 @@ class AdminListDetailWeb extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(width: kListPaneWidth, child: _pane(context, list)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _pane(
-              context,
-              detail ??
-                  Center(
-                    key: const ValueKey('list_detail_empty'),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(emptyIcon, size: 56, color: cs.onSurfaceVariant),
-                        const SizedBox(height: 12),
-                        Text(
-                          emptyText,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              key: const ValueKey('list_detail_list_pane'),
+              width: listPaneWidthFor(constraints.maxWidth),
+              child: _pane(context, list),
             ),
-          ),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: _pane(
+                context,
+                detail ??
+                    Center(
+                      key: const ValueKey('list_detail_empty'),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(emptyIcon, size: 56, color: cs.onSurfaceVariant),
+                          const SizedBox(height: 12),
+                          Text(
+                            emptyText,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -105,13 +120,14 @@ class _AdminDelegatesListDetailWebState
       list: AdminDelegateSelectionScope(
         selectedUid: sel?.uid,
         onSelect: _onSelect,
-        child: widget.listOverride ??
+        child:
+            widget.listOverride ??
             AdminDelegatesScreen(adminDelegate: widget.adminDelegate),
       ),
       detail: sel == null
           ? null
           : (widget.detailBuilderOverride?.call(sel) ??
-              AdminDelegateDetailView(delegate: sel)),
+                AdminDelegateDetailView(delegate: sel)),
       emptyIcon: Symbols.badge_rounded,
       emptyText: 'اختار مندوب لعرض التفاصيل',
     );
@@ -122,7 +138,8 @@ class HRRequestsListDetailWeb extends StatefulWidget {
   final Delegate hrDelegate;
 
   /// Test hook: builds the list given the selection callback/key.
-  final Widget Function(ValueChanged<HRLeaveSelection>, String?)? listBuilderOverride;
+  final Widget Function(ValueChanged<HRLeaveSelection>, String?)?
+  listBuilderOverride;
 
   const HRRequestsListDetailWeb({
     super.key,
@@ -144,7 +161,8 @@ class _HRRequestsListDetailWebState extends State<HRRequestsListDetailWeb> {
   Widget build(BuildContext context) {
     final sel = _selected;
     return AdminListDetailWeb(
-      list: widget.listBuilderOverride?.call(_onSelect, sel?.key) ??
+      list:
+          widget.listBuilderOverride?.call(_onSelect, sel?.key) ??
           HRLeavesAndExcusesScreen(
             hrDelegate: widget.hrDelegate,
             showAppBar: false,

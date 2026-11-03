@@ -119,6 +119,12 @@ void main() {
     b.platformDispatcher.views.first.resetDevicePixelRatio();
   });
 
+  test('list pane width clamps 360..520', () {
+    expect(listPaneWidthFor(600), kListPaneWidth);
+    expect(listPaneWidthFor(900), closeTo(432, 0.01));
+    expect(listPaneWidthFor(2000), kListPaneMaxWidth);
+  });
+
   testWidgets('no scope => mobile path (maybeOf is null)', (t) async {
     AdminDelegateSelectionScope? s;
     await t.pumpWidget(Builder(builder: (c) {
@@ -131,8 +137,9 @@ void main() {
   testWidgets('delegates 1280 light: empty state, then select', (t) async {
     await _pump(t, const Size(1280, 800), AppTheme.lightTheme(), _delegates());
     expect(find.text('اختار مندوب لعرض التفاصيل'), findsOneWidget);
-    final list = t.getSize(find.byType(SizedBox).first);
-    expect(list.width, kListPaneWidth);
+    final list = t.getSize(find.byKey(const ValueKey('list_detail_list_pane')));
+    expect(list.width, greaterThanOrEqualTo(kListPaneWidth));
+    expect(list.width, listPaneWidthFor(1280 - 32));
     await t.tap(find.text('محمد حسن'));
     await t.pumpAndSettle();
     expect(find.text('تفاصيل محمد حسن'), findsOneWidget);
