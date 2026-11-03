@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
+import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
@@ -563,6 +564,9 @@ class _HrLoginScreenState extends State<HrLoginScreen>
           phoneNumber: _phoneController.text,
           password: _passwordController.text,
           rememberMe: _rememberMe,
+          // The HR portal is staff-only. Skipping the delegate path avoids
+          // delegateLoginV2 recording a failure on the phone's rate limit.
+          mode: LoginMode.staff,
         ),
       );
     }
