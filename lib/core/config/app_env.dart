@@ -92,11 +92,13 @@ class AppEnv {
 
   /// Test helpers mirroring the getters for an arbitrary env name.
 
+  @visibleForTesting
   static String mapsJsApiKeyFor(String env, [String override = '']) {
     if (override.isNotEmpty) return override;
     return env == 'dev' ? MapsKeys.devMapsPlaces : MapsKeys.prodMapsJs;
   }
 
+  @visibleForTesting
   static String placesApiKeyFor(String env, [String override = '']) {
     if (override.isNotEmpty) return override;
     return env == 'dev' ? MapsKeys.devMapsPlaces : MapsKeys.prodPlaces;

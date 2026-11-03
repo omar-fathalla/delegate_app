@@ -13,10 +13,12 @@ case "$ENV_NAME" in
     ;;
   dev)
     flutter build web --release --dart-define=ENV=dev
-    PROD_KEY="$(key_of prodMapsJs)"; DEV_KEY="$(key_of devMapsPlaces)"
-    [ -n "$PROD_KEY" ] && [ -n "$DEV_KEY" ] || { echo "maps keys not found" >&2; exit 1; }
+    PROD_KEY="$(key_of prodMapsJs)"; PLACES_KEY="$(key_of prodPlaces)"; DEV_KEY="$(key_of devMapsPlaces)"
+    [ -n "$PROD_KEY" ] && [ -n "$PLACES_KEY" ] && [ -n "$DEV_KEY" ] || { echo "maps keys not found" >&2; exit 1; }
     sed -i.bak "s/${PROD_KEY}/${DEV_KEY}/g" build/web/index.html && rm build/web/index.html.bak
     if grep -rq "$PROD_KEY" build/web; then echo "prod Maps key still in dev build" >&2; exit 1; fi
+    if grep -rq "$PLACES_KEY" build/web; then echo "prod Places key in dev build" >&2; exit 1; fi
+    if ! grep -q "$DEV_KEY" build/web/index.html; then echo "dev Maps key missing from build/web/index.html" >&2; exit 1; fi
     ;;
   *) echo "usage: $0 [prod|dev]" >&2; exit 2 ;;
 esac
