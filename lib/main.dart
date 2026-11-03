@@ -4,6 +4,7 @@ import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/services/crashlytics_service.dart';
 import 'package:delegate_app/core/services/app_bloc_observer.dart';
+import 'package:delegate_app/core/services/firestore_client_health.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/core/config/app_env.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -104,6 +105,16 @@ void main() async {
     CrashlyticsService.initialize().catchError((e) {
       debugPrint('Crashlytics Init Error: $e');
     });
+  }
+
+  if (kIsWeb) {
+    // Catch the Firestore JS SDK assert (ca9/b815) and show a reload banner
+    // instead of blank tabs. Chains any existing handler.
+    final previous = PlatformDispatcher.instance.onError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      final handled = FirestoreClientHealth.report(error);
+      return (previous?.call(error, stack) ?? false) || handled;
+    };
   }
 
   // مراقب BLoC لتسجيل الأخطاء والانتقالات
@@ -253,7 +264,7 @@ class _MyAppState extends State<MyApp> {
                     );
                   });
                 },
-                child: shown,
+                child: FirestoreClientHealthBanner(child: shown),
               );
             },
             locale: localeProvider.locale,

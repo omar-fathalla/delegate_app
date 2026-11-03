@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:delegate_app/core/services/branches_session_cache.dart';
+import 'package:delegate_app/core/services/firestore_client_health.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -3184,8 +3186,10 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
       _selectedOrgUID = orgs.first['uid'];
 
       // 2. Fetch all branches
-      final snapshot = await firestore.collection('branches').get();
-      final docs = snapshot.docs.map((d) {
+      // Reuse the once-per-session branches list (shared with getBranches)
+      // instead of a second full-collection get.
+      final branchDocs = await BranchesSessionCache.load(firestore);
+      final docs = branchDocs.map((d) {
         final data = d.data();
         final name = (data['branchName'] as String?) ??
             (data['name'] as String?) ??
@@ -3210,10 +3214,14 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
           _applyFilter();
         });
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('AddBranchPicker: failed to load branches: $e\n$st');
+      FirestoreClientHealth.report(e);
       if (mounted) {
         setState(() {
-          _error = 'فشل في جلب الفروع';
+          _error = FirestoreClientHealth.isClientDeadError(e)
+              ? FirestoreClientHealth.reloadMessage
+              : 'فشل في جلب الفروع';
           _loading = false;
         });
       }

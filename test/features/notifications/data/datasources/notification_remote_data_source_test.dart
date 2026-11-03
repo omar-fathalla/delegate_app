@@ -130,7 +130,7 @@ void main() {
       await dataSource.markAllAsRead('delegate123', 'org123');
 
       verify(() => mockFirestore.batch()).called(1);
-      verify(() => mockWriteBatch.update(mockDocument, any())).called(2);
+      verify(() => mockWriteBatch.update<Object?>(mockDocument, any())).called(2);
       verify(() => mockWriteBatch.commit()).called(1);
     });
   });
