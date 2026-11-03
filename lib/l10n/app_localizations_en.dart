@@ -923,4 +923,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get walletsManagement => 'Wallets Management';
+
+  @override
+  String get splashConnectionFailed => 'Couldn\'t connect';
+
+  @override
+  String get splashRetry => 'Retry';
+
+  @override
+  String get splashSignIn => 'Sign in';
 }

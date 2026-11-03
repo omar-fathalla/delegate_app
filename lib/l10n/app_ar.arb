@@ -1249,5 +1249,17 @@
     "walletsManagement": "إدارة المحافظ",
     "@walletsManagement": {
         "description": "Wallets management label"
+    },
+    "splashConnectionFailed": "تعذّر الاتصال",
+    "@splashConnectionFailed": {
+        "description": "Splash stall message"
+    },
+    "splashRetry": "إعادة المحاولة",
+    "@splashRetry": {
+        "description": "Splash retry button"
+    },
+    "splashSignIn": "تسجيل الدخول",
+    "@splashSignIn": {
+        "description": "Splash go-to-login button"
     }
 }

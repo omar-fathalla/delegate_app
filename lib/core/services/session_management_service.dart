@@ -38,6 +38,10 @@ class SessionManagementService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const String defaultOrgId = 'PiioBFgxaHAeuRdjlDgj';
 
+  /// Max wait for each Firestore read below. On timeout the session is
+  /// treated as valid (same as any other network error), never logged out.
+  static Duration sessionReadTimeout = const Duration(seconds: 5);
+
   /// فحص صلاحية جلسة المندوب المسجل محلياً
   static Future<SessionVerificationResult> checkSessionStatus({
     required Delegate delegate,
@@ -58,7 +62,8 @@ class SessionManagementService {
         final globalConfigDoc = await _firestore
             .collection('system_config')
             .doc('session_control')
-            .get();
+            .get()
+            .timeout(sessionReadTimeout);
 
         if (globalConfigDoc.exists && globalConfigDoc.data() != null) {
           final gData = globalConfigDoc.data()!;
@@ -85,7 +90,8 @@ class SessionManagementService {
             .doc(compId)
             .collection('delegates')
             .doc(delegate.uid)
-            .get();
+            .get()
+            .timeout(sessionReadTimeout);
 
         if (delegateDoc.exists && delegateDoc.data() != null) {
           final data = delegateDoc.data()!;
@@ -102,7 +108,8 @@ class SessionManagementService {
               .doc(orgId)
               .collection('companies')
               .doc(compId)
-              .get();
+              .get()
+            .timeout(sessionReadTimeout);
           if (companyDoc.exists && companyDoc.data() != null) {
             final compData = companyDoc.data()!;
             final compResetAt = compData['delegatesForceLogoutAt'] as Timestamp?;
@@ -127,7 +134,8 @@ class SessionManagementService {
             .collectionGroup('delegates')
             .where('phoneNumber', isEqualTo: delegate.phoneNumber)
             .limit(1)
-            .get();
+            .get()
+            .timeout(sessionReadTimeout);
 
         if (querySnap.docs.isNotEmpty) {
           final newDoc = querySnap.docs.first;

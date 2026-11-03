@@ -921,4 +921,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get walletsManagement => 'إدارة المحافظ';
+
+  @override
+  String get splashConnectionFailed => 'تعذّر الاتصال';
+
+  @override
+  String get splashRetry => 'إعادة المحاولة';
+
+  @override
+  String get splashSignIn => 'تسجيل الدخول';
 }

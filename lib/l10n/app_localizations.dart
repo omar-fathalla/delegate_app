@@ -1819,6 +1819,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wallets Management'**
   String get walletsManagement;
+
+  /// Splash stall message
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t connect'**
+  String get splashConnectionFailed;
+
+  /// Splash retry button
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get splashRetry;
+
+  /// Splash go-to-login button
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get splashSignIn;
 }
 
 class _AppLocalizationsDelegate

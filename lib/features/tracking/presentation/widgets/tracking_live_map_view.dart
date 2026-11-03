@@ -922,34 +922,36 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
 
     return Stack(
       children: [
-        GoogleMap(
-          initialCameraPosition: CameraPosition(
-            target: initialCenter,
-            zoom: 15.0,
-          ),
-          circles: circles,
-          markers: markers,
-          polylines: polylines,
-          myLocationEnabled: true,
-          myLocationButtonEnabled: false,
-          zoomControlsEnabled: false,
-          mapToolbarEnabled: false,
-          onMapCreated: (controller) {
-            _mapController = controller;
-            if (_selectedSession != null) {
-              _focusOnDelegate(_selectedSession!);
-              if (_activeBreadcrumbs.isNotEmpty) {
-                _fitTrailBounds(_activeBreadcrumbs);
+        GoogleMapsReadyGate(
+          child: GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: initialCenter,
+              zoom: 15.0,
+            ),
+            circles: circles,
+            markers: markers,
+            polylines: polylines,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            onMapCreated: (controller) {
+              _mapController = controller;
+              if (_selectedSession != null) {
+                _focusOnDelegate(_selectedSession!);
+                if (_activeBreadcrumbs.isNotEmpty) {
+                  _fitTrailBounds(_activeBreadcrumbs);
+                }
+              } else {
+                _fitMapBounds();
               }
-            } else {
-              _fitMapBounds();
-            }
-          },
-          onTap: (_) {
-            if (_selectedSession != null) {
-              _selectSession(null);
-            }
-          },
+            },
+            onTap: (_) {
+              if (_selectedSession != null) {
+                _selectSession(null);
+              }
+            },
+          ),
         ),
 
         // أزرار التحكم الطافية (إعادة الضبط والتحديث)
