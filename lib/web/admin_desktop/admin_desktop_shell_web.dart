@@ -313,6 +313,8 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
       body: Row(
         children: [
           nav,
+          if (_isDark(context))
+            VerticalDivider(width: 1, thickness: 1, color: cs.outlineVariant),
           Expanded(
             child: Column(
               children: [
@@ -365,6 +367,16 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
     );
   }
 
+  /// Dark: nav matches the page (surface) and a divider separates it.
+  /// Light keeps surfaceContainer.
+  static bool _isDark(BuildContext c) =>
+      Theme.of(c).brightness == Brightness.dark;
+
+  Color _navColor(BuildContext c) {
+    final cs = Theme.of(c).colorScheme;
+    return _isDark(c) ? cs.surface : cs.surfaceContainer;
+  }
+
   Widget _buildTopBar(BuildContext context, String pageTitle) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
@@ -414,7 +426,7 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
     return SizedBox(
       width: 80,
       child: NavigationRail(
-        backgroundColor: cs.surfaceContainer,
+        backgroundColor: _navColor(context),
         indicatorColor: cs.secondaryContainer,
         labelType: NavigationRailLabelType.all,
         selectedIndex: _extra == null ? _index : null,
@@ -485,7 +497,7 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
     return SizedBox(
       width: 300, // standard drawer, <= 360
       child: NavigationDrawer(
-        backgroundColor: cs.surfaceContainer,
+        backgroundColor: _navColor(context),
         indicatorColor: cs.secondaryContainer,
         elevation: 0,
         selectedIndex: _drawerSelected(dests.length),
