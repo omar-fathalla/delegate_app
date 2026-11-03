@@ -28,7 +28,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
-    "site": "tashil-hr-test",
+    "target": "web",
     "public": "build/web",
     "ignore": [
       "firebase.json",
