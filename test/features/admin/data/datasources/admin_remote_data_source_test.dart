@@ -1,6 +1,7 @@
 import 'package:delegate_app/features/admin/data/datasources/admin_remote_data_source.dart';
 import 'package:delegate_app/features/admin/data/models/admin_user_model.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
+import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,6 +12,33 @@ void main() {
   setUp(() {
     fakeFirestore = FakeFirebaseFirestore();
     dataSource = AdminRemoteDataSourceImpl(firestore: fakeFirestore);
+  });
+
+  group('BranchesSessionCache invalidation', () {
+    setUp(() {
+      BranchesSessionCache.invalidate();
+      BranchesSessionCache.debugSessionKey = () => 'u1';
+    });
+    tearDown(() {
+      BranchesSessionCache.invalidate();
+      BranchesSessionCache.debugSessionKey = null;
+    });
+
+    test('addBranch refreshes the cached branches list', () async {
+      expect(await BranchesSessionCache.load(fakeFirestore), isEmpty);
+      await dataSource.addBranch(BranchModel(
+          id: '', branchName: 'فرع جديد', latitude: 30, longitude: 31, geofenceRadius: 100));
+      final after = await BranchesSessionCache.load(fakeFirestore);
+      expect(after.map((d) => d['branchName']), contains('فرع جديد'));
+    });
+
+    test('updateBranch refreshes the cached branches list', () async {
+      await fakeFirestore.collection('branches').doc('b1').set({'branchName': 'قديم'});
+      expect((await BranchesSessionCache.load(fakeFirestore)).single['branchName'], 'قديم');
+      await dataSource.updateBranch(BranchModel(
+          id: 'b1', branchName: 'جديد', latitude: 30, longitude: 31, geofenceRadius: 100));
+      expect((await BranchesSessionCache.load(fakeFirestore)).single['branchName'], 'جديد');
+    });
   });
 
   group('getBranches', () {

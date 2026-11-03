@@ -25,8 +25,10 @@ class FirestoreClientHealth {
   static bool isClientDeadError(Object? error) {
     if (error == null) return false;
     final text = error.toString();
+    // Match only the SDK's own failure texts. Bare ids like 'b815'/'ca9'
+    // could appear in unrelated messages (doc ids, hashes) and must not
+    // trigger the reload banner.
     return text.contains('INTERNAL ASSERTION FAILED') ||
-        text.contains('b815') ||
         text.contains('AsyncQueue is already failed');
   }
 

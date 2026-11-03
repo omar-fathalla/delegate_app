@@ -134,6 +134,10 @@ void main() {
           'FIRESTORE INTERNAL ASSERTION FAILED: Unexpected state (ID: ca9)'), isTrue);
       expect(FirestoreClientHealth.isClientDeadError('AsyncQueue is already failed'), isTrue);
       expect(FirestoreClientHealth.isClientDeadError('permission-denied'), isFalse);
+      expect(FirestoreClientHealth.isClientDeadError('doc b815 not found'), isFalse);
+      expect(FirestoreClientHealth.isClientDeadError('branch-ca9-id'), isFalse);
+      expect(FirestoreClientHealth.isClientDeadError(
+          'FIRESTORE (12.19.0) INTERNAL ASSERTION FAILED: Unexpected state (ID: b815)'), isTrue);
     });
 
     test('no-op on mobile', () {
