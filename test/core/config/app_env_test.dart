@@ -1,6 +1,7 @@
 import 'package:delegate_app/core/config/app_env.dart';
 import 'package:delegate_app/firebase_options.dart' as prod;
 import 'package:delegate_app/firebase_options_dev.dart' as dev;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -27,5 +28,51 @@ void main() {
 
   test('unknown ENV fails instead of falling back', () {
     expect(() => AppEnv.optionsFor('staging'), throwsUnsupportedError);
+  });
+  group('ENV=dev fails closed on mobile', () {
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test('dev on Android throws', () {
+      expect(
+        () => AppEnv.ensureDevSupported(
+          isWeb: false,
+          platform: TargetPlatform.android,
+        ),
+        throwsUnsupportedError,
+      );
+    });
+
+    test('dev on iOS throws', () {
+      expect(
+        () => AppEnv.ensureDevSupported(
+          isWeb: false,
+          platform: TargetPlatform.iOS,
+        ),
+        throwsUnsupportedError,
+      );
+    });
+
+    test('dev on web is allowed', () {
+      expect(
+        () => AppEnv.ensureDevSupported(
+          isWeb: true,
+          platform: TargetPlatform.android,
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('optionsFor dev throws with Android platform override', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      expect(
+        () => AppEnv.optionsFor('dev', isWeb: false),
+        throwsUnsupportedError,
+      );
+    });
+
+    test('optionsFor prod on Android still works', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      expect(AppEnv.optionsFor('prod').projectId, 'practice-firebase-72df1');
+    });
   });
 }
