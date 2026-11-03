@@ -315,6 +315,19 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     _loadInitialData();
   }
 
+  bool _viewModeInitialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The 6-column table needs ~1260px. On phones (I-9) start on the card
+    // list, which fits 360-414; the user can still switch to the table.
+    if (!_viewModeInitialized) {
+      _viewModeInitialized = true;
+      if (MediaQuery.sizeOf(context).width < 600) _isTableView = false;
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -2528,6 +2541,19 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                   ],
                 ),
                 const SizedBox(height: 3),
+                // I-10: no fake zeros while the day is loading.
+                if (_isLoading)
+                  Container(
+                    key: const ValueKey('kpi-loading'),
+                    width: isWide ? 28 : 22,
+                    height: isWide ? 20 : 14,
+                    margin: const EdgeInsets.symmetric(vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  )
+                else
                 Directionality(
                   textDirection: TextDirection.ltr,
                   child: Text(
@@ -3402,91 +3428,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
 
             // ── Attendance Times & Branch ──
             if (record.checkInTime != null || record.branchName != null) ...[
-              Row(
-                children: [
-                  // Branch
-                  if (record.branchName != null) ...[
-                    Icon(Icons.storefront_rounded,
-                        size: 16, color: colorScheme.primary),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: BranchNameLabel(
-                        branchName: record.branchName,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  // Check-in Time
-                  if (record.checkInTime != null) ...[
-                    Icon(Icons.login_rounded,
-                        size: 15, color: const Color(0xFF2E7D32)),
-                    const SizedBox(width: 4),
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Text(
-                        DateFormat('hh:mm a', 'ar').format(record.checkInTime!),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2E7D32),
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  // Check-out Time
-                  if (record.checkOutTime != null) ...[
-                    const SizedBox(width: 12),
-                    Icon(
-                      record.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
-                      size: 15,
-                      color: record.isAutoCheckOut ? Colors.amber[800] : const Color(0xFFE65100),
-                    ),
-                    const SizedBox(width: 4),
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Text(
-                        DateFormat('hh:mm a', 'ar').format(record.checkOutTime!),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: record.isAutoCheckOut ? Colors.amber[900] : const Color(0xFFE65100),
-                        ),
-                      ),
-                    ),
-                    if (record.isAutoCheckOut) ...[
-                      const SizedBox(width: 6),
-                      Tooltip(
-                        message: 'تم إغلاق الانصراف تلقائياً بعد مرور 11.5 ساعة على بداية الوردية لعدم تسجيل الانصراف يدوياً',
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.auto_mode_rounded, size: 12, color: Colors.amber[800]),
-                              const SizedBox(width: 3),
-                              Text(
-                                'إغلاق تلقائي (11.5 س)',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: Colors.amber[900],
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ],
-              ),
+              HRAttendanceCardTimes(record: record),
               if (record.checkInTime != null) ...[
                 const SizedBox(height: 6),
                 Row(
@@ -3592,72 +3534,24 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
               const SizedBox(height: 8),
             ],
 
-            // ── Device Info & Actions Row ──
-            Row(
-              children: [
-                if (record.deviceInfo != null && record.deviceInfo!.trim().isNotEmpty) ...[
-                  Icon(Icons.smartphone_rounded,
-                      size: 14, color: colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      record.deviceInfo!,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+            HRAttendanceCardActions(
+              deviceInfo: record.deviceInfo,
+              phoneNumber: record.delegate.phoneNumber,
+              onCall: () => _callPhone(record.delegate.phoneNumber),
+              onWhatsApp: () => _openWhatsApp(record.delegate.phoneNumber),
+              onHistory: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HRDelegateAttendanceDetailScreen(
+                      delegate: record.delegate,
+                      initialMonth: _selectedDate,
+                      branchesByName: _branchesByName,
+                      hrDelegate: widget.hrDelegate,
                     ),
                   ),
-                ] else
-                  const Spacer(),
-
-                // Action: Phone Call
-                if (record.delegate.phoneNumber.isNotEmpty) ...[
-                  TashilIconButton.tonal(
-                    icon: Icons.call_outlined,
-                    tooltip: 'اتصال بالمندوب',
-                    size: 34,
-                    iconSize: 17,
-                    onPressed: () => _callPhone(record.delegate.phoneNumber),
-                  ),
-                  const SizedBox(width: 6),
-                  TashilIconButton.tonal(
-                    icon: Icons.chat_outlined,
-                    tooltip: 'مراسلة عبر واتساب',
-                    size: 34,
-                    iconSize: 17,
-                    onPressed: () => _openWhatsApp(record.delegate.phoneNumber),
-                  ),
-                  const SizedBox(width: 6),
-                ],
-
-                // Action: View Monthly History
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  icon: const Icon(Icons.history_rounded, size: 16),
-                  label: const Text('السجل الشهري والتفصيلي'),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => HRDelegateAttendanceDetailScreen(
-                          delegate: record.delegate,
-                          initialMonth: _selectedDate,
-                          branchesByName: _branchesByName,
-                          hrDelegate: widget.hrDelegate,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
+                );
+              },
             ),
           ],
         ),
@@ -4446,6 +4340,209 @@ class _ExportMenuButtonState extends State<_ExportMenuButton> {
                 ),
         ),
       ),
+    );
+  }
+}
+
+
+/// Branch + check-in/out line of an attendance card. Wraps instead of
+/// overflowing on 360-414px phones (I-9).
+class HRAttendanceCardTimes extends StatelessWidget {
+  const HRAttendanceCardTimes({super.key, required this.record});
+
+  final HRAttendanceRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Wrap(
+      spacing: 12,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        // Branch
+        if (record.branchName != null)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.storefront_rounded,
+                  size: 16, color: colorScheme.primary),
+              const SizedBox(width: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 220),
+                child: BranchNameLabel(
+                  branchName: record.branchName,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        // Check-in Time
+        if (record.checkInTime != null)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.login_rounded,
+                  size: 15, color: Color(0xFF2E7D32)),
+              const SizedBox(width: 4),
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Text(
+                  DateFormat('hh:mm a', 'ar').format(record.checkInTime!),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF2E7D32),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        // Check-out Time
+        if (record.checkOutTime != null)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                record.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
+                size: 15,
+                color: record.isAutoCheckOut ? Colors.amber[800] : const Color(0xFFE65100),
+              ),
+              const SizedBox(width: 4),
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Text(
+                  DateFormat('hh:mm a', 'ar').format(record.checkOutTime!),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: record.isAutoCheckOut ? Colors.amber[900] : const Color(0xFFE65100),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        // Own Wrap item so it drops to the next line on phones.
+        if (record.isAutoCheckOut)
+            Tooltip(
+              message: 'تم إغلاق الانصراف تلقائياً بعد مرور 11.5 ساعة على بداية الوردية لعدم تسجيل الانصراف يدوياً',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_mode_rounded, size: 12, color: Colors.amber[800]),
+                    const SizedBox(width: 3),
+                    Text(
+                      'إغلاق تلقائي (11.5 س)',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.amber[900],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+/// Device line + call/WhatsApp/history actions of an attendance card. The
+/// actions sit on their own wrapping row so they stay on-screen (I-9).
+class HRAttendanceCardActions extends StatelessWidget {
+  const HRAttendanceCardActions({
+    super.key,
+    required this.deviceInfo,
+    required this.phoneNumber,
+    required this.onCall,
+    required this.onWhatsApp,
+    required this.onHistory,
+  });
+
+  final String? deviceInfo;
+  final String phoneNumber;
+  final VoidCallback onCall;
+  final VoidCallback onWhatsApp;
+  final VoidCallback onHistory;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ── Device Info (own line) & Actions Row (wraps on phones, I-9) ──
+        if (deviceInfo != null && deviceInfo!.trim().isNotEmpty) ...[
+          Row(
+            children: [
+              Icon(Icons.smartphone_rounded,
+                  size: 14, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  deviceInfo!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+        ],
+        Wrap(
+          alignment: WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            // Action: Phone Call
+            if (phoneNumber.isNotEmpty) ...[
+              TashilIconButton.tonal(
+                icon: Icons.call_outlined,
+                tooltip: 'اتصال بالمندوب',
+                size: 34,
+                iconSize: 17,
+                onPressed: onCall,
+              ),
+              TashilIconButton.tonal(
+                icon: Icons.chat_outlined,
+                tooltip: 'مراسلة عبر واتساب',
+                size: 34,
+                iconSize: 17,
+                onPressed: onWhatsApp,
+              ),
+            ],
+
+            // Action: View Monthly History
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              icon: const Icon(Icons.history_rounded, size: 16),
+              label: const Text('السجل الشهري والتفصيلي'),
+              onPressed: onHistory,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
