@@ -80,12 +80,6 @@ import 'package:delegate_app/features/profile/data/repositories/profile_reposito
 import 'package:delegate_app/features/profile/domain/repositories/profile_repository.dart';
 import 'package:delegate_app/features/profile/domain/usecases/get_delegate_profile.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
-import 'package:delegate_app/features/changelog/data/datasources/changelog_remote_datasource.dart';
-import 'package:delegate_app/features/changelog/data/repositories/changelog_repository_impl.dart';
-import 'package:delegate_app/features/changelog/domain/repositories/changelog_repository.dart';
-import 'package:delegate_app/features/changelog/domain/usecases/get_new_updates.dart';
-import 'package:delegate_app/features/changelog/domain/usecases/get_all_updates.dart';
-import 'package:delegate_app/features/changelog/presentation/bloc/changelog_bloc.dart';
 import 'package:delegate_app/features/tracking/data/services/delegate_tracking_service.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
@@ -391,29 +385,6 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   // Company Data source
   sl.registerLazySingleton<CompanyRemoteDataSource>(
     () => CompanyRemoteDataSourceImpl(firestore: sl()),
-  );
-
-  // ! Features - Changelog
-  // Bloc
-  sl.registerFactory(
-    () => ChangelogBloc(getNewUpdates: sl(), getAllUpdates: sl()),
-  );
-
-  // Use cases
-  sl.registerLazySingleton(() => GetNewUpdates(sl()));
-  sl.registerLazySingleton(() => GetAllUpdates(sl()));
-
-  // Repository
-  sl.registerLazySingleton<ChangelogRepository>(
-    () => ChangelogRepositoryImpl(
-      remoteDataSource: sl(),
-      sharedPreferences: sl(),
-    ),
-  );
-
-  // Data source
-  sl.registerLazySingleton<ChangelogRemoteDataSource>(
-    () => ChangelogRemoteDataSourceImpl(firestore: sl()),
   );
 
   // ! Features - Tasks
