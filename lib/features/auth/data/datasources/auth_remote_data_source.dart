@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
@@ -169,6 +170,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> signOut() => _signOutQuietly();
 
   Future<void> _signOutQuietly() async {
+    BranchesSessionCache.invalidate();
     try {
       await firebaseAuth.signOut();
     } catch (_) {}

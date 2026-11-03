@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -292,10 +293,8 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
   @override
   Future<List<Map<String, dynamic>>> getBranches() async {
     try {
-      final snapshot = await firestore
-          .collection('branches')
-          .getResilient(forceServer: true);
-      final list = snapshot.docs
+      final docs = await BranchesSessionCache.load(firestore);
+      final list = docs
           .map((doc) {
             final data = doc.data();
             final name = (data['branchName'] as String?) ??
