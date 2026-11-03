@@ -67,7 +67,7 @@ class _AdminTasksScreenState extends State<AdminTasksScreen> {
           final theme = Theme.of(context);
           return Scaffold(
             appBar: AppBar(
-              title: const SizedBox.shrink(),
+              title: Text(l10n.tasks),
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(110),
                 child: _FilterBar(adminDelegate: widget.adminDelegate),
