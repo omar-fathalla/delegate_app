@@ -90,7 +90,7 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
 
     // 2. مسح شامل لكافة الكاشات والبيانات المرتبطة بالمستخدم والجلسة السابقة
     // مع الإبقاء الصارم على معرّف الجهاز الثابت (persistent_app_device_uuid)
-    // وإعدادات التطبيق العامة (الثيم، اللغة، إصدار سجل التغييرات)
+    // وإعدادات التطبيق العامة (الثيم، اللغة، وحالة طلب تقييم التطبيق)
     final allKeys = sharedPreferences.getKeys();
     final keysToRemove = <String>[];
 
