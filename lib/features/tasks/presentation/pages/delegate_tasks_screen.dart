@@ -351,7 +351,7 @@ class _DateHeader extends StatelessWidget {
     } else if (checkDate == yesterday) {
       text = l10n.yesterday;
     } else {
-      text = DateFormat.yMMMMd().format(date);
+      text = DateFormat.yMMMMd(Localizations.localeOf(context).languageCode).format(date);
     }
 
     return Padding(

@@ -502,7 +502,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                             ),
                             const SizedBox(width: 16),
                             Text(
-                              DateFormat.yMMMMd().format(_dueDate),
+                              DateFormat.yMMMMd(Localizations.localeOf(context).languageCode).format(_dueDate),
                               style: theme.textTheme.bodyLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),

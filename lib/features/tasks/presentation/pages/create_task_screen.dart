@@ -284,7 +284,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      DateFormat.yMMMMd().format(_selectedDate),
+                                      DateFormat.yMMMMd(Localizations.localeOf(context).languageCode).format(_selectedDate),
                                       style: theme.textTheme.bodyLarge
                                           ?.copyWith(
                                             fontWeight: FontWeight.bold,
