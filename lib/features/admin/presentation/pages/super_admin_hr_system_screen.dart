@@ -127,7 +127,7 @@ class SuperAdminHRSystemScreen extends StatelessWidget {
         },
       ),
       _HRModuleItem(
-        title: 'Live Tracking',
+        title: (Localizations.localeOf(context).languageCode == 'ar' ? 'التتبع المباشر' : 'Live Tracking'),
         badgeLabel: 'مباشر',
         subtitle: 'المراقبة الحية لمواقع المناديب والمروجين على الخريطة، متابعة خطوط السير والتواجد في الفروع لحظياً.',
         icon: Icons.radar_rounded,

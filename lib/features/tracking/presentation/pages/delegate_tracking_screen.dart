@@ -321,7 +321,7 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
       appBar: widget.showAppBar
           ? AppBar(
         title: Text(
-          'Live Tracking',
+          (Localizations.localeOf(context).languageCode == 'ar' ? 'التتبع المباشر' : 'Live Tracking'),
           style: textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
             color: colorScheme.onSurface,

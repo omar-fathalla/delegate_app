@@ -786,7 +786,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               buildPopupItem(
                 value: 'delegate_tracking',
                 icon: Icons.radar_rounded,
-                title: 'Live Tracking',
+                title: (Localizations.localeOf(context).languageCode == 'ar' ? 'التتبع المباشر' : 'Live Tracking'),
               ),
               buildPopupItem(
                 value: 'leaves_and_excuses',
@@ -963,7 +963,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             buildPopupItem(
               value: 'penalties_management',
               icon: Icons.gavel_rounded,
-              title: 'نظام الغرامات والمخالفات',
+              title: (Localizations.localeOf(context).languageCode == 'ar' ? 'سجل المخالفات والغرامات' : 'Penalties Management'),
               color: Theme.of(context).colorScheme.error,
             ),
           ],

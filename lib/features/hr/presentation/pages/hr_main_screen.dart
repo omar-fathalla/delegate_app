@@ -259,7 +259,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
         value: 'delegate_tracking',
         icon: Icon(Icons.radar_rounded,
             color: colorScheme.primary, size: 20),
-        title: 'Live Tracking',
+        title: (Localizations.localeOf(context).languageCode == 'ar' ? 'التتبع المباشر' : 'Live Tracking'),
       ),
       buildMenuItem(
         value: 'leaves_and_excuses',
