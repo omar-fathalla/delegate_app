@@ -10,6 +10,8 @@ This applies to Tashil App (`omar-fathalla/delegate_app`) only.
 5. Open a PR `dev → main` whose head is exactly the approved SHA, and merge it. No other commits go to `main`.
 6. Production deploys (Hosting, rules, indexes, functions) and the rules cut-over each need **a separate go from Mohamed** and a filled rollback record (section 5) before they run.
 
+- Without GitHub Pro the CI checks can't be made required, so **never merge into `dev` (or `main`) when the CI run on the exact PR head is red or missing**.
+
 ## 2. Manual version bump
 CI no longer bumps the version or pushes commits.
 - In a normal PR into `dev`, edit `pubspec.yaml` `version: X.Y.Z+N`. **N (the versionCode) must be greater than the last released one**. Google Play rejects anything else.
