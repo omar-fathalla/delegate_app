@@ -5,12 +5,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   var available = false;
+  var reloads = 0;
 
   setUp(() {
     available = false;
+    reloads = 0;
     googleMapsAvailabilityOverride = () => available;
+    googleMapsReloadOverride = () => reloads++;
   });
-  tearDown(() => googleMapsAvailabilityOverride = null);
+  tearDown(() {
+    googleMapsAvailabilityOverride = null;
+    googleMapsReloadOverride = null;
+  });
 
   Future<void> pumpGate(WidgetTester tester) => tester.pumpWidget(
         const MaterialApp(
@@ -53,6 +59,21 @@ void main() {
 
     available = true;
     await tester.tap(find.byKey(const Key('maps_gate_retry')));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+    expect(find.text('MAP'), findsOneWidget);
+  });
+
+  testWidgets('retry re-injects the script and waits again', (tester) async {
+    await pumpGate(tester);
+    await tester.pump(const Duration(milliseconds: 1300));
+    await tester.pump();
+    expect(reloads, 0);
+    await tester.tap(find.byKey(const Key('maps_gate_retry')));
+    await tester.pump();
+    expect(reloads, 1);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    available = true; // script loaded after re-inject
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pump();
     expect(find.text('MAP'), findsOneWidget);

@@ -14,6 +14,14 @@ bool get isGoogleMapsAvailable =>
 
 Future<bool>? _ready;
 
+/// Test seam: replaces the web script reload when set.
+@visibleForTesting
+void Function()? googleMapsReloadOverride;
+
+/// Web: re-inject the Maps <script> (same src/key as index.html). Mobile: no-op.
+void reloadGoogleMapsScript() =>
+    (googleMapsReloadOverride ?? loader.reloadGoogleMapsScript)();
+
 /// Completes when the Maps JS SDK is usable (web), or immediately (mobile).
 /// Resolves `false` after [timeout] instead of hanging.
 Future<bool> googleMapsReady({
@@ -60,6 +68,7 @@ class _GoogleMapsReadyGateState extends State<GoogleMapsReadyGate> {
   }
 
   void _retry() {
+    if (!isGoogleMapsAvailable) reloadGoogleMapsScript();
     setState(() {
       _wait = isGoogleMapsAvailable
           ? null

@@ -221,4 +221,26 @@ void main() {
       verifyNever(() => logout(any()));
     });
   });
+
+  test('cancelled run never calls the device check', () async {
+    AuthBloc.autoLoginTimeout = const Duration(seconds: 5);
+    final gate = Completer<SessionVerificationResult>();
+    var deviceCalls = 0;
+    when(() => checkAutoLogin(any())).thenAnswer((_) async => Right(tDelegate));
+    final bloc = build(
+      session: (_) => gate.future,
+      device: (_) async {
+        deviceCalls++;
+        return _ok;
+      },
+    );
+    bloc.add(CheckAutoLoginRequested());
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    bloc.add(const AutoLoginCancelled());
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    gate.complete(const SessionVerificationResult.valid());
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    await bloc.close();
+    expect(deviceCalls, 0);
+  });
 }

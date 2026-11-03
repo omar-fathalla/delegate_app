@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
+import 'package:delegate_app/core/config/debug_stall.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
@@ -285,17 +286,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(const AuthUnauthenticated(fromLogout: true));
       return;
     }
+    final gen = ++_autoLoginGen;
     emit(AuthLoading());
     if (isAnonymousSession?.call() == true) {
       await _signOutAnonymousSession(emit);
       return;
     }
-    final gen = ++_autoLoginGen;
+    if (debugStallActive) {
+      // DEV-only (?debugStall=1): hang auto-login so the splash stall UI can
+      // be exercised. Compiled out of prod (AppEnv.isDev is const false).
+      await Completer<void>().future;
+    }
     Delegate? cached;
     final _AutoLoginDecision decision;
     try {
       decision = await _resolveAutoLogin(
         (d) => cached = d,
+        gen,
       ).timeout(autoLoginTimeout);
     } on TimeoutException {
       if (gen != _autoLoginGen) return;
@@ -334,6 +341,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   /// late result after [autoLoginTimeout] has no side effects.
   Future<_AutoLoginDecision> _resolveAutoLogin(
     void Function(Delegate) onCached,
+    int gen,
   ) async {
     final result = await checkAutoLoginUseCase(NoParams());
     final delegate = result.fold((_) => null, (d) => d);
@@ -352,6 +360,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
 
     // 2. فحص بصمة الجهاز للتسجيل التلقائي
+    // A stale (timed-out, cancelled or restarted) run must not touch the
+    // device binding.
+    if (gen != _autoLoginGen) {
+      return _AutoLoginDecision(AuthAuthenticated(delegate: delegate));
+    }
     final device = await deviceCheck(delegate);
     if (device.isMismatched) {
       return _AutoLoginDecision(
