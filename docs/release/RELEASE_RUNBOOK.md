@@ -41,3 +41,7 @@ Before any production deploy, copy `docs/release/ROLLBACK_RECORD_TEMPLATE.md` to
 - Rules: redeploy the previous ruleset IDs in the record.
 - Android: halt the staged rollout in Play Console if one is running. Then open a revert PR into `main` and bump the versionCode above the current one in it, and ship it through the normal release flow (User Test OK on the SHA, Mohamed's go).
 Every rollback needs Mohamed's go, the same as a deploy.
+
+## 7. Known follow-ups
+- functions/ devDependencies `eslint@8` and its transitive `uuid@10` are deprecated (npm warnings). Upgrading them is a separate PR.
+- Since #193 commits `functions/package-lock.json`, the **first functions deploy after #193** installs the exact lockfile versions, which may differ from what was last deployed. Smoke-test it on `tashil-dev` first, and note it in that release's rollback record.
