@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -185,7 +186,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
       for (final field in ['phoneNumber', 'phone', 'mobile', 'mobileNumber']) {
         final query =
             await firestore
-                .collectionGroup('delegates')
+                .scopedDelegatesGroup()
                 .where(field, isEqualTo: phoneVar)
                 .limit(1)
                 .get();
@@ -254,7 +255,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
         targetName = 'منظمة: ${org['name']}';
         targetDetails = 'جميع أعضاء ومناديب ${org['name']}';
 
-        final snap = await firestore.collectionGroup('delegates').get();
+        final snap = await firestore.scopedDelegatesGroup().get();
         final batch = firestore.batch();
         int count = 0;
 

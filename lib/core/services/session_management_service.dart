@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -124,7 +125,7 @@ class SessionManagementService {
       // 3. إذا لم يتم العثور على مستند المندوب في شركته القديمة، نبحث برقم الهاتف لمعرفة ما إذا تم نقله لشركة أخرى!
       if (delegate.phoneNumber.isNotEmpty) {
         final querySnap = await _firestore
-            .collectionGroup('delegates')
+            .scopedDelegatesGroup()
             .where('phoneNumber', isEqualTo: delegate.phoneNumber)
             .limit(1)
             .get();
@@ -235,7 +236,7 @@ class SessionManagementService {
       } else {
         // البحث عبر collectionGroup وتحديث كل مستندات المندوب بهذا المعرّف
         final docs = await _firestore
-            .collectionGroup('delegates')
+            .scopedDelegatesGroup()
             .where('uid', isEqualTo: delegateUid)
             .get();
 

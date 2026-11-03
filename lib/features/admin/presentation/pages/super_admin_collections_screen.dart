@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -175,7 +176,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
       // 1. Fetch total due electronic receipts across delegates
       int totalElectronicReceipts = _totalDueReceiptsCount;
       try {
-        final delegatesSnapshot = await firestore.collectionGroup('delegates').get();
+        final delegatesSnapshot = await firestore.scopedDelegatesGroup().get();
 
         final filteredDelegates = delegatesSnapshot.docs.where((doc) {
           final pathParts = doc.reference.path.split('/');

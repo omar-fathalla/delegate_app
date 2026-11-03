@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:flutter/material.dart';
@@ -1510,7 +1511,7 @@ class _ApproverNameTextState extends State<ApproverNameText> {
       }
 
       final delegatesQuery = await firestore
-          .collectionGroup('delegates')
+          .scopedDelegatesGroup()
           .where('uid', isEqualTo: text)
           .limit(1)
           .get();

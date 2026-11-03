@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -42,7 +43,7 @@ class _SuperAdminPaymentReceiptsReportScreenState
 
       // 1. Fetch all delegates using collectionGroup
       final delegatesSnapshot =
-          await firestore.collectionGroup('delegates').get();
+          await firestore.scopedDelegatesGroup().get();
 
       // 2. Filter delegates by organization if the Super Admin belongs to a specific one
       final filteredDelegates = delegatesSnapshot.docs.where((doc) {

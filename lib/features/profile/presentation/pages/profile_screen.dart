@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -692,7 +693,7 @@ class _ProfileBody extends StatelessWidget {
       // 2. CollectionGroup query deletion to ensure no orphan doc exists
       try {
         final groupQuery = await firestore
-            .collectionGroup('delegates')
+            .scopedDelegatesGroup()
             .where('uid', isEqualTo: delegate.uid)
             .get();
         for (final doc in groupQuery.docs) {

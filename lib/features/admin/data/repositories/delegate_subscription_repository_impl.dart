@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dartz/dartz.dart';
@@ -94,7 +95,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // Check if phone number already belongs to an existing active delegate
       try {
         final existingDelegateByPhone = await _firestore
-            .collectionGroup('delegates')
+            .scopedDelegatesGroup()
             .where('phoneNumber', isEqualTo: cleanPhone)
             .limit(1)
             .get();
@@ -228,7 +229,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         String? existingPid;
         try {
           final existingByNat = await _firestore
-              .collectionGroup('delegates')
+              .scopedDelegatesGroup()
               .where('nationalId', isEqualTo: cleanNationalId)
               .limit(1)
               .get();
@@ -656,7 +657,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // 3. Check collectionGroup('delegates') where receiptCode == cleanCode
       try {
         final delSnap = await _firestore
-            .collectionGroup('delegates')
+            .scopedDelegatesGroup()
             .where('receiptCode', isEqualTo: cleanCode)
             .limit(1)
             .get();
@@ -748,7 +749,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         // B. CollectionGroup query deletion to ensure no orphan doc exists
         try {
           final groupQuery = await _firestore
-              .collectionGroup('delegates')
+              .scopedDelegatesGroup()
               .where('uid', isEqualTo: targetDelegateUid)
               .get();
           for (final doc in groupQuery.docs) {
@@ -1041,7 +1042,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       if (delegatePublicId.isNotEmpty) {
         try {
           final groupQuery = await _firestore
-              .collectionGroup('delegates')
+              .scopedDelegatesGroup()
               .where('uid', isEqualTo: targetDelegateUid)
               .get();
           for (final doc in groupQuery.docs) {
@@ -1189,7 +1190,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     if (cleanUid.isNotEmpty) {
       try {
         final uidSnap = await _firestore
-            .collectionGroup('delegates')
+            .scopedDelegatesGroup()
             .where('uid', isEqualTo: cleanUid)
             .get();
         for (final doc in uidSnap.docs) {
@@ -1205,7 +1206,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     if (cleanNat.isNotEmpty) {
       try {
         final natSnap = await _firestore
-            .collectionGroup('delegates')
+            .scopedDelegatesGroup()
             .where('nationalId', isEqualTo: cleanNat)
             .limit(5)
             .get();

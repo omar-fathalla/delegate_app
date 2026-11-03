@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/delegate_query_scope.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -219,7 +220,7 @@ class DeviceBindingService {
       return;
     }
 
-    final snap = await _firestore.collectionGroup('delegates').get();
+    final snap = await _firestore.scopedDelegatesGroup().get();
     for (final doc in snap.docs) {
       if (doc.id == delegateUid) {
         await doc.reference.update(resetData);
