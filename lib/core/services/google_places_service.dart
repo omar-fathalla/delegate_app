@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+
+import 'package:delegate_app/core/config/app_env.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 /// Representation of a Google Places suggestion / prediction.
@@ -27,7 +29,7 @@ class PlaceSuggestion {
 /// Service providing live Google Places Autocomplete, Geocoding, and Nearby Place details
 /// using the project's authorized Google Maps API key and Android package headers.
 class GooglePlacesService {
-  static const String _apiKey = 'AIzaSyDQkxCw7YSM1-qUxcjT9oWA9DNZyp3fsOk';
+  static String get _apiKey => AppEnv.placesApiKey;
   static const String _androidPackage = 'com.tashil.delegate';
   static const String _androidCert = '425213bfb15948a1cbfba42989605ebfb558a47e';
 

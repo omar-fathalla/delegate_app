@@ -16,10 +16,14 @@ No `bucket` override is needed: the CLI uses each project's default bucket
 ```bash
 flutter pub get
 ./scripts/build_web.sh dev        # ENV=dev build + dev Maps key in index.html
-                                  # (script lands with the Maps key PR; until then:
-                                  #  flutter build web --release --dart-define=ENV=dev)
 firebase hosting:channel:deploy <channel> --project tashil-dev --expires 7d
 ```
+ALWAYS build dev web with `scripts/build_web.sh dev`. A plain
+`flutter build web --dart-define=ENV=dev` leaves the prod Maps key in
+`index.html`. The script fails if any prod Maps/Places key remains in
+`build/web` or the dev Maps key is missing from `index.html`.
+Note: a `--dart-define=MAPS_API_KEY=...` override only changes the Dart side;
+it does NOT change the key in `index.html`.
 Rules / indexes / functions (dev only):
 ```bash
 firebase deploy --only firestore:rules,firestore:indexes,storage --project tashil-dev
