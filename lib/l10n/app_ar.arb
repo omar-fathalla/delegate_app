@@ -84,9 +84,13 @@
   "@delegateAccountInactive": {
     "description": "Pending or blocked delegate login error"
   },
-  "tooManyLoginAttempts": "تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً.",
+  "tooManyLoginAttempts": "محاولات كثيرة، حاول لاحقاً",
   "@tooManyLoginAttempts": {
     "description": "Delegate login lockout message"
+  },
+  "loginNetworkError": "تعذّر الاتصال، تأكد من الإنترنت",
+  "@loginNetworkError": {
+    "description": "Login failed because the device is offline"
   },
   "loginTemporarilyUnavailable": "تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.",
   "@loginTemporarilyUnavailable": {

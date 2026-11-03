@@ -436,4 +436,69 @@ void main() {
       }, (_) => fail('left'));
     });
   });
+
+  group('staff sign-in errors reach the screen (I-5)', () {
+    for (final code in ['rate_limited', 'network']) {
+      test('$code from Firebase Auth stops the staff chain', () async {
+        mockAuthRepository.getDelegatesByPhoneStub =
+            (_) async => Right([_staffFrom(tDelegate)]);
+        mockAuthRepository.verifyAdminPasswordStub =
+            (_, _) async => Left(AuthFailure('x', code));
+        final result = await usecase(const LoginParams(
+            phoneNumber: tMobile, password: 'p', mode: LoginMode.staff));
+        result.fold((f) => expect((f as AuthFailure).code, code),
+            (_) => fail('expected failure'));
+      });
+    }
+
+    test('wrong password stays the generic invalid-credentials failure',
+        () async {
+      mockAuthRepository.getDelegatesByPhoneStub =
+          (_) async => Right([_staffFrom(tDelegate)]);
+      mockAuthRepository.verifyAdminPasswordStub =
+          (_, _) async => const Right(false);
+      final result = await usecase(const LoginParams(
+          phoneNumber: tMobile, password: 'p', mode: LoginMode.staff));
+      result.fold((f) {
+        expect((f as AuthFailure).code, 'invalid_credentials');
+        expect(f.message, 'رقم الهاتف أو كلمة المرور غير صحيحة');
+      }, (_) => fail('expected failure'));
+    });
+  });
+}
+
+Delegate _staffFrom(Delegate base) {
+      return Delegate(
+        uid: base.uid,
+        firstName: base.firstName,
+        middleName: base.middleName,
+        lastName: base.lastName,
+        fullName: base.fullName,
+        nationalityID: '__firebase_auth__:staff@example.com',
+        email: 'staff@example.com',
+        motherName: base.motherName,
+        city: base.city,
+        phoneNumber: base.phoneNumber,
+        gender: base.gender,
+        position: base.position,
+        birthDate: base.birthDate,
+        organizationUID: base.organizationUID,
+        organizationName: base.organizationName,
+        companyUID: base.companyUID,
+        companyName: base.companyName,
+        status: base.status,
+        delegatePublicId: base.delegatePublicId,
+        allReceiptCodes: base.allReceiptCodes,
+        createdAt: base.createdAt,
+        createdBy: base.createdBy,
+        hasPendingUpdate: base.hasPendingUpdate,
+        isDeductedFromCompany: base.isDeductedFromCompany,
+        isPrinted: base.isPrinted,
+        isProfileComplete: base.isProfileComplete,
+        numberOfDocuments: base.numberOfDocuments,
+        paymentAmount: base.paymentAmount,
+        version: base.version,
+        documents: base.documents,
+        role: UserRole.superAdmin,
+      );
 }

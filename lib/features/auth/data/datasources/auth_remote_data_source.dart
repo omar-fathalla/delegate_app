@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
@@ -355,10 +356,33 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return credential.user != null;
     } on FirebaseAuthException catch (e) {
       debugPrint('FirebaseAuth admin signIn exception: ${e.code}');
+      final mapped = mapStaffSignInError(e.code);
+      if (mapped != null) throw mapped;
+      // Wrong password, unknown user, etc. stay a plain "no match" so the
+      // screen keeps its generic invalid-credentials message.
       return false;
+    } on TimeoutException {
+      throw const AuthFailure(
+        'تعذّر الاتصال، تأكد من الإنترنت',
+        'network',
+      );
     } catch (e) {
       debugPrint('FirebaseAuth admin signIn error: $e');
       return false;
+    }
+  }
+
+  /// Firebase Auth codes that must reach the login screen instead of being
+  /// reported as a wrong password. Returns null for credential misses.
+  @visibleForTesting
+  static AuthFailure? mapStaffSignInError(String code) {
+    switch (code) {
+      case 'too-many-requests':
+        return const AuthFailure('محاولات كثيرة، حاول لاحقاً', 'rate_limited');
+      case 'network-request-failed':
+        return const AuthFailure('تعذّر الاتصال، تأكد من الإنترنت', 'network');
+      default:
+        return null;
     }
   }
 
@@ -368,6 +392,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final email = await _staffEmailForPhone(phoneNumber);
       if (email == null) return false;
       return await verifyAdminPassword(email, password);
+    } on AuthFailure {
+      rethrow;
     } catch (_) {
       return false;
     }

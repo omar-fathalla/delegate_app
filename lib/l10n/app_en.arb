@@ -80,6 +80,10 @@
   "@tooManyLoginAttempts": {
     "description": "Delegate login lockout message"
   },
+  "loginNetworkError": "Couldn't connect. Check your internet connection.",
+  "@loginNetworkError": {
+    "description": "Login failed because the device is offline"
+  },
   "loginTemporarilyUnavailable": "Sign-in is temporarily unavailable. Please try again.",
   "@loginTemporarilyUnavailable": {
     "description": "Delegate login service unavailable"

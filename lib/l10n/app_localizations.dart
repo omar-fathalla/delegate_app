@@ -218,6 +218,12 @@ abstract class AppLocalizations {
   /// **'Too many attempts. Please try again later.'**
   String get tooManyLoginAttempts;
 
+  /// Login failed because the device is offline
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t connect. Check your internet connection.'**
+  String get loginNetworkError;
+
   /// Delegate login service unavailable
   ///
   /// In en, this message translates to:

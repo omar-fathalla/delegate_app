@@ -20,6 +20,8 @@ String localizedAuthError(
       return l10n.invalidMobileNumber;
     case 'invalid_national_id':
       return l10n.invalidNationalId;
+    case 'network':
+      return l10n.loginNetworkError;
     case 'unavailable':
       return l10n.loginTemporarilyUnavailable;
     default:

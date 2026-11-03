@@ -69,8 +69,10 @@ class AppLocalizationsAr extends AppLocalizations {
       'هذا الحساب قيد المراجعة أو موقوف. يرجى التواصل مع مسؤول الشركة.';
 
   @override
-  String get tooManyLoginAttempts =>
-      'تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً.';
+  String get tooManyLoginAttempts => 'محاولات كثيرة، حاول لاحقاً';
+
+  @override
+  String get loginNetworkError => 'تعذّر الاتصال، تأكد من الإنترنت';
 
   @override
   String get loginTemporarilyUnavailable =>

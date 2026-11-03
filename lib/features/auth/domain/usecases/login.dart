@@ -48,6 +48,8 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
             phone,
             params.password,
           );
+          final blocking = _blockingFailure(isValid);
+          if (blocking != null) return Left(blocking);
           final valid = isValid.fold((_) => false, (v) => v);
           if (valid) matched.add(delegate);
         } else if (delegate.nationalityID.startsWith('__firebase_auth__:')) {
@@ -59,6 +61,8 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
             email,
             params.password,
           );
+          final blocking = _blockingFailure(verifyResult);
+          if (blocking != null) return Left(blocking);
           final isValid = verifyResult.fold((_) => false, (valid) => valid);
           if (isValid) matched.add(delegate);
         }
@@ -77,6 +81,17 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
 
       return _finish(matched, params);
     });
+  }
+
+  /// Lockout and connectivity failures stop the staff chain so the screen
+  /// can say so. Any other failure still counts as "no match".
+  AuthFailure? _blockingFailure(Either<Failure, bool> result) {
+    return result.fold((f) {
+      if (f is AuthFailure && (f.code == 'rate_limited' || f.code == 'network')) {
+        return f;
+      }
+      return null;
+    }, (_) => null);
   }
 
   Future<Either<Failure, List<Delegate>>> _finish(

@@ -73,6 +73,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Too many attempts. Please try again later.';
 
   @override
+  String get loginNetworkError =>
+      'Couldn\'t connect. Check your internet connection.';
+
+  @override
   String get loginTemporarilyUnavailable =>
       'Sign-in is temporarily unavailable. Please try again.';
 
