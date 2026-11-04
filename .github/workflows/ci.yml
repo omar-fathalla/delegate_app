@@ -48,6 +48,28 @@ jobs:
       - name: Test
         run: flutter test --concurrency=1
 
+  p0-scripts:
+    name: P0 scripts (emulators)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - name: P0 scripts emulator test
+        run: npx --yes firebase-tools@14.15.1 emulators:exec --only auth,firestore --project demo-p0-scripts "node --test scripts/p0-scripts.emulator.test.js"
+
   build-web:
     name: Build web (release)
     runs-on: ubuntu-latest
