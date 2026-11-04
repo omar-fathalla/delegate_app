@@ -1196,15 +1196,14 @@ PODS:
   - BoringSSL-GRPC/Implementation (0.0.37):
     - BoringSSL-GRPC/Interface (= 0.0.37)
   - BoringSSL-GRPC/Interface (0.0.37)
-  - cloud_firestore (6.10.2):
+  - cloud_firestore (7.1.0):
     - Firebase/Firestore (= 12.19.3)
     - firebase_core
     - Flutter
-  - cloud_functions (6.5.1):
+  - cloud_functions (7.0.1):
     - Firebase/Functions (= 12.19.3)
     - firebase_core
     - Flutter
-  - CocoaAsyncSocket (7.6.5)
   - connectivity_plus (0.0.1):
     - Flutter
   - device_info_plus (0.0.1):
@@ -1232,26 +1231,26 @@ PODS:
   - Firebase/Storage (12.19.3):
     - Firebase/CoreOnly
     - FirebaseStorage (~> 12.19.0)
-  - firebase_auth (6.7.1):
+  - firebase_auth (7.0.1):
     - Firebase/Auth (= 12.19.3)
     - firebase_core
     - Flutter
-  - firebase_core (4.15.2):
+  - firebase_core (5.1.0):
     - Firebase/CoreOnly (= 12.19.3)
     - Flutter
-  - firebase_crashlytics (5.4.1):
+  - firebase_crashlytics (6.0.1):
     - Firebase/Crashlytics (= 12.19.3)
     - firebase_core
     - Flutter
-  - firebase_messaging (16.7.1):
+  - firebase_messaging (17.0.1):
     - Firebase/Messaging (= 12.19.3)
     - firebase_core
     - Flutter
-  - firebase_remote_config (6.7.1):
+  - firebase_remote_config (7.0.1):
     - Firebase/RemoteConfig (= 12.19.3)
     - firebase_core
     - Flutter
-  - firebase_storage (13.6.1):
+  - firebase_storage (14.0.1):
     - Firebase/Storage (= 12.19.3)
     - firebase_core
     - Flutter
@@ -1511,10 +1510,6 @@ PODS:
   - nanopb/encode (3.30910.0)
   - package_info_plus (0.4.5):
     - Flutter
-  - patrol (0.0.1):
-    - CocoaAsyncSocket (~> 7.6)
-    - Flutter
-    - FlutterMacOS
   - printing (1.0.0):
     - Flutter
   - PromisesObjC (2.4.1)
@@ -1560,7 +1555,6 @@ DEPENDENCIES:
   - in_app_review (from `.symlinks/plugins/in_app_review/ios`)
   - mobile_scanner (from `.symlinks/plugins/mobile_scanner/darwin`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
-  - patrol (from `.symlinks/plugins/patrol/darwin`)
   - printing (from `.symlinks/plugins/printing/ios`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -1573,7 +1567,6 @@ SPEC REPOS:
   trunk:
     - abseil
     - BoringSSL-GRPC
-    - CocoaAsyncSocket
     - Firebase
     - FirebaseABTesting
     - FirebaseAppCheckInterop
@@ -1652,8 +1645,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/mobile_scanner/darwin"
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
-  patrol:
-    :path: ".symlinks/plugins/patrol/darwin"
   printing:
     :path: ".symlinks/plugins/printing/ios"
   share_plus:
@@ -1673,18 +1664,17 @@ SPEC CHECKSUMS:
   abseil: a05cc83bf02079535e17169a73c5be5ba47f714b
   battery_plus: b42253f6d2dde71712f8c36fef456d99121c5977
   BoringSSL-GRPC: dded2a44897e45f28f08ae87a55ee4bcd19bc508
-  cloud_firestore: 80cb65a08f881ca2c811dce631cd3fd1120c25e0
-  cloud_functions: aed2c977869e57132b87fe398a6fa0f365efeb27
-  CocoaAsyncSocket: 065fd1e645c7abab64f7a6a2007a48038fdc6a99
+  cloud_firestore: a9637b45813d95cc7371aa819d31bf975b27ef31
+  cloud_functions: 21e02dfd9b777f20246eb31e21622257829ec93b
   connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
   Firebase: e3c5ab38229ae085490d02398d97b9f5374bbe6e
-  firebase_auth: 749e959255e42e6ca6ec2ecc83a0e1ce55d384fe
-  firebase_core: 4d065e808a89f0eaa0df16660666783f9ea13d38
-  firebase_crashlytics: d4d2cffdd16f240f8b563c2351b9285595b82e5f
-  firebase_messaging: d66dd9b68ca259955678628aa4f3e4294d055790
-  firebase_remote_config: bc36198938c089ac4d7d77f2d0ab7618f33c400d
-  firebase_storage: 8ea03b6c6623411cd9995b2950e3b6fe7f256afa
+  firebase_auth: 1be750cad742730e67d5b6d959b563368eab05de
+  firebase_core: 80d50cac10fc9dff2597c55ed43e296d9a0bc90a
+  firebase_crashlytics: a2af9cc2455b53c53af479e7712711a2758e9f99
+  firebase_messaging: 378a914df459aea513c6642ebb531fe7d7200c94
+  firebase_remote_config: 998bb0a01a21146c43e13cacd3731e785b748519
+  firebase_storage: ac98c8947d44a65b5043c883aa80896f27ddac08
   FirebaseABTesting: 3f0f330ed5e19323fe512006d62a38399a7de7c1
   FirebaseAppCheckInterop: bd4b791ffaed7ae719304af6369d243ddee5e4a0
   FirebaseAuth: 8c38236f67e5e3dd6aacf3e0c46b3eed31e9c820
@@ -1704,7 +1694,7 @@ SPEC CHECKSUMS:
   FirebaseSessions: 39bcaa7c16b5d8b91d58f495f29ce2988d2f915c
   FirebaseSharedSwift: c91f36aeaa566e12b682caacc40d34c8303c3124
   FirebaseStorage: 357354fbde2ba62983c0fe5d9cf10155046b5404
-  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
   flutter_local_notifications: a5a732f069baa862e728d839dd2ebb904737effb
   flutter_native_splash: c32d145d68aeda5502d5f543ee38c192065986cf
   gal: baecd024ebfd13c441269ca7404792a7152fde89
@@ -1724,7 +1714,6 @@ SPEC CHECKSUMS:
   mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
-  patrol: 09773d9cd563ec54230813755b3231b2e8252aac
   printing: 54ff03f28fe9ba3aa93358afb80a8595a071dd07
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   PromisesSwift: 217dea0fd5d2ad65222a109c48698add13cc1c5b
@@ -1736,6 +1725,6 @@ SPEC CHECKSUMS:
   webview_flutter_wkwebview: 8ebf4fded22593026f7dbff1fbff31ea98573c8d
   workmanager_apple: 1fc2a64e6a63ed3540fbb91b65f0c0d501881248
 
-PODFILE CHECKSUM: d9de4a49ee829a7f13ba90412b4ffbcd53dd6b57
+PODFILE CHECKSUM: ad1617839d59b1e4c8152755b0bb8c729e524080
 
 COCOAPODS: 1.16.2

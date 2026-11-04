@@ -40,10 +40,6 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    kotlinOptions {
-        jvmTarget = "21"
-    }
-
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.tashil.delegate"
@@ -183,5 +179,11 @@ afterEvaluate {
     tasks.matching { it.name.matches(Regex("^assemble.+AndroidTest$")) }.configureEach {
         val appAssembleName = name.removeSuffix("AndroidTest")
         tasks.findByName(appAssembleName)?.let { dependsOn(it) }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
 }
