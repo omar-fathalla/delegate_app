@@ -427,9 +427,14 @@ describe("docs-pending round 2", () => {
         await ok(updateDoc(doc(as("ts"), path), {fullName: "z", status: "suspended"}));
       });
       const cpath = path.replace(/d1$/, "newT");
-      test("ALLOW ts creates active delegate with approved docs batched with its pending request [r4]", async () => {
+      // r5: a tech approval needs the request's own nested doc
+      // (organizations/{org}/companies/{comp}/delegates/{id}) active in the
+      // batch, so the same batch on a top-level / branch path is denied.
+      const nestedOnly = label === "nested";
+      test(`${nestedOnly ? "ALLOW" : "DENY"} ts creates active delegate with approved docs batched with its pending request [r4/r5]`, async () => {
         await seed("delegate_requests/newT", REQ);
-        await ok(batchApprove(as("ts"), "newT", cpath, {...BASE, uid: "newT", status: "active", documents: [PHOTO]}, true));
+        const p = batchApprove(as("ts"), "newT", cpath, {...BASE, uid: "newT", status: "active", documents: [PHOTO]}, true);
+        await (nestedOnly ? ok(p) : no(p));
       });
       test("DENY ts creates active delegate for an already-approved request (not batched) [r4 F2]", async () => {
         await seed("delegate_requests/newT", {...REQ, status: "approved"});
@@ -520,7 +525,9 @@ describe("docs-pending round 2", () => {
     test("DENY ts approves the request first, then activates in a later write", async () => {
       await seed("delegate_requests/n1", REQ);
       await seed(NP, {...BASE, uid: "n1", status: "pending", documents: [{...PHOTO, documentStatus: "pending"}]});
-      await ok(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "approved"}));
+      // r5: the lone request approval (old builds' first step) is denied too.
+      await no(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "approved"}));
+      assert.equal(await readReq("n1"), "pending");
       await no(updateDoc(doc(as("ts"), NP), {status: "active", documents: [PHOTO]}));
     });
     test("DENY ts batch whose request is rejected in the same batch", async () => {
@@ -640,6 +647,118 @@ describe("docs-pending round 2", () => {
       await seed("delegate_requests/a1", AREQ);
       await no(batchApprove(as("ts"), "a1", "organizations/o3/companies/c1/delegates/d1", {...D, organizationUID: "o3"}, true));
     });
+  });
+
+  describe("r5 old builds: tech approval needs the target active in the same batch", () => {
+    const NP = "organizations/o1/companies/c1/delegates/n1";
+    const AP = "organizations/o2/companies/c1/delegates/d1";
+    const AREQ = {...REQ, requestType: "add_organization", existingDelegateUid: "d1", organizationUID: "o2"};
+    test("DENY ts approves new_delegate alone (no delegate doc)", async () => {
+      await seed("delegate_requests/n1", REQ);
+      await no(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "approved", reviewedBy: "ts"}));
+      assert.equal(await readReq("n1"), "pending");
+    });
+    test("DENY ts approves new_delegate alone (delegate doc still pending)", async () => {
+      await seed("delegate_requests/n1", REQ);
+      await seed(NP, {...BASE, uid: "n1", status: "pending", documents: [{...PHOTO, documentStatus: "pending"}]});
+      await no(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "approved", reviewedBy: "ts"}));
+    });
+    test("DENY ts approves add_organization alone", async () => {
+      await seed("delegate_requests/a1", AREQ);
+      await no(updateDoc(doc(as("ts"), "delegate_requests/a1"), {status: "approved", reviewedBy: "ts"}));
+      assert.equal(await readReq("a1"), "pending");
+    });
+    test("DENY ts approves add_organization with no existingDelegateUid", async () => {
+      await seed("delegate_requests/a1", {...AREQ, existingDelegateUid: null});
+      await no(updateDoc(doc(as("ts"), "delegate_requests/a1"), {status: "approved"}));
+    });
+    test("ALLOW ts approves delete_delegate alone (Q3 unchanged)", async () => {
+      await seed("delegate_requests/x1", {...REQ, requestType: "delete_delegate"});
+      await ok(updateDoc(doc(as("ts"), "delegate_requests/x1"), {status: "approved", reviewedBy: "ts"}));
+    });
+    test("ALLOW ts rejects new_delegate alone", async () => {
+      await seed("delegate_requests/n1", REQ);
+      await ok(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "rejected", rejectionReason: "x"}));
+    });
+    test("ALLOW super-admin approves new_delegate alone (unchanged)", async () => {
+      await seed("delegate_requests/n1", REQ);
+      await ok(updateDoc(doc(as("sa"), "delegate_requests/n1"), {status: "approved", reviewedBy: "sa"}));
+    });
+    test("ALLOW ts batched create (new_delegate) still passes", async () => {
+      await seed("delegate_requests/n1", REQ);
+      await ok(batchApprove(as("ts"), "n1", NP, {...BASE, uid: "n1", status: "active", documents: [PHOTO, NID, RCPT]}, true));
+    });
+    test("ALLOW ts batched add_organization still passes", async () => {
+      await seed("delegate_requests/a1", AREQ);
+      await ok(batchApprove(as("ts"), "a1", AP, {...BASE, organizationUID: "o2", status: "active", approvedRequestId: "a1", documents: [PHOTO, NID, RCPT]}, true));
+    });
+  });
+
+  describe("r5 budget: tech status-only activation with an extra pending e-receipt", () => {
+    const NP = "organizations/o1/companies/c1/delegates/n1";
+    const ER = {documentKey: "electronicPaymentReceipt", documentStatus: "approved", documentURL: "r0"};
+    const ER2 = {documentKey: "electronic_payment_receipt", documentStatus: "approved", documentURL: "r0"};
+    const pend = (e) => ({...e, documentStatus: "pending"});
+    const extra = (i) => ({documentKey: "x" + i, documentStatus: "pending", documentURL: "x"});
+    test("ALLOW 4 flips (photo, ID, receipt, e-receipt) + 4 untouched entries", async () => {
+      await seed("delegate_requests/n1", REQ);
+      const o = [pend(PHOTO), pend(NID), pend(RCPT), pend(ER), extra(1), extra(2), extra(3), extra(4)];
+      await seed(NP, {...BASE, uid: "n1", status: "pending", documents: o});
+      const n = o.map((e, i) => (i < 4 ? {...e, documentStatus: "approved"} : e));
+      await ok(batchApprove(as("ts"), "n1", NP, {status: "active", documents: n, reviewedBy: "ts", updatedAt: "t"}));
+      assert.equal(await readReq("n1"), "approved");
+    });
+    test("DENY (documented limit) 5 flips on one doc: atomic, request stays pending", async () => {
+      await seed("delegate_requests/n1", REQ);
+      const o = [pend(PHOTO), pend(NID), pend(RCPT), pend(ER), pend(ER2)];
+      await seed(NP, {...BASE, uid: "n1", status: "pending", documents: o});
+      const n = o.map((e) => ({...e, documentStatus: "approved"}));
+      await no(batchApprove(as("ts"), "n1", NP, {status: "active", documents: n}));
+      assert.equal(await readReq("n1"), "pending");
+    });
+    test("ALLOW super-admin 5 flips on one doc", async () => {
+      await seed("delegate_requests/n1", REQ);
+      const o = [pend(PHOTO), pend(NID), pend(RCPT), pend(ER), pend(ER2)];
+      await seed(NP, {...BASE, uid: "n1", status: "pending", documents: o});
+      const n = o.map((e) => ({...e, documentStatus: "approved"}));
+      await ok(batchApprove(as("sa"), "n1", NP, {status: "active", documents: n}));
+    });
+    test("DENY ts flip with a mismatched e-receipt URL", async () => {
+      await seed("delegate_requests/n1", REQ);
+      const o = [pend(PHOTO), pend(NID), pend(RCPT), {...pend(ER), documentURL: "evil"}];
+      await seed(NP, {...BASE, uid: "n1", status: "pending", documents: o});
+      const n = o.map((e) => ({...e, documentStatus: "approved"}));
+      await no(batchApprove(as("ts"), "n1", NP, {status: "active", documents: n}));
+    });
+  });
+
+  describe("r5 tech create binds phone and top-level URLs", () => {
+    const NP = "organizations/o1/companies/c1/delegates/n1";
+    const R = {...REQ, phoneNumber: "0100000000"};
+    const D = {...BASE, uid: "n1", phoneNumber: "0100000000", status: "active", documents: [PHOTO, NID, RCPT]};
+    test("ALLOW the app's create payload", async () => {
+      await seed("delegate_requests/n1", R);
+      await ok(batchApprove(as("ts"), "n1", NP, D, true));
+    });
+    for (const [k, v] of [["phoneNumber", "0199999999"], ["nationalIdFrontUrl", "evil"], ["nationalIdBackUrl", "evil"],
+      ["receiptImageUrl", "evil"], ["personalPhotoURL", "evil"], ["photoURL", "evil"]]) {
+      test(`DENY ts create with a different ${k}`, async () => {
+        await seed("delegate_requests/n1", R);
+        await no(batchApprove(as("ts"), "n1", NP, {...D, [k]: v}, true));
+        assert.equal(await readReq("n1"), "pending");
+      });
+    }
+  });
+
+  describe("r5 sent_notifications log (app payload: senderUid, no supervisorUid)", () => {
+    const SN = (w) => ({title: "t", body: "b", senderUid: w, senderName: "S", targetType: "company",
+      organizationUID: "o1", companyUID: "c1", sentAt: "t", recipientCount: 3});
+    for (const w of ["sa", "ts", "oa", "ca", "adm", "sup", "hr"]) {
+      test(`ALLOW ${w} writes the notification log`, () => ok(setDoc(doc(as(w), `sent_notifications/s_${w}`), SN(w))));
+    }
+    for (const w of ["acc", "bmm", "mk", "d1"]) {
+      test(`DENY ${w} writes the notification log`, () => no(setDoc(doc(as(w), `sent_notifications/s_${w}`), SN(w))));
+    }
   });
 
   describe("Q3 who can delete", () => {

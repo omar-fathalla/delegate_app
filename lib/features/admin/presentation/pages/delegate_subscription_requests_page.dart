@@ -534,6 +534,11 @@ class _DelegateSubscriptionRequestsPageState
 
     if (!mounted) return;
 
+    final failure = result.fold((f) => f, (_) => null);
+    if (failure is ApprovalFollowUpFailure) {
+      await _retryApprovalFollowUps(failure);
+      return;
+    }
     result.fold(
       (failure) => AppSnackBar.showError(context, failure.message),
       (_) => AppSnackBar.showSuccess(
@@ -543,6 +548,42 @@ class _DelegateSubscriptionRequestsPageState
             : 'تم اعتماد المندوب ${request.fullName} بنجاح وتفعيل حسابه!',
       ),
     );
+  }
+
+  /// The approval committed but the delegate's account record did not; keep
+  /// offering a retry of the follow-up writes until they succeed or the
+  /// reviewer closes the dialog.
+  Future<void> _retryApprovalFollowUps(ApprovalFollowUpFailure failure) async {
+    var message = failure.message;
+    while (mounted) {
+      final retry = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('إكمال اعتماد المندوب'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إغلاق'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      );
+      if (retry != true || !mounted) return;
+      final r = await failure.retry();
+      if (!mounted) return;
+      final f = r.fold((f) => f, (_) => null);
+      if (f == null) {
+        AppSnackBar.showSuccess(context, 'تم إكمال بيانات حساب المندوب بنجاح.');
+        return;
+      }
+      message = f.message;
+    }
   }
 
   Future<void> _handleReject(DelegateSubscriptionRequest request) async {

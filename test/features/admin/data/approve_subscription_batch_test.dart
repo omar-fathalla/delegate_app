@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:delegate_app/features/admin/data/repositories/delegate_subscription_repository_impl.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
+import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
+import 'package:delegate_app/core/error/failures.dart';
 
 class _MockStorage extends Mock implements FirebaseStorage {}
 
@@ -29,6 +31,42 @@ class _FailingBatch implements WriteBatch {
 class _FailingBatchFirestore extends FakeFirebaseFirestore {
   @override
   WriteBatch batch() => _FailingBatch(super.batch());
+}
+
+// r5: users/{uid} writes fail while [failUsers] is true (post-commit step 3).
+class _UsersFailFirestore extends FakeFirebaseFirestore {
+  bool failUsers = true;
+  @override
+  CollectionReference<Map<String, dynamic>> collection(String collectionPath) {
+    final c = super.collection(collectionPath);
+    if (collectionPath != 'users') return c;
+    return _FailingUsers(c, this);
+  }
+}
+
+class _FailingUsers extends Fake implements CollectionReference<Map<String, dynamic>> {
+  _FailingUsers(this.inner, this.db);
+  final CollectionReference<Map<String, dynamic>> inner;
+  final _UsersFailFirestore db;
+  @override
+  DocumentReference<Map<String, dynamic>> doc([String? path]) => _FailingUserDoc(inner.doc(path), db);
+}
+
+class _FailingUserDoc extends Fake implements DocumentReference<Map<String, dynamic>> {
+  _FailingUserDoc(this.inner, this.db);
+  final DocumentReference<Map<String, dynamic>> inner;
+  final _UsersFailFirestore db;
+  @override
+  String get id => inner.id;
+  @override
+  Future<DocumentSnapshot<Map<String, dynamic>>> get([GetOptions? options]) => inner.get(options);
+  @override
+  Future<void> set(Map<String, dynamic> data, [SetOptions? options]) async {
+    if (db.failUsers) {
+      throw FirebaseException(plugin: 'cloud_firestore', code: 'unavailable');
+    }
+    return inner.set(data, options);
+  }
 }
 
 const _req = <String, dynamic>{
@@ -76,6 +114,7 @@ void main() {
       reviewerName: 'TS',
     );
     expect(result.isLeft(), isTrue);
+    expect(result.fold((f) => f.message, (_) => ''), approvalBatchDeniedMessage);
     expect((await db.doc('delegate_requests/r1').get()).data()!['status'], 'pending');
     final d = (await db.doc(_delegatePath).get()).data()!;
     expect(d['status'], 'pending');
@@ -122,5 +161,34 @@ void main() {
   test('profileMergeFields never carries status, documents or URLs', () {
     final m = profileMergeFields({'status': 'active', 'documents': [], 'profileImageUrl': 'p', 'fullName': 'F', 'approvedRequestId': 'r'});
     expect(m, {'fullName': 'F'});
+  });
+
+  test('r5: users/{uid} write fails after commit -> surfaced with a working retry', () async {
+    final db = _UsersFailFirestore();
+    await _seed(db);
+    final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    final result = await repo.approveSubscriptionRequest(
+      request: DelegateSubscriptionRequest.fromMap(_req, 'r1'),
+      reviewerUid: 'ts',
+      reviewerName: 'TS',
+    );
+    final Failure? f = result.fold((f) => f, (_) => null);
+    expect(f, isA<ApprovalFollowUpFailure>());
+    // Batch already committed.
+    expect((await db.doc('delegate_requests/r1').get()).data()!['status'], 'approved');
+    expect((await db.doc(_delegatePath).get()).data()!['status'], 'active');
+    expect((await db.doc('users/r1').get()).exists, isFalse);
+
+    // Still failing -> plain failure, retry can be offered again.
+    expect((await (f! as ApprovalFollowUpFailure).retry()).isLeft(), isTrue);
+
+    db.failUsers = false;
+    final retried = await (f as ApprovalFollowUpFailure).retry();
+    expect(retried.isRight(), isTrue);
+    final u = (await db.doc('users/r1').get()).data()!;
+    expect(u['role'], 'delegate');
+    expect(u['status'], 'active');
+    // The profile merge for the status-only activation also ran.
+    expect((await db.doc(_delegatePath).get()).data()!['firstName'], 'Fake');
   });
 }

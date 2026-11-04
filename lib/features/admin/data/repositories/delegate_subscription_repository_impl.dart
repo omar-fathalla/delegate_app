@@ -997,12 +997,14 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       if (supRef != null && supDelegateData != null) {
         await addActivation(supRef, supDelegateData);
       }
-      await batch.commit();
-
-      for (final e in followUps.entries) {
-        try {
-          await e.key.set(e.value, SetOptions(merge: true));
-        } catch (_) {}
+      try {
+        await batch.commit();
+      } on FirebaseException catch (e) {
+        // Atomic: nothing was written, the request is still pending.
+        if (e.code == 'permission-denied') {
+          return const Left(ServerFailure(approvalBatchDeniedMessage));
+        }
+        rethrow;
       }
 
       // 2a. Ensure the company exists under the target organization
@@ -1071,20 +1073,47 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         } catch (_) {}
       }
 
-      // 3. Also ensure user record exists for mobile login with all organization names
-      await _firestore.collection('users').doc(targetDelegateUid).set({
-        'uid': targetDelegateUid,
-        if (delegatePublicId.isNotEmpty) 'delegatePublicId': delegatePublicId,
-        'fullName': request.fullName,
-        'phoneNumber': request.phoneNumber,
-        'phone': request.phoneNumber,
-        'role': 'delegate',
-        'organizationUID': request.organizationUID,
-        'companyUID': request.companyUID,
-        'organizationNames': FieldValue.arrayUnion(allKnownOrgs),
-        'status': 'active',
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      // 3. Profile merges (status-only activations) and the users/{uid}
+      // record the delegate logs in with. These run after the batch, so a
+      // failure is surfaced with a retry instead of being swallowed (the
+      // request is already approved, so approving again is not possible).
+      Future<void> criticalFollowUps() async {
+        for (final e in followUps.entries) {
+          await e.key.set(e.value, SetOptions(merge: true));
+        }
+        await _firestore.collection('users').doc(targetDelegateUid).set({
+          'uid': targetDelegateUid,
+          if (delegatePublicId.isNotEmpty) 'delegatePublicId': delegatePublicId,
+          'fullName': request.fullName,
+          'phoneNumber': request.phoneNumber,
+          'phone': request.phoneNumber,
+          'role': 'delegate',
+          'organizationUID': request.organizationUID,
+          'companyUID': request.companyUID,
+          'organizationNames': FieldValue.arrayUnion(allKnownOrgs),
+          'status': 'active',
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      Failure? followUpFailure;
+      try {
+        await criticalFollowUps();
+      } catch (e) {
+        debugPrint('approveSubscriptionRequest follow-up failed: $e');
+        followUpFailure = ApprovalFollowUpFailure(
+          'تم اعتماد الطلب وتفعيل المندوب، لكن تعذّر إكمال بيانات حسابه. اضغط "إعادة المحاولة".',
+          retry: () async {
+            try {
+              await criticalFollowUps();
+              return const Right(null);
+            } catch (e) {
+              debugPrint('approveSubscriptionRequest follow-up retry failed: $e');
+              return const Left(ServerFailure('تعذّر إكمال بيانات حساب المندوب، حاول مرة أخرى.'));
+            }
+          },
+        );
+      }
 
       // 3a. Sync delegatePublicId to any existing delegate records across other organizations
       if (delegatePublicId.isNotEmpty) {
@@ -1152,6 +1181,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         // Log non-blocking auxiliary error
       }
 
+      if (followUpFailure != null) return Left(followUpFailure);
       return const Right(null);
     } catch (e) {
       return Left(ServerFailure('فشل اعتماد طلب المندوب: $e'));
@@ -1406,6 +1436,15 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     }
   }
 }
+
+/// Shown when the approval batch is denied. Nothing was written. Known causes:
+/// an old app build approving in separate writes, a request that is no longer
+/// pending, or (technical support) more than 4 pending documents to approve
+/// on one delegate doc, or 4 with extra entries on each of two docs, exceeds Firestore's
+/// 1000-expression rules limit (see techFlipOk in firestore.rules).
+const approvalBatchDeniedMessage =
+    'تعذّر اعتماد الطلب ولم يُحفظ أي تغيير. تأكد أن الطلب ما زال قيد المراجعة. '
+    'إذا كان على المندوب مستندات كثيرة قيد المراجعة فيعتمده السوبر أدمن.';
 
 /// r4 F4: status-only activation payload for an existing 'pending' delegate
 /// doc. Same list size and order; each 'pending' entry flips to 'approved'

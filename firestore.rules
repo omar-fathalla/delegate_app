@@ -450,43 +450,48 @@ service cloud.firestore {
             && orgId == get(/databases/$(database)/documents/users/$(a.get('supervisorUid', ''))).data.get('organizationUID', '')));
     }
 
-    // r4 F3: an approved entry written by tech support must carry the request's
-    // own URLs for its key.
-    function reqEntryOk(e, a) {
-      let k = e.get('documentKey', '');
-      return !docIsApproved(e)
-        || (k == 'personalPhoto' && e.get('documentURL', '') == a.get('profileImageUrl', ''))
-        || (k == 'nationalityId' && e.get('documentURL', '') == a.get('nationalIdFrontUrl', '')
-          && e.get('secondaryURL', '') == a.get('nationalIdBackUrl', ''))
-        || (k in ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt']
-          && e.get('documentURL', '') == a.get('receiptImageUrl', ''));
-    }
-
     function reqAfter(delegateId) {
       return getAfter(/databases/$(database)/documents/delegate_requests/$(request.resource.data.get('approvedRequestId', delegateId))).data;
     }
 
     // r4 F4: by index, an entry is unchanged or flips pending -> approved with
     // only documentStatus / reviewedBy / reviewedAt changed and the request's URL.
-    function flipAt(n, o, i, a) {
+    // r5 budget: the URL check reads a precomputed key -> URL map (m) instead
+    // of re-reading the request per entry; 4+ flips used to hit the
+    // 1000-expression limit.
+    function flipAt(n, o, i, m) {
       return i >= n.size() || n[i] == o[i]
         || (o[i].get('documentStatus', '') == 'pending'
           && n[i].get('documentStatus', '') == 'approved'
           && n[i].diff(o[i]).affectedKeys().hasOnly(['documentStatus', 'reviewedBy', 'reviewedAt'])
-          && reqEntryOk(n[i], a));
+          && m.get(n[i].get('documentKey', ''), null) == n[i].get('documentURL', '')
+          && (n[i].get('documentKey', '') != 'nationalityId' || n[i].get('secondaryURL', '') == m['#nidBack']));
+    }
+
+    // Request URL per document key; '#nidBack' is the national ID back URL
+    // (compared as the nationalityId entry's secondaryURL).
+    function reqUrlMap(a) {
+      return {
+        'personalPhoto': a.get('profileImageUrl', ''),
+        'nationalityId': a.get('nationalIdFrontUrl', ''),
+        '#nidBack': a.get('nationalIdBackUrl', ''),
+        'paymentReceipt': a.get('receiptImageUrl', ''),
+        'electronicPaymentReceipt': a.get('receiptImageUrl', ''),
+        'electronic_payment_receipt': a.get('receiptImageUrl', '')
+      };
     }
 
     // r4 F4: tech support activation of an existing doc is a status-only write.
     function techFlipOk(delegateId) {
       let n = request.resource.data.get('documents', []);
       let o = resource.data.get('documents', []);
-      let a = reqAfter(delegateId);
+      let m = reqUrlMap(reqAfter(delegateId));
       return changedKeys().hasOnly(['status', 'documents', 'updatedAt', 'reviewedBy', 'reviewedAt', 'approvedRequestId'])
         && resource.data.get('statusReason', '') != 'delete'
         && (!changedKeys().hasAny(['documents'])
           || (n is list && o is list && n.size() == o.size() && n.size() <= 8
-            && flipAt(n, o, 0, a) && flipAt(n, o, 1, a) && flipAt(n, o, 2, a) && flipAt(n, o, 3, a)
-            && flipAt(n, o, 4, a) && flipAt(n, o, 5, a) && flipAt(n, o, 6, a) && flipAt(n, o, 7, a)));
+            && flipAt(n, o, 0, m) && flipAt(n, o, 1, m) && flipAt(n, o, 2, m) && flipAt(n, o, 3, m)
+            && flipAt(n, o, 4, m) && flipAt(n, o, 5, m) && flipAt(n, o, 6, m) && flipAt(n, o, 7, m)));
     }
 
     function staffDocsApproveOk(o1, c1, c2, delegateId) {
@@ -531,15 +536,30 @@ service cloud.firestore {
       let d = request.resource.data;
       let n = d.get('documents', []);
       let a = reqAfter(delegateId);
+      let m = reqUrlMap(a);
       return d.get('status', '') == 'active'
-        && d.get('fullName', '') == a.get('fullName', '')
-        && d.get('nationalId', '') == a.get('nationalId', '')
-        && d.get('profileImageUrl', '') == a.get('profileImageUrl', '')
+        && [d.get('fullName', ''), d.get('nationalId', ''), d.get('profileImageUrl', ''),
+            // r5: phone and the other top-level URLs are bound too (absent is
+            // ok for the ones the app does not write).
+            d.get('phoneNumber', ''), d.get('nationalIdFrontUrl', ''), d.get('nationalIdBackUrl', ''),
+            d.get('receiptImageUrl', m['paymentReceipt']), d.get('personalPhotoURL', m['personalPhoto']),
+            d.get('photoURL', m['personalPhoto'])]
+          == [a.get('fullName', ''), a.get('nationalId', ''), m['personalPhoto'],
+            a.get('phoneNumber', ''), m['nationalityId'], m['#nidBack'],
+            m['paymentReceipt'], m['personalPhoto'], m['personalPhoto']]
         && n is list && n.size() <= 8
-        && (n.size() <= 0 || reqEntryOk(n[0], a)) && (n.size() <= 1 || reqEntryOk(n[1], a))
-        && (n.size() <= 2 || reqEntryOk(n[2], a)) && (n.size() <= 3 || reqEntryOk(n[3], a))
-        && (n.size() <= 4 || reqEntryOk(n[4], a)) && (n.size() <= 5 || reqEntryOk(n[5], a))
-        && (n.size() <= 6 || reqEntryOk(n[6], a)) && (n.size() <= 7 || reqEntryOk(n[7], a));
+        && (n.size() <= 0 || entryOk(n[0], m)) && (n.size() <= 1 || entryOk(n[1], m))
+        && (n.size() <= 2 || entryOk(n[2], m)) && (n.size() <= 3 || entryOk(n[3], m))
+        && (n.size() <= 4 || entryOk(n[4], m)) && (n.size() <= 5 || entryOk(n[5], m))
+        && (n.size() <= 6 || entryOk(n[6], m)) && (n.size() <= 7 || entryOk(n[7], m));
+    }
+
+    // r5 budget: an approved entry written by tech support must carry the
+    // request's URL for its key (m = reqUrlMap of the request).
+    function entryOk(e, m) {
+      return !docIsApproved(e)
+        || (m.get(e.get('documentKey', ''), null) == e.get('documentURL', '')
+          && (e.get('documentKey', '') != 'nationalityId' || e.get('secondaryURL', '') == m['#nidBack']));
     }
 
     // Budget-flat staff check for delegate docs: one users/{uid} get, literal
@@ -769,6 +789,49 @@ service cloud.firestore {
       // supervisor/company-admin for delegates/promoters of its own company.
       allow delete: if signedIn() && request.auth.uid != userId
         && usersDeleteOk(userRole(), callerOrg(), callerCompany(), resource.data);
+    }
+
+    // r5: one users/{uid} get and literal role lists (budget: the four role
+    // helpers cost ~80 expressions, shared with the delegate writes of the
+    // approval batch). Super-admin, org-admin, company-admin / supervisor and
+    // HR update freely (unchanged).
+    // r4 F1 + H1 (a): tech support only reviews: status/review fields,
+    // approve only from exactly 'pending', never into 'pending', and never a
+    // request it created or supervises. Delete requests included (Q3).
+    // r5: a tech approval of new_delegate / add_organization must leave the
+    // target delegate doc (request org/company, id = request id or
+    // existingDelegateUid) 'active' in the same batch, so an old build that
+    // approves the request in its own write is denied instead of leaving an
+    // approved request with no delegate.
+    function requestStaffUpdateOk(requestId) {
+      let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
+      return signedIn() && (r in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
+          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources']
+        || (r in techRoleList() && techRequestReviewOk(requestId)));
+    }
+
+    function techRequestReviewOk(requestId) {
+      let d = request.resource.data;
+      let st = d.get('status', '');
+      let ty = d.get('requestType', 'new_delegate');
+      return changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt'])
+        && resource.data.get('supervisorUid', '') != request.auth.uid
+        && resource.data.get('createdBy', '') != request.auth.uid
+        && !(changedKeys().hasAny(['status']) && st == 'pending')
+        && !(st == 'approved' && resource.data.get('status', '') != 'pending')
+        && (st != 'approved' || !(ty in ['new_delegate', 'add_organization'])
+          || getAfter(/databases/$(database)/documents/organizations/$(d.get('organizationUID', ''))/companies/$(d.get('companyUID', ''))/delegates/$(ty == 'add_organization' ? d.get('existingDelegateUid', '') : requestId)).data.get('status', '') == 'active');
+    }
+
+    // r5 budget: true for a technical support caller writing a delegate doc
+    // at organizations/{o}/companies/{c}/delegates/{id}. The collection-group
+    // delegates match defers those writes to the nested match.
+    function techOnNestedDelegate() {
+      return request.path[3] == 'organizations' && request.path[5] == 'companies'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in techRoleList();
     }
 
     function techRoleList() {
@@ -1033,12 +1096,20 @@ service cloud.firestore {
 
     match /{path=**}/delegates/{delegateId} {
       allow read: if signedIn() && canReadDelegate();
-      allow create: if signedIn() && deviceBindingAbsent() && (
+      // r5 budget: like update below, a tech support create of a nested
+      // organizations/{o}/companies/{c}/delegates doc is decided by the
+      // nested match alone (techCreateOk there is bound to the path).
+      allow create: if signedIn() && !techOnNestedDelegate() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
       ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId);
-      allow update: if signedIn() && (delegateOwns(delegateId)
+      // r5 budget: a tech support write to a nested
+      // organizations/{o}/companies/{c}/delegates doc is decided by the nested
+      // match alone (same checks, bound to the path), so the approval batch
+      // does not spend the 1000-expression budget twice on one doc.
+      allow update: if signedIn() && !techOnNestedDelegate()
+        && (delegateOwns(delegateId)
         ? delegateFieldsSafe()
         : (deviceBindingUntouched() && staffManagesDelegate(
             [resource.data.get('organizationUID', ''), resource.data.get('organizationId', '')],
@@ -1306,12 +1377,9 @@ service cloud.firestore {
 
     match /sent_notifications/{docId} {
       allow read: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin();
-      // r4 F1: tech support no longer creates requests; every other creator
-      // must name itself as supervisorUid (all app flows pass the signed-in
-      // user). Super-admin is exempt.
-      allow create: if isSuperAdmin()
-        || ((isOrgAdmin() || isCompanyAdmin() || isHR())
-          && request.resource.data.get('supervisorUid', '') == request.auth.uid);
+      // The app's log payload carries senderUid (no supervisorUid); the
+      // r4 delegate_requests F1 clause does not apply here (r5 B-r4-1).
+      allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
       allow update, delete: if isSuperAdmin() || isOrgAdmin();
     }
 
@@ -1390,17 +1458,7 @@ service cloud.firestore {
           && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
             'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
           && delegateDocsOk() && delegateUrlsWithDocs())
-        || isSuperAdmin() || isOrgAdmin() || isCompanyAdmin() || isHR()
-        // r4 F1 + H1 (a): tech support only reviews: status/review fields,
-        // approve only from exactly 'pending', never into 'pending', and never
-        // a request it created or supervises. Delete requests included (Q3).
-        || (isTechnicalSupport()
-          && changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt'])
-          && resource.data.get('supervisorUid', '') != request.auth.uid
-          && resource.data.get('createdBy', '') != request.auth.uid
-          && !(changedKeys().hasAny(['status']) && request.resource.data.get('status', '') == 'pending')
-          && !(request.resource.data.get('status', '') == 'approved'
-            && resource.data.get('status', '') != 'pending'));
+        || requestStaffUpdateOk(requestId);
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }
 
