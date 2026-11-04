@@ -107,14 +107,14 @@ jobs:
 
       # 7. بناء نسخة الـ App Bundle الموقعة
       - name: Build AAB
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --flavor prod
 
       # 8. رفع الملف الناتج كـ Artifact (لتتمكن من تحميله)
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.run_number }}
-          path: build/app/outputs/bundle/release/app-release.aab
+          path: build/app/outputs/bundle/prodRelease/app-prod-release.aab
           retention-days: 7
 
       # 9. الرفع لـ Google Play (Internal Testing) بناءً على خيار التشغيل
@@ -124,7 +124,7 @@ jobs:
         with:
           serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           packageName: com.tashil.delegate
-          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          releaseFiles: build/app/outputs/bundle/prodRelease/app-prod-release.aab
           track: internal
           status: completed
 

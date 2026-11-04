@@ -43,6 +43,25 @@ android {
         versionName = flutter.versionName
     }
 
+    // "prod" is the default and keeps the store applicationId and the
+    // production google-services.json (android/app/google-services.json).
+    // "dev" installs beside prod and uses android/app/src/dev/google-services.json
+    // (tashil-dev). Build with: flutter build apk --flavor dev --dart-define=ENV=dev
+    flavorDimensions += "env"
+    productFlavors {
+        create("prod") {
+            dimension = "env"
+            isDefault = true
+            manifestPlaceholders["appLabel"] = "Tashil Employee"
+        }
+        create("dev") {
+            dimension = "env"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            manifestPlaceholders["appLabel"] = "Tashil Dev"
+        }
+    }
+
     signingConfigs {
         create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias")
