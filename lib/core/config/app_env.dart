@@ -11,9 +11,10 @@ import 'package:delegate_app/firebase_options_dev.dart' as dev;
 /// `ENV=dev` always uses the tashil-dev Firebase project and never falls back
 /// to production. Any other value fails at startup.
 ///
-/// ENV=dev is web-only for now. Android still bundles the production
-/// google-services.json (no `dev` flavor yet) and there is no dev iOS app, so
-/// a dev build on those platforms fails closed instead of mixing projects.
+/// ENV=dev works on web and on Android with the `dev` flavor
+/// (`flutter build apk --flavor dev --dart-define=ENV=dev`), which bundles the
+/// tashil-dev google-services.json under com.tashil.delegate.dev. There is no
+/// dev iOS app yet, so ENV=dev on iOS fails closed instead of mixing projects.
 class AppEnv {
   AppEnv._();
 
@@ -43,11 +44,12 @@ class AppEnv {
     required TargetPlatform platform,
   }) {
     if (isWeb) return;
-    if (platform == TargetPlatform.android || platform == TargetPlatform.iOS) {
+    if (platform == TargetPlatform.android) return;
+    if (platform == TargetPlatform.iOS) {
       throw UnsupportedError(
         'ENV=dev is not supported on ${platform.name} yet: there is no dev '
-        'flavor/app, so it would mix tashil-dev with production config. '
-        'Use ENV=dev on web only.',
+        'iOS app, so it would mix tashil-dev with production config. '
+        'Use ENV=dev on web or Android (--flavor dev).',
       );
     }
   }

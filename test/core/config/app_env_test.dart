@@ -29,16 +29,16 @@ void main() {
   test('unknown ENV fails instead of falling back', () {
     expect(() => AppEnv.optionsFor('staging'), throwsUnsupportedError);
   });
-  group('ENV=dev fails closed on mobile', () {
+  group('ENV=dev platform support', () {
     tearDown(() => debugDefaultTargetPlatformOverride = null);
 
-    test('dev on Android throws', () {
+    test('dev on Android is allowed (dev flavor)', () {
       expect(
         () => AppEnv.ensureDevSupported(
           isWeb: false,
           platform: TargetPlatform.android,
         ),
-        throwsUnsupportedError,
+        returnsNormally,
       );
     });
 
@@ -62,8 +62,15 @@ void main() {
       );
     });
 
-    test('optionsFor dev throws with Android platform override', () {
+    test('optionsFor dev on Android uses the tashil-dev dev-flavor app', () {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final o = AppEnv.optionsFor('dev', isWeb: false);
+      expect(o.projectId, 'tashil-dev');
+      expect(o.appId, '1:582609039627:android:40c38c45d1bdb99add720e');
+    });
+
+    test('optionsFor dev throws with iOS platform override', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       expect(
         () => AppEnv.optionsFor('dev', isWeb: false),
         throwsUnsupportedError,

@@ -16,6 +16,31 @@
       "api_key": [
         {
           "current_key": "AIzaSyB1L1SqG6Io7_Lh2L_9-BaGiyeHA3N8hHA"
+        },
+        {
+          "current_key": "AIzaSyC9oN-Jw_NKDxsP3FDdRH5x4J2D9cJQ1pw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:582609039627:android:40c38c45d1bdb99add720e",
+        "android_client_info": {
+          "package_name": "com.tashil.delegate.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1L1SqG6Io7_Lh2L_9-BaGiyeHA3N8hHA"
+        },
+        {
+          "current_key": "AIzaSyC9oN-Jw_NKDxsP3FDdRH5x4J2D9cJQ1pw"
         }
       ],
       "services": {
