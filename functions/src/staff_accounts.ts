@@ -3,7 +3,7 @@ import * as functions from "firebase-functions";
 import {normalizePhone} from "./delegate_login_logic";
 import {
   Caller, decideClaim, decideStaffCreate, isValidEmail, nextRate,
-  normalizeEmail, setupEmail,
+  normalizeEmail, setupEmail, staffCreateEnabled, isSuperRole,
 } from "./staff_accounts_logic";
 
 /**
@@ -41,8 +41,12 @@ async function loadCaller(ctx: functions.https.CallableContext): Promise<Caller>
   return snap.data() as Caller;
 }
 
-async function takeRate(uid: string): Promise<void> {
-  const ref = admin.firestore().collection(RATE_COLLECTION).doc(uid);
+function requireEnabled(): void {
+  if (!staffCreateEnabled(process.env)) fail("failed-precondition", "staff_create_disabled");
+}
+
+async function takeRate(key: string): Promise<void> {
+  const ref = admin.firestore().collection(RATE_COLLECTION).doc(key);
   const ok = await admin.firestore().runTransaction(async (tx) => {
     const s = await tx.get(ref);
     const next = nextRate(s.data(), Date.now());
@@ -62,6 +66,9 @@ async function queueSetupEmail(email: string, displayName: string): Promise<void
 export const createStaffUser = functions.region("us-central1").runWith(opts).https.onCall(
   wrap("createStaffUser", async (data, ctx) => {
     const caller = await loadCaller(ctx);
+    requireEnabled();
+    // Rate first: phone_taken / email_taken must not be an unmetered oracle.
+    await takeRate(ctx.auth!.uid);
     const p = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
     const email = normalizeEmail(p.email);
     const phone = normalizePhone(typeof p.phoneNumber === "string" ? p.phoneNumber : "");
@@ -86,13 +93,15 @@ export const createStaffUser = functions.region("us-central1").runWith(opts).htt
       const co = await db.doc(`organizations/${target.organizationUID}/companies/${target.companyUID}`).get();
       if (!co.exists) fail("invalid-argument", "company_not_found");
     }
-    const [byPhone, byEmail] = await Promise.all([
-      db.collection("users").where("phoneNumber", "==", phone).limit(1).get(),
-      db.collection("users").where("email", "==", email).limit(1).get(),
-    ]);
-    if (!byPhone.empty) fail("already-exists", "phone_taken");
-    if (!byEmail.empty) fail("already-exists", "email_taken");
-    await takeRate(ctx.auth!.uid);
+    const taken = async (get: (q: FirebaseFirestore.Query) => Promise<FirebaseFirestore.QuerySnapshot>) => {
+      const [byPhone, byEmail] = await Promise.all([
+        get(db.collection("users").where("phoneNumber", "==", phone).limit(1)),
+        get(db.collection("users").where("email", "==", email).limit(1)),
+      ]);
+      if (!byPhone.empty) fail("already-exists", "phone_taken");
+      if (!byEmail.empty) fail("already-exists", "email_taken");
+    };
+    await taken((q) => q.get());
 
     let user: admin.auth.UserRecord;
     try {
@@ -102,7 +111,7 @@ export const createStaffUser = functions.region("us-central1").runWith(opts).htt
       throw e;
     }
     const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-    await db.collection("users").doc(user.uid).set({
+    const userDoc = {
       uid: user.uid,
       email,
       phoneNumber: phone,
@@ -115,7 +124,18 @@ export const createStaffUser = functions.region("us-central1").runWith(opts).htt
       isActive: true,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       createdBy: ctx.auth!.uid,
-    });
+    };
+    try {
+      // Uniqueness re-checked inside the transaction; create() never overwrites.
+      await db.runTransaction(async (tx) => {
+        await taken((q) => tx.get(q));
+        tx.create(db.collection("users").doc(user.uid), userDoc);
+      });
+    } catch (e) {
+      // No orphaned Auth user when the profile write fails.
+      await admin.auth().deleteUser(user.uid).catch(() => undefined);
+      throw e;
+    }
     await queueSetupEmail(email, displayName);
     return {uid: user.uid};
   }));
@@ -123,10 +143,17 @@ export const createStaffUser = functions.region("us-central1").runWith(opts).htt
 export const resendStaffSetupLink = functions.region("us-central1").runWith(opts).https.onCall(
   wrap("resendStaffSetupLink", async (data, ctx) => {
     const caller = await loadCaller(ctx);
+    requireEnabled();
+    await takeRate(ctx.auth!.uid);
     const uid = data && typeof data === "object" ? (data as Record<string, unknown>).uid : undefined;
     if (typeof uid !== "string" || !uid) fail("invalid-argument", "invalid_uid");
     const snap = await admin.firestore().collection("users").doc(uid).get();
-    if (!snap.exists) fail("not-found", "not_found");
+    // Only a global caller learns that a uid does not exist; everyone else
+    // gets the same out_of_scope answer for missing and foreign accounts.
+    if (!snap.exists) {
+      if (isSuperRole(caller.role) && caller.isActive !== false) fail("not-found", "not_found");
+      fail("permission-denied", "out_of_scope");
+    }
     const t = snap.data() as Record<string, unknown>;
     const d = decideStaffCreate(caller, {
       role: String(t.role ?? ""),
@@ -136,7 +163,6 @@ export const resendStaffSetupLink = functions.region("us-central1").runWith(opts
     if (!d.ok) fail("permission-denied", d.reason);
     const email = normalizeEmail(t.email);
     if (!isValidEmail(email)) fail("failed-precondition", "no_email");
-    await takeRate(ctx.auth!.uid);
     await queueSetupEmail(email, String(t.displayName ?? ""));
     return {queued: true};
   }));
@@ -150,6 +176,7 @@ export const claimInvite = functions.region("us-central1")
     const displayName = typeof p.displayName === "string" ? p.displayName.trim().slice(0, 120) : "";
     if (!inviteId || !displayName) fail("invalid-argument", "invalid_input");
     const uid = ctx.auth.uid;
+    await takeRate(`claim_${uid}`);
     const email = normalizeEmail(ctx.auth.token.email);
     const db = admin.firestore();
     const ts = admin.firestore.FieldValue.serverTimestamp();
@@ -157,6 +184,16 @@ export const claimInvite = functions.region("us-central1")
       const ref = db.collection("invites").doc(inviteId);
       const s = await tx.get(ref);
       const inv = s.data() as Record<string, unknown> | undefined;
+      // Safe retry: the same caller re-claiming an invite it already claimed
+      // gets the original result and nothing is written again.
+      if (inv && inv.status === "claimed" && inv.claimedByUid === uid) {
+        const co0 = typeof inv.companyId === "string" ? inv.companyId : "";
+        return {
+          inviteId, status: "claimed", roleToAssign: inv.roleToAssign,
+          organizationId: String(inv.organizationId ?? ""), companyId: co0 || null,
+          isFirstAdmin: inv.isFirstAdmin === true,
+        };
+      }
       const exp = inv?.expiresAt as {toMillis?: () => number} | undefined;
       const d = decideClaim(inv, {email, emailVerified: ctx.auth!.token.email_verified === true},
         Date.now(), typeof exp?.toMillis === "function" ? exp.toMillis() : null);

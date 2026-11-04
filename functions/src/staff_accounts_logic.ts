@@ -10,9 +10,13 @@ const SUPER = new Set(["super_admin", "superadmin"]);
 const ORG_ADMIN = new Set(["organization_admin", "organizationadmin", "org_admin"]);
 const TECH = new Set(["technical_support", "technicalsupport", "tech_support", "techsupport"]);
 const COMPANY_ADMIN = new Set(["company_admin", "companyadmin", "admin"]);
-const COMPANY_STAFF_WRITER = new Set([
-  ...COMPANY_ADMIN, "supervisor", "company_supervisor", "hr", "company_hr", "human_resources",
+const COMPANY_FIELD_MANAGER = new Set([
+  "supervisor", "company_supervisor", "hr", "company_hr", "human_resources",
 ]);
+// Matches firestore.rules companyCanGrant: a company admin may grant only
+// supervisor/HR staff roles; supervisor/HR may grant field roles only, and
+// field roles are never created here (delegate flow), so they get nothing.
+const COMPANY_ADMIN_GRANTS = COMPANY_FIELD_MANAGER;
 const FIELD = new Set(["delegate", "promoter", ""]);
 
 export interface Caller {
@@ -46,15 +50,19 @@ export function decideStaffCreate(caller: Caller | null, target: StaffTarget): D
   const t = normalizeRoleKey(target.role);
   if (FIELD.has(t) || !isStaffRole(target.role)) return {ok: false, reason: "not_staff_role"};
   if (SUPER.has(t)) return {ok: false, reason: "super_admin_not_creatable"};
+  if (COMPANY_ADMIN.has(t) && (!target.organizationUID || !target.companyUID)) {
+    return {ok: false, reason: "company_required"};
+  }
   if (SUPER.has(c)) return {ok: true};
   const co = str(caller.organizationUID);
   const cc = str(caller.companyUID);
   if (!co || target.organizationUID !== co) return {ok: false, reason: "out_of_scope"};
   if (TECH.has(t) || ORG_ADMIN.has(t)) return {ok: false, reason: "role_not_allowed"};
   if (ORG_ADMIN.has(c)) return {ok: true};
-  if (COMPANY_STAFF_WRITER.has(c)) {
+  if (COMPANY_FIELD_MANAGER.has(c)) return {ok: false, reason: "role_not_allowed"};
+  if (COMPANY_ADMIN.has(c)) {
     if (!cc || target.companyUID !== cc) return {ok: false, reason: "out_of_scope"};
-    if (COMPANY_ADMIN.has(t)) return {ok: false, reason: "role_not_allowed"};
+    if (!COMPANY_ADMIN_GRANTS.has(t)) return {ok: false, reason: "role_not_allowed"};
     return {ok: true};
   }
   return {ok: false, reason: "caller_not_allowed"};
@@ -94,6 +102,13 @@ export interface InviteData {
   claimedBy?: unknown;
   claimedByUid?: unknown;
   claimedAt?: unknown;
+}
+
+/** Server-side kill switch: createStaffUser/resendStaffSetupLink stay off
+ * until the #204 rules are live (mail read lock + users write lock). Set
+ * STAFF_CREATE_ENABLED=true in functions/.env.<project> to enable. */
+export function staffCreateEnabled(env: Record<string, string | undefined>): boolean {
+  return env.STAFF_CREATE_ENABLED === "true";
 }
 
 /** claimInvite checks (E1/H3): never claimed, pending, unexpired, email match, roleToAssign only. */

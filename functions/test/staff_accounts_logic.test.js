@@ -28,13 +28,33 @@ test("org-admin: own org only, no org-admin or tech support", () => {
   assert.equal(L.decideStaffCreate(oa, T("technical-support")).ok, false);
 });
 
-test("company admin/supervisor/hr: own company, not company-admin", () => {
-  for (const role of ["company-admin", "Supervisor", "hr"]) {
-    const c = {role, organizationUID: "o1", companyUID: "c1"};
-    assert.equal(L.decideStaffCreate(c, T("marketing")).ok, true, role);
-    assert.equal(L.decideStaffCreate(c, T("marketing", "o1", "c2")).ok, false, role);
-    assert.equal(L.decideStaffCreate(c, T("company-admin")).ok, false, role);
+test("company admin: own company, supervisor/HR only (rules companyCanGrant)", () => {
+  const c = {role: "company-admin", organizationUID: "o1", companyUID: "c1"};
+  for (const r of ["supervisor", "company_supervisor", "hr", "company-hr"]) assert.equal(L.decideStaffCreate(c, T(r)).ok, true, r);
+  assert.equal(L.decideStaffCreate(c, T("hr", "o1", "c2")).reason, "out_of_scope");
+  for (const r of ["company-admin", "marketing", "branches_marketing_manager", "accountant", "organization-admin"]) {
+    assert.equal(L.decideStaffCreate(c, T(r)).ok, false, r);
   }
+});
+
+test("supervisor / HR: no staff role at all (field roles only, via the delegate flow)", () => {
+  for (const role of ["Supervisor", "company_supervisor", "hr", "company-hr", "human_resources"]) {
+    const c = {role, organizationUID: "o1", companyUID: "c1"};
+    for (const r of ["marketing", "branches_marketing_manager", "accountant", "hr", "supervisor", "company-admin", "organization-admin"]) {
+      assert.equal(L.decideStaffCreate(c, T(r)).ok, false, `${role}->${r}`);
+    }
+  }
+});
+
+test("company-admin target needs a company, even for super-admin / org-admin", () => {
+  assert.equal(L.decideStaffCreate({role: "organization-admin", organizationUID: "o1"}, T("company-admin", "o1", "")).reason, "company_required");
+  assert.equal(L.decideStaffCreate({role: "super-admin"}, T("company-admin", "o1", "")).reason, "company_required");
+});
+
+test("kill switch is off unless STAFF_CREATE_ENABLED is exactly true", () => {
+  assert.equal(L.staffCreateEnabled({}), false);
+  assert.equal(L.staffCreateEnabled({STAFF_CREATE_ENABLED: "1"}), false);
+  assert.equal(L.staffCreateEnabled({STAFF_CREATE_ENABLED: "true"}), true);
 });
 
 test("inactive, missing or field callers are refused", () => {

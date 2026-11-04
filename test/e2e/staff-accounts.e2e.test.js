@@ -11,12 +11,15 @@ let fn; let db;
 const ctx = (uid, extra = {}) => ({auth: {uid, token: {firebase: {sign_in_provider: "password"}, ...extra}}, rawRequest: {headers: {}}});
 
 test.before(async () => {
+  process.env.STAFF_CREATE_ENABLED = "true";
   fn = require("../../functions/lib/index.js");
   db = admin.firestore();
   await db.doc("organizations/o1").set({name: "O"});
   await db.doc("organizations/o1/companies/c1").set({name: "C"});
   await db.doc("users/sa").set({role: "super-admin"});
   await db.doc("users/ca").set({role: "company-admin", organizationUID: "o1", companyUID: "c1"});
+  await db.doc("users/sup").set({role: "supervisor", organizationUID: "o1", companyUID: "c1"});
+  await db.doc("users/hr2").set({role: "hr", organizationUID: "o1", companyUID: "c1"});
   await db.doc("users/del").set({role: "delegate", organizationUID: "o1", companyUID: "c1"});
 });
 test.after(async () => { await Promise.all(admin.apps.map((a) => a && a.delete())); });
@@ -48,6 +51,32 @@ test("scope and staff-only checks", async () => {
   assert.equal(await code(fn.createStaffUser.run({...base, email: "c@e.com", role: "company-admin"}, ctx("ca"))), "role_not_allowed");
   assert.equal(await code(fn.createStaffUser.run({...base, email: "d@e.com", role: "hr"}, ctx("del"))), "caller_not_allowed");
   assert.equal(await code(fn.createStaffUser.run({...base, email: "e@e.com", role: "hr"}, {rawRequest: {headers: {}}})), "sign_in_required");
+  // #205 review: supervisor / HR cannot create any staff role.
+  for (const r of ["marketing", "branches_marketing_manager", "accountant", "hr", "supervisor"]) {
+    assert.equal(await code(fn.createStaffUser.run({...base, email: `s-${r}@e.com`, role: r}, ctx("sup"))), "role_not_allowed", r);
+  }
+});
+
+test("rate limit runs before lookups (no unmetered phone/email oracle)", async () => {
+  const base = {displayName: "X", role: "hr", organizationUID: "o1", companyUID: "c1", email: "taken@e.com"};
+  const seen = [];
+  for (let i = 0; i < 6; i++) seen.push(await code(fn.createStaffUser.run({...base, phoneNumber: "01234567890"}, ctx("hr2"))));
+  assert.deepEqual(seen.slice(0, 5), Array(5).fill("role_not_allowed"));
+  assert.equal(seen[5], "rate_limited");
+});
+
+test("resendStaffSetupLink: missing uid looks like out_of_scope for non-global callers", async () => {
+  assert.equal(await code(fn.resendStaffSetupLink.run({uid: "nope"}, ctx("ca"))), "out_of_scope");
+  assert.equal(await code(fn.resendStaffSetupLink.run({uid: "sa"}, ctx("ca"))), "super_admin_not_creatable");
+  assert.equal(await code(fn.resendStaffSetupLink.run({uid: "nope"}, ctx("sa"))), "not_found");
+});
+
+test("kill switch: disabled by default", async () => {
+  delete process.env.STAFF_CREATE_ENABLED;
+  assert.equal(await code(fn.createStaffUser.run({email: "k@e.com", phoneNumber: "01299999999", displayName: "K",
+    role: "hr", organizationUID: "o1", companyUID: "c1"}, ctx("sa"))), "staff_create_disabled");
+  assert.equal(await code(fn.resendStaffSetupLink.run({uid: "ca"}, ctx("sa"))), "staff_create_disabled");
+  process.env.STAFF_CREATE_ENABLED = "true";
 });
 
 test("claimInvite: verified email claims once; unverified refused", async () => {
@@ -61,4 +90,12 @@ test("claimInvite: verified email claims once; unverified refused", async () => 
   assert.ok((await db.doc("organizations/o1/companies/c1/members/u1").get()).exists);
   assert.equal((await db.doc("organizations/o1/companies/c1").get()).data().admins, 1);
   assert.equal(await code(fn.claimInvite.run({inviteId: "i1", displayName: "I"}, ctx("u2", {email: "inv@e.com", email_verified: true}))), "invite_already_claimed");
+  // Safe retry: same caller gets the same result, nothing double-counted.
+  const again = await fn.claimInvite.run({inviteId: "i1", displayName: "I"}, ctx("u1", {email: "inv@e.com", email_verified: true}));
+  assert.equal(again.status, "claimed");
+  assert.equal((await db.doc("organizations/o1/companies/c1").get()).data().admins, 1);
+  // Rate limit on claimInvite (5/hour per uid; u1 has used 3).
+  const r2 = [];
+  for (let i = 0; i < 3; i++) r2.push(await code(fn.claimInvite.run({inviteId: "i1", displayName: "I"}, ctx("u1", {email: "inv@e.com", email_verified: true}))));
+  assert.deepEqual(r2, ["ok", "ok", "rate_limited"]);
 });
