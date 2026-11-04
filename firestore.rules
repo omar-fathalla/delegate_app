@@ -423,7 +423,73 @@ service cloud.firestore {
     // still write delegate docs but may not introduce 'approved'.
     // B1: c1 / c2 are plain strings (a two-element list argument errored in
     // the collection-group match). M1: nobody approves their own doc.
-    function staffDocsApproveOk(c1, c2, delegateId) {
+    // r4 F2/F3/R2: a tech support write that activates a delegate or carries
+    // an approved document must be in the same batch that moves the bound
+    // delegate_requests doc from exactly 'pending' to 'approved' (get vs
+    // getAfter). The request is the doc's approvedRequestId (add_organization)
+    // or the delegate id itself (new_delegate). Path and company/org fields
+    // are bound to the request; the new_delegate copy may also sit under the
+    // supervisor's own organization.
+    function techReqOk(orgId, compId, delegateId) {
+      let d = request.resource.data;
+      let rid = d.get('approvedRequestId', delegateId);
+      let R = /databases/$(database)/documents/delegate_requests/$(rid);
+      let a = getAfter(R).data;
+      let ex = a.get('existingDelegateUid', null);
+      let ty = a.get('requestType', 'new_delegate');
+      return get(R).data.get('status', '') == 'pending'
+        && a.get('status', '') == 'approved'
+        && ty in ['new_delegate', 'add_organization']
+        && ((ty == 'add_organization' && ex is string && ex == delegateId)
+          || (ty == 'new_delegate' && rid == delegateId))
+        && compId == a.get('companyUID', '')
+        && d.get('companyUID', '') == compId
+        && d.get('organizationUID', '') == orgId
+        && (orgId == a.get('organizationUID', '')
+          || (ty == 'new_delegate'
+            && orgId == get(/databases/$(database)/documents/users/$(a.get('supervisorUid', ''))).data.get('organizationUID', '')));
+    }
+
+    // r4 F3: an approved entry written by tech support must carry the request's
+    // own URLs for its key.
+    function reqEntryOk(e, a) {
+      let k = e.get('documentKey', '');
+      return !docIsApproved(e)
+        || (k == 'personalPhoto' && e.get('documentURL', '') == a.get('profileImageUrl', ''))
+        || (k == 'nationalityId' && e.get('documentURL', '') == a.get('nationalIdFrontUrl', '')
+          && e.get('secondaryURL', '') == a.get('nationalIdBackUrl', ''))
+        || (k in ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt']
+          && e.get('documentURL', '') == a.get('receiptImageUrl', ''));
+    }
+
+    function reqAfter(delegateId) {
+      return getAfter(/databases/$(database)/documents/delegate_requests/$(request.resource.data.get('approvedRequestId', delegateId))).data;
+    }
+
+    // r4 F4: by index, an entry is unchanged or flips pending -> approved with
+    // only documentStatus / reviewedBy / reviewedAt changed and the request's URL.
+    function flipAt(n, o, i, a) {
+      return i >= n.size() || n[i] == o[i]
+        || (o[i].get('documentStatus', '') == 'pending'
+          && n[i].get('documentStatus', '') == 'approved'
+          && n[i].diff(o[i]).affectedKeys().hasOnly(['documentStatus', 'reviewedBy', 'reviewedAt'])
+          && reqEntryOk(n[i], a));
+    }
+
+    // r4 F4: tech support activation of an existing doc is a status-only write.
+    function techFlipOk(delegateId) {
+      let n = request.resource.data.get('documents', []);
+      let o = resource.data.get('documents', []);
+      let a = reqAfter(delegateId);
+      return changedKeys().hasOnly(['status', 'documents', 'updatedAt', 'reviewedBy', 'reviewedAt', 'approvedRequestId'])
+        && resource.data.get('statusReason', '') != 'delete'
+        && (!changedKeys().hasAny(['documents'])
+          || (n is list && o is list && n.size() == o.size() && n.size() <= 8
+            && flipAt(n, o, 0, a) && flipAt(n, o, 1, a) && flipAt(n, o, 2, a) && flipAt(n, o, 3, a)
+            && flipAt(n, o, 4, a) && flipAt(n, o, 5, a) && flipAt(n, o, 6, a) && flipAt(n, o, 7, a)));
+    }
+
+    function staffDocsApproveOk(o1, c1, c2, delegateId) {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let r = u.get('role', '');
       let c = u.get('companyUID', '');
@@ -435,35 +501,45 @@ service cloud.firestore {
         || (c != '' && (c == c1 || c == c2) && r in [
           'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor']));
       let tech = r in techRoleList();
-      // H1 option (a), Mohamed 2026-11-04: technical support may activate a
-      // signup (old status exactly 'pending' -> 'active') and approve its
-      // documents in that same write. No other route to active for tech
-      // support (suspended, 'Active', missing status), and no approving
-      // re-uploads on an existing delegate.
+      // H1 (a) + r4: tech support activates only 'pending' -> 'active', as a
+      // status-only write batched with the request approval.
       let techSignup = tech && st0 == 'pending' && st1 == 'active';
       return !(tech && stCh && st1 is string && st1.lower() == 'active' && !techSignup)
-        // Only approvers may move an existing doc into 'pending' (otherwise the
-        // signup state could be manufactured).
         && !(stCh && st1 == 'pending' && !approver)
-        && (delegateDocsOk() || techSignup || approver);
+        && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
+          || (!techSignup && (delegateDocsOk() || approver)));
     }
 
-    // H1 (a): tech support may create a delegate that is active or carries an
-    // approved document only for a signup request with the same id that is
-    // pending or approved (the signup approval flow).
-    function techCreateOk(delegateId) {
+    // r4: tech support may create a delegate that is active or carries an
+    // approved document only inside the request-approval batch (techReqOk),
+    // with the request's URLs, name and national id.
+    function techCreateOk(orgId, compId, delegateId) {
       let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
       let d = request.resource.data;
       let n = d.get('documents', []);
-      let req = /databases/$(database)/documents/delegate_requests/$(delegateId);
+      let act = d.get('status', '') is string && d.get('status', '').lower() == 'active';
       return !(r in techRoleList())
-        || (exists(req) && get(req).data.get('status', '') in ['pending', 'approved'])
-        || (!(d.get('status', '') is string && d.get('status', '').lower() == 'active')
-          && n is list && n.size() <= 8
+        || (!act && n is list && n.size() <= 8
           && (n.size() <= 0 || !docIsApproved(n[0])) && (n.size() <= 1 || !docIsApproved(n[1]))
           && (n.size() <= 2 || !docIsApproved(n[2])) && (n.size() <= 3 || !docIsApproved(n[3]))
           && (n.size() <= 4 || !docIsApproved(n[4])) && (n.size() <= 5 || !docIsApproved(n[5]))
-          && (n.size() <= 6 || !docIsApproved(n[6])) && (n.size() <= 7 || !docIsApproved(n[7])));
+          && (n.size() <= 6 || !docIsApproved(n[6])) && (n.size() <= 7 || !docIsApproved(n[7])))
+        || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId));
+    }
+
+    function techCreateBound(delegateId) {
+      let d = request.resource.data;
+      let n = d.get('documents', []);
+      let a = reqAfter(delegateId);
+      return d.get('status', '') == 'active'
+        && d.get('fullName', '') == a.get('fullName', '')
+        && d.get('nationalId', '') == a.get('nationalId', '')
+        && d.get('profileImageUrl', '') == a.get('profileImageUrl', '')
+        && n is list && n.size() <= 8
+        && (n.size() <= 0 || reqEntryOk(n[0], a)) && (n.size() <= 1 || reqEntryOk(n[1], a))
+        && (n.size() <= 2 || reqEntryOk(n[2], a)) && (n.size() <= 3 || reqEntryOk(n[3], a))
+        && (n.size() <= 4 || reqEntryOk(n[4], a)) && (n.size() <= 5 || reqEntryOk(n[5], a))
+        && (n.size() <= 6 || reqEntryOk(n[6], a)) && (n.size() <= 7 || reqEntryOk(n[7], a));
     }
 
     // Budget-flat staff check for delegate docs: one users/{uid} get, literal
@@ -832,12 +908,12 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(delegateId);
+          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(orgId, compId, delegateId);
           allow update: if delegateOwns(delegateId)
             ? delegateFieldsSafe()
             : (deviceBindingUntouched() && signedIn()
               && staffManagesDelegate([orgId], [compId], true)
-              && staffDocsApproveOk(compId, compId, delegateId));
+              && staffDocsApproveOk(orgId, compId, compId, delegateId));
           allow delete: if canManageNestedDelegate(orgId, compId);
         }
 
@@ -961,13 +1037,13 @@ service cloud.firestore {
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
-      ) && techCreateOk(delegateId);
+      ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId);
       allow update: if signedIn() && (delegateOwns(delegateId)
         ? delegateFieldsSafe()
         : (deviceBindingUntouched() && staffManagesDelegate(
             [resource.data.get('organizationUID', ''), resource.data.get('organizationId', '')],
             [resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)
-          && staffDocsApproveOk(resource.data.get('companyUID', ''), resource.data.get('companyId', ''), delegateId)));
+          && staffDocsApproveOk(resource.data.get('organizationUID', ''), resource.data.get('companyUID', ''), resource.data.get('companyId', ''), delegateId)));
       allow delete: if signedIn() && canManageDelegate();
     }
 
@@ -1230,7 +1306,12 @@ service cloud.firestore {
 
     match /sent_notifications/{docId} {
       allow read: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin();
-      allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
+      // r4 F1: tech support no longer creates requests; every other creator
+      // must name itself as supervisorUid (all app flows pass the signed-in
+      // user). Super-admin is exempt.
+      allow create: if isSuperAdmin()
+        || ((isOrgAdmin() || isCompanyAdmin() || isHR())
+          && request.resource.data.get('supervisorUid', '') == request.auth.uid);
       allow update, delete: if isSuperAdmin() || isOrgAdmin();
     }
 
@@ -1297,20 +1378,29 @@ service cloud.firestore {
       // The approved delegate's uid equals the request id, so the self path
       // is an allow-list of the upload fields and can never approve documents
       // or change status.
-      allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
+      // r4 F1: tech support no longer creates requests; every other creator
+      // must name itself as supervisorUid (all app flows pass the signed-in
+      // user). Super-admin is exempt.
+      allow create: if isSuperAdmin()
+        || ((isOrgAdmin() || isCompanyAdmin() || isHR())
+          && request.resource.data.get('supervisorUid', '') == request.auth.uid);
       // Self clause first: the staff role helpers are expensive and would
       // otherwise eat the 1000-expression budget before the docs checks.
       allow update: if (signedIn() && request.auth.uid == requestId
           && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
             'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
           && delegateDocsOk() && delegateUrlsWithDocs())
-        || ((isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR())
-          // H1 (a): technical support approves a signup request only from
-          // status exactly 'pending', and never moves a request into 'pending'.
-          && !(isTechnicalSupport() && changedKeys().hasAny(['status'])
-            && (request.resource.data.get('status', '') == 'pending'
-              || (request.resource.data.get('status', '') == 'approved'
-                && resource.data.get('status', '') != 'pending'))));
+        || isSuperAdmin() || isOrgAdmin() || isCompanyAdmin() || isHR()
+        // r4 F1 + H1 (a): tech support only reviews: status/review fields,
+        // approve only from exactly 'pending', never into 'pending', and never
+        // a request it created or supervises. Delete requests included (Q3).
+        || (isTechnicalSupport()
+          && changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt'])
+          && resource.data.get('supervisorUid', '') != request.auth.uid
+          && resource.data.get('createdBy', '') != request.auth.uid
+          && !(changedKeys().hasAny(['status']) && request.resource.data.get('status', '') == 'pending')
+          && !(request.resource.data.get('status', '') == 'approved'
+            && resource.data.get('status', '') != 'pending'));
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }
 
