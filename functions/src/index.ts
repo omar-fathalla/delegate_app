@@ -501,3 +501,4 @@ export {delegateLoginV2} from "./delegate_login";
 export {confirmDelegateOtp} from "./confirm_delegate_otp";
 export {staffPhoneLookup} from "./staff_phone_lookup";
 
+export {createStaffUser, resendStaffSetupLink, claimInvite} from "./staff_accounts";
