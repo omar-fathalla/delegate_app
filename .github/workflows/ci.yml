@@ -84,6 +84,13 @@ jobs:
         run: npm run lint
       - name: Test
         run: npm test --if-present
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Staff accounts e2e (createStaffUser / claimInvite on emulators)
+        working-directory: .
+        run: npm install --no-audit --no-fund && npm run test:e2e:staff
 
   rules:
     name: Firestore rules & delegate login e2e (emulators)
@@ -98,9 +105,6 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-      - name: Staff accounts e2e (createStaffUser / claimInvite on emulators)
-        working-directory: .
-        run: npm install --no-audit --no-fund && npm run test:e2e:staff
       - name: Install root test deps
         run: npm install --no-audit --no-fund
       - name: Install functions deps
