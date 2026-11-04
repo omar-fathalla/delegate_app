@@ -364,7 +364,8 @@ describe("firestore tightened rules", () => {
     await assertSucceeds(dbFor("comp").collection("mail").add({to: ["new@example.com"]}));
     await assertFails(dbFor("del-1", DELEGATE).collection("mail").add({to: ["new@example.com"]}));
     await assertFails(dbFor("comp").doc("mail/existing").get());
-    await assertSucceeds(dbFor("super").doc("mail/existing").get());
+    // mail holds set-password links: no client reads, not even super-admin.
+    await assertFails(dbFor("super").doc("mail/existing").get());
   });
 
   test("delegate can stamp checkOutTime on own check-in (fix2 denormalize)", async () => {

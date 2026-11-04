@@ -82,6 +82,10 @@ describe("adversarial", ()=>{
     await rec("oa invite company-admin 30d","deny",setDoc(doc(as("oa"),"invites/j3"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(30)}));
     await rec("oa invite company-admin 3d","allow",setDoc(doc(as("oa"),"invites/j4"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(3)}));
     await rec("oa invite tech support","deny",setDoc(doc(as("oa"),"invites/j5"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"technical_support",expiresAt:exp(3)}));
+    // NEW-1: supervisor (and HR) cannot invite or edit company-admin invites.
+    await rec("sup invite company-admin own co","deny",setDoc(doc(as("sup"),"invites/k1"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(3)}));
+    await rec("hr invite company-admin own co","deny",setDoc(doc(as("hr"),"invites/k2"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(3)}));
+    await rec("sup extends company-admin invite","deny",updateDoc(doc(as("sup"),"invites/i1"),{expiresAt:exp(5)}));
     await rec("ca invite company-admin own co","allow",setDoc(doc(as("ca"),"invites/j6"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(3)}));
     await rec("oa extends invite expiry to 1 year (update)","deny",updateDoc(doc(as("oa"),"invites/i1"),{expiresAt:exp(365)}));
     await rec("oa reopens claimed invite to pending","deny",updateDoc(doc(as("oa"),"invites/i2"),{status:"pending"}));
@@ -110,12 +114,27 @@ describe("adversarial", ()=>{
     await rec("delegate changes own nationalityID","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{nationalityID:"OTHER"}));
     await rec("delegate changes own phoneNumber","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01099999999"}));
     await rec("delegate adds nationalId alt key","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{nationalId:"OTHER"}));
-    await rec("delegate full-map write same phone/NID","allow",setDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01011111111",nationalityID:"NID-PLACEHOLDER",organizationUID:"o1",companyUID:"c1",status:"active",name:"b"}));
-    await rec("delegate self update name only (nested)","allow",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{name:"n2"}));
-    await rec("delegate self update same phone + NID (nested)","allow",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01011111111",nationalityID:"NID-PLACEHOLDER",name:"n3"}));
+    await rec("delegate full-map write same phone/NID","allow",setDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01011111111",nationalityID:"NID-PLACEHOLDER",organizationUID:"o1",companyUID:"c1",status:"active",name:"a",photoURL:"u1"}));
+    await rec("delegate self update name (not in allow-list)","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{name:"n2"}));
+    await rec("delegate self update same phone + NID (nested)","allow",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01011111111",nationalityID:"NID-PLACEHOLDER",photoURL:"u3"}));
     await rec("delegate changes own deviceBinding","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{boundDeviceId:"x"}));
     await rec("delegate updates other delegate","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d9"),{name:"x"}));
     await rec("ca updates own-company delegate name","allow",updateDoc(doc(as("ca"),"organizations/o1/companies/c1/delegates/d9"),{name:"x"}));
+    // NEW-2: allow-list. App writes (dev / 1.14.2 / 1.14.x-supervisor):
+    const D1="organizations/o1/companies/c1/delegates/d1";
+    await rec("delegate reLogin ack (session service)","allow",updateDoc(doc(dt,D1),{requireReLogin:false,reLoginCompletedAt:1}));
+    await rec("delegate sets requireReLogin true","deny",updateDoc(doc(dt,D1),{requireReLogin:true}));
+    await rec("delegate photo re-upload (user_profile_screen)","allow",setDoc(doc(dt,D1),{profileImageUrl:"u",personalPhotoURL:"u",photoURL:"u",documents:[{documentKey:"personalPhoto",documentURL:"u"}],updatedAt:1},{merge:true}));
+    await rec("delegate ID image re-upload (profile_screen)","allow",setDoc(doc(dt,D1),{nationalIdFrontUrl:"u",nationalIdBackUrl:"u",receiptImageUrl:"u",updatedAt:1},{merge:true}));
+    for(const [k,v] of [["annualLeaveQuota",99],["isAnnualLeaveEnabled",true],["paymentAmount",0],["receiptCode","x"],["hasPendingUpdate",false],["isDeductedFromCompany",true],["supervisorUid","sup"],["delegatePublicId","x"],["originOrganizationUID","o2"],["isExternal",true],["role","supervisor"],["status","active2"]])
+      await rec("delegate self sets "+k,"deny",updateDoc(doc(dt,D1),{[k]:v}));
+    // REGRESSION budget: company staff updating a nested delegate.
+    for(const who of ["hr","sup","acc","bmm","ca"]) await rec(who+" updates nested own-company delegate","allow",updateDoc(doc(as(who),"organizations/o1/companies/c1/delegates/d9"),{name:"y",annualLeaveQuota:5}));
+    for(const who of ["sa","ts","oa","mk"]) await rec(who+" updates nested delegate","allow",updateDoc(doc(as(who),"organizations/o1/companies/c1/delegates/d9"),{name:"z"}));
+    await rec("hr updates other-company delegate","deny",setDoc(doc(as("hr"),"organizations/o1/companies/c2/delegates/x"),{name:"q"},{merge:true}));
+    await rec("hr changes delegate device binding","deny",updateDoc(doc(as("hr"),"organizations/o1/companies/c1/delegates/d9"),{boundDeviceId:"x"}));
+    await rec("sa reads mail doc","deny",getDoc(doc(as("sa"),"mail/m1")));
+    await rec("sa lists mail","deny",getDocs(collection(as("sa"),"mail")));
     await rec("anon get delegate","deny",getDoc(doc(anon(),"organizations/o1/companies/c1/delegates/d1")));});
   // Runs last: every recorded case must match its expectation.
   // Known, out-of-scope gaps (tracked, not fixed in this PR):

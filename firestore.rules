@@ -89,6 +89,12 @@ service cloud.firestore {
       ]);
     }
 
+    // Strict company admin (no supervisor): only these may invite or edit
+    // company-admin invites (NEW-1).
+    function isStrictCompanyAdmin() {
+      return roleIs(['company-admin', 'company_admin', 'companyadmin', 'admin']);
+    }
+
     function isHR() {
       return roleIs(['hr', 'company-hr', 'company_hr', 'human_resources']);
     }
@@ -281,18 +287,44 @@ service cloud.firestore {
         );
     }
 
-    // P0 (N4): a delegate cannot change its own login fields (phone +
-    // national ID) or scope. Unchanged values in a full-map write still pass.
-    // Delegate login itself (delegateLoginV2, Admin SDK) is not affected.
-    // One diff, one literal list (D1: the old form plus staff checks ran
-    // past the 1000-expression limit on the collection-group match).
+    // P0 (N4/NEW-2): delegate self-update is an ALLOW-LIST of the fields the
+    // app itself writes on a delegate's own doc (dev, v1.14.2 and
+    // release/1.14.x-supervisor): session re-login ack, own photo / ID image
+    // re-upload (profile_screen, user_profile_screen) and updatedAt.
+    // Everything else (role, scope, phone/NID, device binding, leave quota,
+    // payment, supervisor, origin ...) is denied. Unchanged values in a
+    // full-map write still pass. Delegate login (delegateLoginV2) is Admin SDK
+    // and not affected.
     function delegateFieldsSafe() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-        'role', 'status', 'organizationUID', 'companyUID', 'uid', 'organizationId', 'companyId',
-        'phoneNumber', 'phone', 'nationalityID', 'nationalId', 'nationalityId', 'national_id',
-        'boundDeviceId', 'boundDeviceModel', 'boundDeviceBrand', 'boundDeviceOs',
-        'deviceBoundAt', 'deviceLastSeenAt', 'isDeviceLocked', 'deviceResetAt', 'deviceResetBy'
-      ]);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'updatedAt', 'requireReLogin', 'reLoginCompletedAt',
+        'profileImageUrl', 'personalPhotoURL', 'photoURL',
+        'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'
+      ]) && request.resource.data.get('requireReLogin', false) == false;
+    }
+
+    // Budget-flat staff check for delegate docs: one users/{uid} get, literal
+    // role lists, no nested role helpers (REGRESSION: HR on a nested delegate
+    // hit the 1000-expression limit because both delegate matches ran the
+    // nested helpers).
+    function staffManagesDelegate(orgId, compId, companyNeedsOrg) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let o = u.get('organizationUID', '');
+      let c = u.get('companyUID', '');
+      return r in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
+          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
+          'tech_support', 'techsupport']
+        || (o != '' && o in orgId && r in [
+          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'])
+        || (c != '' && c in compId && (!companyNeedsOrg || o in orgId) && r in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources',
+          'accountant', 'accounting', 'account_admin',
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager']);
     }
 
     function deviceBindingKeys() {
@@ -640,7 +672,8 @@ service cloud.firestore {
           allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent();
           allow update: if delegateOwns(delegateId)
             ? delegateFieldsSafe()
-            : (deviceBindingUntouched() && canManageNestedDelegate(orgId, compId));
+            : (deviceBindingUntouched() && signedIn()
+              && staffManagesDelegate([orgId], [compId], true));
           allow delete: if canManageNestedDelegate(orgId, compId);
         }
 
@@ -767,7 +800,9 @@ service cloud.firestore {
       );
       allow update: if signedIn() && (delegateOwns(delegateId)
         ? delegateFieldsSafe()
-        : (deviceBindingUntouched() && canManageDelegate()));
+        : (deviceBindingUntouched() && staffManagesDelegate(
+            [resource.data.get('organizationUID', ''), resource.data.get('organizationId', '')],
+            [resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)));
       allow delete: if signedIn() && canManageDelegate();
     }
 
@@ -845,7 +880,7 @@ service cloud.firestore {
             && exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)/companies/$(request.resource.data.companyId))
             && (
               (isOrgAdmin() && request.resource.data.organizationId == callerOrg()) ||
-              (isCompanyAdmin() && request.resource.data.organizationId == callerOrg()
+              (isStrictCompanyAdmin() && request.resource.data.organizationId == callerOrg()
                 && request.resource.data.companyId == callerCompany())
             )
           )
@@ -867,7 +902,7 @@ service cloud.firestore {
           (isOrgAdmin() && (resource.data.get('organizationId', '') == callerOrg() || resource.data.get('organizationUID', '') == callerOrg())
             && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
             && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', '')) ||
-          (isCompanyAdmin() && companyScoped()
+          (isStrictCompanyAdmin() && companyScoped()
             && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
             && request.resource.data.get('companyId', '') == resource.data.get('companyId', '')
             && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', ''))
@@ -876,8 +911,11 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // #205 review: mail docs carry set-password / reset links. No client may
+    // read or edit them (the Trigger Email extension uses the Admin SDK).
     match /mail/{mailId} {
-      allow read, update, delete: if isSuperAdmin();
+      allow read, update: if false;
+      allow delete: if isSuperAdmin();
       allow create: if isSuperAdmin() || isTechnicalSupport() || isOrgAdmin() || isCompanyAdmin() || isHR();
     }
 
