@@ -32,6 +32,21 @@ void main() {
       expect(after.map((d) => d['branchName']), contains('فرع جديد'));
     });
 
+    test('deleteBranch refreshes the cached branches list', () async {
+      await fakeFirestore.collection('branches').doc('b1').set({'branchName': 'قديم', 'organizationUID': 'o1'});
+      await fakeFirestore.collection('organizations').doc('o1').collection('branches').doc('b1').set({'branchName': 'قديم'});
+      expect(await BranchesSessionCache.load(fakeFirestore), hasLength(1));
+      await dataSource.deleteBranch('b1');
+      expect(await BranchesSessionCache.load(fakeFirestore), isEmpty);
+    });
+
+    test('deleteBranch of a branch without org also refreshes the cache', () async {
+      await fakeFirestore.collection('branches').doc('b2').set({'branchName': 'بدون منظمة'});
+      expect(await BranchesSessionCache.load(fakeFirestore), hasLength(1));
+      await dataSource.deleteBranch('b2');
+      expect(await BranchesSessionCache.load(fakeFirestore), isEmpty);
+    });
+
     test('updateBranch refreshes the cached branches list', () async {
       await fakeFirestore.collection('branches').doc('b1').set({'branchName': 'قديم'});
       expect((await BranchesSessionCache.load(fakeFirestore)).single['branchName'], 'قديم');

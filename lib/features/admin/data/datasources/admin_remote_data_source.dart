@@ -168,6 +168,10 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
       await _branches.doc(branchId).delete();
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في حذف الفرع.');
+    } finally {
+      // Always refresh the shared branches list after any delete attempt
+      // (full, partial org-subcollection cleanup, or failure).
+      BranchesSessionCache.invalidate();
     }
   }
 
