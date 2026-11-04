@@ -79,7 +79,7 @@ jobs:
           cache: npm
           cache-dependency-path: functions/package-lock.json
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci
       - name: Lint
         run: npm run lint
       - name: Test

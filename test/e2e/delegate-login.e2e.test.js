@@ -46,9 +46,10 @@ before(async () => {
   });
   app = initializeApp({projectId: PROJECT, apiKey: "fake-api-key"}, "e2e");
   auth = getAuth(app);
-  connectAuthEmulator(auth, "http://" + process.env.FIREBASE_AUTH_EMULATOR_HOST, {disableWarnings: true});
+  connectAuthEmulator(auth, "http://" + process.env.FIREBASE_AUTH_EMULATOR_HOST.replace(/^localhost:/, "127.0.0.1:"), {disableWarnings: true});
   db = getFirestore(app);
-  const [h, p] = process.env.FIRESTORE_EMULATOR_HOST.split(":");
+  const [h0, p] = process.env.FIRESTORE_EMULATOR_HOST.split(":");
+  const h = h0 === "localhost" ? "127.0.0.1" : h0;
   connectFirestoreEmulator(db, h, Number(p));
 });
 after(async () => {
