@@ -1,7 +1,8 @@
 {
   "scripts": {
     "test:rules": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-tashil-rules \"node --test test/rules/firestore.rules.test.js\"",
-    "test:rules:interim": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-interim-base \"node --test test/rules/interim-prod-hardening.test.js\""
+    "test:rules:interim": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-interim-base \"node --test test/rules/interim-prod-hardening.test.js\"",
+    "test:e2e:staff": "npm --prefix functions run build && npx --yes firebase-tools@14.15.1 emulators:exec --only auth,firestore --project demo-tashil-staff \"node --test test/e2e/staff-accounts.e2e.test.js\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
