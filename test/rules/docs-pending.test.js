@@ -142,8 +142,8 @@ describe("docs-pending rules", () => {
     }
     test("ALLOW hr rejects (no approved introduced)", () => assertSucceeds(updateDoc(doc(as("hr"), pendPath),
       {documents: [{...PHOTO, documentStatus: "rejected", rejectionReason: "x"}, {...NID, documentStatus: "pending"}]})));
-    test("DENY tech support signup approval (pending -> active with approved docs) [H1]", () =>
-      assertFails(updateDoc(doc(as("ts"), pendPath), {...approveData, status: "active"})));
+    test("ALLOW tech support signup approval (pending -> active with approved docs) [H1a]", () =>
+      assertSucceeds(updateDoc(doc(as("ts"), pendPath), {...approveData, status: "active"})));
     test("ALLOW super-admin signup approval (pending -> active with approved docs)", () =>
       assertSucceeds(updateDoc(doc(as("sa"), pendPath), {...approveData, status: "active"})));
     test("ALLOW super-admin approves in another company", async () => {
@@ -337,52 +337,109 @@ describe("docs-pending round 2", () => {
   }
 
   for (const [label, path] of Object.entries(ALL)) {
-    describe(`H1 tech support never activates or approves (${label})`, () => {
+    describe(`H1 (a) tech support signup only (${label})`, () => {
       const pendDocs = [{...PHOTO, documentStatus: "pending", documentURL: "pX"}];
       const appr = [{...pendDocs[0], documentStatus: "approved"}];
-      for (const st of ["pending", "suspended", "Active", "inactive"]) {
+      test("ALLOW ts 'pending' -> 'active' + approve docs in the same write", async () => {
+        await seed(path, {...BASE, status: "pending", documents: pendDocs});
+        await ok(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
+      });
+      test("ALLOW ts 'pending' -> 'active' without docs change", async () => {
+        await seed(path, {...BASE, status: "pending", documents: pendDocs});
+        await ok(updateDoc(doc(as("ts"), path), {status: "active"}));
+      });
+      for (const st of ["suspended", "Active", "inactive", "Pending", "rejected"]) {
         test(`DENY ts '${st}' -> active + approve`, async () => {
           await seed(path, {...BASE, status: st, documents: pendDocs});
           await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
         });
-        test(`DENY ts '${st}' -> active (no docs change)`, async () => {
+        test(`DENY ts '${st}' -> active`, async () => {
           await seed(path, {...BASE, status: st, documents: pendDocs});
           await no(updateDoc(doc(as("ts"), path), {status: "active"}));
         });
       }
-      test("DENY ts no-status doc -> active", async () => {
+      test("DENY ts 'pending' -> 'Active' (capital)", async () => {
+        await seed(path, {...BASE, status: "pending", documents: pendDocs});
+        await no(updateDoc(doc(as("ts"), path), {status: "Active", documents: appr}));
+      });
+      test("DENY ts missing status -> active + approve", async () => {
         const {status: _s, ...noStatus} = BASE;
         await seed(path, {...noStatus, documents: pendDocs});
         await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
       });
-      test("DENY ts approves docs on an active delegate", async () => {
+      test("DENY ts approves re-uploaded doc on an active delegate", async () => {
         await seed(path, {...BASE, documents: pendDocs});
         await no(updateDoc(doc(as("ts"), path), {documents: appr}));
+      });
+      test("DENY ts suspend then re-activate + approve (two-step)", async () => {
+        await seed(path, {...BASE, documents: pendDocs});
+        await ok(updateDoc(doc(as("ts"), path), {status: "suspended"}));
+        await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
+      });
+      test("DENY ts approves docs on a pending delegate without activating", async () => {
+        await seed(path, {...BASE, status: "pending", documents: pendDocs});
+        await no(updateDoc(doc(as("ts"), path), {documents: appr}));
+      });
+      for (const w of ["ts", "hr", "oa", "acc", "sup2"]) {
+        test(`DENY non-approver ${w} sets status 'pending' on an existing doc`, async () => {
+          await seed(path, {...BASE, status: "suspended", documents: pendDocs});
+          await no(updateDoc(doc(as(w), path), {status: "pending"}));
+        });
+      }
+      for (const w of ["sa", "sup"]) {
+        test(`ALLOW approver ${w} sets status 'pending'`, async () => {
+          await seed(path, {...BASE, status: "suspended", documents: pendDocs});
+          await ok(updateDoc(doc(as(w), path), {status: "pending"}));
+        });
+      }
+      test("ALLOW same-company sup approves re-upload on active delegate", async () => {
+        await seed(path, {...BASE, documents: pendDocs});
+        await ok(updateDoc(doc(as("sup"), path), {documents: appr}));
       });
       test("ALLOW ts plain edit / suspend", async () => {
         await seed(path, {...BASE, documents: pendDocs});
         await ok(updateDoc(doc(as("ts"), path), {fullName: "z", status: "suspended"}));
       });
-      test("ALLOW super-admin activates + approves (signup)", async () => {
-        await seed(path, {...BASE, status: "pending", documents: pendDocs});
-        await ok(updateDoc(doc(as("sa"), path), {status: "active", documents: appr}));
-      });
       const cpath = path.replace(/d1$/, "newT");
-      test("DENY ts creates an active delegate", () =>
+      test("ALLOW ts creates active delegate with approved docs for a pending/approved signup request", async () => {
+        await seed("delegate_requests/newT", {status: "approved", organizationUID: "o1", companyUID: "c1"});
+        await ok(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: [PHOTO]}));
+      });
+      test("DENY ts creates an active delegate without a signup request", () =>
         no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: pendDocs})));
-      test("DENY ts creates a delegate with an approved document", () =>
-        no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "pending", documents: [PHOTO]})));
+      test("DENY ts creates approved-docs delegate when the request is rejected", async () => {
+        await seed("delegate_requests/newT", {status: "rejected", organizationUID: "o1", companyUID: "c1"});
+        await no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "pending", documents: [PHOTO]}));
+      });
       test("ALLOW super-admin creates active delegate with approved docs", () =>
         ok(setDoc(doc(as("sa"), cpath), {...BASE, uid: "newT", status: "active", documents: [PHOTO]})));
     });
   }
-  describe("H1 delegate_requests", () => {
-    test("DENY ts approves a signup request", () =>
-      no(updateDoc(doc(as("ts"), "delegate_requests/d1"), {status: "approved", reviewedBy: "ts"})));
-    test("ALLOW ts other request edit", () =>
-      ok(updateDoc(doc(as("ts"), "delegate_requests/d1"), {notes: "x"})));
-    test("ALLOW super-admin approves a signup request", () =>
-      ok(updateDoc(doc(as("sa"), "delegate_requests/d1"), {status: "approved", reviewedBy: "sa"})));
+  describe("H1 (a) delegate_requests", () => {
+    const R = "delegate_requests/d1";
+    test("ALLOW ts approves a pending signup request", () =>
+      ok(updateDoc(doc(as("ts"), R), {status: "approved", reviewedBy: "ts"})));
+    for (const st of ["rejected", "Pending", "approved_x"]) {
+      test(`DENY ts approves a '${st}' request`, async () => {
+        await seed(R, {status: st, organizationUID: "o1", companyUID: "c1"});
+        await no(updateDoc(doc(as("ts"), R), {status: "approved", reviewedBy: "ts"}));
+      });
+    }
+    test("DENY ts approves a request with no status", async () => {
+      await seed(R, {organizationUID: "o1", companyUID: "c1"});
+      await no(updateDoc(doc(as("ts"), R), {status: "approved"}));
+    });
+    test("DENY ts moves a rejected request back to 'pending'", async () => {
+      await seed(R, {status: "rejected", organizationUID: "o1", companyUID: "c1"});
+      await no(updateDoc(doc(as("ts"), R), {status: "pending"}));
+    });
+    test("ALLOW ts rejects a pending request", () =>
+      ok(updateDoc(doc(as("ts"), R), {status: "rejected", rejectionReason: "x"})));
+    test("ALLOW ts other request edit", () => ok(updateDoc(doc(as("ts"), R), {notes: "x"})));
+    test("ALLOW super-admin approves a rejected request", async () => {
+      await seed(R, {status: "rejected", organizationUID: "o1", companyUID: "c1"});
+      await ok(updateDoc(doc(as("sa"), R), {status: "approved", reviewedBy: "sa"}));
+    });
   });
 
   describe("L1 documentStatus type / L2 unchanged unknown keys", () => {
