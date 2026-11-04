@@ -60,5 +60,5 @@ test("claimInvite: verified email claims once; unverified refused", async () => 
   assert.equal((await db.doc("users/u1").get()).data().role, "company-admin");
   assert.ok((await db.doc("organizations/o1/companies/c1/members/u1").get()).exists);
   assert.equal((await db.doc("organizations/o1/companies/c1").get()).data().admins, 1);
-  assert.equal(await code(fn.claimInvite.run({inviteId: "i1", displayName: "I"}, ctx("u2", {email: "inv@e.com", email_verified: true}))), "invite_not_pending");
+  assert.equal(await code(fn.claimInvite.run({inviteId: "i1", displayName: "I"}, ctx("u2", {email: "inv@e.com", email_verified: true}))), "invite_already_claimed");
 });
