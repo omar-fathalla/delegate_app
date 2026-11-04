@@ -106,6 +106,6 @@ jobs:
       - name: Install functions deps
         run: npm --prefix functions ci
       - name: Rules tests
-        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0
+        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv
       - name: Delegate login e2e (delegateLoginV2 -> custom token -> 1.14.3 query)
         run: npm run test:e2e:delegate

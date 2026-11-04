@@ -284,10 +284,15 @@ service cloud.firestore {
     // P0 (N4): a delegate cannot change its own login fields (phone +
     // national ID) or scope. Unchanged values in a full-map write still pass.
     // Delegate login itself (delegateLoginV2, Admin SDK) is not affected.
+    // One diff, one literal list (D1: the old form plus staff checks ran
+    // past the 1000-expression limit on the collection-group match).
     function delegateFieldsSafe() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(escalationKeys().concat([
-        'phoneNumber', 'phone', 'nationalityID', 'nationalId', 'nationalityId', 'national_id'
-      ]));
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'role', 'status', 'organizationUID', 'companyUID', 'uid', 'organizationId', 'companyId',
+        'phoneNumber', 'phone', 'nationalityID', 'nationalId', 'nationalityId', 'national_id',
+        'boundDeviceId', 'boundDeviceModel', 'boundDeviceBrand', 'boundDeviceOs',
+        'deviceBoundAt', 'deviceLastSeenAt', 'isDeviceLocked', 'deviceResetAt', 'deviceResetBy'
+      ]);
     }
 
     function deviceBindingKeys() {
@@ -443,9 +448,13 @@ service cloud.firestore {
     }
 
     // N3: a doc that names a company must name a company of its own org.
+    // H4: the alt keys companyId / organizationId are pinned the same way.
     function companyPinned(d) {
-      return !(d.get('companyUID', '') is string) || d.get('companyUID', '') == ''
-        || exists(/databases/$(database)/documents/organizations/$(orgSegment(d))/companies/$(d.get('companyUID', '')));
+      return (!(d.get('companyUID', '') is string) || d.get('companyUID', '') == ''
+        || exists(/databases/$(database)/documents/organizations/$(orgSegment(d))/companies/$(d.get('companyUID', ''))))
+        && (!(d.get('companyId', '') is string) || d.get('companyId', '') == ''
+        || exists(/databases/$(database)/documents/organizations/$(orgSegment(d))/companies/$(d.get('companyId', ''))))
+        && (d.get('organizationId', '') == '' || d.get('organizationId', '') == d.get('organizationUID', ''));
     }
 
     function pinKeysChanged() {
@@ -500,6 +509,15 @@ service cloud.firestore {
         'hr', 'company-hr', 'company_hr', 'human_resources'];
     }
 
+    // H1: roles company staff may grant. Supervisor/HR: field roles only.
+    // Company admin: field roles plus company-level supervisor/HR. Never
+    // marketing / branches marketing (org-scoped readers) or any admin role.
+    function companyCanGrant(r, nr) {
+      return nr in ['delegate', 'promoter', '']
+        || (r in ['company-admin', 'company_admin', 'companyadmin', 'admin']
+          && nr in ['supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources']);
+    }
+
     function newRoleOk(r) {
       return r == 'super-admin' || !(r in superAdminRoleList());
     }
@@ -520,7 +538,7 @@ service cloud.firestore {
           (r in orgAdminRoleList() && org != '' && d.get('organizationUID', '') == org) ||
           (r in companyStaffWriterRoleList() && co != '' && org != ''
             && d.get('organizationUID', '') == org && d.get('companyUID', '') == co
-            && !(nr in companyAdminRoleList()))
+            && companyCanGrant(r, nr))
         )
       ));
     }
@@ -545,8 +563,8 @@ service cloud.firestore {
               (r in companyStaffWriterRoleList() && co != ''
                 && old.get('companyUID', '') == co && d.get('companyUID', '') == co
                 && old.get('organizationUID', '') == d.get('organizationUID', '')
-                && !(nr in companyAdminRoleList())
-                && (!changed.hasAny(['role']) || !(or in companyAdminRoleList())))
+                && (!changed.hasAny(['role'])
+                  || (companyCanGrant(r, nr) && companyCanGrant(r, or))))
             ))
         )
       );
@@ -620,10 +638,9 @@ service cloud.firestore {
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
           allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent();
-          allow update: if deviceBindingUntouched() && (
-            canManageNestedDelegate(orgId, compId)
-            || (delegateOwns(delegateId) && delegateFieldsSafe())
-          );
+          allow update: if delegateOwns(delegateId)
+            ? delegateFieldsSafe()
+            : (deviceBindingUntouched() && canManageNestedDelegate(orgId, compId));
           allow delete: if canManageNestedDelegate(orgId, compId);
         }
 
@@ -748,9 +765,9 @@ service cloud.firestore {
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
       );
-      allow update: if signedIn() && deviceBindingUntouched() && (
-        canManageDelegate() || (delegateOwns(delegateId) && delegateFieldsSafe())
-      );
+      allow update: if signedIn() && (delegateOwns(delegateId)
+        ? delegateFieldsSafe()
+        : (deviceBindingUntouched() && canManageDelegate()));
       allow delete: if signedIn() && canManageDelegate();
     }
 
@@ -817,9 +834,13 @@ service cloud.firestore {
         && request.resource.data.get('organizationId', '') is string
         && request.resource.data.get('organizationId', '') != ''
         && exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId))
+        // H2: explicit invitable roles; an extra `role` key must equal
+        // roleToAssign (claimInvite reads roleToAssign only).
+        && request.resource.data.get('role', request.resource.data.get('roleToAssign', ''))
+          == request.resource.data.get('roleToAssign', '')
         && (
-          isSuperAdmin() || (
-            !(request.resource.data.get('roleToAssign', '') in orgAdminRoleList())
+          (isSuperAdmin() && request.resource.data.get('roleToAssign', '') in ['org-admin', 'company-admin']) || (
+            request.resource.data.get('roleToAssign', '') == 'company-admin'
             && request.resource.data.get('companyId', null) is string
             && exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)/companies/$(request.resource.data.companyId))
             && (
@@ -831,9 +852,16 @@ service cloud.firestore {
         );
 
       // Claiming is function-only (claimInvite). Clients cannot set claimed.
+      // H3: only pending, never-claimed invites change; claimed (and any
+      // other non-pending status) is terminal; the 7-day cap applies again.
       allow update: if signedIn()
+        && resource.data.get('status', '') == 'pending'
+        && !resource.data.keys().hasAny(['claimedBy', 'claimedByUid', 'claimedAt'])
         && request.resource.data.get('status', '') != 'claimed'
-        && !changedKeys().hasAny(['claimedBy', 'claimedByUid', 'claimedByEmail', 'claimedAt'])
+        && !changedKeys().hasAny(['claimedBy', 'claimedByUid', 'claimedByEmail', 'claimedAt', 'role', 'roleToAssign'])
+        && (!changedKeys().hasAny(['expiresAt']) || (
+          request.resource.data.expiresAt is timestamp
+          && request.resource.data.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')))
         && (
           isSuperAdmin() ||
           (isOrgAdmin() && (resource.data.get('organizationId', '') == callerOrg() || resource.data.get('organizationUID', '') == callerOrg())
