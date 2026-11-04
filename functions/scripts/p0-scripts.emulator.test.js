@@ -13,10 +13,19 @@ const {counts} = require("./role-counts");
 
 const live = !!process.env.FIRESTORE_EMULATOR_HOST && !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
 
-test("guards: project required, prod refused", () => {
-  assert.throws(() => common.assertTarget(common.parseArgs([])), /required/);
-  assert.throws(() => common.assertTarget(common.parseArgs(["--project", "practice-firebase-72df1", "--apply"])), /prod/);
-  assert.doesNotThrow(() => common.assertTarget(common.parseArgs(["--project=tashil-dev"])));
+test("guards: allow-list, normalized; prod and look-alikes refused", () => {
+  const t = (...a) => common.assertTarget(common.parseArgs(a));
+  assert.throws(() => t(), /required/);
+  for (const p of ["practice-firebase-72df1", "Practice-Firebase-72df1", " practice-firebase-72df1 ",
+    "projects/practice-firebase-72df1", "123456789012", "tashil-prod", "tashil-dev2", "demo-", "other"]) {
+    assert.throws(() => t("--project", p, "--apply"), /allow-list|required/, p);
+  }
+  assert.equal(t("--project=tashil-dev"), "tashil-dev");
+  assert.equal(t("--project", " Tashil-Dev "), "tashil-dev");
+  assert.equal(t("--project", "projects/tashil-dev"), "tashil-dev");
+  assert.equal(t("--project", "demo-p0-scripts"), "demo-p0-scripts");
+  assert.throws(() => t("--project", "practice-firebase-72df1", "--allow-prod-project=tashil-dev"), /allow-list/);
+  assert.equal(t("--project", "practice-firebase-72df1", "--allow-prod-project=practice-firebase-72df1"), "practice-firebase-72df1");
   assert.equal(common.resetPriority("super_admin"), 0);
   assert.equal(common.resetPriority("hr"), 1);
   assert.equal(common.resetPriority("delegate"), -1);

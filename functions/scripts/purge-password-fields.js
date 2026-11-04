@@ -4,7 +4,8 @@
  * Default: dry run, prints COUNTS ONLY (no paths, no values).
  *   node scripts/purge-password-fields.js --project tashil-dev
  *   node scripts/purge-password-fields.js --project tashil-dev --apply
- * Refuses prod. Do not run on prod without written approval.
+ * Allow-list: tashil-dev and demo-* only; prod needs --allow-prod-project=<id>
+ * and written approval (not given).
  */
 const admin = require("firebase-admin");
 const {parseArgs, assertTarget, secretKeysPresent, SECRET_KEYS} = require("./p0-common");
@@ -32,10 +33,10 @@ async function purge(db, apply) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  assertTarget(args);
-  admin.initializeApp({projectId: args.project});
+  const project = assertTarget(args);
+  admin.initializeApp({projectId: project});
   const c = await purge(admin.firestore(), args.apply);
-  console.log(JSON.stringify({mode: args.apply ? "apply" : "dry-run", project: args.project, ...c}));
+  console.log(JSON.stringify({mode: args.apply ? "apply" : "dry-run", project, ...c}));
 }
 
 if (require.main === module) main().catch((e) => { console.error(e.message); process.exit(1); });

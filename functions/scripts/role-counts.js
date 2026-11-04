@@ -1,8 +1,8 @@
 /**
  * P0: canonical role list with per-role COUNTS ONLY (read-only).
  *   node scripts/role-counts.js --project tashil-dev
- * Reads only the `role` field. Refuses prod unless --allow-prod (read-only,
- * still needs approval).
+ * Reads only the `role` field. Allow-list: tashil-dev and demo-* only; prod needs
+ * --allow-prod-project=<id> and written approval (not given).
  */
 const admin = require("firebase-admin");
 const {parseArgs, assertTarget} = require("./p0-common");
@@ -21,9 +21,9 @@ async function counts(db) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.apply) throw new Error("role-counts is read-only; --apply is not supported.");
-  assertTarget(args);
-  admin.initializeApp({projectId: args.project});
-  console.log(JSON.stringify({project: args.project, ...(await counts(admin.firestore()))}));
+  const project = assertTarget(args);
+  admin.initializeApp({projectId: project});
+  console.log(JSON.stringify({project, ...(await counts(admin.firestore()))}));
 }
 
 if (require.main === module) main().catch((e) => { console.error(e.message); process.exit(1); });

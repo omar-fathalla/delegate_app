@@ -7,7 +7,8 @@
  *   node scripts/revoke-and-force-reset.js --project tashil-dev
  *   node scripts/revoke-and-force-reset.js --project tashil-dev --super-only --apply
  *   node scripts/revoke-and-force-reset.js --project tashil-dev --apply
- * Refuses prod. Do not run on prod without written approval.
+ * Allow-list: tashil-dev and demo-* only; prod needs --allow-prod-project=<id>
+ * and written approval (not given).
  */
 const admin = require("firebase-admin");
 const {parseArgs, assertTarget, resetPriority} = require("./p0-common");
@@ -52,11 +53,11 @@ async function run(db, auth, {apply, superOnly}) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  assertTarget(args);
-  admin.initializeApp({projectId: args.project});
+  const project = assertTarget(args);
+  admin.initializeApp({projectId: project});
   const superOnly = args.rest.includes("--super-only");
   const c = await run(admin.firestore(), admin.auth(), {apply: args.apply, superOnly});
-  console.log(JSON.stringify({mode: args.apply ? "apply" : "dry-run", project: args.project, superOnly, ...c}));
+  console.log(JSON.stringify({mode: args.apply ? "apply" : "dry-run", project, superOnly, ...c}));
 }
 
 if (require.main === module) main().catch((e) => { console.error(e.message); process.exit(1); });
