@@ -84,3 +84,9 @@ jobs:
         run: npm run lint
       - name: Test
         run: npm test --if-present
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: P0 scripts emulator test
+        run: npx --yes firebase-tools@14.15.1 emulators:exec --only auth,firestore --project demo-p0-scripts "node --test scripts/p0-scripts.emulator.test.js"
