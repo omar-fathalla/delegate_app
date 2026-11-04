@@ -1,3 +1,5 @@
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:delegate_app/features/admin/data/datasources/admin_remote_data_source.dart';
 import 'package:delegate_app/features/admin/data/models/admin_user_model.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
@@ -150,21 +152,37 @@ void main() {
   });
 
   group('createAdmin', () {
-    test('should add user to Firestore and return model', () async {
+    test('calls createStaffUser with no password and writes nothing client-side', () async {
+      final functions = _MockFunctions();
+      final callable = _MockCallable();
+      final result = _MockResult();
+      Map<String, dynamic>? sent;
+      when(() => functions.httpsCallable('createStaffUser')).thenReturn(callable);
+      when(() => result.data).thenReturn({'uid': 'new-uid'});
+      when(() => callable.call<Map<String, dynamic>>(any())).thenAnswer((inv) async {
+        sent = Map<String, dynamic>.from(inv.positionalArguments.first as Map);
+        return result;
+      });
+      final ds = AdminRemoteDataSourceImpl(firestore: fakeFirestore, functions: functions);
       final admin = AdminUserModel(
         uid: '',
-        phoneNumber: '123456789',
+        phoneNumber: '01000000000',
         email: 'test@test.com',
         displayName: 'Test',
         role: 'company-admin',
+        organizationUID: 'o1',
+        companyUID: 'c1',
         createdAt: DateTime.now(),
         createdBy: 'admin',
-        temporaryPassword: 'temp',
+        temporaryPassword: '',
       );
 
-      final result = await dataSource.createAdmin(admin);
-      expect(result.uid, isNotEmpty);
-      expect(result.email, 'test@test.com');
+      final created = await ds.createAdmin(admin);
+      expect(created.uid, 'new-uid');
+      expect(sent!['email'], 'test@test.com');
+      expect(sent!.keys.any((k) => k.toLowerCase().contains('password')), isFalse);
+      expect((await fakeFirestore.collection('users').get()).docs, isEmpty);
+      expect((await fakeFirestore.collection('mail').get()).docs, isEmpty);
     });
   });
 
@@ -186,3 +204,10 @@ void main() {
     });
   });
 }
+
+class _MockFunctions extends Mock implements FirebaseFunctions {}
+
+class _MockCallable extends Mock implements HttpsCallable {}
+
+class _MockResult extends Mock
+    implements HttpsCallableResult<Map<String, dynamic>> {}

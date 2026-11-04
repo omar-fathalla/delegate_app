@@ -38,7 +38,6 @@ class AdminUserModel extends AdminUser {
       'companyUID': companyUID ?? '',
       if (companyName != null && companyName!.isNotEmpty) 'companyName': companyName,
       if (jobTitle != null && jobTitle!.isNotEmpty) 'jobTitle': jobTitle,
-      'password': temporaryPassword,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
       'createdBy': createdBy,
@@ -162,7 +161,8 @@ class AdminUserModel extends AdminUser {
       jobTitle: str(data['jobTitle']).isNotEmpty ? str(data['jobTitle']) : (str(data['title']).isNotEmpty ? str(data['title']) : null),
       createdAt: createdAt,
       createdBy: str(data['createdBy']),
-      temporaryPassword: str(data['password']),
+      // P0: never load a stored password into the app.
+      temporaryPassword: '',
       isActive: isActive,
     );
   }

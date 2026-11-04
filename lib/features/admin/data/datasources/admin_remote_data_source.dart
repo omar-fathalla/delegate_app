@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'dart:developer' as developer;
 
@@ -21,14 +22,6 @@ abstract class AdminRemoteDataSource {
   Future<void> updateAdminUser(AdminUserModel admin);
   Future<void> deleteAdminUser(String adminId);
   Future<void> suspendAdminUser(String adminId, bool suspend);
-  Future<void> sendActivationEmail({
-    required String email,
-    required String phoneNumber,
-    required String temporaryPassword,
-    required String displayName,
-    String? role,
-    String? companyName,
-  });
   Future<List<Map<String, dynamic>>> getCompaniesForOrg(
     String organizationUID,
   );
@@ -42,8 +35,9 @@ abstract class AdminRemoteDataSource {
 
 class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   final FirebaseFirestore firestore;
+  final FirebaseFunctions? functions;
 
-  AdminRemoteDataSourceImpl({required this.firestore});
+  AdminRemoteDataSourceImpl({required this.firestore, this.functions});
 
   CollectionReference get _branches => firestore.collection('branches');
 
@@ -175,34 +169,28 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     }
   }
 
+  /// Staff (admin) accounts only. The createStaffUser callable creates the
+  /// Firebase Auth user with no password and emails a set-password link.
+  /// No password is generated, stored or sent by the app. Delegate accounts
+  /// and delegate login (phone + national ID) are not affected.
   @override
   Future<AdminUserModel> createAdmin(AdminUserModel admin) async {
     try {
-      // Check if phone number already exists
-      final phoneQuery = await firestore
-          .collection('users')
-          .where('phoneNumber', isEqualTo: admin.phoneNumber)
-          .get();
-          
-      if (phoneQuery.docs.isNotEmpty) {
-        throw const ServerFailure('هذا الرقم مسجل من قبل');
-      }
-
-      // Check if email already exists (only if email is provided)
-      if (admin.email.isNotEmpty) {
-        final emailQuery = await firestore
-            .collection('users')
-            .where('email', isEqualTo: admin.email)
-            .get();
-            
-        if (emailQuery.docs.isNotEmpty) {
-          throw const ServerFailure('هذا الإيميل مسجل من قبل');
-        }
-      }
-
-      final ref = await firestore.collection('users').add(admin.toMap());
+      final result = await (functions ?? FirebaseFunctions.instance)
+          .httpsCallable('createStaffUser')
+          .call<Map<String, dynamic>>({
+            'email': admin.email,
+            'phoneNumber': admin.phoneNumber,
+            'displayName': admin.displayName,
+            'role': AdminUserModel.storedRole(admin.role),
+            'organizationUID': admin.organizationUID ?? '',
+            'companyUID': admin.companyUID ?? '',
+            if (admin.companyName != null) 'companyName': admin.companyName,
+            if (admin.jobTitle != null) 'jobTitle': admin.jobTitle,
+          });
+      final uid = (result.data['uid'] ?? '').toString();
       return AdminUserModel(
-        uid: ref.id,
+        uid: uid,
         phoneNumber: admin.phoneNumber,
         email: admin.email,
         displayName: admin.displayName,
@@ -211,10 +199,36 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
         companyUID: admin.companyUID,
         createdAt: admin.createdAt,
         createdBy: admin.createdBy,
-        temporaryPassword: admin.temporaryPassword,
+        temporaryPassword: '',
       );
-    } on FirebaseException catch (e) {
-      throwFirestoreFailure(e, 'فشل في إنشاء حساب الأدمن.');
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerFailure(staffCreateErrorMessage(e));
+    }
+  }
+
+  /// Arabic message for a createStaffUser error reason.
+  static String staffCreateErrorMessage(FirebaseFunctionsException e) {
+    final details = e.details;
+    final reason = details is Map ? details['reason']?.toString() : null;
+    switch (reason) {
+      case 'phone_taken':
+        return 'هذا الرقم مسجل من قبل';
+      case 'email_taken':
+        return 'هذا الإيميل مسجل من قبل';
+      case 'invalid_email':
+        return 'البريد الإلكتروني غير صحيح';
+      case 'invalid_phone':
+        return 'رقم الهاتف غير صحيح';
+      case 'rate_limited':
+        return 'محاولات كثيرة. حاول لاحقاً.';
+      case 'role_not_allowed':
+      case 'out_of_scope':
+      case 'caller_not_allowed':
+      case 'super_admin_not_creatable':
+      case 'not_staff_role':
+        return 'ليس لديك صلاحية لإنشاء هذا الحساب.';
+      default:
+        return 'فشل في إنشاء حساب الأدمن.';
     }
   }
 
@@ -281,66 +295,6 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
       });
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في تغيير حالة الأدمن.');
-    }
-  }
-
-  @override
-  Future<void> sendActivationEmail({
-    required String email,
-    required String phoneNumber,
-    required String temporaryPassword,
-    required String displayName,
-    String? role,
-    String? companyName,
-  }) async {
-    try {
-      final isHR = role == 'hr' || role == 'company-hr';
-      final emailSubject = isHR
-          ? 'Tashil - تفعيل حساب مسؤول الموارد البشرية (HR)'
-          : 'Tashil - تفعيل حساب Admin';
-      final companyText = (companyName != null && companyName.isNotEmpty)
-          ? ' لشركة <strong>$companyName</strong>'
-          : '';
-      final roleDescription = isHR
-          ? 'تم إنشاء حساب مسؤول موارد بشرية (HR)$companyText على منصة تسهيل.'
-          : 'تم إنشاء حساب Admin لك على منصة تسهيل.';
-      final accessInstruction = isHR
-          ? 'يمكنك تسجيل الدخول عبر تطبيق الهاتف أو بوابة الويب (Desktop / Web) باستخدام البيانات أعلاه.'
-          : 'قم بتحميل تطبيق تسهيل وسجل الدخول بالبيانات أعلاه.';
-
-      await firestore.collection('mail').add({
-        'to': [email],
-        'message': {
-          'subject': emailSubject,
-          'html':
-              '''
-<div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: #1a73e8; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 28px;">Tashil - تسهيل</h1>
-  </div>
-  <div style="background: #ffffff; padding: 32px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px;">
-    <h2 style="color: #333;">مرحباً $displayName</h2>
-    <p style="color: #555; font-size: 16px;">
-      $roleDescription
-    </p>
-    <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-      <p style="margin: 8px 0;"><strong>رقم الهاتف:</strong> $phoneNumber</p>
-      <p style="margin: 8px 0;"><strong>كلمة السر المؤقتة:</strong> $temporaryPassword</p>
-    </div>
-    <p style="color: #555;">
-      $accessInstruction
-    </p>
-    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
-    <p style="color: #999; font-size: 12px; text-align: center;">
-      هذه رسالة تلقائية من تسهيل. لا ترد عليها.
-    </p>
-  </div>
-</div>
-''',
-        },
-      });
-    } on FirebaseException catch (e) {
-      throwFirestoreFailure(e, 'فشل في إرسال بريد التفعيل.');
     }
   }
 

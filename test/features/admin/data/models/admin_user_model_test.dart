@@ -20,7 +20,7 @@ void main() {
     companyUID: 'comp1',
     createdAt: tDateTime,
     createdBy: 'admin1',
-    temporaryPassword: 'temp',
+    temporaryPassword: '',
     isActive: true,
   );
 
@@ -98,7 +98,6 @@ void main() {
         'role': 'company-admin',
         'organizationUID': 'org1',
         'companyUID': 'comp1',
-        'password': 'temp',
         'isActive': true,
         'createdAt': tTimestamp,
         'createdBy': 'admin1',
