@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -970,6 +971,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             .update(data)
             .timeout(const Duration(seconds: 15));
       }
+      BranchesSessionCache.invalidate();
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في حفظ بيانات الفرع.');
     } catch (_) {

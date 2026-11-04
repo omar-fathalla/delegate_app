@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -87,6 +88,7 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     try {
       final data = branch.toMap();
       final ref = await _branches.add(data);
+      BranchesSessionCache.invalidate();
 
       // If the branch is assigned to an organization, save it directly under the organization's branches subcollection
       if (branch.organizationUID != null && branch.organizationUID!.isNotEmpty) {
@@ -123,6 +125,7 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     try {
       final data = branch.toUpdateMap();
       await _branches.doc(branch.id).update(data);
+      BranchesSessionCache.invalidate();
 
       if (branch.organizationUID != null && branch.organizationUID!.isNotEmpty) {
         final orgBranchData = {
