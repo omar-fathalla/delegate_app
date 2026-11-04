@@ -1,4 +1,3 @@
-import 'dart:math';
 
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
@@ -114,12 +113,6 @@ class AdminRepositoryImpl implements AdminRepository {
     }
   }
 
-  String _generateTemporaryPassword() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-    final random = Random.secure();
-    return List.generate(8, (_) => chars[random.nextInt(chars.length)]).join();
-  }
-
   @override
   Future<Either<Failure, AdminUser>> createAdmin({
     required String phoneNumber,
@@ -132,7 +125,6 @@ class AdminRepositoryImpl implements AdminRepository {
     String? jobTitle,
   }) async {
     try {
-      final tempPassword = _generateTemporaryPassword();
       final adminModel = AdminUserModel(
         uid: '',
         phoneNumber: phoneNumber,
@@ -145,19 +137,12 @@ class AdminRepositoryImpl implements AdminRepository {
         jobTitle: jobTitle,
         createdAt: DateTime.now(),
         createdBy: 'super-admin',
-        temporaryPassword: tempPassword,
+        temporaryPassword: '',
       );
 
+      // createStaffUser creates the Auth user and emails the set-password
+      // link server-side; no temp password, no client mail doc.
       final result = await remoteDataSource.createAdmin(adminModel);
-
-      await remoteDataSource.sendActivationEmail(
-        email: email,
-        phoneNumber: phoneNumber,
-        temporaryPassword: tempPassword,
-        displayName: displayName,
-        role: role,
-        companyName: companyName,
-      );
 
       return Right(result);
     } on Failure catch (f) {

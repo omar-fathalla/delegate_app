@@ -1077,12 +1077,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       builder: (context) => _ChangePasswordBottomSheet(
         delegate: delegate,
         firestoreData: _firestoreUserData,
-        onPasswordChanged: (newPass) {
-          setState(() {
-            _firestoreUserData ??= {};
-            _firestoreUserData!['password'] = newPass;
-          });
-        },
+        // P0: the new password stays in Firebase Auth only; nothing is kept
+        // in local profile data.
+        onPasswordChanged: (_) {},
       ),
     );
   }

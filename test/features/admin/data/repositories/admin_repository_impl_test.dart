@@ -59,18 +59,6 @@ class MockAdminRemoteDataSource implements AdminRemoteDataSource {
   }
 
   @override
-  Future<void> sendActivationEmail({
-    required String email,
-    required String phoneNumber,
-    required String temporaryPassword,
-    required String displayName,
-    String? role,
-    String? companyName,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
   Future<List<Map<String, dynamic>>> getCompaniesForOrg(
     String organizationUID,
   ) {
