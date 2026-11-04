@@ -91,9 +91,12 @@ export interface InviteData {
   companyName?: unknown;
   status?: unknown;
   expiresAt?: unknown;
+  claimedBy?: unknown;
+  claimedByUid?: unknown;
+  claimedAt?: unknown;
 }
 
-/** claimInvite checks (E1): pending, unexpired, email match, allowed role. */
+/** claimInvite checks (E1/H3): never claimed, pending, unexpired, email match, roleToAssign only. */
 export function decideClaim(
   invite: InviteData | undefined,
   user: {email: string; emailVerified: boolean},
@@ -102,6 +105,9 @@ export function decideClaim(
 ): Decision {
   if (!invite) return {ok: false, reason: "invite_not_found"};
   if (!user.emailVerified) return {ok: false, reason: "email_not_verified"};
+  if (invite.claimedBy || invite.claimedByUid || invite.claimedAt) {
+    return {ok: false, reason: "invite_already_claimed"};
+  }
   if (invite.status !== "pending") return {ok: false, reason: "invite_not_pending"};
   if (expiresAtMs === null || expiresAtMs <= nowMs) return {ok: false, reason: "invite_expired"};
   if (normalizeEmail(invite.email) !== normalizeEmail(user.email) || !user.email) {

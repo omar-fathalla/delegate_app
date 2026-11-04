@@ -61,6 +61,11 @@ test("claimInvite checks", () => {
   assert.equal(L.decideClaim({...inv, roleToAssign: "super-admin"}, u, 1, 2).reason, "role_not_allowed");
   assert.equal(L.decideClaim({...inv, companyId: ""}, u, 1, 2).reason, "invite_invalid");
   assert.equal(L.decideClaim(undefined, u, 1, 2).reason, "invite_not_found");
+  assert.equal(L.decideClaim({...inv, claimedBy: "zz"}, u, 1, 2).reason, "invite_already_claimed");
+  assert.equal(L.decideClaim({...inv, claimedByUid: "zz"}, u, 1, 2).reason, "invite_already_claimed");
+  // the extra `role` key is ignored; only roleToAssign decides
+  assert.deepEqual(L.decideClaim({...inv, role: "organization-admin"}, u, 1, 2), {ok: true});
+  assert.equal(L.decideClaim({...inv, roleToAssign: "technical_support"}, u, 1, 2).reason, "role_not_allowed");
 });
 
 test("setup email escapes the name and never carries a password", () => {
