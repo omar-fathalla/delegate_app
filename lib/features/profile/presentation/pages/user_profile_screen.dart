@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:delegate_app/features/profile/presentation/utils/document_review.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -267,14 +268,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
       final firestore = FirebaseFirestore.instance;
 
-      // 1. تحديث وثيقة المستخدم المحددة فقط في users
-      await firestore.collection('users').doc(effectiveUid).set({
-        'photoURL': downloadUrl,
-        'profileImageUrl': downloadUrl,
-        'personalPhotoURL': downloadUrl,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
       // 2. تحديث وثيقة المندوب/المشرف في الشركات والمنظمات
       if (delegate != null && delegate.companyUID.isNotEmpty) {
         final orgsSnap = await firestore.collection('organizations').get();
@@ -288,30 +281,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               .doc(delegate.uid);
           final check = await delRef.get();
           if (check.exists) {
-            final currentDocs = (check.data()?['documents'] as List<dynamic>?) ?? [];
-            final updatedDocs = <Map<String, dynamic>>[];
-            bool found = false;
-            for (final d in currentDocs) {
-              if (d is Map && d['documentKey'] == 'personalPhoto') {
-                found = true;
-                updatedDocs.add({
-                  ...Map<String, dynamic>.from(d),
-                  'documentURL': downloadUrl,
-                  'documentStatus': 'approved',
-                  'uploadedAt': DateTime.now().toIso8601String(),
-                });
-              } else if (d is Map) {
-                updatedDocs.add(Map<String, dynamic>.from(d));
-              }
-            }
-            if (!found) {
-              updatedDocs.add({
-                'documentKey': 'personalPhoto',
-                'documentStatus': 'approved',
-                'documentURL': downloadUrl,
-                'uploadedAt': DateTime.now().toIso8601String(),
-              });
-            }
+            // Docs-pending: a re-upload from this screen is always
+            // 'pending' until a supervisor / admin approves it; other
+            // entries are copied exactly as stored.
+            final updatedDocs = mergeReuploadedDocument(
+              check.data()?['documents'],
+              docType: 'personalPhoto',
+              newUrl: downloadUrl,
+            );
 
             await delRef.set({
               'profileImageUrl': downloadUrl,
@@ -323,6 +300,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           }
         }
       }
+
+      // 1b. users doc is written after the delegate doc so a denied write
+      // does not leave the two out of sync.
+      await firestore.collection('users').doc(effectiveUid).set({
+        'photoURL': downloadUrl,
+        'profileImageUrl': downloadUrl,
+        'personalPhotoURL': downloadUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       // 3. تحديث delegate_requests إن وجد
       try {

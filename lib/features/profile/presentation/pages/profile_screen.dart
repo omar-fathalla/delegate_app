@@ -16,6 +16,7 @@ import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/profile/presentation/utils/document_review.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Delegate delegate;
@@ -824,11 +825,15 @@ class _ProfileBody extends StatelessWidget {
       ),
       itemCount: displayDocs.length,
       itemBuilder: (context, index) {
+        final canReview = _docApproverUid(context) != null;
         final item = displayDocs[index];
         return _DocumentCard(
           item: item,
           l10n: l10n,
           onEdit: () => _handleEditDocument(context, item),
+          onReview: canReview && item.status == DocumentStatus.pending
+              ? (approve) => _reviewDocument(context, item, approve)
+              : null,
         );
       },
     );
@@ -896,10 +901,127 @@ class _ProfileBody extends StatelessWidget {
     return list;
   }
 
+  /// uid of the signed-in user when they may approve this delegate's
+  /// documents: super-admin (any company) or company admin/supervisor
+  /// (UserRole.admin) of the same company. Null otherwise.
+  String? _docApproverUid(BuildContext context) {
+    try {
+      final state = context.read<AuthBloc>().state;
+      if (state is! AuthAuthenticated) return null;
+      final me = state.delegate;
+      if (me.uid == delegate.uid) return null;
+      if (me.role == UserRole.superAdmin) return me.uid;
+      if (me.role == UserRole.admin &&
+          me.companyUID.isNotEmpty &&
+          me.companyUID == delegate.companyUID) {
+        return me.uid;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _reviewDocument(
+    BuildContext context,
+    _DisplayDocument item,
+    bool approve,
+  ) async {
+    final reviewerUid = _docApproverUid(context);
+    if (reviewerUid == null) return;
+    String? reason;
+    if (!approve) {
+      final controller = TextEditingController();
+      reason = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('سبب الرفض'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('رفض'),
+            ),
+          ],
+        ),
+      );
+      if (reason == null || reason.isEmpty) return;
+    }
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final refs = <DocumentReference<Map<String, dynamic>>>[];
+      if (delegate.companyUID.isNotEmpty) {
+        final orgsSnap = await firestore.collection('organizations').get();
+        for (final orgDoc in orgsSnap.docs) {
+          refs.add(firestore
+              .collection('organizations')
+              .doc(orgDoc.id)
+              .collection('companies')
+              .doc(delegate.companyUID)
+              .collection('delegates')
+              .doc(delegate.uid));
+        }
+      }
+      refs.add(firestore.collection('delegate_requests').doc(delegate.uid));
+      var updated = 0;
+      for (final ref in refs) {
+        try {
+          final changed = await firestore.runTransaction<bool>((tx) async {
+            final snap = await tx.get(ref);
+            if (!snap.exists) return false;
+            final docs = reviewDocumentEntry(
+              snap.data()?['documents'],
+              docType: item.docType,
+              approve: approve,
+              reviewerUid: reviewerUid,
+              rejectionReason: reason,
+            );
+            if (docs == null) return false;
+            tx.update(ref, {
+              'documents': docs,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+            return true;
+          });
+          if (changed) updated++;
+        } catch (_) {
+          if (ref.parent.id != 'delegate_requests') rethrow;
+        }
+      }
+      if (!context.mounted) return;
+      if (updated == 0) {
+        AppSnackBar.showError(context, 'لم يتم العثور على المستند');
+        return;
+      }
+      AppSnackBar.showSuccess(
+        context,
+        approve ? 'تم اعتماد ${item.title}' : 'تم رفض ${item.title}',
+      );
+      context.read<ProfileBloc>().add(
+        LoadProfile(
+          uid: delegate.uid,
+          organizationUID: delegate.organizationUID,
+          companyUID: delegate.companyUID,
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        AppSnackBar.showError(context, 'فشل تحديث حالة المستند: $e');
+      }
+    }
+  }
+
   Future<void> _handleEditDocument(
     BuildContext context,
     _DisplayDocument item,
   ) async {
+    final approverUid = _docApproverUid(context);
     final picker = ImagePicker();
     final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -1011,67 +1133,10 @@ class _ProfileBody extends StatelessWidget {
         updateFields['receiptImageUrl'] = newUrl;
       }
 
-      final List<Map<String, dynamic>> updatedDocs = [];
-      bool foundMatchingDoc = false;
-      for (final doc in delegate.documents) {
-        if (item.docType == 'personalPhoto' &&
-            doc.documentKey == DocumentKey.personalPhoto) {
-          foundMatchingDoc = true;
-          updatedDocs.add({
-            'documentKey': 'personalPhoto',
-            'documentStatus': 'approved',
-            'documentURL': newUrl,
-            'uploadedAt': DateTime.now().toIso8601String(),
-          });
-        } else if ((item.docType == 'nationalIdFront' ||
-                item.docType == 'nationalIdBack') &&
-            doc.documentKey == DocumentKey.nationalityId) {
-          foundMatchingDoc = true;
-          final front =
-              item.docType == 'nationalIdFront' ? newUrl : doc.documentURL;
-          final back = item.docType == 'nationalIdBack'
-              ? newUrl
-              : (doc.secondaryURL ?? '');
-          updatedDocs.add({
-            'documentKey': 'nationalityId',
-            'documentStatus': 'approved',
-            'documentURL': front,
-            'secondaryURL': back,
-            'uploadedAt': DateTime.now().toIso8601String(),
-          });
-        } else {
-          updatedDocs.add({
-            'documentKey': doc.documentKey.name,
-            'documentStatus': doc.documentStatus.name,
-            'documentURL': doc.documentURL,
-            if (doc.secondaryURL != null) 'secondaryURL': doc.secondaryURL,
-            'uploadedAt': doc.uploadedAt?.toIso8601String() ??
-                DateTime.now().toIso8601String(),
-          });
-        }
-      }
-
-      if (!foundMatchingDoc) {
-        if (item.docType == 'personalPhoto') {
-          updatedDocs.add({
-            'documentKey': 'personalPhoto',
-            'documentStatus': 'approved',
-            'documentURL': newUrl,
-            'uploadedAt': DateTime.now().toIso8601String(),
-          });
-        } else if (item.docType == 'nationalIdFront' ||
-            item.docType == 'nationalIdBack') {
-          updatedDocs.add({
-            'documentKey': 'nationalityId',
-            'documentStatus': 'approved',
-            'documentURL': item.docType == 'nationalIdFront' ? newUrl : '',
-            'secondaryURL': item.docType == 'nationalIdBack' ? newUrl : '',
-            'uploadedAt': DateTime.now().toIso8601String(),
-          });
-        }
-      }
-
-      updateFields['documents'] = updatedDocs;
+      // Docs-pending (Mohamed 2026-11-04): a delegate's own re-upload is
+      // written as 'pending'; only an approver (super-admin, or company
+      // admin/supervisor of the same company) uploads as 'approved'. All other
+      // entries are copied exactly as stored (Firestore rules enforce this).
 
       // Update in all organizations where this company & delegate reside
       if (delegate.companyUID.isNotEmpty) {
@@ -1086,7 +1151,15 @@ class _ProfileBody extends StatelessWidget {
               .doc(delegate.uid);
           final check = await delRef.get();
           if (check.exists) {
-            await delRef.set(updateFields, SetOptions(merge: true));
+            await delRef.set({
+              ...updateFields,
+              'documents': mergeReuploadedDocument(
+                check.data()?['documents'],
+                docType: item.docType,
+                newUrl: newUrl,
+                approverUid: approverUid,
+              ),
+            }, SetOptions(merge: true));
           }
         }
       }
@@ -1106,13 +1179,26 @@ class _ProfileBody extends StatelessWidget {
             firestore.collection('delegate_requests').doc(delegate.uid);
         final reqSnap = await reqRef.get();
         if (reqSnap.exists) {
-          await reqRef.set(updateFields, SetOptions(merge: true));
+          await reqRef.set({
+            ...updateFields,
+            'documents': mergeReuploadedDocument(
+              reqSnap.data()?['documents'],
+              docType: item.docType,
+              newUrl: newUrl,
+              approverUid: approverUid,
+            ),
+          }, SetOptions(merge: true));
         }
       } catch (_) {}
 
       if (context.mounted) {
         Navigator.pop(context); // dismiss progress dialog
-        AppSnackBar.showSuccess(context, 'تم تحديث ${item.title} بنجاح!');
+        AppSnackBar.showSuccess(
+          context,
+          approverUid != null
+              ? 'تم تحديث ${item.title} بنجاح!'
+              : 'تم رفع ${item.title}، بانتظار مراجعة المشرف',
+        );
         context.read<ProfileBloc>().add(
           LoadProfile(
             uid: delegate.uid,
@@ -1377,11 +1463,13 @@ class _DocumentCard extends StatelessWidget {
   final _DisplayDocument item;
   final AppLocalizations l10n;
   final VoidCallback onEdit;
+  final void Function(bool approve)? onReview;
 
   const _DocumentCard({
     required this.item,
     required this.l10n,
     required this.onEdit,
+    this.onReview,
   });
 
   @override
@@ -1565,6 +1653,43 @@ class _DocumentCard extends StatelessWidget {
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (onReview != null)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 26,
+                            child: FilledButton(
+                              key: const Key('doc_approve_button'),
+                              style: FilledButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              onPressed: () => onReview!(true),
+                              child: const Text('اعتماد',
+                                  style: TextStyle(fontSize: 10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: SizedBox(
+                            height: 26,
+                            child: OutlinedButton(
+                              key: const Key('doc_reject_button'),
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                                foregroundColor: colorScheme.error,
+                              ),
+                              onPressed: () => onReview!(false),
+                              child: const Text('رفض',
+                                  style: TextStyle(fontSize: 10)),
+                            ),
                           ),
                         ),
                       ],

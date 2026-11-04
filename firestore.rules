@@ -300,7 +300,70 @@ service cloud.firestore {
         'updatedAt', 'requireReLogin', 'reLoginCompletedAt',
         'profileImageUrl', 'personalPhotoURL', 'photoURL',
         'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'
-      ]) && request.resource.data.get('requireReLogin', false) == false;
+      ]) && request.resource.data.get('requireReLogin', false) == false
+        && delegateDocsOk() && delegateUrlsWithDocs();
+    }
+
+    // Docs-pending (Mohamed 2026-11-04): a delegate (re)upload is written as
+    // pending; only staff approve. An approved entry is allowed only when the
+    // identical entry (same documentKey, URLs and every other field) already
+    // exists anywhere in the old list: matching is by value, not index, so
+    // removing an earlier entry does not break a later approved one. Unknown
+    // keys can never be approved (the app parses unknown keys as personalPhoto).
+    function knownDocKeys() {
+      return ['personalPhoto', 'nationalityId', 'authorizationLetter', 'insuranceLetter',
+        'healthCertificate', 'paymentReceipt', 'electronicPaymentReceipt',
+        'electronic_payment_receipt'];
+    }
+
+    function docIsApproved(e) {
+      return e.get('documentStatus', '') is string
+        && e.get('documentStatus', '').lower() == 'approved';
+    }
+
+    function newDocEntryOk(n, o, i) {
+      return i >= n.size() || !docIsApproved(n[i])
+        || (n[i].get('documentKey', '') in knownDocKeys() && n[i] in o);
+    }
+
+    // True when the write introduces no new 'approved' document entry.
+    function delegateDocsOk() {
+      let n = request.resource.data.get('documents', []);
+      let o = resource.data.get('documents', []);
+      return !changedKeys().hasAny(['documents']) || (
+        n is list && o is list && n.size() <= 8 && o.size() <= 8
+        && newDocEntryOk(n, o, 0) && newDocEntryOk(n, o, 1)
+        && newDocEntryOk(n, o, 2) && newDocEntryOk(n, o, 3)
+        && newDocEntryOk(n, o, 4) && newDocEntryOk(n, o, 5)
+        && newDocEntryOk(n, o, 6) && newDocEntryOk(n, o, 7));
+    }
+
+    // A delegate may change a photo / ID URL only together with `documents`
+    // (kept, not deleted: a URL-only photo would render as approved).
+    function delegateUrlsWithDocs() {
+      return !changedKeys().hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL',
+          'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl'])
+        || (changedKeys().hasAny(['documents'])
+          && request.resource.data.keys().hasAll(['documents']));
+    }
+
+    // S1 (Mohamed): approving a document is super-admin (any company) or
+    // company-admin / admin / supervisor of the SAME company. Other staff may
+    // still write delegate docs but may not introduce 'approved'.
+    function staffDocsApproveOk(compId) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let c = u.get('companyUID', '');
+      return delegateDocsOk()
+        // Signup approval (delegate_subscription_requests_page: super-admin /
+        // technical support) activates a pending delegate and approves its
+        // documents in one write. Kept so tech support can still approve signups.
+        || (r in techRoleList()
+          && resource.data.get('status', '') != 'active'
+          && request.resource.data.get('status', '') == 'active')
+        || r in ['super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
+        || (c != '' && c in compId && r in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor']);
     }
 
     // Budget-flat staff check for delegate docs: one users/{uid} get, literal
@@ -673,7 +736,8 @@ service cloud.firestore {
           allow update: if delegateOwns(delegateId)
             ? delegateFieldsSafe()
             : (deviceBindingUntouched() && signedIn()
-              && staffManagesDelegate([orgId], [compId], true));
+              && staffManagesDelegate([orgId], [compId], true)
+              && staffDocsApproveOk([compId]));
           allow delete: if canManageNestedDelegate(orgId, compId);
         }
 
@@ -802,7 +866,8 @@ service cloud.firestore {
         ? delegateFieldsSafe()
         : (deviceBindingUntouched() && staffManagesDelegate(
             [resource.data.get('organizationUID', ''), resource.data.get('organizationId', '')],
-            [resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)));
+            [resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)
+          && staffDocsApproveOk([resource.data.get('companyUID', ''), resource.data.get('companyId', '')])));
       allow delete: if signedIn() && canManageDelegate();
     }
 
@@ -1128,8 +1193,16 @@ service cloud.firestore {
         || resource.id == request.auth.uid
         || delegateOwns(resource.data.delegateUid)
       );
-      allow create, update: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR()
-        || (signedIn() && request.auth.uid == requestId);
+      // Docs-pending: requests are created by staff only (supervisor flow).
+      // The approved delegate's uid equals the request id, so the self path
+      // is an allow-list of the upload fields and can never approve documents
+      // or change status.
+      allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
+      allow update: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR()
+        || (signedIn() && request.auth.uid == requestId
+          && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
+            'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
+          && delegateDocsOk());
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }
 
