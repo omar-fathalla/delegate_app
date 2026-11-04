@@ -281,8 +281,13 @@ service cloud.firestore {
         );
     }
 
+    // P0 (N4): a delegate cannot change its own login fields (phone +
+    // national ID) or scope. Unchanged values in a full-map write still pass.
+    // Delegate login itself (delegateLoginV2, Admin SDK) is not affected.
     function delegateFieldsSafe() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(escalationKeys());
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(escalationKeys().concat([
+        'phoneNumber', 'phone', 'nationalityID', 'nationalId', 'nationalityId', 'national_id'
+      ]));
     }
 
     function deviceBindingKeys() {
@@ -378,6 +383,75 @@ service cloud.firestore {
       );
     }
 
+    // ==================== P0 USERS HARDENING ====================
+    // FIX_PLAN_USERS_WRITE rev 3.2 (P0). Delegate login is unchanged: the
+    // delegates matches and delegateLoginV2 are not touched here.
+
+    function superAdminRoleList() {
+      return ['super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN'];
+    }
+
+    function orgAdminRoleList() {
+      return ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin', 'org-admin'];
+    }
+
+    // Roles only a super-admin may grant, edit or hold-and-be-edited.
+    function privilegedRoleList() {
+      return superAdminRoleList().concat(orgAdminRoleList()).concat([
+        'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
+        'tech_support', 'techsupport'
+      ]);
+    }
+
+    function companyAdminRoleList() {
+      return ['company-admin', 'company_admin', 'companyadmin', 'admin'];
+    }
+
+    function fieldRoleList() {
+      return ['delegate', 'promoter', ''];
+    }
+
+    function roleOf(d) {
+      return d.get('role', '') is string ? d.get('role', '') : '';
+    }
+
+    // Never stored by a client. The purge script removes legacy values with
+    // the Admin SDK; updates that leave them untouched still pass (S1).
+    function secretKeys() {
+      return ['password', 'temporaryPassword', 'tempPassword'];
+    }
+
+    function privilegeKeys() {
+      return ['permissions', 'isSuperAdmin', 'claims', 'customClaims'];
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function noSecretsCreate() {
+      return !request.resource.data.keys().hasAny(secretKeys());
+    }
+
+    function noSecretsUpdate() {
+      return !changedKeys().hasAny(secretKeys());
+    }
+
+    function orgSegment(d) {
+      return d.get('organizationUID', '') is string && d.get('organizationUID', '') != ''
+        ? d.get('organizationUID', '') : '_none';
+    }
+
+    // N3: a doc that names a company must name a company of its own org.
+    function companyPinned(d) {
+      return !(d.get('companyUID', '') is string) || d.get('companyUID', '') == ''
+        || exists(/databases/$(database)/documents/organizations/$(orgSegment(d))/companies/$(d.get('companyUID', '')));
+    }
+
+    function pinKeysChanged() {
+      return changedKeys().hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']);
+    }
+
     // ==================== SHARED: USERS ====================
 
     match /users/{userId} {
@@ -402,37 +476,89 @@ service cloud.firestore {
           && resource.data.email == userDoc().email)
       );
 
-      allow create: if signedIn() && roleWriteAllowed() && (
-        ownerCreateSafe() ||
-        isGlobalStaff() ||
-        (isOrgAdmin() && request.resource.data.organizationUID == callerOrg()) ||
-        ((isCompanyAdmin() || isHR()) && incomingCompanyScoped() && incomingOrgScoped())
-      );
+      // New staff accounts come from the createStaffUser function (Admin SDK).
+      // Client creates stay for delegate approval (M6) and legacy screens.
+      // Caller role/org/company are read once and passed in (1000-expression budget).
+      allow create: if signedIn() && noSecretsCreate()
+        && usersCreateOk(userRole(), callerOrg(), callerCompany(), request.resource.data);
 
-      allow update: if signedIn() && roleWriteAllowed() && (
-        (request.auth.uid == userId && noSelfEscalation()) ||
-        (request.auth.uid != userId && (
-          isGlobalStaff() ||
-          (isOrgAdmin() && orgScoped()) ||
-          ((isCompanyAdmin() || isHR()) && companyScoped())
-        ))
-      );
+      allow update: if signedIn() && noSecretsUpdate()
+        && usersUpdateOk(userRole(), callerOrg(), callerCompany(), resource.data, request.resource.data, userId);
 
-      allow delete: if signedIn()
-        && request.auth.uid != userId
+      // Mohamed 2026-11-04: deletes are super-admin, plus the company
+      // supervisor/company-admin for delegates/promoters of its own company.
+      allow delete: if signedIn() && request.auth.uid != userId
+        && usersDeleteOk(userRole(), callerOrg(), callerCompany(), resource.data);
+    }
+
+    function techRoleList() {
+      return ['technical_support', 'technical-support', 'technicalSupport', 'technicalsupport', 'tech_support', 'techsupport'];
+    }
+
+    function companyStaffWriterRoleList() {
+      return ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+        'hr', 'company-hr', 'company_hr', 'human_resources'];
+    }
+
+    function newRoleOk(r) {
+      return r == 'super-admin' || !(r in superAdminRoleList());
+    }
+
+    function usersCreateOk(r, org, co, d) {
+      let nr = roleOf(d);
+      let isSA = r in superAdminRoleList();
+      return newRoleOk(nr) && (isSA || (
+        !d.keys().hasAny(privilegeKeys())
+        && !(nr in privilegedRoleList())
+        && companyPinned(d)
         && (
-          isSuperAdmin() ||
-          (
-            !(resource.data.role in [
-              'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-              'Super-Admin', 'SUPER_ADMIN'
-            ]) && (
-              isTechnicalSupport() ||
-              (isOrgAdmin() && orgScoped()) ||
-              ((isCompanyAdmin() || isHR()) && companyScoped())
-            )
-          )
-        );
+          (request.auth.uid == request.resource.id
+            && nr in ['delegate', '']
+            && d.get('uid', request.auth.uid) == request.auth.uid
+            && !d.keys().hasAny(['status', 'organizationUID', 'companyUID', 'organizationId', 'companyId', 'isActive'])) ||
+          (r in techRoleList()) ||
+          (r in orgAdminRoleList() && org != '' && d.get('organizationUID', '') == org) ||
+          (r in companyStaffWriterRoleList() && co != '' && org != ''
+            && d.get('organizationUID', '') == org && d.get('companyUID', '') == co
+            && !(nr in companyAdminRoleList()))
+        )
+      ));
+    }
+
+    function usersUpdateOk(r, org, co, old, d, userId) {
+      let changed = d.diff(old).affectedKeys();
+      let nr = roleOf(d);
+      let or = roleOf(old);
+      return (r in superAdminRoleList() && newRoleOk(nr)) || (
+        newRoleOk(nr)
+        && !changed.hasAny(privilegeKeys())
+        && (!changed.hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']) || companyPinned(d))
+        && (
+          (request.auth.uid == userId
+            && !changed.hasAny(escalationKeys().concat(['isActive']))) ||
+          (request.auth.uid != userId
+            && !(or in privilegedRoleList()) && !(nr in privilegedRoleList())
+            && (
+              (r in techRoleList()) ||
+              (r in orgAdminRoleList() && org != ''
+                && old.get('organizationUID', '') == org && d.get('organizationUID', '') == org) ||
+              (r in companyStaffWriterRoleList() && co != ''
+                && old.get('companyUID', '') == co && d.get('companyUID', '') == co
+                && old.get('organizationUID', '') == d.get('organizationUID', '')
+                && !(nr in companyAdminRoleList())
+                && (!changed.hasAny(['role']) || !(or in companyAdminRoleList())))
+            ))
+        )
+      );
+    }
+
+    function usersDeleteOk(r, org, co, old) {
+      return r in superAdminRoleList() || (
+        r in ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor']
+        && co != '' && org != ''
+        && old.get('companyUID', '') == co && old.get('organizationUID', '') == org
+        && roleOf(old) in fieldRoleList()
+      );
     }
 
     // ==================== SHARED: ORGANIZATIONS AND COMPANIES ====================
@@ -460,8 +586,8 @@ service cloud.firestore {
 
       match /members/{memberId} {
         allow read: if signedIn() && (request.auth.uid == memberId || isGlobalStaff() || callerOrg() == orgId);
-        allow create, update: if signedIn() && request.auth.uid == memberId && callerOrg() == orgId;
-        allow delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
+        // Self writes removed (forged invite claim). claimInvite writes via Admin SDK.
+        allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
       }
 
       match /admins/{adminId} {
@@ -488,8 +614,7 @@ service cloud.firestore {
           allow read: if signedIn() && (
             request.auth.uid == memberId || isGlobalStaff() || canManageNestedDelegate(orgId, compId)
           );
-          allow create, update: if signedIn() && request.auth.uid == memberId;
-          allow delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
+          allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
         }
 
         match /delegates/{delegateId} {
@@ -681,18 +806,44 @@ service cloud.firestore {
         ))
       );
 
-      allow create: if signedIn() && roleWriteAllowed() && (
-        isSuperAdmin() ||
-        isOrgAdmin() ||
-        (isCompanyAdmin() && incomingOrgScoped() && incomingCompanyScoped())
-      );
+      // E1: no super-admin invites; org-admin invites only from a super-admin;
+      // expiresAt required and at most 7 days out; org must exist.
+      allow create: if signedIn() && roleWriteAllowed()
+        && !(request.resource.data.get('roleToAssign', '') in superAdminRoleList())
+        && !(request.resource.data.get('role', '') in superAdminRoleList())
+        && request.resource.data.get('status', '') == 'pending'
+        && request.resource.data.get('expiresAt', null) is timestamp
+        && request.resource.data.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')
+        && request.resource.data.get('organizationId', '') is string
+        && request.resource.data.get('organizationId', '') != ''
+        && exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId))
+        && (
+          isSuperAdmin() || (
+            !(request.resource.data.get('roleToAssign', '') in orgAdminRoleList())
+            && request.resource.data.get('companyId', null) is string
+            && exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)/companies/$(request.resource.data.companyId))
+            && (
+              (isOrgAdmin() && request.resource.data.organizationId == callerOrg()) ||
+              (isCompanyAdmin() && request.resource.data.organizationId == callerOrg()
+                && request.resource.data.companyId == callerCompany())
+            )
+          )
+        );
 
-      allow update: if signedIn() && (
-        isSuperAdmin() ||
-        (isOrgAdmin() && (resource.data.organizationId == callerOrg() || resource.data.organizationUID == callerOrg())) ||
-        (isCompanyAdmin() && companyScoped()) ||
-        (request.resource.data.status == 'claimed' && request.resource.data.claimedByUid == request.auth.uid)
-      );
+      // Claiming is function-only (claimInvite). Clients cannot set claimed.
+      allow update: if signedIn()
+        && request.resource.data.get('status', '') != 'claimed'
+        && !changedKeys().hasAny(['claimedBy', 'claimedByUid', 'claimedByEmail', 'claimedAt'])
+        && (
+          isSuperAdmin() ||
+          (isOrgAdmin() && (resource.data.get('organizationId', '') == callerOrg() || resource.data.get('organizationUID', '') == callerOrg())
+            && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
+            && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', '')) ||
+          (isCompanyAdmin() && companyScoped()
+            && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
+            && request.resource.data.get('companyId', '') == resource.data.get('companyId', '')
+            && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', ''))
+        );
 
       allow delete: if isSuperAdmin();
     }

@@ -84,6 +84,16 @@ jobs:
         run: npm run lint
       - name: Test
         run: npm test --if-present
+
+  rules:
+    name: Firestore rules & delegate login e2e (emulators)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/setup-java@v4
         with:
           java-version: '21'
@@ -91,3 +101,11 @@ jobs:
       - name: Staff accounts e2e (createStaffUser / claimInvite on emulators)
         working-directory: .
         run: npm install --no-audit --no-fund && npm run test:e2e:staff
+      - name: Install root test deps
+        run: npm ci
+      - name: Install functions deps
+        run: npm --prefix functions ci
+      - name: Rules tests
+        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0
+      - name: Delegate login e2e (delegateLoginV2 -> custom token -> 1.14.3 query)
+        run: npm run test:e2e:delegate
