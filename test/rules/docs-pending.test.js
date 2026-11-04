@@ -142,8 +142,10 @@ describe("docs-pending rules", () => {
     }
     test("ALLOW hr rejects (no approved introduced)", () => assertSucceeds(updateDoc(doc(as("hr"), pendPath),
       {documents: [{...PHOTO, documentStatus: "rejected", rejectionReason: "x"}, {...NID, documentStatus: "pending"}]})));
-    test("ALLOW tech support signup approval (pending -> active with approved docs)", () =>
-      assertSucceeds(updateDoc(doc(as("ts"), pendPath), {...approveData, status: "active"})));
+    test("DENY tech support signup approval (pending -> active with approved docs) [H1]", () =>
+      assertFails(updateDoc(doc(as("ts"), pendPath), {...approveData, status: "active"})));
+    test("ALLOW super-admin signup approval (pending -> active with approved docs)", () =>
+      assertSucceeds(updateDoc(doc(as("sa"), pendPath), {...approveData, status: "active"})));
     test("ALLOW super-admin approves in another company", async () => {
       await env.withSecurityRulesDisabled((c) => c.firestore().doc("organizations/o1/companies/c2/delegates/z").set({
         ...BASE, uid: "z", companyUID: "c2", documents: [{...PHOTO, documentStatus: "pending"}]}));
@@ -157,9 +159,253 @@ describe("docs-pending rules", () => {
     test("DENY delegate approves its documents", () => assertFails(updateDoc(doc(del(), p), {documents: [PHOTO]})));
     test("DENY delegate writes other fields", () => assertFails(updateDoc(doc(del(), p), {fee: 0})));
     test("DENY delegate creates its own request", () => assertFails(setDoc(doc(del(), "delegate_requests/new1"), {status: "pending"})));
-    test("ALLOW delegate updates profileImageUrl", () => assertSucceeds(updateDoc(doc(del(), p), {profileImageUrl: "p1", updatedAt: "t"})));
+    test("DENY delegate updates profileImageUrl without a pending entry (L4)", () => assertFails(updateDoc(doc(del(), p), {profileImageUrl: "p1", updatedAt: "t"})));
+    test("ALLOW delegate removes profileImageUrl", () => assertSucceeds(updateDoc(doc(del(), p), {profileImageUrl: "", updatedAt: "t"})));
     test("ALLOW delegate re-upload as pending", () => assertSucceeds(updateDoc(doc(del(), p),
       {documents: [{...PHOTO, documentURL: "p1", documentStatus: "pending"}], profileImageUrl: "p1", updatedAt: "t"})));
     test("ALLOW company staff review update", () => assertSucceeds(updateDoc(doc(as("sup"), p), {status: "approved", reviewedBy: "s"})));
+  });
+});
+
+/**
+ * PR #208 round 2 (FIX_PLAN_PR208_r2): B1 group-path staff, B2 URL side
+ * door, M1 self-approve, L1 status type, L2 unchanged unknown keys.
+ */
+describe("docs-pending round 2", () => {
+  let env;
+  const as = (uid, c = {}) => env.authenticatedContext(uid, {firebase: {sign_in_provider: "password"}, ...c}).firestore();
+  const del = () => as("d1", {role: "delegate"});
+  // A rules evaluation error makes the emulator client retry forever; fail
+  // fast instead of hanging (B1 regression).
+  const T = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error("TIMEOUT_EMULATOR_ERROR")), 5000))]);
+  const ok = (p) => T(assertSucceeds(p));
+  const no = (p) => T(assertFails(p));
+  const ALL = {
+    nested: "organizations/o1/companies/c1/delegates/d1",
+    top: "delegates/d1",
+    branch: "branches/x1/delegates/d1",
+  };
+  const KEYS = ["personalPhoto", "nationalityId", "authorizationLetter", "insuranceLetter",
+    "healthCertificate", "paymentReceipt", "electronicPaymentReceipt", "electronic_payment_receipt"];
+  const EIGHT = KEYS.map((k) => ({documentKey: k, documentStatus: "approved", documentURL: k + "0",
+    secondaryURL: "s", uploadedAt: "2026-01-01", reviewedBy: "x"}));
+  const PEND = {...BASE, documents: [{...PHOTO, documentStatus: "pending"}, NID, RCPT]};
+  const APPROVE = {documents: [{...PHOTO, reviewedBy: "r"}, NID, RCPT]};
+  const seed = (p, d) => env.withSecurityRulesDisabled((c) => c.firestore().doc(p).set(d));
+
+  before(async () => {
+    env = await initializeTestEnvironment({
+      projectId: PROJECT_ID,
+      firestore: {rules: readFileSync(resolve(__dirname, "../../firestore.rules"), "utf8")},
+    });
+  });
+  after(async () => env.cleanup());
+  beforeEach(async () => {
+    await env.clearFirestore();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const [id, d] of Object.entries(USERS)) await db.doc(`users/${id}`).set(d);
+      await db.doc("organizations/o1").set({name: "O1"});
+      await db.doc("organizations/o1/companies/c1").set({name: "C1"});
+      for (const p of Object.values(ALL)) await db.doc(p).set(BASE);
+      await db.doc("delegate_requests/d1").set({
+        status: "pending", organizationUID: "o1", companyUID: "c1", profileImageUrl: "p0",
+        nationalIdFrontUrl: "f0", nationalIdBackUrl: "b0", documents: BASE.documents});
+    });
+  });
+
+  for (const [label, path] of Object.entries({top: ALL.top, branch: ALL.branch})) {
+    describe(`B1 staff on group path (${label})`, () => {
+      for (const w of ["sa", "ca", "sup", "hr", "ts"]) {
+        test(`ALLOW ${w} plain edit (no emulator error)`, () => ok(updateDoc(doc(as(w), path), {fullName: "z"})));
+      }
+      for (const w of ["sa", "ca", "adm", "sup"]) {
+        test(`ALLOW ${w} approves pending entry`, async () => {
+          await seed(path, PEND); await ok(updateDoc(doc(as(w), path), APPROVE));
+        });
+      }
+      for (const w of ["sup2", "hr", "acc", "ts"]) {
+        test(`DENY ${w} approves pending entry`, async () => {
+          await seed(path, PEND); await no(updateDoc(doc(as(w), path), APPROVE));
+        });
+      }
+      for (const w of ["sup", "hr"]) {
+        test(`ALLOW ${w} rejects pending entry`, async () => {
+          await seed(path, PEND);
+          await ok(updateDoc(doc(as(w), path), {documents: [{...PHOTO, documentStatus: "rejected", rejectionReason: "x"}, NID, RCPT]}));
+        });
+      }
+      test("ALLOW hr budget write: 8 approved reversed + other field", async () => {
+        await seed(path, {...BASE, documents: EIGHT});
+        await ok(updateDoc(doc(as("hr"), path), {documents: [...EIGHT].reverse(), notes: "x"}));
+      });
+      test("ALLOW sup approves all 8 (worst-case staff budget)", async () => {
+        await seed(path, {...BASE, documents: EIGHT.map((e) => ({...e, documentStatus: "pending"}))});
+        await ok(updateDoc(doc(as("sup"), path), {documents: [...EIGHT].reverse()}));
+      });
+      test("DENY hr approves 1 of 8 (deny, not error)", async () => {
+        await seed(path, {...BASE, documents: EIGHT.map((e) => ({...e, documentStatus: "pending"}))});
+        await no(updateDoc(doc(as("hr"), path), {documents: [EIGHT[0], ...EIGHT.slice(1).map((e) => ({...e, documentStatus: "pending"}))]}));
+      });
+    });
+  }
+
+  for (const [label, path] of Object.entries({...ALL, request: "delegate_requests/d1"})) {
+    describe(`B2 URL must be backed by a pending entry (${label})`, () => {
+      const allow = (n, f) => test(`ALLOW ${n}`, async () => ok(updateDoc(doc(del(), path), await f())));
+      const deny = (n, f) => test(`DENY ${n}`, async () => no(updateDoc(doc(del(), path), await f())));
+      deny("photo fields set to two different URLs", () =>
+        ({documents: [{...PHOTO, documentStatus: "pending", documentURL: "p1"}, NID, RCPT], profileImageUrl: "p1", personalPhotoURL: "pE"}));
+      deny("drop photo entry + new profileImageUrl/photoURL", () => ({documents: [NID, RCPT], profileImageUrl: "pE", photoURL: "pE"}));
+      deny("pending photo entry with empty URL + new profileImageUrl", () =>
+        ({documents: [{documentKey: "personalPhoto", documentStatus: "pending", documentURL: ""}, NID, RCPT], profileImageUrl: "pE"}));
+      deny("legacy (no photo entry), touch NID pending + new photoURL", async () => {
+        await seed(path, {...BASE, documents: [NID]});
+        return {documents: [{...NID, documentStatus: "pending"}], photoURL: "pE", profileImageUrl: "pE"};
+      });
+      deny("drop nationalityId entry + new nationalIdFrontUrl", () => ({documents: [PHOTO, RCPT], nationalIdFrontUrl: "fE"}));
+      deny("pending photo entry with a different URL", () =>
+        ({documents: [{...PHOTO, documentStatus: "pending", documentURL: "p1"}, NID, RCPT], profileImageUrl: "pE"}));
+      deny("matching entry status 'Pending' (must be exactly 'pending')", () =>
+        ({documents: [{...PHOTO, documentStatus: "Pending", documentURL: "p1"}, NID, RCPT], profileImageUrl: "p1"}));
+      deny("matching URL but wrong key", () =>
+        ({documents: [PHOTO, NID, RCPT, {documentKey: "healthCertificate", documentStatus: "pending", documentURL: "pE"}], profileImageUrl: "pE"}));
+      deny("reorder (approved kept) + new profileImageUrl (L3)", () => ({documents: [NID, PHOTO, RCPT], profileImageUrl: "pE"}));
+      deny("URL only, no documents (L4)", () => ({profileImageUrl: "pE", updatedAt: "t"}));
+      deny("ID back URL backed only by documentURL (must be secondaryURL)", () =>
+        ({documents: [PHOTO, {...NID, documentStatus: "pending", documentURL: "bE"}, RCPT], nationalIdBackUrl: "bE"}));
+      allow("photo re-upload: pending entry with same URL in all photo fields", () => ({
+        documents: [{...PHOTO, documentStatus: "pending", documentURL: "p1"}, NID, RCPT],
+        profileImageUrl: "p1", personalPhotoURL: "p1", ...(label === "request" ? {} : {photoURL: "p1"}), updatedAt: "t"}));
+      allow("ID front re-upload", () =>
+        ({documents: [PHOTO, {...NID, documentStatus: "pending", documentURL: "f1"}, RCPT], nationalIdFrontUrl: "f1"}));
+      allow("ID back re-upload", () =>
+        ({documents: [PHOTO, {...NID, documentStatus: "pending", secondaryURL: "b1"}, RCPT], nationalIdBackUrl: "b1"}));
+      allow("receipt re-upload", () =>
+        ({documents: [PHOTO, NID, {...RCPT, documentStatus: "pending", documentURL: "r1"}], receiptImageUrl: "r1"}));
+      allow("budget: 8 entries, photo re-upload backing entry in slot 7", async () => {
+        await seed(path, {...BASE, documents: EIGHT});
+        return {documents: [...EIGHT.slice(1).reverse(), {...EIGHT[0], documentStatus: "pending", documentURL: "p9"}],
+          profileImageUrl: "p9", personalPhotoURL: "p9", updatedAt: "t"};
+      });
+      allow("budget: 8 entries, ID front+back re-upload backing entry in slot 7", async () => {
+        await seed(path, {...BASE, documents: EIGHT});
+        const rest = EIGHT.filter((e) => e.documentKey !== "nationalityId").reverse();
+        return {documents: [...rest, {...EIGHT[1], documentStatus: "pending", documentURL: "f9", secondaryURL: "b9"}],
+          nationalIdFrontUrl: "f9", nationalIdBackUrl: "b9", updatedAt: "t"};
+      });
+      allow("photo removal (empty URL)", () => ({profileImageUrl: "", personalPhotoURL: "", updatedAt: "t"}));
+      allow("photo + ID front/back in one write (3 entries)", () => ({
+        documents: [{...PHOTO, documentStatus: "pending", documentURL: "p9"}, RCPT,
+          {...NID, documentStatus: "pending", documentURL: "f9", secondaryURL: "b9"}],
+        profileImageUrl: "p9", personalPhotoURL: "p9", nationalIdFrontUrl: "f9", nationalIdBackUrl: "b9", updatedAt: "t"}));
+      // Photo AND ID in one write over a full 8-entry list exceeds the
+      // 1000-expression budget and is denied (fails closed). The app writes
+      // one document per update, which is covered by the 8-entry cases above.
+      deny("photo + ID in one write over 8 entries (budget, fails closed)", async () => {
+        await seed(path, {...BASE, documents: EIGHT});
+        const docs = [...EIGHT.slice(2)].reverse();
+        docs.push({...EIGHT[1], documentStatus: "pending", documentURL: "f9", secondaryURL: "b9"});
+        docs.push({...EIGHT[0], documentStatus: "pending", documentURL: "p9"});
+        return {documents: docs, profileImageUrl: "p9", personalPhotoURL: "p9",
+          nationalIdFrontUrl: "f9", nationalIdBackUrl: "b9", updatedAt: "t"};
+      });
+    });
+  }
+  test("ALLOW photo removal with FieldValue.delete()", async () => {
+    const {deleteField} = require("firebase/firestore");
+    await ok(updateDoc(doc(del(), ALL.nested), {profileImageUrl: deleteField(), photoURL: deleteField()}));
+  });
+
+  for (const [label, path] of Object.entries({
+    nested: "organizations/o1/companies/c1/delegates/sup", top: "delegates/sup", branch: "branches/x1/delegates/sup"})) {
+    describe(`M1 no self-approval (${label})`, () => {
+      test("DENY supervisor approves own documents", async () => {
+        await seed(path, {...PEND, uid: "sup"}); await no(updateDoc(doc(as("sup"), path), APPROVE));
+      });
+      test("DENY super-admin approves own documents", async () => {
+        const p = path.replace(/sup$/, "sa");
+        await seed(p, {...PEND, uid: "sa"}); await no(updateDoc(doc(as("sa"), p), APPROVE));
+      });
+      test("ALLOW supervisor edits own name", async () => {
+        await seed(path, {...PEND, uid: "sup"}); await ok(updateDoc(doc(as("sup"), path), {fullName: "me"}));
+      });
+      test("ALLOW another same-company approver approves it", async () => {
+        await seed(path, {...PEND, uid: "sup"}); await ok(updateDoc(doc(as("ca"), path), APPROVE));
+      });
+    });
+  }
+
+  for (const [label, path] of Object.entries(ALL)) {
+    describe(`H1 tech support never activates or approves (${label})`, () => {
+      const pendDocs = [{...PHOTO, documentStatus: "pending", documentURL: "pX"}];
+      const appr = [{...pendDocs[0], documentStatus: "approved"}];
+      for (const st of ["pending", "suspended", "Active", "inactive"]) {
+        test(`DENY ts '${st}' -> active + approve`, async () => {
+          await seed(path, {...BASE, status: st, documents: pendDocs});
+          await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
+        });
+        test(`DENY ts '${st}' -> active (no docs change)`, async () => {
+          await seed(path, {...BASE, status: st, documents: pendDocs});
+          await no(updateDoc(doc(as("ts"), path), {status: "active"}));
+        });
+      }
+      test("DENY ts no-status doc -> active", async () => {
+        const {status: _s, ...noStatus} = BASE;
+        await seed(path, {...noStatus, documents: pendDocs});
+        await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
+      });
+      test("DENY ts approves docs on an active delegate", async () => {
+        await seed(path, {...BASE, documents: pendDocs});
+        await no(updateDoc(doc(as("ts"), path), {documents: appr}));
+      });
+      test("ALLOW ts plain edit / suspend", async () => {
+        await seed(path, {...BASE, documents: pendDocs});
+        await ok(updateDoc(doc(as("ts"), path), {fullName: "z", status: "suspended"}));
+      });
+      test("ALLOW super-admin activates + approves (signup)", async () => {
+        await seed(path, {...BASE, status: "pending", documents: pendDocs});
+        await ok(updateDoc(doc(as("sa"), path), {status: "active", documents: appr}));
+      });
+      const cpath = path.replace(/d1$/, "newT");
+      test("DENY ts creates an active delegate", () =>
+        no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: pendDocs})));
+      test("DENY ts creates a delegate with an approved document", () =>
+        no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "pending", documents: [PHOTO]})));
+      test("ALLOW super-admin creates active delegate with approved docs", () =>
+        ok(setDoc(doc(as("sa"), cpath), {...BASE, uid: "newT", status: "active", documents: [PHOTO]})));
+    });
+  }
+  describe("H1 delegate_requests", () => {
+    test("DENY ts approves a signup request", () =>
+      no(updateDoc(doc(as("ts"), "delegate_requests/d1"), {status: "approved", reviewedBy: "ts"})));
+    test("ALLOW ts other request edit", () =>
+      ok(updateDoc(doc(as("ts"), "delegate_requests/d1"), {notes: "x"})));
+    test("ALLOW super-admin approves a signup request", () =>
+      ok(updateDoc(doc(as("sa"), "delegate_requests/d1"), {status: "approved", reviewedBy: "sa"})));
+  });
+
+  describe("L1 documentStatus type / L2 unchanged unknown keys", () => {
+    const p = ALL.nested;
+    for (const [n, v] of [["number", 1], ["map", {a: 1}], ["bool", true]]) {
+      test(`DENY new entry with ${n} documentStatus`, () =>
+        no(updateDoc(doc(del(), p), {documents: [{...PHOTO, documentStatus: v, documentURL: "p1"}, NID, RCPT], profileImageUrl: "p1"})));
+    }
+    test("ALLOW unchanged legacy entry with odd status type carried over", async () => {
+      const odd = {documentKey: "healthCertificate", documentStatus: 3, documentURL: "h"};
+      await seed(p, {...BASE, documents: [...BASE.documents, odd]});
+      await ok(updateDoc(doc(del(), p), {documents: [{...PHOTO, documentStatus: "pending", documentURL: "p1"}, NID, RCPT, odd], profileImageUrl: "p1"}));
+    });
+    test("ALLOW legacy approved unknown-key entry carried over during re-upload", async () => {
+      const leg = {documentKey: "personal_photo", documentStatus: "approved", documentURL: "L"};
+      await seed(p, {...BASE, documents: [...BASE.documents, leg]});
+      await ok(updateDoc(doc(del(), p), {documents: [{...PHOTO, documentStatus: "pending", documentURL: "p1"}, NID, RCPT, leg], profileImageUrl: "p1"}));
+    });
+    test("DENY new approved unknown key", () =>
+      no(updateDoc(doc(del(), p), {documents: [PHOTO, NID, RCPT, {documentKey: "bogus", documentStatus: "approved", documentURL: "z"}]})));
+    test("DENY copy approved entry under another key", () =>
+      no(updateDoc(doc(del(), p), {documents: [PHOTO, NID, RCPT, {...PHOTO, documentKey: "healthCertificate"}]})));
+    test("ALLOW pending unknown key", () =>
+      ok(updateDoc(doc(del(), p), {documents: [PHOTO, NID, RCPT, {documentKey: "bogus", documentStatus: "pending", documentURL: "z"}]})));
   });
 });

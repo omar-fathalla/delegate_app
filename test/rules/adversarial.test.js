@@ -126,8 +126,9 @@ describe("adversarial", ()=>{
     const D1="organizations/o1/companies/c1/delegates/d1";
     await rec("delegate reLogin ack (session service)","allow",updateDoc(doc(dt,D1),{requireReLogin:false,reLoginCompletedAt:1}));
     await rec("delegate sets requireReLogin true","deny",updateDoc(doc(dt,D1),{requireReLogin:true}));
-    await rec("delegate photo re-upload (user_profile_screen)","allow",setDoc(doc(dt,D1),{profileImageUrl:"u",personalPhotoURL:"u",photoURL:"u",documents:[{documentKey:"personalPhoto",documentURL:"u"}],updatedAt:1},{merge:true}));
-    await rec("delegate ID image re-upload (profile_screen)","allow",setDoc(doc(dt,D1),{nationalIdFrontUrl:"u",nationalIdBackUrl:"u",receiptImageUrl:"u",documents:[{documentKey:"nationalityId",documentStatus:"pending",documentURL:"u",secondaryURL:"u"}],updatedAt:1},{merge:true}));
+    await rec("delegate photo re-upload (user_profile_screen)","allow",setDoc(doc(dt,D1),{profileImageUrl:"u",personalPhotoURL:"u",photoURL:"u",documents:[{documentKey:"personalPhoto",documentStatus:"pending",documentURL:"u"}],updatedAt:1},{merge:true}));
+    await rec("delegate receipt URL without a pending receipt entry (B2)","deny",setDoc(doc(dt,D1),{receiptImageUrl:"u2",updatedAt:1},{merge:true}));
+    await rec("delegate ID image re-upload (profile_screen)","allow",setDoc(doc(dt,D1),{nationalIdFrontUrl:"u",nationalIdBackUrl:"u",documents:[{documentKey:"nationalityId",documentStatus:"pending",documentURL:"u",secondaryURL:"u"}],updatedAt:1},{merge:true}));
     await rec("delegate ID image re-upload without documents","deny",setDoc(doc(dt,D1),{nationalIdFrontUrl:"u2",updatedAt:1},{merge:true}));
     for(const [k,v] of [["annualLeaveQuota",99],["isAnnualLeaveEnabled",true],["paymentAmount",0],["receiptCode","x"],["hasPendingUpdate",false],["isDeductedFromCompany",true],["supervisorUid","sup"],["delegatePublicId","x"],["originOrganizationUID","o2"],["isExternal",true],["role","supervisor"],["status","active2"]])
       await rec("delegate self sets "+k,"deny",updateDoc(doc(dt,D1),{[k]:v}));
