@@ -31,3 +31,7 @@ Switching schemes in Xcode without re-running Flutter therefore cannot ship prod
 registrant: the next prod compile copies from the shared generated file again.
 
 Manual regression (macOS + Xcode): `scripts/test_derived_registrant_switching.sh` from `ios/`.
+The script runs `flutter build ios --config-only` for **dev** and **prod** (simulator, no codesign),
+then `pod install` after each, so plain `xcodebuild` resolves the Flutter module like a normal
+Flutter+iOS workspace. It then runs **Debug-dev → Debug-prod → Debug-dev** without calling Flutter
+again between those builds (only `DART_DEFINES` is overridden per configuration to match `ENV`).

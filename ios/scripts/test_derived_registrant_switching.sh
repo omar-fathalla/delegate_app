@@ -13,6 +13,11 @@
 # Parallel xcodebuild (two DERIVED_DATA dirs) is skipped here: a single workspace cannot
 # safely run concurrent Flutter codegen (`xcode_backend.sh`) against the same Runner tree
 # without races; use CI matrix / separate worktrees for true parallelism.
+#
+# Raw `xcodebuild` needs the same prep Flutter applies (Pods + xcconfigs + module maps).
+# This script runs `flutter build ios --config-only` per flavor and `pod install` before
+# the dev→prod→dev sequence, without re-running Flutter between xcodebuild steps (User Test
+# scenario: switch configuration in Xcode only).
 set -euo pipefail
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -32,11 +37,70 @@ cd "$REPO_ROOT"
 
 SRC_GENERATED="$IOS_ROOT/Runner/GeneratedPluginRegistrant.m"
 DERIVED="$IOS_ROOT/Runner/.tashil_registrant_derived/GeneratedPluginRegistrant.m"
+GENERATED_XCCONFIG="$IOS_ROOT/Flutter/Generated.xcconfig"
 
-[[ -f "$SRC_GENERATED" ]] || {
-  echo "test_derived_registrant_switching: missing $SRC_GENERATED — run flutter pub get / ios build first" >&2
-  exit 1
+resolve_flutter_bin() {
+  if command -v flutter >/dev/null 2>&1; then
+    command -v flutter
+    return 0
+  fi
+  if [[ -f "$GENERATED_XCCONFIG" ]]; then
+    # shellcheck disable=SC2002
+    local root
+    root="$(grep -m1 '^FLUTTER_ROOT=' "$GENERATED_XCCONFIG" | sed 's/^FLUTTER_ROOT=//')"
+    root="${root//[[:space:]]/}"
+    if [[ -n "$root" && -x "$root/bin/flutter" ]]; then
+      echo "$root/bin/flutter"
+      return 0
+    fi
+  fi
+  return 1
 }
+
+# Comma-separated base64 defines, matching Xcode / Flutter (DART_DEFINES).
+encode_dart_defines() {
+  local out="" item enc
+  for item in "$@"; do
+    enc="$(printf '%s' "$item" | base64 | tr -d '\n')"
+    if [[ -z "$out" ]]; then
+      out="$enc"
+    else
+      out="$out,$enc"
+    fi
+  done
+  printf '%s' "$out"
+}
+
+prep_workspace() {
+  local flutter_bin
+  flutter_bin="$(resolve_flutter_bin)" || {
+    echo "test_derived_registrant_switching: need flutter on PATH or valid Flutter/Generated.xcconfig (run flutter pub get)" >&2
+    exit 1
+  }
+
+  echo "test_derived_registrant_switching: using flutter: $flutter_bin"
+  (cd "$REPO_ROOT" && "$flutter_bin" pub get)
+
+  # Per-flavor: regenerate iOS config and pod integration without a full compile.
+  echo "test_derived_registrant_switching: flutter build ios --config-only (dev)"
+  (cd "$REPO_ROOT" && "$flutter_bin" build ios --config-only --no-codesign --simulator \
+    --flavor dev --dart-define=ENV=dev)
+  echo "test_derived_registrant_switching: pod install (after dev config-only)"
+  (cd "$IOS_ROOT" && pod install)
+
+  echo "test_derived_registrant_switching: flutter build ios --config-only (prod)"
+  (cd "$REPO_ROOT" && "$flutter_bin" build ios --config-only --no-codesign --simulator \
+    --flavor prod --dart-define=ENV=prod)
+  echo "test_derived_registrant_switching: pod install (after prod config-only)"
+  (cd "$IOS_ROOT" && pod install)
+
+  [[ -f "$SRC_GENERATED" ]] || {
+    echo "test_derived_registrant_switching: missing $SRC_GENERATED after flutter config-only" >&2
+    exit 1
+  }
+}
+
+prep_workspace
 
 baseline_copy="$(mktemp)"
 cp "$SRC_GENERATED" "$baseline_copy"
@@ -46,13 +110,29 @@ sha_file() {
   shasum -a 256 "$1" | awk '{print $1}'
 }
 
+dart_defines_for_configuration() {
+  case "$1" in
+    Debug-dev | Profile-dev | Release-dev)
+      encode_dart_defines "ENV=dev"
+      ;;
+    *)
+      encode_dart_defines "ENV=prod"
+      ;;
+  esac
+}
+
 build() {
   local config="$1"
+  local defines
+  defines="$(dart_defines_for_configuration "$config")"
   # CODE_SIGNING_ALLOWED=NO keeps CI/local from needing provisioning profiles for this check.
+  # DART_DEFINES must match the configuration so firebase_config.sh and flutter_assemble agree
+  # with what `flutter build` would pass (simulates switching scheme only in Xcode).
   xcodebuild -workspace "$IOS_ROOT/Runner.xcworkspace" \
     -scheme Runner \
     -configuration "$config" \
     -destination 'generic/platform=iOS Simulator' \
+    DART_DEFINES="$defines" \
     CODE_SIGNING_ALLOWED=NO \
     build
 }
