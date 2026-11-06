@@ -18,6 +18,18 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
+// tashil-dev "Dev Maps Android key" — set locally (see android/README_MAPS_KEYS.md); never commit.
+fun loadDevMapsAndroidKey(): String? {
+    System.getenv("DEV_MAPS_ANDROID_KEY")?.trim()?.takeIf { it.isNotEmpty() }?.let {
+        return it
+    }
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (!localPropertiesFile.exists()) return null
+    val p = Properties()
+    localPropertiesFile.inputStream().use { p.load(it) }
+    return p.getProperty("devMapsAndroidKey")?.trim()?.takeIf { it.isNotEmpty() }
+}
+
 android {
     namespace = "com.tashil.delegate"
     compileSdk = flutter.compileSdkVersion
@@ -42,6 +54,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Production Maps key (must remain byte-for-byte for prod/store builds).
+        manifestPlaceholders["GOOGLE_MAPS_ANDROID_API_KEY"] =
+            "AIzaSyDQkxCw7YSM1-qUxcjT9oWA9DNZyp3fsOk"
     }
 
     // Always pass --flavor on Android: `flutter build apk --flavor prod` or
@@ -63,6 +78,8 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             manifestPlaceholders["appLabel"] = "Tashil Dev"
+            manifestPlaceholders["GOOGLE_MAPS_ANDROID_API_KEY"] =
+                loadDevMapsAndroidKey().orEmpty()
         }
     }
 
@@ -129,5 +146,12 @@ gradle.taskGraph.whenReady {
     }
     if (buildsProd && dartEnv != "prod") {
         throw GradleException("Flavor 'prod' requires ENV=prod or no ENV define (got ENV=$dartEnv).")
+    }
+    if (buildsDev && loadDevMapsAndroidKey().isNullOrEmpty()) {
+        throw GradleException(
+            "Flavor 'dev' requires the tashil-dev Android Maps API key. " +
+                "Set devMapsAndroidKey in android/local.properties (gitignored) or " +
+                "DEV_MAPS_ANDROID_KEY in the environment. See android/README_MAPS_KEYS.md."
+        )
     }
 }
