@@ -48,10 +48,10 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="task_notifications" />
 
-        <!-- Google Maps API Key -->
+        <!-- Google Maps API Key (prod via defaultConfig; dev flavor overrides in build.gradle.kts) -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyDQkxCw7YSM1-qUxcjT9oWA9DNZyp3fsOk" />
+            android:value="${GOOGLE_MAPS_ANDROID_API_KEY}" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

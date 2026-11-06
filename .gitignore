@@ -47,6 +47,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android SDK path and local keys (never commit)
+android/local.properties
+
 # Node dependencies
 node_modules/
 **/node_modules/
