@@ -16,10 +16,23 @@ set -eu
 PROD_PROJECT_ID="practice-firebase-72df1"
 DEV_PROJECT_ID="tashil-dev"
 PB=/usr/libexec/PlistBuddy
+SCRIPT_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+PY="$SCRIPT_DIR/tashil_plist_tools.py"
 
 fail() {
   echo "error: [Tashil firebase-config] $*" >&2
   exit 1
+}
+
+# PlistBuddy exists on macOS; GitHub Actions (Ubuntu) uses Python plistlib.
+pl_get() {
+  _f="$1"
+  _k="$2"
+  if [ -x "$PB" ]; then
+    $PB -c "Print :$_k" "$_f" 2>/dev/null || true
+  else
+    python3 "$PY" get "$_f" "$_k" 2>/dev/null || true
+  fi
 }
 
 mode="${1:-}"
@@ -61,8 +74,8 @@ check_env_match() {
 verify_plist() {
   f="$1"
   [ -f "$f" ] || fail "$2: $f is missing."
-  pid=$($PB -c 'Print :PROJECT_ID' "$f" 2>/dev/null || true)
-  bid=$($PB -c 'Print :BUNDLE_ID' "$f" 2>/dev/null || true)
+  pid=$(pl_get "$f" PROJECT_ID)
+  bid=$(pl_get "$f" BUNDLE_ID)
   [ "$pid" = "$EXPECTED_PROJECT_ID" ] || fail "$2: PROJECT_ID='$pid', expected '$EXPECTED_PROJECT_ID' for APP_ENV=$APP_ENV."
   [ "$bid" = "$PRODUCT_BUNDLE_IDENTIFIER" ] || fail "$2: BUNDLE_ID='$bid', expected '$PRODUCT_BUNDLE_IDENTIFIER'."
   if [ "$APP_ENV" = dev ] && grep -q "$PROD_PROJECT_ID" "$f"; then
@@ -92,24 +105,28 @@ case "$mode" in
     verify_plist "$DEST" "bundle"
 
     # TashilEnv is read by AppDelegate to decide whether native configure() runs.
-    $PB -c "Delete :TashilEnv" "$APP_INFO" >/dev/null 2>&1 || true
-    $PB -c "Add :TashilEnv string $APP_ENV" "$APP_INFO"
-    if [ "$APP_ENV" = dev ]; then
-      # Plan §2.2: no data collection in dev. FirebaseAppDelegateProxyEnabled stays default.
-      for kv in \
-        "FirebaseAutomaticDataCollectionEnabled bool false" \
-        "FirebaseCrashlyticsCollectionEnabled bool false" \
-        "FIREBASE_ANALYTICS_COLLECTION_ENABLED bool false" \
-        "FIREBASE_ANALYTICS_COLLECTION_DEACTIVATED bool true" \
-        "GOOGLE_ANALYTICS_ADID_COLLECTION_ENABLED bool false" \
-        "GOOGLE_ANALYTICS_IDFV_COLLECTION_ENABLED bool false" \
-        "GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS bool false"; do
-        set -- $kv
-        $PB -c "Delete :$1" "$APP_INFO" >/dev/null 2>&1 || true
-        $PB -c "Add :$1 $2 $3" "$APP_INFO"
-      done
+    if [ -x "$PB" ]; then
+      $PB -c "Delete :TashilEnv" "$APP_INFO" >/dev/null 2>&1 || true
+      $PB -c "Add :TashilEnv string $APP_ENV" "$APP_INFO"
+      if [ "$APP_ENV" = dev ]; then
+        # Plan §2.2: no data collection in dev. FirebaseAppDelegateProxyEnabled stays default.
+        for kv in \
+          "FirebaseAutomaticDataCollectionEnabled bool false" \
+          "FirebaseCrashlyticsCollectionEnabled bool false" \
+          "FIREBASE_ANALYTICS_COLLECTION_ENABLED bool false" \
+          "FIREBASE_ANALYTICS_COLLECTION_DEACTIVATED bool true" \
+          "GOOGLE_ANALYTICS_ADID_COLLECTION_ENABLED bool false" \
+          "GOOGLE_ANALYTICS_IDFV_COLLECTION_ENABLED bool false" \
+          "GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS bool false"; do
+          set -- $kv
+          $PB -c "Delete :$1" "$APP_INFO" >/dev/null 2>&1 || true
+          $PB -c "Add :$1 $2 $3" "$APP_INFO"
+        done
+      fi
+    else
+      python3 "$PY" patch-info "$APP_INFO" "$APP_ENV"
     fi
-    got=$($PB -c 'Print :TashilEnv' "$APP_INFO")
+    got=$(pl_get "$APP_INFO" TashilEnv)
     [ "$got" = "$APP_ENV" ] || fail "TashilEnv in built Info.plist is '$got'."
     echo "[Tashil firebase-config] install OK: $DEST (project=$EXPECTED_PROJECT_ID) TashilEnv=$APP_ENV"
     ;;

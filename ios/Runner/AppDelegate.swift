@@ -32,15 +32,16 @@ import GoogleMaps
     case "prod":
       FirebaseApp.configure()
     case "dev":
+      // Never call FirebaseApp.configure() in dev; Dart initializes tashil-dev only.
       let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist")
       let projectId = path.flatMap { NSDictionary(contentsOfFile: $0)?["PROJECT_ID"] as? String }
       if projectId != "tashil-dev" {
-        NSLog("[Tashil] dev build bundles PROJECT_ID=%@; expected tashil-dev. Firebase stays unconfigured natively.", projectId ?? "nil")
-        assertionFailure("dev build must bundle the tashil-dev GoogleService-Info.plist")
+        NSLog("[Tashil] FATAL: dev build PROJECT_ID=%@ (expected tashil-dev). Refusing to launch.", projectId ?? "nil")
+        return false
       }
     default:
-      NSLog("[Tashil] TashilEnv=%@ is not dev/prod; native Firebase not configured.", tashilEnv ?? "nil")
-      assertionFailure("TashilEnv missing from Info.plist")
+      NSLog("[Tashil] FATAL: TashilEnv=%@ is missing or invalid; native Firebase not configured.", tashilEnv ?? "nil")
+      return false
     }
     
     GeneratedPluginRegistrant.register(with: self)

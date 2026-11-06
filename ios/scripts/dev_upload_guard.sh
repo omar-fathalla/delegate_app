@@ -14,6 +14,18 @@ fail() {
   exit 1
 }
 
+PB=/usr/libexec/PlistBuddy
+PY="${SRCROOT:-}/scripts/tashil_plist_tools.py"
+
+pl_pid() {
+  f="$1"
+  if [ -x "$PB" ]; then
+    $PB -c 'Print :PROJECT_ID' "$f" 2>/dev/null || true
+  else
+    python3 "$PY" get "$f" PROJECT_ID 2>/dev/null || true
+  fi
+}
+
 APP_ENV="${APP_ENV:-}"
 case "$APP_ENV" in
   prod)
@@ -42,7 +54,7 @@ if [ -n "${TARGET_BUILD_DIR:-}" ] && [ -n "${UNLOCALIZED_RESOURCES_FOLDER_PATH:-
   APP_RES="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
   f="$APP_RES/GoogleService-Info.plist"
   [ -f "$f" ] || fail "no GoogleService-Info.plist in the built app."
-  pid=$(/usr/libexec/PlistBuddy -c 'Print :PROJECT_ID' "$f" 2>/dev/null || true)
+  pid=$(pl_pid "$f")
   [ "$pid" = "tashil-dev" ] || fail "bundled PROJECT_ID='$pid', expected tashil-dev."
   # No production Firebase config file may sit anywhere in the dev .app.
   if grep -rl --include='*.plist' 'practice-firebase-72df1' "$APP_RES" >/dev/null 2>&1; then
