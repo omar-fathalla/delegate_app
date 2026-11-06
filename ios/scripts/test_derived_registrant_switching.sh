@@ -140,9 +140,12 @@ build() {
     "DART_DEFINES=$defines"
     CODE_SIGNING_ALLOWED=NO
   )
-  if [[ "$(uname -m)" == "arm64" ]]; then
-    xcode_flags+=(EXCLUDED_ARCHS=x86_64)
-  fi
+  # Apple Silicon simulators: exclude Rosetta x86_64 slice. Intel Macs: exclude arm64 so
+  # IOS_ARCHS is a single arch for Flutter's debug_unpack_ios / lipo -verify_arch.
+  case "$(uname -m)" in
+    arm64) xcode_flags+=(EXCLUDED_ARCHS=x86_64) ;;
+    *) xcode_flags+=(EXCLUDED_ARCHS=arm64) ;;
+  esac
   xcodebuild "${xcode_flags[@]}" build
 }
 
