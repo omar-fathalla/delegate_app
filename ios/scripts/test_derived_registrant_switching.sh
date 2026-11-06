@@ -128,13 +128,22 @@ build() {
   # CODE_SIGNING_ALLOWED=NO keeps CI/local from needing provisioning profiles for this check.
   # DART_DEFINES must match the configuration so firebase_config.sh and flutter_assemble agree
   # with what `flutter build` would pass (simulates switching scheme only in Xcode).
-  xcodebuild -workspace "$IOS_ROOT/Runner.xcworkspace" \
-    -scheme Runner \
-    -configuration "$config" \
-    -destination 'generic/platform=iOS Simulator' \
-    DART_DEFINES="$defines" \
-    CODE_SIGNING_ALLOWED=NO \
-    build
+  #
+  # On Apple Silicon, the generic iOS Simulator destination can produce arm64+x86_64 slices;
+  # Flutter's unpack step then sees IOS_ARCHS in a form `lipo -verify_arch` rejects. Force a
+  # single simulator arch without passing -arch (incompatible with generic/platform=).
+  local -a xcode_flags=(
+    -workspace "$IOS_ROOT/Runner.xcworkspace"
+    -scheme Runner
+    -configuration "$config"
+    -destination 'generic/platform=iOS Simulator'
+    "DART_DEFINES=$defines"
+    CODE_SIGNING_ALLOWED=NO
+  )
+  if [[ "$(uname -m)" == "arm64" ]]; then
+    xcode_flags+=(EXCLUDED_ARCHS=x86_64)
+  fi
+  xcodebuild "${xcode_flags[@]}" build
 }
 
 check_shared_unchanged() {
