@@ -1,26 +1,21 @@
+import 'package:delegate_app/core/time/cairo_clock.dart';
+
 import '../entities/delegate_tracking_session.dart';
 
 /// Filters [delegate_tracking] sessions down to delegates who are currently
 /// checked in for live tracking.
 ///
-/// Egypt (Africa/Cairo) is permanently UTC+2 (no DST). We convert via UTC then
-/// apply that fixed offset so "today" matches Cairo calendar days regardless of
-/// the device's local zone.
+/// "Today" is the Africa/Cairo civil calendar day (IANA, including DST), via
+/// [CairoClock] — not a fixed UTC offset and not the device local zone.
 class LiveTrackingActiveFilter {
   LiveTrackingActiveFilter._();
 
-  static const Duration cairoOffsetFromUtc = Duration(hours: 2);
+  /// Converts any [DateTime] to an Africa/Cairo wall-clock instant.
+  /// Requires [CairoClock.ensureInitialized].
+  static DateTime toCairo(DateTime value) => CairoClock.toCairo(value);
 
-  /// Converts any [DateTime] to a Cairo wall-clock [DateTime] (not a true TZ
-  /// type — year/month/day are what callers need for day comparisons).
-  static DateTime toCairo(DateTime value) =>
-      value.toUtc().add(cairoOffsetFromUtc);
-
-  static bool isSameCairoCalendarDay(DateTime a, DateTime b) {
-    final ca = toCairo(a);
-    final cb = toCairo(b);
-    return ca.year == cb.year && ca.month == cb.month && ca.day == cb.day;
-  }
+  static bool isSameCairoCalendarDay(DateTime a, DateTime b) =>
+      CairoClock.isSameCairoCalendarDay(a, b);
 
   /// Whether [session] should appear on the Live Tracking screen right now.
   ///

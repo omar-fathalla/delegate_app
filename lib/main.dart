@@ -8,6 +8,7 @@ import 'package:delegate_app/core/services/firestore_client_health.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/core/services/task_push_route.dart';
 import 'package:delegate_app/core/config/app_env.dart';
+import 'package:delegate_app/core/time/cairo_clock.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -79,6 +80,7 @@ Future<void> bootstrapDelegateAppForPatrol() async {
   _delegateAppBootstrapped = true;
 
   WidgetsFlutterBinding.ensureInitialized();
+  CairoClock.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
   // M3 design system: Latin digits in Arabic locales (dates, numbers).
   DateFormat.useNativeDigitsByDefaultFor('ar', false);
