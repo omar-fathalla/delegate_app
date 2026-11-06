@@ -112,5 +112,52 @@ void main() {
       expect(graceModel.remainingGraceSeconds > 0, true);
       expect(graceModel.remainingGraceSeconds <= 180, true);
     });
+    test('maps checked_out (and variants) to TrackingStatus.checkedOut, never inside', () {
+      for (final raw in ['checked_out', 'checked-out', 'checkout', 'CHECKED_OUT']) {
+        final model = DelegateTrackingSessionModel.fromJson({
+          'delegateId': 'del_out',
+          'delegateName': 'أسماء',
+          'currentStatus': raw,
+          'checkInTime': '2026-11-06T08:00:00.000Z',
+          'checkOutTime': '2026-11-06T21:08:00.000Z',
+        }, 'del_out');
+        expect(model.currentStatus, TrackingStatus.checkedOut, reason: raw);
+        expect(model.isInside, isFalse, reason: raw);
+        expect(model.isOutside, isFalse, reason: raw);
+        expect(model.checkOutTime, isNotNull, reason: raw);
+      }
+    });
+
+    test('unknown status maps to offline, not inside', () {
+      final model = DelegateTrackingSessionModel.fromJson({
+        'delegateId': 'del_x',
+        'currentStatus': 'weird_future_status',
+      }, 'del_x');
+      expect(model.currentStatus, TrackingStatus.offline);
+      expect(model.isInside, isFalse);
+    });
+
+    test('toJson writes checked_out for checkedOut status', () {
+      final model = DelegateTrackingSessionModel(
+        delegateId: 'del_out',
+        delegateName: 'أسماء',
+        delegatePhone: '010',
+        companyId: 'c',
+        organizationId: 'o',
+        branchId: 'b',
+        branchName: 'فرع',
+        branchLat: 30,
+        branchLng: 31,
+        geofenceRadius: 100,
+        isTrackingEnabled: false,
+        currentStatus: TrackingStatus.checkedOut,
+        currentDistanceMeters: 0,
+        lastUpdated: now,
+        checkInTime: now,
+        checkOutTime: now.add(const Duration(hours: 8)),
+      );
+      expect(model.toJson()['currentStatus'], 'checked_out');
+    });
+
   });
 }

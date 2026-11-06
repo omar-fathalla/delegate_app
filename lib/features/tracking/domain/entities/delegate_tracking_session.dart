@@ -4,6 +4,7 @@ enum TrackingStatus {
   insideZone,
   outsideZone,
   offline,
+  checkedOut,
 }
 
 class DelegateTrackingSession extends Equatable {
@@ -26,6 +27,7 @@ class DelegateTrackingSession extends Equatable {
   final DateTime? lastBreachAt;
   final DateTime? firstExitedAt;
   final DateTime? checkInTime;
+  final DateTime? checkOutTime;
   final bool isOnline;
   final bool isMockLocationDetected;
   final int offlineBreadcrumbsCount;
@@ -54,6 +56,7 @@ class DelegateTrackingSession extends Equatable {
     this.lastBreachAt,
     this.firstExitedAt,
     this.checkInTime,
+    this.checkOutTime,
     this.isOnline = true,
     this.isMockLocationDetected = false,
     this.offlineBreadcrumbsCount = 0,
@@ -100,6 +103,7 @@ class DelegateTrackingSession extends Equatable {
     DateTime? lastBreachAt,
     DateTime? firstExitedAt,
     DateTime? checkInTime,
+    DateTime? checkOutTime,
     bool? isOnline,
     bool? isMockLocationDetected,
     int? offlineBreadcrumbsCount,
@@ -128,6 +132,7 @@ class DelegateTrackingSession extends Equatable {
       lastBreachAt: lastBreachAt ?? this.lastBreachAt,
       firstExitedAt: firstExitedAt ?? this.firstExitedAt,
       checkInTime: checkInTime ?? this.checkInTime,
+      checkOutTime: checkOutTime ?? this.checkOutTime,
       isOnline: isOnline ?? this.isOnline,
       isMockLocationDetected:
           isMockLocationDetected ?? this.isMockLocationDetected,
@@ -161,6 +166,7 @@ class DelegateTrackingSession extends Equatable {
         lastBreachAt,
         firstExitedAt,
         checkInTime,
+        checkOutTime,
         isOnline,
         isMockLocationDetected,
         offlineBreadcrumbsCount,

@@ -7,7 +7,9 @@ import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../profile/domain/entities/delegate.dart';
 import '../../data/services/delegate_tracking_service.dart';
 import '../../domain/entities/delegate_tracking_session.dart';
+import '../../domain/utils/live_tracking_active_filter.dart';
 import '../widgets/delegate_tracking_table.dart';
+import '../widgets/live_tracking_load_error.dart';
 import '../widgets/tracking_live_map_view.dart';
 import '../widgets/tracking_stats_overview.dart';
 import '../../../../core/widgets/tashil_button_group.dart';
@@ -40,6 +42,10 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
   late bool _isMapView;
   bool _isBulkUpdating = false;
   String? _selectedDelegateId;
+  int _streamGeneration = 0;
+
+  /// Injectable clock for tests (Cairo "today" filtering).
+  DateTime Function() now = DateTime.now;
 
   @override
   void initState() {
@@ -89,7 +95,9 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
             }
           },
         );
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint('LiveTracking: failed loading company delegates: $e\n$st');
+      }
 
       // 2. البحث المباشر في Firestore للتأكيد
       try {
@@ -123,7 +131,9 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
             }
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint('LiveTracking: failed loading nested delegates: $e\n$st');
+      }
 
       if (mounted) setState(() {});
 
@@ -347,18 +357,32 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
       )
           : null,
       body: StreamBuilder<List<DelegateTrackingSession>>(
+        key: ValueKey('live_tracking_stream_$_streamGeneration'),
         stream: _trackingService.streamTrackingSessions(
           companyId: companyId.isNotEmpty ? companyId : null,
           organizationId: companyId.isEmpty ? orgId : null,
         ),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            debugPrint(
+              'LiveTracking: stream error: ${snapshot.error}\n${snapshot.stackTrace}',
+            );
+            return LiveTrackingLoadError(
+              error: snapshot.error,
+              onRetry: () {
+                setState(() => _streamGeneration++);
+                _populateInitialData();
+              },
+            );
+          }
+
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
           final rawSessions = snapshot.data ?? [];
-          final allSessions = rawSessions.map((s) {
+          final enrichedSessions = rawSessions.map((s) {
             final realName = _delegateNamesMap[s.delegateId];
             final realPhone = _delegatePhonesMap[s.delegateId];
             final realPhoto = _delegatePhotosMap[s.delegateId];
@@ -387,9 +411,14 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
               avatarUrl: effectivePhoto,
             );
           }).toList();
+          // Only currently checked-in delegates (today, Africa/Cairo).
+          final allSessions = LiveTrackingActiveFilter.filterActive(
+            enrichedSessions,
+            now: now(),
+          );
           final filteredSessions = _filterSessions(allSessions);
 
-          // حساب الإحصائيات الحية
+          // حساب الإحصائيات الحية (على القائمة المفلترة فقط)
           final totalCount = allSessions.length;
           final activeTrackingCount =
               allSessions.where((s) => s.isTrackingEnabled).length;

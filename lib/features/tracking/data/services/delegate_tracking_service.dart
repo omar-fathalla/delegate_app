@@ -187,6 +187,7 @@ class DelegateTrackingService {
         'companyUID': companyId,
         'organizationId': organizationId,
         'organizationUID': organizationId,
+        'checkOutTime': FieldValue.delete(),
       }, SetOptions(merge: true));
 
       // تسجيل أول نقطة مسار (First Breadcrumb)

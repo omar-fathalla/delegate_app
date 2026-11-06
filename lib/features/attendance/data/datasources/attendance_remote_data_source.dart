@@ -1268,7 +1268,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             }
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint(
+          'AttendanceTrackingSync: failed loading delegate profile on check-in: $e\n$st',
+        );
+      }
 
       double branchLat = lat;
       double branchLng = long;
@@ -1291,7 +1295,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             geofenceRadius =
                 (bData['geofenceRadius'] as num?)?.toDouble() ?? 100.0;
           }
-        } catch (_) {}
+        } catch (e, st) {
+          debugPrint(
+            'AttendanceTrackingSync: failed loading branch on check-in: $e\n$st',
+          );
+        }
       }
 
       // احتساب المسافة الدقيقة عن الفرع ونسبة البطارية الحقيقية
@@ -1302,7 +1310,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       int? batteryLevel;
       try {
         batteryLevel = await Battery().batteryLevel;
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint(
+          'AttendanceTrackingSync: failed reading battery on check-in: $e\n$st',
+        );
+      }
 
       await firestore.collection('delegate_tracking').doc(userId).set({
         'delegateId': userId,
@@ -1324,6 +1336,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'isMoving': false,
         'lastUpdated': FieldValue.serverTimestamp(),
         'checkInTime': Timestamp.fromDate(time),
+        'checkOutTime': FieldValue.delete(),
         'isOnline': true,
       }, SetOptions(merge: true));
 
@@ -1342,16 +1355,27 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           'distanceMeters': exactDist,
           'isInside': isInside,
         });
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint(
+          'AttendanceTrackingSync: failed writing check-in breadcrumb: $e\n$st',
+        );
+      }
 
       // بدء محرك التتبع الدوري في جهاز المندوب
       try {
         unawaited(
           DelegateTrackingEngine().startTrackingSession(delegateId: userId),
         );
-      } catch (_) {}
-    } catch (e) {
-      debugPrint('Error syncing delegate tracking on checkIn: $e');
+      } catch (e, st) {
+        debugPrint(
+          'AttendanceTrackingSync: failed starting tracking engine: $e\n$st',
+        );
+      }
+    } catch (e, st) {
+      // Never fail the attendance write because of tracking sync.
+      debugPrint(
+        'AttendanceTrackingSync: error syncing delegate tracking on check-in: $e\n$st',
+      );
     }
   }
 
@@ -1366,6 +1390,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'checkOutTime': FieldValue.serverTimestamp(),
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-    } catch (_) {}
+    } catch (e, st) {
+      // Never fail the attendance write because of tracking sync.
+      debugPrint(
+        'AttendanceTrackingSync: error syncing delegate tracking on check-out: $e\n$st',
+      );
+    }
   }
 }
