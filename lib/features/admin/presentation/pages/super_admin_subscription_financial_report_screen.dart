@@ -275,6 +275,8 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           branchReceiptAmount += req.fee;
           break;
         case SubscriptionPaymentMethod.freePromotion:
+        case SubscriptionPaymentMethod.paymob:
+        case SubscriptionPaymentMethod.notRequired:
           break;
       }
     }
@@ -306,6 +308,8 @@ class _SuperAdminSubscriptionFinancialReportScreenState
             branchAmt += r.fee;
             break;
           case SubscriptionPaymentMethod.freePromotion:
+          case SubscriptionPaymentMethod.paymob:
+          case SubscriptionPaymentMethod.notRequired:
             break;
         }
       }
@@ -1315,6 +1319,18 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           const Color(0xFF16A34A),
           const Color(0xFFDCFCE7),
         ),
+      SubscriptionPaymentMethod.paymob => (
+          'Paymob',
+          Icons.credit_card_rounded,
+          colorScheme.primary,
+          colorScheme.primaryContainer.withValues(alpha: 0.4),
+        ),
+      SubscriptionPaymentMethod.notRequired => (
+          'بدون رسوم',
+          Icons.link_rounded,
+          colorScheme.onSurfaceVariant,
+          colorScheme.surfaceContainerHigh,
+        ),
     };
 
     return Container(
@@ -1492,6 +1508,8 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           SubscriptionPaymentMethod.instaPay => 'تحويل انستاباي',
           SubscriptionPaymentMethod.branchReceipt => 'إيصال إلكتروني من تسويق الفرع',
           SubscriptionPaymentMethod.freePromotion => 'عرض ترويجي مجاني',
+          SubscriptionPaymentMethod.paymob => 'دفع إلكتروني Paymob',
+          SubscriptionPaymentMethod.notRequired => 'بدون رسوم',
         };
 
         final statusText = switch (req.status) {

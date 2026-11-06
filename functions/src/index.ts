@@ -502,3 +502,8 @@ export {confirmDelegateOtp} from "./confirm_delegate_otp";
 export {staffPhoneLookup} from "./staff_phone_lookup";
 
 export {createStaffUser, resendStaffSetupLink, claimInvite} from "./staff_accounts";
+
+// Delegate subscriptions: period-end suspension (daily, Cairo time). Paymob
+// hooks (quoteSubscriptionRequest / applyVerifiedSubscriptionPayment) are
+// library functions for Engineering's Paymob webhook, not deployed endpoints.
+export {suspendExpiredSubscriptions} from "./subscription_schedule";

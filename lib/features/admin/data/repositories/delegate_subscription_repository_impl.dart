@@ -47,6 +47,18 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       final docRef = _firestore.collection('delegate_requests').doc();
       final requestId = docRef.id;
 
+      // Subscription terms are always computed here (never trusted from the
+      // caller). From 2027 the only paid method is Paymob (online).
+      final now = DateTime.now().toUtc();
+      final isFree = SubscriptionCycleHelper.isFreePromotionActive(now);
+      if (!isFree) {
+        paymentMethod = SubscriptionPaymentMethod.paymob;
+        receiptCode = null;
+        receiptImage = null;
+      }
+      final paymentStatus =
+          isFree ? SubscriptionPaymentStatus.waived : SubscriptionPaymentStatus.pending;
+
       // 0. Duplicate prevention: Check if a request already exists with the same nationalId or phoneNumber
       final cleanNationalId = nationalId.trim();
       final cleanPhone = phoneNumber.trim();
@@ -160,13 +172,11 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       }
 
       // 5. Subscription cycle dates and prorated fee
-      final cycleCode = SubscriptionCycleHelper.getCycleCode();
-      final cycleStartDate = SubscriptionCycleHelper.getCycleStartDate();
-      final cycleEndDate = SubscriptionCycleHelper.getCycleEndDate();
-      final calculatedRemainingMonths =
-          remainingMonths ?? SubscriptionCycleHelper.getRemainingMonthsInCycle();
-      final calculatedFee =
-          fee ?? SubscriptionCycleHelper.getProratedSubscriptionFee();
+      final cycleCode = SubscriptionCycleHelper.getCycleCode(now);
+      final cycleStartDate = SubscriptionCycleHelper.getCycleStartDate(now);
+      final cycleEndDate = SubscriptionCycleHelper.getCycleEndDate(now);
+      final calculatedRemainingMonths = SubscriptionCycleHelper.getRemainingMonthsInCycle(now);
+      final calculatedFee = SubscriptionCycleHelper.getProratedSubscriptionFee(now);
 
       final fullName = '$firstName $secondName $thirdName'.trim();
 
@@ -198,6 +208,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         remainingMonths: calculatedRemainingMonths,
         status: SubscriptionRequestStatus.pending,
         createdAt: DateTime.now(),
+        paymentStatus: paymentStatus,
       );
 
       // 6. Write request to Firestore
@@ -302,6 +313,14 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
               paymentMethod == SubscriptionPaymentMethod.companyDeduction,
           'receiptCode': receiptCode,
           'subscriptionCycle': cycleCode,
+          'subscription': {
+            'periodCode': cycleCode,
+            'periodStart': SubscriptionCycleHelper.periodStartDay(now),
+            'periodEnd': SubscriptionCycleHelper.periodEndDay(now),
+            'amountDue': calculatedFee,
+            'paymentStatus': paymentStatus.wire,
+            'registrationRequestId': requestId,
+          },
           'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (_) {
@@ -418,6 +437,12 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       final docRef = _firestore.collection('delegate_requests').doc();
       final requestId = docRef.id;
 
+      // One subscription per delegate covers every chain: adding a chain is
+      // never charged, whatever the caller passes.
+      paymentMethod = SubscriptionPaymentMethod.notRequired;
+      receiptCode = null;
+      receiptImage = null;
+
       // 1. Upload Receipt Image (if provided)
       String? receiptUrl;
       if (receiptImage != null) {
@@ -431,10 +456,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       final cycleCode = SubscriptionCycleHelper.getCycleCode();
       final cycleStartDate = SubscriptionCycleHelper.getCycleStartDate();
       final cycleEndDate = SubscriptionCycleHelper.getCycleEndDate();
-      final calculatedRemainingMonths =
-          remainingMonths ?? SubscriptionCycleHelper.getRemainingMonthsInCycle();
-      final calculatedFee =
-          fee ?? SubscriptionCycleHelper.getProratedSubscriptionFee();
+      const calculatedRemainingMonths = 0;
+      const calculatedFee = 0.0;
 
       // 3. Extract existing document URLs
       final profileUrl = existingDelegate.personalPhotoUrl ?? '';
@@ -479,6 +502,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         existingDelegateUid: existingDelegate.uid,
         currentOrganizationName: existingDelegate.organizationName,
         createdAt: DateTime.now(),
+        paymentStatus: SubscriptionPaymentStatus.notRequired,
       );
 
       // 4. Write request to Firestore
@@ -507,7 +531,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // 6. Send notifications to admins
       final notifTitle = 'طلب إضافة سلسلة جديدة لمندوب';
       final notifBody =
-          'طلب المشرف $supervisorName ربط المندوب ${existingDelegate.fullName} بسلسلة $targetOrganizationName (${paymentMethod.displayName})';
+          'طلب المشرف $supervisorName ربط المندوب ${existingDelegate.fullName} بسلسلة $targetOrganizationName (بدون رسوم إضافية)';
 
       for (final roleKey in ['super-admin', 'technicalSupport', 'role_super_admin', 'role_technical_support']) {
         await _firestore.collection('notifications').add({
@@ -713,6 +737,19 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     try {
       final now = DateTime.now();
 
+      // Renewals are approved by the server when Paymob confirms payment.
+      if (request.isRenewalRequest) {
+        return const Left(ServerFailure(
+          'طلبات التجديد تُعتمد تلقائياً بعد تأكيد الدفع الإلكتروني (Paymob)، ولا تحتاج اعتماداً يدوياً.',
+        ));
+      }
+      // From 2027 a new delegate can be activated only after a verified payment.
+      if (request.isNewDelegateRequest && !request.isPaymentSettled) {
+        return const Left(ServerFailure(
+          'لا يمكن اعتماد المندوب قبل تأكيد دفع الاشتراك إلكترونياً (Paymob).',
+        ));
+      }
+
       // 1. Request status. For new_delegate / add_organization the approval is
       // written in the same WriteBatch as the delegate activation (r4 F2):
       // either both land or the request stays pending.
@@ -870,15 +907,21 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'isDeductedFromCompany':
             request.paymentMethod == SubscriptionPaymentMethod.companyDeduction,
         'receiptCode': request.receiptCode,
-        'subscription': {
-          'cycle': request.subscriptionCycle,
-          'startDate': request.cycleStartDate.toIso8601String(),
-          'endDate': request.cycleEndDate.toIso8601String(),
-          'isPaid': true,
-          'paymentMethod': request.paymentMethod.name,
-          'approvedBy': reviewerName,
-          'approvedAt': now.toIso8601String(),
-        },
+        // add_organization keeps the delegate's own subscription (one per delegate).
+        if (!request.isAddOrganizationRequest)
+          'subscription': {
+            'periodCode': request.subscriptionCycle,
+            'periodStart': SubscriptionCycleHelper.periodStartDay(request.cycleStartDate),
+            'periodEnd': SubscriptionCycleHelper.periodEndDay(request.cycleStartDate),
+            'amountDue': request.fee,
+            // Mirror only; the server decides coverage from delegate_requests.
+            'paymentStatus': request.paymentStatus.wire,
+            'paymentMethod': request.paymentMethod.name,
+            'registrationRequestId': request.id,
+            'renewalRequestId': null,
+            'approvedBy': reviewerName,
+            'approvedAt': now.toIso8601String(),
+          },
         'updatedAt': FieldValue.serverTimestamp(),
       };
 

@@ -1435,6 +1435,22 @@ service cloud.firestore {
       allow create, update, delete: if isStaffWriter();
     }
 
+    // SUBSCRIPTIONS (PR feat/subscription-cycles): only the server (verified
+    // Paymob webhook, Admin SDK) may mark a request paid or write Paymob data,
+    // and a paid request's coverage/amount can no longer change. Requests that
+    // never touch these fields (Angular, delete, approve/reject) are unaffected.
+    function subscriptionPaymentUntouched() {
+      let incoming = request.resource.data;
+      let before = resource == null ? {} : resource.data;
+      let wasPaid = before.get('paymentStatus', '') == 'paid';
+      return (incoming.get('paymentStatus', '') != 'paid' || wasPaid)
+        && incoming.get('paymob', null) == before.get('paymob', null)
+        && (!wasPaid || !incoming.diff(before).affectedKeys().hasAny([
+          'paymentStatus', 'paymob', 'paidAt', 'amountPaid', 'amountDue',
+          'coveredDelegateUids', 'items', 'periodCode', 'requestType', 'applyState'
+        ]));
+    }
+
     match /delegate_requests/{requestId} {
       allow read: if signedIn() && (
         isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR()
@@ -1449,16 +1465,18 @@ service cloud.firestore {
       // r4 F1: tech support no longer creates requests; every other creator
       // must name itself as supervisorUid (all app flows pass the signed-in
       // user). Super-admin is exempt.
-      allow create: if isSuperAdmin()
+      allow create: if (isSuperAdmin()
         || ((isOrgAdmin() || isCompanyAdmin() || isHR())
-          && request.resource.data.get('supervisorUid', '') == request.auth.uid);
+          && request.resource.data.get('supervisorUid', '') == request.auth.uid))
+        && subscriptionPaymentUntouched();
       // Self clause first: the staff role helpers are expensive and would
       // otherwise eat the 1000-expression budget before the docs checks.
-      allow update: if (signedIn() && request.auth.uid == requestId
+      allow update: if ((signedIn() && request.auth.uid == requestId
           && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
             'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
           && delegateDocsOk() && delegateUrlsWithDocs())
-        || requestStaffUpdateOk(requestId);
+        || requestStaffUpdateOk(requestId))
+        && subscriptionPaymentUntouched();
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }
 

@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -502,9 +503,9 @@ class _DelegateSubscriptionRequestsPageState
                   '⚠️ تحذير: سيتم حذف المندوب وكافة بياناته وسجلاته نهائياً من قاعدة البيانات والمنظومة، ولا يمكن التراجع عن هذا الإجراء.\n\n'
                   '${request.rejectionReason?.isNotEmpty == true ? "سبب طلب الحذف: ${request.rejectionReason}" : ""}'
               : request.requestType == 'add_organization'
-                  ? 'هل أنت متأكد من الموافقة على ربط المندوب "${request.fullName}" بسلسلة "${request.organizationName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر)؟\n\n'
+                  ? 'هل أنت متأكد من الموافقة على ربط المندوب "${request.fullName}" بسلسلة "${request.organizationName}"؟ (بدون رسوم: الاشتراك الواحد يغطي كل السلاسل)\n\n'
                       'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}'
-                  : 'هل أنت متأكد من اعتماد المندوب "${request.fullName}" وتفعيل اشتراكه بقيمة ${request.fee.toInt()} ج.م (${request.remainingMonths} أشهر) حتى نهاية دورة ${request.subscriptionCycle}؟\n\n'
+                  : 'هل أنت متأكد من اعتماد المندوب "${request.fullName}" وتفعيل اشتراكه بقيمة ${SubscriptionCycleHelper.formatEgp(request.fee)} ج.م (${request.remainingMonths} أشهر، ${request.paymentStatus.arabicLabel}) حتى نهاية دورة ${request.subscriptionCycle}؟\n\n'
                       'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}',
         ),
         actions: [
@@ -854,6 +855,28 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                   fontWeight: FontWeight.bold,
                                   color: Colors.red.shade900,
                                 ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (request.isRenewalRequest) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: colorScheme.tertiaryContainer.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: colorScheme.tertiary.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.autorenew_rounded, size: 16, color: colorScheme.tertiary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'طلب تجديد (${request.items.length} مندوب) • ${request.paymentStatus.arabicLabel} • يُعتمد تلقائياً بعد الدفع',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                               ),
                             ),
                           ],
@@ -1229,7 +1252,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    '${request.fee.toInt()} ج.م (${request.remainingMonths} ش)',
+                                    '${SubscriptionCycleHelper.formatEgp(request.fee)} ج.م (${request.remainingMonths} ش) • ${request.paymentStatus.arabicLabel}',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,

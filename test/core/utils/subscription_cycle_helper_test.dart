@@ -94,24 +94,64 @@ void main() {
       expect(SubscriptionCycleHelper.isFreePromotionActive(DateTime(2027, 1, 1, 0, 0, 1)), isFalse);
     });
 
-    test('getFeeForMonths returns correct rounded fee per user tiers', () {
+    test('getFeeForMonths is 500 x months / 6 rounded to 2 decimals', () {
       expect(SubscriptionCycleHelper.getFeeForMonths(6), equals(500.0));
-      expect(SubscriptionCycleHelper.getFeeForMonths(5), equals(450.0));
-      expect(SubscriptionCycleHelper.getFeeForMonths(4), equals(350.0));
+      expect(SubscriptionCycleHelper.getFeeForMonths(5), equals(416.67));
+      expect(SubscriptionCycleHelper.getFeeForMonths(4), equals(333.33));
       expect(SubscriptionCycleHelper.getFeeForMonths(3), equals(250.0));
-      expect(SubscriptionCycleHelper.getFeeForMonths(2), equals(200.0));
-      expect(SubscriptionCycleHelper.getFeeForMonths(1), equals(100.0));
+      expect(SubscriptionCycleHelper.getFeeForMonths(2), equals(166.67));
+      expect(SubscriptionCycleHelper.getFeeForMonths(1), equals(83.33));
     });
 
-    test('getProratedSubscriptionFee returns 0.0 during active free promotion in 2026', () {
-      // Free during active promotion in 2026
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 10, 8)), equals(0.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 12, 1)), equals(0.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 12, 31)), equals(0.0));
+    test('fee for every month of both halves of 2027', () {
+      const expected = [500.0, 416.67, 333.33, 250.0, 166.67, 83.33];
+      for (var m = 1; m <= 12; m++) {
+        final first = DateTime(2027, m, 1);
+        final last = DateTime(2027, m + 1, 0, 23, 59);
+        expect(SubscriptionCycleHelper.getProratedSubscriptionFee(first), expected[(m - 1) % 6], reason: 'month $m day 1');
+        expect(SubscriptionCycleHelper.getProratedSubscriptionFee(last), expected[(m - 1) % 6], reason: 'month $m last day');
+      }
+    });
 
-      // Post promotion in 2027 (standard tiers)
+    test('roundMoney and totals for a multi-delegate renewal', () {
+      expect(SubscriptionCycleHelper.roundMoney(416.666666), 416.67);
+      expect(SubscriptionCycleHelper.roundMoney(1.005), 1.01);
+      expect(SubscriptionCycleHelper.totalFor(3, DateTime(2027, 2, 10)), 1250.01);
+      expect(SubscriptionCycleHelper.totalFor(2, DateTime(2027, 2, 10)), 833.34);
+      expect(SubscriptionCycleHelper.totalFor(0, DateTime(2027, 2, 10)), 0.0);
+      expect(SubscriptionCycleHelper.totalFor(5, DateTime(2026, 11, 10)), 0.0);
+      expect(SubscriptionCycleHelper.formatEgp(500), '500');
+      expect(SubscriptionCycleHelper.formatEgp(416.67), '416.67');
+    });
+
+    test('free promotion boundary on 2026-12-31 in Cairo time', () {
+      // 21:59:59Z on 31 Dec = 23:59:59 Cairo (UTC+2) -> still free.
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime.utc(2026, 12, 31, 21, 59, 59)), 0.0);
+      // 22:00Z on 31 Dec = 00:00 on 1 Jan 2027 Cairo -> paid, full period.
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime.utc(2026, 12, 31, 22)), 500.0);
+      expect(SubscriptionCycleHelper.getCycleCode(DateTime.utc(2026, 12, 31, 22)), '2027_H1');
+      for (var m = 1; m <= 12; m++) {
+        expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, m, 15)), 0.0);
+      }
+    });
+
+    test('period boundaries in Cairo time (summer time on 1 July)', () {
+      // Cairo is UTC+3 on 1 July: 21:00Z on 30 June is already H2.
+      expect(SubscriptionCycleHelper.cairoUtcOffset(DateTime.utc(2027, 6, 30, 12)), const Duration(hours: 3));
+      expect(SubscriptionCycleHelper.getCycleCode(DateTime.utc(2027, 6, 30, 20, 59, 59)), '2027_H1');
+      expect(SubscriptionCycleHelper.getCycleCode(DateTime.utc(2027, 6, 30, 21)), '2027_H2');
+      // Winter: UTC+2.
+      expect(SubscriptionCycleHelper.cairoUtcOffset(DateTime.utc(2027, 1, 1)), const Duration(hours: 2));
+      expect(SubscriptionCycleHelper.periodStartDay(DateTime(2027, 3, 3)), '2027-01-01');
+      expect(SubscriptionCycleHelper.periodEndDay(DateTime(2027, 3, 3)), '2027-06-30');
+      expect(SubscriptionCycleHelper.periodEndDay(DateTime(2027, 9, 3)), '2027-12-31');
+    });
+
+    test('getProratedSubscriptionFee returns 0.0 during the 2026 promotion, prorated after', () {
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 10, 8)), equals(0.0));
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 12, 31)), equals(0.0));
       expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 1, 1)), equals(500.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 3, 1)), equals(350.0));
+      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 3, 1)), equals(333.33));
       expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 4, 1)), equals(250.0));
     });
   });

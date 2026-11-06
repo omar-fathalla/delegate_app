@@ -1,10 +1,5 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
@@ -43,38 +38,25 @@ class LinkDelegateToOrgSheet extends StatefulWidget {
 }
 
 class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
-  static const String _instaPayLink = 'https://ipn.eg/S/fathall/instapay/1VphF7';
 
   final _formKey = GlobalKey<FormState>();
-  final _receiptCodeController = TextEditingController();
 
   List<Map<String, dynamic>> _organizations = [];
   String? _selectedOrgUID;
   String? _selectedOrgName;
   bool _isLoadingOrgs = true;
 
-  SubscriptionPaymentMethod _paymentMethod =
-      SubscriptionPaymentMethod.companyDeduction;
-  File? _receiptImage;
-  bool _isCheckingReceiptCode = false;
-  bool? _isReceiptCodeValid;
-  String? _receiptCodeStatusText;
   bool _isSubmitting = false;
 
-  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    if (SubscriptionCycleHelper.isFreePromotionActive()) {
-      _paymentMethod = SubscriptionPaymentMethod.freePromotion;
-    }
     _fetchAvailableOrganizations();
   }
 
   @override
   void dispose() {
-    _receiptCodeController.dispose();
     super.dispose();
   }
 
@@ -127,81 +109,6 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
     }
   }
 
-  Future<void> _pickReceiptImage() async {
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (picked != null) {
-      setState(() {
-        _receiptImage = File(picked.path);
-      });
-    }
-  }
-
-  Future<void> _openInstaPayUrl() async {
-    final uri = Uri.parse(_instaPayLink);
-    try {
-      final launched =
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched) {
-        await launchUrl(uri, mode: LaunchMode.platformDefault);
-      }
-    } catch (_) {
-      if (mounted) {
-        AppSnackBar.showError(context, 'تعذر فتح تطبيق انستاباي تلقائياً.');
-      }
-    }
-  }
-
-  Future<void> _copyInstaPayLink() async {
-    await Clipboard.setData(const ClipboardData(text: _instaPayLink));
-    if (mounted) {
-      AppSnackBar.showSuccess(context, 'تم نسخ رابط حساب انستاباي بنجاح');
-    }
-  }
-
-  Future<void> _checkReceiptCode(String code) async {
-    final clean = code.trim();
-    if (clean.length != 5) {
-      setState(() {
-        _isCheckingReceiptCode = false;
-        _isReceiptCodeValid = null;
-        _receiptCodeStatusText = null;
-      });
-      return;
-    }
-
-    setState(() {
-      _isCheckingReceiptCode = true;
-      _receiptCodeStatusText = 'جاري التحقق من توفر كود الإيصال...';
-    });
-
-    final repo = sl<DelegateSubscriptionRepository>();
-    final result = await repo.isReceiptCodeUsed(clean);
-
-    if (!mounted) return;
-
-    result.fold(
-      (failure) {
-        setState(() {
-          _isCheckingReceiptCode = false;
-          _isReceiptCodeValid = null;
-          _receiptCodeStatusText = 'تعذر التحقق: ${failure.message}';
-        });
-      },
-      (isUsed) {
-        setState(() {
-          _isCheckingReceiptCode = false;
-          _isReceiptCodeValid = !isUsed;
-          _receiptCodeStatusText = isUsed
-              ? 'عذراً، كود الإيصال ($clean) مستخدم مسبقاً وغير صالح للاستخدام.'
-              : 'كود الإيصال متاح وصالح للاستخدام ✓';
-        });
-      },
-    );
-  }
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -213,43 +120,7 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
       return;
     }
 
-    if (_paymentMethod == SubscriptionPaymentMethod.branchReceipt) {
-      final code = _receiptCodeController.text.trim();
-      if (code.length != 5) {
-        AppSnackBar.showError(
-          context,
-          'كود الإيصال الإلكتروني يجب أن يتكون من 5 أرقام بالضبط.',
-        );
-        return;
-      }
-      if (_isReceiptCodeValid == false) {
-        AppSnackBar.showError(
-          context,
-          'كود الإيصال ($code) مستخدم مسبقاً، يرجى إدخال كود صالح.',
-        );
-        return;
-      }
-      if (_receiptImage == null) {
-        AppSnackBar.showError(
-          context,
-          'يرجى إرفاق صورة الإيصال الإلكتروني من تسويق الفرع.',
-        );
-        return;
-      }
-    } else if (_paymentMethod == SubscriptionPaymentMethod.instaPay) {
-      if (_receiptImage == null) {
-        AppSnackBar.showError(
-          context,
-          'يرجى إرفاق صورة إشعار التحويل من تطبيق انستاباي.',
-        );
-        return;
-      }
-    }
-
     setState(() => _isSubmitting = true);
-
-    final remainingMonths = SubscriptionCycleHelper.getRemainingMonthsInCycle();
-    final fee = SubscriptionCycleHelper.getProratedSubscriptionFee();
 
     final repo = sl<DelegateSubscriptionRepository>();
     final result = await repo.submitAddOrganizationRequest(
@@ -265,16 +136,10 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
       targetOrganizationUID: _selectedOrgUID!,
       targetOrganizationName: _selectedOrgName ?? _selectedOrgUID!,
       existingDelegate: widget.delegate,
-      paymentMethod: _paymentMethod,
-      fee: fee,
-      remainingMonths: remainingMonths,
-      receiptCode: _paymentMethod == SubscriptionPaymentMethod.branchReceipt
-          ? _receiptCodeController.text.trim()
-          : null,
-      receiptImage: (_paymentMethod == SubscriptionPaymentMethod.branchReceipt ||
-              _paymentMethod == SubscriptionPaymentMethod.instaPay)
-          ? _receiptImage
-          : null,
+      // One subscription per delegate covers all chains: no fee here.
+      paymentMethod: SubscriptionPaymentMethod.notRequired,
+      fee: 0,
+      remainingMonths: 0,
     );
 
     if (!mounted) return;
@@ -283,12 +148,9 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
     result.fold(
       (failure) => AppSnackBar.showError(context, failure.message),
       (_) {
-        final isFree = _paymentMethod == SubscriptionPaymentMethod.freePromotion;
         AppSnackBar.showSuccess(
           context,
-          isFree
-              ? 'تم إرسال طلب ربط المندوب بسلسلة ($_selectedOrgName) بنجاح (مجاناً حتى 31/12)! بانتظار الاعتماد.'
-              : 'تم إرسال طلب ربط المندوب بسلسلة ($_selectedOrgName) وسداد الاشتراك بنجاح! بانتظار الاعتماد.',
+          'تم إرسال طلب ربط المندوب بسلسلة ($_selectedOrgName) بنجاح (بدون رسوم إضافية)! بانتظار الاعتماد.',
         );
         Navigator.pop(context, true);
       },
@@ -299,9 +161,6 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final fee = SubscriptionCycleHelper.getProratedSubscriptionFee();
-    final remainingMonths = SubscriptionCycleHelper.getRemainingMonthsInCycle();
-    final cycleCode = SubscriptionCycleHelper.getCycleCode();
 
     return Material(
       color: colorScheme.surface,
@@ -544,275 +403,7 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                           ),
                         const SizedBox(height: 16),
 
-                        if (SubscriptionCycleHelper.isFreePromotionActive()) ...[
-                          _buildFreePromotionCard(colorScheme, theme.brightness == Brightness.dark),
-                        ] else ...[
-                          // 3. Subscription & Fee Banner
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  const Color(0xFFB8860B).withValues(alpha: 0.12),
-                                  const Color(0xFFD4AF37).withValues(alpha: 0.05),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: const Color(0xFFB8860B)
-                                    .withValues(alpha: 0.35),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.workspace_premium_rounded,
-                                      color: Color(0xFFB8860B),
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'رسوم وفترة الاشتراك بالسلسلة الإضافية',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                        color:
-                                            theme.brightness == Brightness.dark
-                                                ? const Color(0xFFFFE082)
-                                                : const Color(0xFF8D6200),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'دورة الاشتراك: $cycleCode ($remainingMonths أشهر)',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                    Text(
-                                      '${fee.toInt()} ج.م',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: Color(0xFFB8860B),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'ينتهي الاشتراك بنهاية الدورة الحالية، ويتجدد دورياً لكل سلسلة مستقلة.',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // 4. Payment Method Selection
-                          Text(
-                            'طريقة سداد الاشتراك',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          RadioGroup<SubscriptionPaymentMethod>(
-                            groupValue: _paymentMethod,
-                            onChanged: (val) {
-                              if (val != null) setState(() => _paymentMethod = val);
-                            },
-                            child: Column(
-                              children: [
-                                RadioListTile<SubscriptionPaymentMethod>(
-                                  value: SubscriptionPaymentMethod.companyDeduction,
-                                  contentPadding: EdgeInsets.zero,
-                                  title: Text(
-                                    SubscriptionPaymentMethod
-                                        .companyDeduction.displayName,
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                  subtitle: Text(
-                                    'خصم مباشر من رصيد الشركة المسجل في النظام',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                                RadioListTile<SubscriptionPaymentMethod>(
-                                  value: SubscriptionPaymentMethod.instaPay,
-                                  contentPadding: EdgeInsets.zero,
-                                  title: Text(
-                                    SubscriptionPaymentMethod.instaPay.displayName,
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                  subtitle: Text(
-                                    'تحويل إلكتروني مباشر عبر تطبيق انستاباي',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                                RadioListTile<SubscriptionPaymentMethod>(
-                                  value: SubscriptionPaymentMethod.branchReceipt,
-                                  contentPadding: EdgeInsets.zero,
-                                  title: Text(
-                                    SubscriptionPaymentMethod
-                                        .branchReceipt.displayName,
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                  subtitle: Text(
-                                    'سداد نقدي بتسويق الفرع وإدخال كود الإيصال الخماسي',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Conditional: InstaPay details
-                          if (_paymentMethod ==
-                              SubscriptionPaymentMethod.instaPay) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    icon: const Icon(Icons.launch_rounded, size: 16),
-                                    label: const Text('فتح انستاباي', style: TextStyle(fontSize: 12)),
-                                    onPressed: _openInstaPayUrl,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    icon: const Icon(Icons.copy_rounded, size: 16),
-                                    label: const Text('نسخ الحساب', style: TextStyle(fontSize: 12)),
-                                    onPressed: _copyInstaPayLink,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(42),
-                              ),
-                              icon: Icon(
-                                _receiptImage != null
-                                    ? Icons.check_circle_rounded
-                                    : Icons.upload_file_rounded,
-                                size: 18,
-                                color: _receiptImage != null
-                                    ? Colors.green
-                                    : null,
-                              ),
-                              label: Text(
-                                _receiptImage != null
-                                    ? 'تم إرفاق إيصال التحويل ✓'
-                                    : 'إرفاق إشعار تحويل انستاباي *',
-                                style: const TextStyle(fontSize: 12.5),
-                              ),
-                              onPressed: _pickReceiptImage,
-                            ),
-                          ],
-
-                          // Conditional: Branch receipt code
-                          if (_paymentMethod ==
-                              SubscriptionPaymentMethod.branchReceipt) ...[
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: _receiptCodeController,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(5),
-                              ],
-                              decoration: InputDecoration(
-                                labelText: 'كود الإيصال الخماسي *',
-                                hintText: '5 أرقام (مثال: 48921)',
-                                prefixIcon: const Icon(Icons.pin_rounded, size: 20),
-                                suffixIcon: _isCheckingReceiptCode
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(12),
-                                        child: SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        ),
-                                      )
-                                    : _isReceiptCodeValid == true
-                                        ? const Icon(
-                                            Icons.check_circle_rounded,
-                                            color: Colors.green,
-                                          )
-                                        : _isReceiptCodeValid == false
-                                            ? const Icon(
-                                                Icons.cancel_rounded,
-                                                color: Colors.red,
-                                              )
-                                            : null,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onChanged: _checkReceiptCode,
-                            ),
-                            if (_receiptCodeStatusText != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                _receiptCodeStatusText!,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: _isReceiptCodeValid == true
-                                      ? Colors.green
-                                      : _isReceiptCodeValid == false
-                                          ? colorScheme.error
-                                          : colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 8),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(42),
-                              ),
-                              icon: Icon(
-                                _receiptImage != null
-                                    ? Icons.check_circle_rounded
-                                    : Icons.receipt_long_rounded,
-                                size: 18,
-                                color: _receiptImage != null
-                                    ? Colors.green
-                                    : null,
-                              ),
-                              label: Text(
-                                _receiptImage != null
-                                    ? 'تم إرفاق صورة الإيصال ✓'
-                                    : 'إرفاق صورة الإيصال الإلكتروني *',
-                                style: const TextStyle(fontSize: 12.5),
-                              ),
-                              onPressed: _pickReceiptImage,
-                            ),
-                          ],
-                        ],
+                        _buildNoExtraFeeCard(colorScheme),
 
                         const SizedBox(height: 24),
 
@@ -840,9 +431,7 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                           label: Text(
                             _isSubmitting
                                 ? 'جاري إرسال الطلب...'
-                                : (SubscriptionCycleHelper.isFreePromotionActive()
-                                    ? 'تأكيد ربط المندوب بالسلسلة (مجاناً)'
-                                    : 'إرسال طلب الربط وسداد الاشتراك'),
+                                : 'تأكيد ربط المندوب بالسلسلة (بدون رسوم)',
                             style: const TextStyle(
                               fontSize: 14.5,
                               fontWeight: FontWeight.bold,
@@ -861,177 +450,28 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
     );
   }
 
-  Widget _buildFreePromotionCard(ColorScheme colorScheme, bool isDark) {
+  Widget _buildNoExtraFeeCard(ColorScheme colorScheme) {
     return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? colorScheme.surfaceContainerLow
-            : const Color(0xFFF0FDF4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? const Color(0xFF16A34A).withValues(alpha: 0.4)
-              : const Color(0xFF86EFAC),
-          width: 1.2,
-        ),
-      ),
       padding: const EdgeInsets.all(14),
-      child: Column(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF166534).withValues(alpha: 0.4)
-                      : const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF16A34A) : const Color(0xFF86EFAC),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.local_offer_rounded,
-                      size: 14,
-                      color: Color(0xFF16A34A),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'عرض خاص حتى 31 ديسمبر 2026',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF16A34A),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'مجاناً 0 ج.م',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF166534).withValues(alpha: 0.4)
-                      : const Color(0xFFDCFCE7),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.card_giftcard_rounded,
-                  color: Color(0xFF16A34A),
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'ربط المندوب بالسلسلة الإضافية مجاناً بالكامل',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? colorScheme.onSurface : const Color(0xFF14532D),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.surfaceContainer
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isDark
-                    ? colorScheme.outlineVariant
-                    : const Color(0xFFBBF7D0),
-              ),
-            ),
+          Icon(Icons.verified_rounded, color: colorScheme.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
             child: Text(
-              'يمكنك الآن ربط المندوب بالسلاسل والمنظمات الأخرى ومتابعة حضوره وانصرافه ورفع التصوير مجاناً بالكامل حتى 31/12 بدون أي رسوم اشتراك.',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.45,
-                fontWeight: FontWeight.w600,
-                color: isDark ? colorScheme.onSurface : const Color(0xFF1F2937),
-              ),
+              'بدون رسوم إضافية: اشتراك المندوب الواحد يغطي كل السلاسل. '
+              'يتجدد الاشتراك مرة واحدة كل دورة (يناير–يونيو / يوليو–ديسمبر) من صفحة «تجديد المناديب».',
+              style: TextStyle(fontSize: 12.5, height: 1.5, color: colorScheme.onSurface),
             ),
-          ),
-          const SizedBox(height: 10),
-          _buildSheetBenefit(
-            icon: Icons.check_circle_rounded,
-            text: 'متابعة حضور وانصراف المندوب في فروع السلسلة الجديدة لحظياً.',
-            isDark: isDark,
-            colorScheme: colorScheme,
-          ),
-          const SizedBox(height: 6),
-          _buildSheetBenefit(
-            icon: Icons.check_circle_rounded,
-            text: 'إدارة أذونات ورفع تقارير التصوير الميداني للفرع المستهدف.',
-            isDark: isDark,
-            colorScheme: colorScheme,
-          ),
-          const SizedBox(height: 6),
-          _buildSheetBenefit(
-            icon: Icons.check_circle_rounded,
-            text: 'ربط فوري بدون أي رسوم مالية أو إيصالات دفع حتى نهاية 2026.',
-            isDark: isDark,
-            colorScheme: colorScheme,
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSheetBenefit({
-    required IconData icon,
-    required String text,
-    required bool isDark,
-    required ColorScheme colorScheme,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 15, color: const Color(0xFF16A34A)),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 11.5,
-              height: 1.35,
-              color: isDark ? colorScheme.onSurfaceVariant : const Color(0xFF334155),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
