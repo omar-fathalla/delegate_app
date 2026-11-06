@@ -79,6 +79,11 @@ void main() async {
     SharedPreferences.getInstance(),
   ]);
 
+  // Fail closed if a dev build ended up on any project other than tashil-dev.
+  if (AppEnv.isDev) {
+    AppEnv.verifyFirebaseProject(Firebase.app().options.projectId);
+  }
+
   // Remote Config must not delay the first frame or login. A failed or
   // offline fetch leaves delegate_otp_enabled at its in-app default (false).
   // The login path reads the flag when the session is known, so a fetch that

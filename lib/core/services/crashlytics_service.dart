@@ -2,16 +2,28 @@ import 'dart:async';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:delegate_app/core/config/app_env.dart';
+
 /// خدمة مركزية لإدارة Crashlytics وتسجيل الأخطاء
 class CrashlyticsService {
   CrashlyticsService._();
 
+  /// Crashlytics is fully off outside prod (Mohamed's decision for dev):
+  /// no collection, no error hooks, no uploads to tashil-dev or production.
+  static const bool enabledForEnv = !kIsWeb && AppEnv.name == 'prod';
+
   static FirebaseCrashlytics? get _crashlytics =>
-      kIsWeb ? null : FirebaseCrashlytics.instance;
+      enabledForEnv ? FirebaseCrashlytics.instance : null;
 
   /// تهيئة Crashlytics - يتم استدعاؤها في main()
   static Future<void> initialize() async {
     if (kIsWeb) return;
+    if (!enabledForEnv) {
+      // dev: switch native collection off explicitly (Android has no
+      // Info.plist flag) and do not install any error handler.
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(false);
+      return;
+    }
     // تعطيل في وضع التطوير
     await _crashlytics?.setCrashlyticsCollectionEnabled(!kDebugMode);
 

@@ -11,10 +11,12 @@ import 'package:delegate_app/firebase_options_dev.dart' as dev;
 /// `ENV=dev` always uses the tashil-dev Firebase project and never falls back
 /// to production. Any other value fails at startup.
 ///
-/// ENV=dev works on web and on Android with the `dev` flavor
-/// (`flutter build apk --flavor dev --dart-define=ENV=dev`), which bundles the
-/// tashil-dev google-services.json under com.tashil.delegate.dev. There is no
-/// dev iOS app yet, so ENV=dev on iOS fails closed instead of mixing projects.
+/// ENV=dev works on web, on Android with the `dev` flavor
+/// (`flutter build apk --flavor dev --dart-define=ENV=dev`) and on iOS with the
+/// `dev` flavor (`flutter build ios --flavor dev --dart-define=ENV=dev`). Both
+/// mobile flavors use the tashil-dev apps registered for com.tashil.delegate.dev.
+/// On iOS dev the native side never calls FirebaseApp.configure(); Firebase is
+/// initialised from Dart with these options only. Other platforms fail closed.
 class AppEnv {
   AppEnv._();
 
@@ -24,6 +26,29 @@ class AppEnv {
   );
 
   static const bool isDev = name == 'dev';
+
+  static const String devProjectId = 'tashil-dev';
+  static const String prodProjectId = 'practice-firebase-72df1';
+
+  /// Firebase project this build must talk to.
+  static const String expectedProjectId = isDev ? devProjectId : prodProjectId;
+
+  /// Call after Firebase.initializeApp: fails closed if the default app is not
+  /// the project this build was compiled for (e.g. a dev build that somehow
+  /// got the production config from a native plist).
+  static void verifyFirebaseProject(String actualProjectId) =>
+      verifyFirebaseProjectFor(name, actualProjectId);
+
+  @visibleForTesting
+  static void verifyFirebaseProjectFor(String env, String actualProjectId) {
+    final expected = env == 'dev' ? devProjectId : prodProjectId;
+    if (actualProjectId != expected) {
+      throw StateError(
+        'ENV=$env expects Firebase project "$expected" but the app is '
+        'configured for "$actualProjectId". Refusing to continue.',
+      );
+    }
+  }
 
   /// Firebase options for the current environment.
   ///
@@ -45,13 +70,11 @@ class AppEnv {
   }) {
     if (isWeb) return;
     if (platform == TargetPlatform.android) return;
-    if (platform == TargetPlatform.iOS) {
-      throw UnsupportedError(
-        'ENV=dev is not supported on ${platform.name} yet: there is no dev '
-        'iOS app, so it would mix tashil-dev with production config. '
-        'Use ENV=dev on web or Android (--flavor dev).',
-      );
-    }
+    if (platform == TargetPlatform.iOS) return;
+    throw UnsupportedError(
+      'ENV=dev is not supported on ${platform.name}: there is no tashil-dev '
+      'app for it. Use ENV=dev on web, Android or iOS (--flavor dev).',
+    );
   }
 
   /// Same mapping as [firebaseOptions] for an explicit [env] (used in tests).

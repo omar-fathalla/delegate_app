@@ -1,0 +1,8 @@
+// Tashil dev flavor (Firebase project tashil-dev, bundle com.tashil.delegate.dev).
+// No production values may appear in this file.
+APP_ENV = dev
+APP_DISPLAY_NAME = Tashil Dev
+// Firebase Auth URL scheme for an iOS app without an OAuth client: the encoded app id.
+APP_URL_SCHEME = app-1-582609039627-ios-0a788355f5bc4886dd720e
+// tashil-dev "Dev Maps iOS key": restricted to com.tashil.delegate.dev + Maps SDK for iOS.
+GMS_API_KEY = AIzaSyDTJgZBQif1z2bBftRqlfOhVwiNtVq1sow
