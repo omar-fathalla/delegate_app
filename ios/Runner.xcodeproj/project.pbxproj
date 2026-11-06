@@ -235,6 +235,7 @@
 				23B1088A06FAA5DE1A34355F /* [CP] Check Pods Manifest.lock */,
 				D419100482B24D82179BD125 /* [Tashil] Check Firebase config (flavor/ENV) */,
 				9740EEB61CF901F6004384FC /* Run Script */,
+				D5E6F7081CF901F600438500 /* [Tashil] Strip Crashlytics plugin (dev) */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
@@ -428,6 +429,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+		D5E6F7081CF901F600438500 /* [Tashil] Strip Crashlytics plugin (dev) */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${SRCROOT}/Runner/GeneratedPluginRegistrant.m",
+			);
+			name = "[Tashil] Strip Crashlytics plugin (dev)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"${SRCROOT}/scripts/strip_dev_crashlytics_plugin_registration.sh\"\n";
+			showEnvVarsInLog = 0;
 		};
 		BC1D2DC3D2247DFF467A09CC /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;

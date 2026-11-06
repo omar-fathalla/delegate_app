@@ -39,6 +39,9 @@ assert_no_crashlytics_upload_in_pbxproj() {
   if grep -E 'upload-symbols|FirebaseCrashlytics/run' ios/Runner.xcodeproj/project.pbxproj >/dev/null 2>&1; then
     fail "upload-symbols or FirebaseCrashlytics run script found in pbxproj"
   fi
+  if ! grep -q 'strip_dev_crashlytics_plugin_registration' ios/Runner.xcodeproj/project.pbxproj; then
+    fail "project.pbxproj missing [Tashil] Strip Crashlytics plugin (dev) build phase"
+  fi
 }
 
 check_built_app() {
@@ -60,6 +63,12 @@ check_built_app() {
   env="$(python3 ios/scripts/tashil_plist_tools.py get "$info" TashilEnv 2>/dev/null | tr -d '\r\n' || true)"
   if [[ "$env_label" == dev ]]; then
     [[ "$env" == "dev" ]] || fail "expected TashilEnv=dev in built Info.plist, got '$env'"
+    local gs
+    gs="$app/GoogleService-Info.plist"
+    [[ -f "$gs" ]] || fail "dev .app missing $gs"
+    local pid
+    pid="$(python3 ios/scripts/tashil_plist_tools.py get "$gs" PROJECT_ID 2>/dev/null | tr -d '\r\n' || true)"
+    [[ "$pid" == "tashil-dev" ]] || fail "dev built app: GoogleService-Info PROJECT_ID must be tashil-dev (got '$pid')"
     for key in FirebaseCrashlyticsCollectionEnabled FirebaseAutomaticDataCollectionEnabled; do
       local v
       v="$(python3 ios/scripts/tashil_plist_tools.py get "$info" "$key" 2>/dev/null | tr -d '\r\n' || true)"
@@ -300,5 +309,40 @@ PY
   rm -rf "$SIM"
   trap - EXIT
 fi
+
+echo "== Negative: dev --app-path with TashilEnv=dev but wrong PROJECT_ID in bundled plist"
+BAD_SIM="$(mktemp -d)"
+trap 'rm -rf "$BAD_SIM"' EXIT
+mkdir -p "$BAD_SIM/Bad.app"
+cp "$FIXTURE_DEV" "$BAD_SIM/Bad.app/GoogleService-Info.plist"
+BAD_GS="$BAD_SIM/Bad.app/GoogleService-Info.plist"
+python3 - "$BAD_GS" <<'PY'
+import plistlib
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+d = plistlib.loads(p.read_bytes())
+d["PROJECT_ID"] = "not-tashil-dev"
+p.write_bytes(plistlib.dumps(d, fmt=plistlib.FMT_XML))
+PY
+python3 - <<'PY' "$BAD_SIM/Bad.app/Info.plist"
+import plistlib
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+d = {"CFBundleIdentifier": "com.tashil.delegate.dev", "CFBundleShortVersionString": "1.0", "CFBundleVersion": "1"}
+p.write_bytes(plistlib.dumps(d, fmt=plistlib.FMT_XML))
+PY
+python3 ios/scripts/tashil_plist_tools.py patch-info "$BAD_SIM/Bad.app/Info.plist" dev
+outf="$(mktemp)"
+set +e
+( check_built_app "$BAD_SIM/Bad.app" dev ) >"$outf" 2>&1
+code=$?
+set -e
+rm -rf "$BAD_SIM"
+trap - EXIT
+[[ "$code" -ne 0 ]] || fail "expected check_built_app failure for dev with wrong PROJECT_ID"
+grep -q "PROJECT_ID" "$outf" || fail "wrong PROJECT_ID: expected PROJECT_ID in error message"
+rm -f "$outf"
 
 echo "ios-dev-config-check: OK"
