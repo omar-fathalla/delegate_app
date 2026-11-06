@@ -8,6 +8,7 @@
 ## Git & Version Control Policy
 - **Do NOT run `git push` (or push commits to GitHub / remote repositories) automatically or proactively.**
 - Only push to GitHub when the user explicitly and directly asks to push (e.g. "ارفع على جيت هب" أو "push on github").
+- قواعد سير العمل العربي (فروع منفصلة، اختبار قبل الدمج، فشل البيلد عند إعدادات Firebase غلط): انظر `docs/DEV_WORKFLOW_RULES_AR.md`.
 
 ## Header & App Bar Popup Menu Ordering (Across all 9 User Roles)
 - In all App Bars / Header Menus / `PopupMenuButton`s across all user roles (Delegate, Promoter, Supervisor, Admin, Super Admin, Organization Admin, Technical Support, Marketing, Branches Marketing Manager):
