@@ -8,7 +8,26 @@
 Build phases (`scripts/firebase_config.sh`) copy the correct plist into the app and fail closed
 if this file is missing or does not match `APP_ENV` and `PRODUCT_BUNDLE_IDENTIFIER`.
 
-For **dev** configurations only (`Debug-dev`, `Profile-dev`, `Release-dev`), a Runner build phase
-runs `scripts/strip_dev_crashlytics_plugin_registration.sh` after code generation to remove the
-Firebase Crashlytics plugin block from `GeneratedPluginRegistrant.m`, so native Crashlytics never
-initializes on dev; **prod** builds are unchanged.
+## Derived plugin registrant (do not mutate Flutter output)
+
+Flutter generates `Runner/GeneratedPluginRegistrant.m` during the Xcode “Run Script” phase that
+invokes `xcode_backend.sh`. That file is **never edited in place**.
+
+A second Run Script phase — **`[Tashil] Prepare derived plugin registrant`** — runs **after** Flutter
+codegen and **before** Compile Sources. It writes **only** to:
+
+`Runner/.tashil_registrant_derived/GeneratedPluginRegistrant.m` (gitignored)
+
+- **Dev** (`Debug-dev`, `Profile-dev`, `Release-dev`): copies from the generated file and strips
+  native Crashlytics plugin registration so dev never initializes Crashlytics.
+- **Prod** (all other configurations): copies the generated file verbatim and **fails the build**
+  if Crashlytics registration lines are missing in the derived file (fail closed).
+
+The Runner target’s **Compile Sources** entry is the **derived** `.m` file, not
+`Runner/GeneratedPluginRegistrant.m`. The header `GeneratedPluginRegistrant.h` stays in
+`Runner/` (unchanged; still the Flutter-generated header next to the generated `.m`).
+
+Switching schemes in Xcode without re-running Flutter therefore cannot ship prod with a stripped
+registrant: the next prod compile copies from the shared generated file again.
+
+Manual regression (macOS + Xcode): `scripts/test_derived_registrant_switching.sh` from `ios/`.

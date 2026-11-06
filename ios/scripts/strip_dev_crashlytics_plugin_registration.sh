@@ -1,41 +1,55 @@
 #!/bin/sh
-# Dev-only: remove Firebase Crashlytics from GeneratedPluginRegistrant.m so the native
-# Crashlytics plugin is never registered in Debug-dev / Profile-dev / Release-dev.
-# Runs after Flutter's Xcode build step (which generates this file); idempotent.
-# See ios/config/README.md.
+# Prepare the Objective-C plugin registrant used at compile time.
+#
+# Flutter generates `Runner/GeneratedPluginRegistrant.m` (tracked only as a template in git;
+# normally gitignored). That file must never be modified in place.
+#
+# This script runs after Flutter's Xcode build step (`xcode_backend.sh` build). It writes a
+# **derived** copy only:
+#   `Runner/.tashil_registrant_derived/GeneratedPluginRegistrant.m` (gitignored)
+#
+# - Dev configurations (`Debug-dev`, `Profile-dev`, `Release-dev`): copy from the generated
+#   file and strip Firebase Crashlytics registration (native plugin not registered on dev).
+# - All other configurations (prod): copy verbatim so the derived file always matches Flutter's
+#   generated registrant (Crashlytics remains registered). Fails the build if Crashlytics
+#   registration would be missing after copy.
+#
+# The Xcode target compiles the derived `.m` file, not `Runner/GeneratedPluginRegistrant.m`.
+# See `ios/config/README.md`.
 set -eu
 
-case "${CONFIGURATION:-}" in
-  Debug-dev|Profile-dev|Release-dev) ;;
-  *)
-    exit 0
-    ;;
-esac
+SOURCE="${SRCROOT:?}/Runner/GeneratedPluginRegistrant.m"
+DERIVED_DIR="${SRCROOT:?}/Runner/.tashil_registrant_derived"
+DERIVED="${DERIVED_DIR}/GeneratedPluginRegistrant.m"
 
-TARGET="${SRCROOT:?}/Runner/GeneratedPluginRegistrant.m"
-if [ ! -f "$TARGET" ]; then
-  echo "error: [Tashil strip-dev-crashlytics] missing $TARGET" >&2
+if [ ! -f "$SOURCE" ]; then
+  echo "error: [Tashil derived registrant] missing generated file: $SOURCE (run Flutter build first)" >&2
   exit 1
 fi
 
-exec python3 - "$TARGET" <<'PY'
+mkdir -p "$DERIVED_DIR"
+
+case "${CONFIGURATION:-}" in
+  Debug-dev|Profile-dev|Release-dev)
+    exec python3 - "$SOURCE" "$DERIVED" <<'PY'
 import re
 import sys
 from pathlib import Path
 
-path = Path(sys.argv[1])
-text = path.read_text(encoding="utf-8")
+source_path = Path(sys.argv[1])
+dest_path = Path(sys.argv[2])
+text = source_path.read_text(encoding="utf-8")
 low = text.lower()
 
-# Already stripped (no crashlytics references)
+# Dev-only strip — write only to derived path; never mutate `source_path`.
 if "crashlytics" not in low:
-    print("[Tashil strip-dev-crashlytics] OK: no Crashlytics in GeneratedPluginRegistrant.m (already stripped).")
+    print("[Tashil derived registrant] OK (dev): no Crashlytics in source; writing derived copy.")
+    dest_path.write_text(text, encoding="utf-8")
     sys.exit(0)
 
 lines = text.splitlines(keepends=True)
 out: list[str] = []
 i = 0
-# Match FlutterFire's #if wrapper for the firebase_crashlytics pod
 crash_block = re.compile(
     r"#\s*if\b.*firebase_crashlytics",
     re.IGNORECASE,
@@ -69,9 +83,21 @@ while i < len(lines):
 
 new_text = "".join(out)
 if re.search(r"crashlytics", new_text, re.IGNORECASE):
-    print("error: [Tashil strip-dev-crashlytics] Crashlytics references remain after strip.", file=sys.stderr)
+    print("error: [Tashil derived registrant] Crashlytics references remain after strip.", file=sys.stderr)
     sys.exit(1)
 
-path.write_text(new_text, encoding="utf-8")
-print("[Tashil strip-dev-crashlytics] OK: removed Crashlytics from GeneratedPluginRegistrant.m.")
+dest_path.write_text(new_text, encoding="utf-8")
+print("[Tashil derived registrant] OK (dev): wrote stripped derived GeneratedPluginRegistrant.m.")
 PY
+    ;;
+  *)
+    cp -f "$SOURCE" "$DERIVED"
+    if ! grep -q 'FLTFirebaseCrashlyticsPlugin registerWithRegistrar' "$DERIVED" \
+      && ! grep -q 'FirebaseCrashlyticsPlugin registerWithRegistrar' "$DERIVED"
+    then
+      echo "error: [Tashil derived registrant] prod/non-dev build requires Crashlytics plugin registration in derived registrant (see $DERIVED)." >&2
+      exit 1
+    fi
+    echo "[Tashil derived registrant] OK (${CONFIGURATION:-unknown}): copied generated registrant to derived path (Crashlytics present)."
+    ;;
+esac

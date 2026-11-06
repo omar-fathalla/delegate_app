@@ -43,7 +43,7 @@
 
 /* Begin PBXFileReference section */
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
-		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
+		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ".tashil_registrant_derived/GeneratedPluginRegistrant.m"; sourceTree = "<group>"; };
 		20CC55ECE703044AB0E76B1D /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		2640372049C1E890273C01CD /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		269CE679120B10149914F292 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
@@ -235,7 +235,7 @@
 				23B1088A06FAA5DE1A34355F /* [CP] Check Pods Manifest.lock */,
 				D419100482B24D82179BD125 /* [Tashil] Check Firebase config (flavor/ENV) */,
 				9740EEB61CF901F6004384FC /* Run Script */,
-				D5E6F7081CF901F600438500 /* [Tashil] Strip Crashlytics plugin (dev) */,
+				D5E6F7081CF901F600438500 /* [Tashil] Derived plugin registrant */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
@@ -430,7 +430,7 @@
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
 		};
-		D5E6F7081CF901F600438500 /* [Tashil] Strip Crashlytics plugin (dev) */ = {
+		D5E6F7081CF901F600438500 /* [Tashil] Derived plugin registrant */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -441,10 +441,11 @@
 			inputPaths = (
 				"${SRCROOT}/Runner/GeneratedPluginRegistrant.m",
 			);
-			name = "[Tashil] Strip Crashlytics plugin (dev)";
+			name = "[Tashil] Prepare derived plugin registrant (dev strip / prod copy)";
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"${SRCROOT}/Runner/.tashil_registrant_derived/GeneratedPluginRegistrant.m",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

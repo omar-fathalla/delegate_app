@@ -40,7 +40,13 @@ assert_no_crashlytics_upload_in_pbxproj() {
     fail "upload-symbols or FirebaseCrashlytics run script found in pbxproj"
   fi
   if ! grep -q 'strip_dev_crashlytics_plugin_registration' ios/Runner.xcodeproj/project.pbxproj; then
-    fail "project.pbxproj missing [Tashil] Strip Crashlytics plugin (dev) build phase"
+    fail "project.pbxproj missing derived registrant Run Script (strip_dev_crashlytics_plugin_registration.sh)"
+  fi
+  if ! grep -q '\[Tashil\] Derived plugin registrant' ios/Runner.xcodeproj/project.pbxproj; then
+    fail "project.pbxproj missing [Tashil] Derived plugin registrant build phase"
+  fi
+  if ! grep -q '.tashil_registrant_derived' ios/Runner.xcodeproj/project.pbxproj; then
+    fail "project.pbxproj missing derived registrant path (.tashil_registrant_derived)"
   fi
 }
 
