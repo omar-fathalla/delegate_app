@@ -1,0 +1,3 @@
+// XCTest bundle: embedded pod frameworks + Patrol host (Runner.app) resolution.
+// See CocoaPods #8337 / Firebase UI-test inherit! :search_paths guidance.
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @loader_path/Frameworks @executable_path/Frameworks @loader_path/../Frameworks
