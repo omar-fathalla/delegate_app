@@ -54,8 +54,25 @@ assert_no_crashlytics_upload_in_pbxproj() {
   if ! grep -q 'tashil_before_flutter_xcode_backend.sh' ios/Runner.xcodeproj/project.pbxproj; then
     fail "project.pbxproj must run tashil_before_flutter_xcode_backend.sh before xcode_backend build (dev SPM strip)"
   fi
-  if ! grep -q 'tashil_after_embed_and_thin.sh' ios/Runner.xcodeproj/project.pbxproj; then
-    fail "project.pbxproj must chain tashil_after_embed_and_thin.sh after embed_and_thin (dev bundle strip)"
+  if ! grep -q 'strip_dev_crashlytics_from_app.sh' ios/Runner.xcodeproj/project.pbxproj; then
+    fail "project.pbxproj must include strip_dev_crashlytics_from_app.sh (dev bundle strip after Pods embed)"
+  fi
+  python3 <<'PY' || fail "Runner buildPhases: [Tashil] Dev strip Crashlytics from app must run after [CP] Embed Pods Frameworks"
+import re
+from pathlib import Path
+text = Path("ios/Runner.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+start = text.find("97C146ED1CF9000F007C117D /* Runner */")
+assert start != -1, "Runner target missing"
+sub = text[start : start + 4000]
+m = re.search(r"buildPhases = \((.*?)\n\t\t\t\);", sub, re.S)
+assert m, "Runner buildPhases missing"
+labels = re.findall(r"/\*\s*(.+?)\s*\*/", m.group(1))
+embed = next(i for i, n in enumerate(labels) if n == "[CP] Embed Pods Frameworks")
+strip = next(i for i, n in enumerate(labels) if "Dev strip Crashlytics from app" in n)
+assert strip > embed, (embed, strip, labels)
+PY
+  if ! grep -q 'tashil_strip_crashlytics_from_dev_pod_support.sh' ios/Podfile; then
+    fail "Podfile post_install must run tashil_strip_crashlytics_from_dev_pod_support.sh"
   fi
   if ! grep -q 'strip_dev_crashlytics_spm_package.sh' ios/Runner.xcodeproj/xcshareddata/xcschemes/dev.xcscheme; then
     fail "dev.xcscheme must pre-build strip Crashlytics SPM before implicit dependency resolution"
@@ -157,6 +174,8 @@ bash ios/scripts/test_tashil_dev_build_context.sh
 
 echo "== strip_dev_crashlytics_spm_package unit test"
 bash ios/scripts/test_strip_dev_crashlytics_spm_package.sh
+echo "== tashil_strip_crashlytics_from_dev_pod_support unit test"
+bash ios/scripts/test_tashil_strip_crashlytics_from_dev_pod_support.sh
 
 # CI uses committed fixture as the dev GoogleService-Info (no secrets).
 FIXTURE_DEV="ios/config/test/GoogleService-Info-tashil-dev.fixture.plist"

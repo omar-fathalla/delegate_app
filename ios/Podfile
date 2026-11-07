@@ -86,4 +86,10 @@ post_install do |installer|
   end
 
   tashil_strip_dev_crashlytics_if_needed!
+
+  pod_strip = File.expand_path('scripts/tashil_strip_crashlytics_from_dev_pod_support.sh', __dir__)
+  if File.exist?(pod_strip)
+    success = system('/bin/sh', pod_strip, File.expand_path(__dir__))
+    raise '[Tashil] tashil_strip_crashlytics_from_dev_pod_support.sh failed during pod install' unless success
+  end
 end

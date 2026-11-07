@@ -243,6 +243,7 @@
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				65F88028DFF99F710F975233 /* [CP] Embed Pods Frameworks */,
 				BC1D2DC3D2247DFF467A09CC /* [CP] Copy Pods Resources */,
+				E8F1A2B3C4D5061728394A5B /* [Tashil] Dev strip Crashlytics from app */,
 				170A61BE810DC90489385D65 /* [Tashil] Select Firebase config */,
 				F7DD36EDC1DCCA02088D6F3C /* [Tashil] Dev Crashlytics upload guard */,
 			);
@@ -374,7 +375,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin\n/bin/sh \"${SRCROOT}/scripts/tashil_after_embed_and_thin.sh\"\n";
+			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin";
+		};
+		E8F1A2B3C4D5061728394A5B /* [Tashil] Dev strip Crashlytics from app */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "[Tashil] Dev strip Crashlytics from app";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"${SRCROOT}/scripts/strip_dev_crashlytics_from_app.sh\"\n";
 		};
 		65F88028DFF99F710F975233 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
