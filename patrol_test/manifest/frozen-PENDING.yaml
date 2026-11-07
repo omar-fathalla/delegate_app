@@ -4,18 +4,32 @@ git_short: PENDING
 capture_status: pending_mac
 bundle_id: com.tashil.delegate.dev
 firebase_project_id: tashil-dev
+xctestrun:
+  path: null
+  format_version: null
+  blueprint_name: null
+  keys:
+    UITargetAppPath: null
+    TestHostPath: null
+    TestBundlePath: null
+  sha256: null
 artifacts:
   runner_app:
+    source: xctestrun UITargetAppPath
     path: null
     sha256:
+      tree: null
       Runner: null
       Info.plist: null
       GoogleService-Info.plist: null
+  test_runner:
+    source: xctestrun TestHostPath
+    path: null
+    sha256:
+      tree: null
   runner_ui_tests:
+    source: xctestrun TestBundlePath
     path: null
     sha256:
       bundle: null
       RunnerUITests: null
-  xctestrun:
-    path: null
-    sha256: null
