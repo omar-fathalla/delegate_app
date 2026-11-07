@@ -5,8 +5,9 @@
 # normally gitignored). That file must never be modified in place.
 #
 # This script runs after Flutter's Xcode build step (`xcode_backend.sh` build). It writes a
-# **derived** copy only:
-#   `Runner/.tashil_registrant_derived/GeneratedPluginRegistrant.m` (gitignored)
+# **derived** copy only — under **DERIVED_FILE_DIR** (per-configuration, per-target), so concurrent
+# dev + prod builds do not race on one shared path under Runner/:
+#   `$(DERIVED_FILE_DIR)/tashil_registrant/GeneratedPluginRegistrant.m`
 #
 # - Dev configurations (`Debug-dev`, `Profile-dev`, `Release-dev`): copy from the generated
 #   file and strip Firebase Crashlytics registration (native plugin not registered on dev).
@@ -19,7 +20,9 @@
 set -eu
 
 SOURCE="${SRCROOT:?}/Runner/GeneratedPluginRegistrant.m"
-DERIVED_DIR="${SRCROOT:?}/Runner/.tashil_registrant_derived"
+# Xcode sets DERIVED_FILE_DIR per configuration; fallback only for ad-hoc runs (e.g. tests).
+DERIVED_BASE="${DERIVED_FILE_DIR:-${SRCROOT:?}/Runner/.tashil_registrant_derived}"
+DERIVED_DIR="${DERIVED_BASE}/tashil_registrant"
 DERIVED="${DERIVED_DIR}/GeneratedPluginRegistrant.m"
 
 if [ ! -f "$SOURCE" ]; then

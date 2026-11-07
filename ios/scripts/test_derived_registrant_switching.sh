@@ -10,9 +10,9 @@
 # then Debug-prod → shared file still has Crashlytics; derived prod copy has Crashlytics;
 # then Debug-dev again → derived dev file has no Crashlytics registration line.
 #
-# Parallel xcodebuild (two DERIVED_DATA dirs) is skipped here: a single workspace cannot
-# safely run concurrent Flutter codegen (`xcode_backend.sh`) against the same Runner tree
-# without races; use CI matrix / separate worktrees for true parallelism.
+# Concurrent Flutter codegen (`xcode_backend.sh`) for the same Runner tree is still unsafe;
+# the derived registrant file now lives under each configuration’s `DERIVED_FILE_DIR` so dev
+# and prod builds do not overwrite the same path on disk.
 #
 # Raw `xcodebuild` needs the same prep Flutter applies (Pods + xcconfigs + module maps).
 # This script runs `flutter build ios --config-only` per flavor and `pod install` before
@@ -36,7 +36,6 @@ REPO_ROOT="$(cd "$IOS_ROOT/.." && pwd)"
 cd "$REPO_ROOT"
 
 SRC_GENERATED="$IOS_ROOT/Runner/GeneratedPluginRegistrant.m"
-DERIVED="$IOS_ROOT/Runner/.tashil_registrant_derived/GeneratedPluginRegistrant.m"
 GENERATED_XCCONFIG="$IOS_ROOT/Flutter/Generated.xcconfig"
 
 resolve_flutter_bin() {
@@ -121,17 +120,10 @@ dart_defines_for_configuration() {
   esac
 }
 
-build() {
+derived_registrant_path_for_configuration() {
   local config="$1"
   local defines
   defines="$(dart_defines_for_configuration "$config")"
-  # CODE_SIGNING_ALLOWED=NO keeps CI/local from needing provisioning profiles for this check.
-  # DART_DEFINES must match the configuration so firebase_config.sh and flutter_assemble agree
-  # with what `flutter build` would pass (simulates switching scheme only in Xcode).
-  #
-  # On Apple Silicon, the generic iOS Simulator destination can produce arm64+x86_64 slices;
-  # Flutter's unpack step then sees IOS_ARCHS in a form `lipo -verify_arch` rejects. Force a
-  # single simulator arch without passing -arch (incompatible with generic/platform=).
   local -a xcode_flags=(
     -workspace "$IOS_ROOT/Runner.xcworkspace"
     -scheme Runner
@@ -140,8 +132,34 @@ build() {
     "DART_DEFINES=$defines"
     CODE_SIGNING_ALLOWED=NO
   )
-  # Apple Silicon simulators: exclude Rosetta x86_64 slice. Intel Macs: exclude arm64 so
-  # IOS_ARCHS is a single arch for Flutter's debug_unpack_ios / lipo -verify_arch.
+  case "$(uname -m)" in
+    arm64) xcode_flags+=(EXCLUDED_ARCHS=x86_64) ;;
+    *) xcode_flags+=(EXCLUDED_ARCHS=arm64) ;;
+  esac
+  local ddir
+  ddir="$(xcodebuild "${xcode_flags[@]}" -showBuildSettings 2>/dev/null \
+    | grep -m1 '^\s*DERIVED_FILE_DIR = ' \
+    | sed 's/^[[:space:]]*DERIVED_FILE_DIR = //' \
+    | sed 's/^"//;s/"$//' )"
+  [[ -n "$ddir" ]] || {
+    echo "test_derived_registrant_switching: could not resolve DERIVED_FILE_DIR for $config" >&2
+    exit 1
+  }
+  printf '%s' "${ddir}/tashil_registrant/GeneratedPluginRegistrant.m"
+}
+
+build() {
+  local config="$1"
+  local defines
+  defines="$(dart_defines_for_configuration "$config")"
+  local -a xcode_flags=(
+    -workspace "$IOS_ROOT/Runner.xcworkspace"
+    -scheme Runner
+    -configuration "$config"
+    -destination 'generic/platform=iOS Simulator'
+    "DART_DEFINES=$defines"
+    CODE_SIGNING_ALLOWED=NO
+  )
   case "$(uname -m)" in
     arm64) xcode_flags+=(EXCLUDED_ARCHS=x86_64) ;;
     *) xcode_flags+=(EXCLUDED_ARCHS=arm64) ;;
@@ -168,6 +186,7 @@ has_crashlytics_registration() {
 echo "== 1/3 xcodebuild Debug-dev"
 build "Debug-dev"
 check_shared_unchanged
+DERIVED="$(derived_registrant_path_for_configuration "Debug-dev")"
 [[ -f "$DERIVED" ]] || { echo "test_derived_registrant_switching: missing derived file after dev build" >&2; exit 1; }
 if has_crashlytics_registration "$DERIVED"; then
   echo "test_derived_registrant_switching: dev derived file must NOT register Crashlytics" >&2
@@ -177,6 +196,7 @@ fi
 echo "== 2/3 xcodebuild Debug-prod"
 build "Debug-prod"
 check_shared_unchanged
+DERIVED="$(derived_registrant_path_for_configuration "Debug-prod")"
 [[ -f "$DERIVED" ]] || { echo "test_derived_registrant_switching: missing derived file after prod build" >&2; exit 1; }
 if ! has_crashlytics_registration "$DERIVED"; then
   echo "test_derived_registrant_switching: prod derived file must include Crashlytics registration" >&2
@@ -186,6 +206,7 @@ fi
 echo "== 3/3 xcodebuild Debug-dev (again)"
 build "Debug-dev"
 check_shared_unchanged
+DERIVED="$(derived_registrant_path_for_configuration "Debug-dev")"
 if has_crashlytics_registration "$DERIVED"; then
   echo "test_derived_registrant_switching: dev derived file must NOT register Crashlytics after prod→dev" >&2
   exit 1
