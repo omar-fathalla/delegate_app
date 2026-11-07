@@ -41,4 +41,6 @@ Environment:
 | `MAESTRO_DEVICE_ID` | no | Passed to `maestro test --device` |
 | `TASHIL_MAESTRO_LOG` | no | Default `maestro/logs/supervisor-identity-persist.log` (gitignored) |
 
-Semantics ids (ENV=dev only): `tashil_login_submit`, `tashil_main_menu_button`, `tashil_profile_phone_value`.
+M3 login (supervisor flow): tap segment **موظف إداري**, fill **رقم الجوال** + **كلمة المرور**, submit **تسجيل الدخول** (`ValueKey('login_submit')` in app). Delegate smoke uses segment **مندوب** + national ID field instead.
+
+Semantics ids (ENV=dev only): `tashil_main_menu_button`, `tashil_profile_phone_value`.

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 
+import 'smoke_login_finders.dart';
+
 /// Poll interval while splash / auto-login may still be in flight.
 const Duration smokeSplashPollInterval = Duration(milliseconds: 500);
 
@@ -19,35 +21,18 @@ const Duration smokePostSignInPumpStep = Duration(milliseconds: 200);
 
 const int smokePostSignInPumpIterations = 40;
 
-/// ENV=dev Maestro marker on the login submit button ([login_screen.dart]).
-Finder devLoginScreenSemanticsFinder() {
-  return find.bySemanticsIdentifier('tashil_login_submit');
-}
-
-Finder devLoginPhoneFieldFinder() => find.byType(TextFormField).at(0);
-
-Finder devLoginSecretFieldFinder() => find.byType(TextFormField).at(1);
-
 bool _loginSubmitHitTestable(WidgetTester tester) {
-  final elements = devLoginScreenSemanticsFinder().evaluate();
-  for (final element in elements) {
-    final render = element.renderObject;
-    if (render == null || !render.attached) continue;
-    if (render is! RenderBox || !render.hasSize) continue;
-    if (render.size.isEmpty) continue;
-    return true;
-  }
-  return false;
+  final hitTestable =
+      devLoginSubmitFinder().hitTestable(at: Alignment.center);
+  return hitTestable.evaluate().isNotEmpty;
 }
 
-bool _textFormFieldsHitTestable(WidgetTester tester) {
-  final fields = find.byType(TextFormField);
-  if (fields.evaluate().length < 2) return false;
-  for (final index in [0, 1]) {
-    final hitTestable = fields.at(index).hitTestable(at: Alignment.center);
-    if (hitTestable.evaluate().isEmpty) return false;
-  }
-  return true;
+bool _staffLoginFieldsHitTestable(WidgetTester tester) {
+  final phone =
+      devLoginPhoneFieldFinder().hitTestable(at: Alignment.center);
+  final secret =
+      devLoginStaffPasswordFieldFinder().hitTestable(at: Alignment.center);
+  return phone.evaluate().isNotEmpty && secret.evaluate().isNotEmpty;
 }
 
 /// Pumps through the login screen slide/fade so fields are hit-testable.
@@ -62,7 +47,7 @@ Future<void> settleDevLoginScreenEntrance(PatrolIntegrationTester $) async {
 
 /// Scrolls the dev login form into view and waits for both [TextFormField]s.
 Future<void> waitForDevLoginFormFieldsReady(PatrolIntegrationTester $) async {
-  final submit = devLoginScreenSemanticsFinder();
+  final submit = devLoginSubmitFinder();
   if ($.tester.any(submit)) {
     await $(submit).scrollTo();
   }
@@ -71,7 +56,7 @@ Future<void> waitForDevLoginFormFieldsReady(PatrolIntegrationTester $) async {
 
   final deadline = DateTime.now().add(smokeLoginVisibleTimeout);
   while (DateTime.now().isBefore(deadline)) {
-    if (_textFormFieldsHitTestable($.tester)) return;
+    if (_staffLoginFieldsHitTestable($.tester)) return;
 
     if ($.tester.any(submit)) {
       await $(submit).scrollTo();
@@ -86,14 +71,14 @@ Future<void> waitForDevLoginFormFieldsReady(PatrolIntegrationTester $) async {
     timeout: smokeLoginVisibleTimeout,
     alignment: Alignment.topCenter,
   );
-  await $(devLoginSecretFieldFinder()).waitUntilVisible(
+  await $(devLoginStaffPasswordFieldFinder()).waitUntilVisible(
     timeout: smokeLoginVisibleTimeout,
     alignment: Alignment.topCenter,
   );
 }
 
 /// Waits for splash / auto-login to finish, taps [splash_sign_in] when the stall UI
-/// appears, then asserts the dev delegate login screen is visible via [tashil_login_submit].
+/// appears, then asserts the dev login screen submit control is visible.
 Future<void> waitForDevLoginScreenAfterSplash(PatrolIntegrationTester $) async {
   final splashSignIn = find.byKey(const Key('splash_sign_in'));
   final deadline = DateTime.now().add(smokeReachLoginDeadline);
@@ -117,7 +102,7 @@ Future<void> waitForDevLoginScreenAfterSplash(PatrolIntegrationTester $) async {
     }
   }
 
-  await $(devLoginScreenSemanticsFinder()).waitUntilVisible(
+  await $(devLoginSubmitFinder()).waitUntilVisible(
     timeout: smokeLoginVisibleTimeout,
   );
   await waitForDevLoginFormFieldsReady($);
