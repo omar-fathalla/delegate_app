@@ -24,7 +24,7 @@ Override the sim with `PATROL_IOS_SIM_UDID` if needed (same value as `-d`).
 ## Smoke assertions
 
 1. `Firebase.app().options.projectId` is **`tashil-dev`**.
-2. Dummy login on the dev supervisor account (`01500000002` by default) via phone + secret fields (same as Maestro).
+2. M3 dummy login on the dev **staff** supervisor (`01500000002`): tap **موظف إداري** (`group_item_LoginMode.staff`), then `login_phone` + `login_staff_password` (same fields as Maestro).
 3. Post-login: `tashil_main_menu_button` → **الملف الشخصي** → phone visible + role badge **`مشرف الشركة (Company Admin)`** for `01500000002` (overridable).
 
 Helpers live under `patrol_test/support/` only — no `lib/` edits.

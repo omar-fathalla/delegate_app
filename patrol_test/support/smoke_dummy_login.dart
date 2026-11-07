@@ -2,14 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 
 import 'smoke_dev_credentials.dart';
+import 'smoke_login_finders.dart';
 import 'smoke_login_wait.dart';
 
 const Duration smokeLoginFieldTimeout = Duration(seconds: 30);
 const Duration smokePostLoginDeadline = Duration(seconds: 120);
 const Duration smokePostLoginPumpStep = Duration(milliseconds: 250);
 
-Finder devLoginSubmitSemanticsFinder() =>
-    find.bySemanticsIdentifier('tashil_login_submit');
 Finder devMainMenuButtonFinder() =>
     find.bySemanticsIdentifier('tashil_main_menu_button');
 Finder devProfilePhoneValueFinder() =>
@@ -48,8 +47,13 @@ Future<void> submitDevDummyLogin(
 
   await waitForDevLoginScreenAfterSplash($);
 
+  final staffMode = devLoginStaffModeFinder();
+  expect(staffMode, findsOneWidget);
+  await $.tester.tap(staffMode);
+  await $.tester.pump(smokePostLoginPumpStep);
+
   final phoneField = devLoginPhoneFieldFinder();
-  final secretField = devLoginSecretFieldFinder();
+  final secretField = devLoginStaffPasswordFieldFinder();
   expect(phoneField, findsOneWidget);
   expect(secretField, findsOneWidget);
 
@@ -63,8 +67,8 @@ Future<void> submitDevDummyLogin(
   await $.tester.enterText(secretField, creds.secret);
   await $.tester.pump(smokePostLoginPumpStep);
 
-  final submit = devLoginSubmitSemanticsFinder();
-  expect($.tester.any(submit), isTrue, reason: 'tashil_login_submit must be visible');
+  final submit = devLoginSubmitFinder();
+  expect($.tester.any(submit), isTrue, reason: 'login_submit must be visible');
   await $(submit).scrollTo();
   await $.tester.tap(submit);
   await $.tester.pump(smokePostLoginPumpStep);

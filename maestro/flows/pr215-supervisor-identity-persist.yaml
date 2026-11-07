@@ -7,23 +7,24 @@ appId: com.tashil.delegate.dev
     clearState: true
     clearKeychain: true
 
+# M3 login: staff supervisor uses موظف إداري + phone + password ([login_screen.dart]).
 - assertVisible: "رقم الجوال"
+
+- tapOn: "موظف إداري"
 
 - tapOn: "رقم الجوال"
 - inputText: ${TASHIL_MAESTRO_DEV_PHONE}
 
-- tapOn: "الرقم القومي"
+- tapOn: "كلمة المرور"
 - inputText: ${TASHIL_MAESTRO_DEV_SECRET}
 
 - pressKey: Enter
 
 - runFlow:
     when:
-      visible:
-        id: "tashil_login_submit"
+      visible: "تسجيل الدخول"
     commands:
-      - tapOn:
-          id: "tashil_login_submit"
+      - tapOn: "تسجيل الدخول"
 
 - runFlow:
     file: ../subflows/dismiss-ios-save-password.yaml
