@@ -428,7 +428,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build\n/bin/sh \"${SRCROOT}/scripts/tashil_after_flutter_xcode_backend.sh\"\n";
+			shellScript = "/bin/sh \"${SRCROOT}/scripts/tashil_before_flutter_xcode_backend.sh\"\n/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build\n/bin/sh \"${SRCROOT}/scripts/tashil_after_flutter_xcode_backend.sh\"\n";
 		};
 		D5E6F7081CF901F600438500 /* [Tashil] Derived plugin registrant */ = {
 			isa = PBXShellScriptBuildPhase;

@@ -2,8 +2,8 @@
 # Remove firebase_crashlytics from FlutterGeneratedPluginSwiftPackage on dev builds so the
 # FirebaseCrashlytics native module is not linked and cannot log/init at startup.
 #
-# Invoked from: Podfile pre_install (before resolution), xcode_backend post-hook,
-# derived registrant prep, and Podfile post_install
+# Invoked from: Podfile pre_install, tashil_before_flutter_xcode_backend.sh,
+# xcode_backend post-hook, derived registrant prep, and Podfile post_install
 # (see ios/scripts/tashil_dev_build_context.sh).
 #
 # - Dev (`Debug-dev`, `Profile-dev`, `Release-dev` or APP_ENV=dev): strip manifest + plugin symlink.
@@ -19,6 +19,21 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 MANIFEST="${SRCROOT:?}/Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage/Package.swift"
 CRASHLYTICS_LINK="${SRCROOT:?}/Flutter/ephemeral/Packages/.packages/firebase_crashlytics"
 
+remove_dev_swiftpm_resolved_caches() {
+  for resolved in \
+    "${SRCROOT}/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved" \
+    "${SRCROOT}/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+  do
+    if [ ! -f "$resolved" ]; then
+      continue
+    fi
+    if grep -qi 'crashlytics' "$resolved"; then
+      rm -f "$resolved"
+      echo "[Tashil SPM] OK (dev): removed SwiftPM Package.resolved (Crashlytics pins)."
+    fi
+  done
+}
+
 remove_crashlytics_symlink() {
   if [ -L "$CRASHLYTICS_LINK" ] || [ -d "$CRASHLYTICS_LINK" ]; then
     rm -rf "$CRASHLYTICS_LINK"
@@ -28,11 +43,12 @@ remove_crashlytics_symlink() {
 
 if tashil_is_dev_build; then
   remove_crashlytics_symlink
+  remove_dev_swiftpm_resolved_caches
   if [ ! -f "$MANIFEST" ]; then
     echo "[Tashil SPM] OK (dev): no FlutterGeneratedPluginSwiftPackage/Package.swift; skip manifest strip."
     exit 0
   fi
-  exec python3 - "$MANIFEST" <<'PY'
+  python3 - "$MANIFEST" <<'PY'
 import re
 import sys
 from pathlib import Path
@@ -72,6 +88,7 @@ if re.search(r"firebase_crashlytics|firebase-crashlytics", new_text, re.IGNORECA
 path.write_text(new_text, encoding="utf-8")
 print("[Tashil SPM] OK (dev): removed firebase_crashlytics from FlutterGeneratedPluginSwiftPackage.")
 PY
+  remove_dev_swiftpm_resolved_caches
 else
   if [ ! -f "$MANIFEST" ]; then
     echo "[Tashil SPM] OK: no FlutterGeneratedPluginSwiftPackage/Package.swift (SPM plugins not used); skip."

@@ -51,6 +51,9 @@ assert_no_crashlytics_upload_in_pbxproj() {
   if ! grep -q 'tashil_registrant/GeneratedPluginRegistrant.m' ios/Runner.xcodeproj/project.pbxproj; then
     fail "project.pbxproj missing derived registrant path (tashil_registrant under DERIVED_FILE_DIR)"
   fi
+  if ! grep -q 'tashil_before_flutter_xcode_backend.sh' ios/Runner.xcodeproj/project.pbxproj; then
+    fail "project.pbxproj must run tashil_before_flutter_xcode_backend.sh before xcode_backend build (dev SPM strip)"
+  fi
   if ! grep -q 'tashil_after_flutter_xcode_backend.sh' ios/Runner.xcodeproj/project.pbxproj; then
     fail "project.pbxproj must chain tashil_after_flutter_xcode_backend.sh after xcode_backend build"
   fi

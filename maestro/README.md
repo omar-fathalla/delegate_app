@@ -20,6 +20,18 @@ export TASHIL_MAESTRO_DEV_SECRET='<from store doc only>'
 bash maestro/run-pr215-supervisor-identity-persist.sh
 ```
 
+The runner passes Maestro `-e TASHIL_MAESTRO_DEV_PHONE=…` and `-e TASHIL_MAESTRO_DEV_SECRET=…` so flow `${…}` substitution works (export alone is not enough on some Maestro versions).
+
+Direct CLI (equivalent):
+
+```bash
+maestro test -e TASHIL_MAESTRO_DEV_PHONE=01500000002 \
+  -e TASHIL_MAESTRO_DEV_SECRET='<from store>' \
+  maestro/flows/pr215-supervisor-identity-persist.yaml
+```
+
+See `maestro/env.example` for variable names only (no secrets in repo).
+
 Environment:
 
 | Variable | Required | Notes |

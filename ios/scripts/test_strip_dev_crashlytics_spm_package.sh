@@ -87,4 +87,34 @@ if [ "$code" -eq 0 ]; then
   exit 1
 fi
 
+RESOLVED_DIR="$WORKDIR/swiftpm"
+mkdir -p "$RESOLVED_DIR"
+cat >"$RESOLVED_DIR/Package.resolved" <<'JSON'
+{
+  "pins" : [
+    {
+      "identity" : "firebase-ios-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/firebase/firebase-ios-sdk",
+      "state" : { "revision" : "abc", "version" : "12.19.3" }
+    },
+    {
+      "identity" : "firebase-crashlytics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://example.com/firebase-crashlytics",
+      "state" : { "revision" : "def" }
+    }
+  ],
+  "version" : 2
+}
+JSON
+export SRCROOT="$WORKDIR"
+mkdir -p "$WORKDIR/Runner.xcworkspace/xcshareddata/swiftpm"
+ln -sf "$RESOLVED_DIR/Package.resolved" "$WORKDIR/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+SRCROOT="$WORKDIR" CONFIGURATION=Debug-dev /bin/sh "$STRIP_SCRIPT"
+if [ -f "$WORKDIR/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved" ]; then
+  echo "test_strip_dev_crashlytics_spm_package: Package.resolved with crashlytics must be removed on dev" >&2
+  exit 1
+fi
+
 echo "test_strip_dev_crashlytics_spm_package: OK"

@@ -20,5 +20,9 @@ if [[ -n "${MAESTRO_DEVICE_ID:-}" ]]; then
 fi
 
 cd "$FLOW_DIR"
+ENV_ARGS=(
+  -e "TASHIL_MAESTRO_DEV_PHONE=${TASHIL_MAESTRO_DEV_PHONE}"
+  -e "TASHIL_MAESTRO_DEV_SECRET=${TASHIL_MAESTRO_DEV_SECRET}"
+)
 # shellcheck disable=SC2068
-maestro test "${ARGS[@]}" "flows/pr215-supervisor-identity-persist.yaml" 2>&1 | tee "$LOG"
+maestro test "${ARGS[@]}" "${ENV_ARGS[@]}" "flows/pr215-supervisor-identity-persist.yaml" 2>&1 | tee "$LOG"
