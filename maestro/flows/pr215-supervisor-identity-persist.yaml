@@ -1,0 +1,67 @@
+appId: com.tashil.delegate.dev
+---
+# PR #215 — supervisor dev account identity after login and after relaunch.
+# Secrets: TASHIL_MAESTRO_DEV_SECRET (+ optional TASHIL_MAESTRO_DEV_PHONE) via run script only.
+
+- launchApp:
+    clearState: true
+    clearKeychain: true
+
+- assertVisible: "رقم الجوال"
+
+- tapOn: "رقم الجوال"
+- inputText: ${TASHIL_MAESTRO_DEV_PHONE}
+
+- tapOn: "الرقم القومي"
+- inputText: ${TASHIL_MAESTRO_DEV_SECRET}
+
+- pressKey: Enter
+
+- runFlow:
+    when:
+      visible:
+        id: "tashil_login_submit"
+    commands:
+      - tapOn:
+          id: "tashil_login_submit"
+
+- runFlow:
+    file: ../subflows/dismiss-ios-save-password.yaml
+
+- extendedWaitUntil:
+    notVisible: "تسجيل الدخول"
+    timeout: 120000
+
+- assertVisible:
+    id: "tashil_main_menu_button"
+
+- tapOn:
+    id: "tashil_main_menu_button"
+- tapOn: "الملف الشخصي"
+
+- extendedWaitUntil:
+    visible:
+      id: "tashil_profile_phone_value"
+    timeout: 60000
+- assertVisible:
+    id: "tashil_profile_phone_value"
+- assertVisible: ${TASHIL_MAESTRO_DEV_PHONE}
+
+# Session persist: no clearState / clearKeychain on relaunch
+- stopApp
+
+- launchApp:
+    clearState: false
+    clearKeychain: false
+
+- extendedWaitUntil:
+    notVisible: "تسجيل الدخول"
+    timeout: 90000
+
+- tapOn:
+    id: "tashil_main_menu_button"
+- tapOn: "الملف الشخصي"
+
+- assertVisible:
+    id: "tashil_profile_phone_value"
+- assertVisible: ${TASHIL_MAESTRO_DEV_PHONE}
