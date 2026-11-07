@@ -69,28 +69,27 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// Global providers accessible throughout the app.
 late final LocaleProvider localeProvider;
 
-void main() async {
+bool _delegateAppBootstrapped = false;
+
+/// Minimal startup for Patrol (`patrol_test/`) entrypoints that do not run [main].
+Future<void> bootstrapDelegateAppForPatrol() async {
+  if (_delegateAppBootstrapped) return;
+  _delegateAppBootstrapped = true;
+
   WidgetsFlutterBinding.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
 
-  // Run Firebase and SharedPreferences in parallel to reduce frame skipping
   final results = await Future.wait([
     Firebase.initializeApp(options: AppEnv.firebaseOptions),
     SharedPreferences.getInstance(),
   ]);
 
-  // Fail closed if a dev build ended up on any project other than tashil-dev.
   if (AppEnv.isDev) {
     AppEnv.verifyFirebaseProject(Firebase.app().options.projectId);
   }
 
-  // Remote Config must not delay the first frame or login. A failed or
-  // offline fetch leaves delegate_otp_enabled at its in-app default (false).
-  // The login path reads the flag when the session is known, so a fetch that
-  // finishes while the user types still applies.
   unawaited(DelegateOtpConfig.refreshFromRemoteConfig());
 
-  // Enable smart offline persistence and caching for Firestore
   try {
     if (!kIsWeb) {
       FirebaseFirestore.instance.settings = const Settings(
@@ -100,6 +99,20 @@ void main() async {
     }
   } catch (e) {
     debugPrint('Firestore settings config: $e');
+  }
+
+  Bloc.observer = AppBlocObserver();
+  final sharedPreferences = results[1] as SharedPreferences;
+  await di.init(sharedPreferences: sharedPreferences);
+  localeProvider = di.sl<LocaleProvider>();
+
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 40 * 1024 * 1024;
+  PaintingBinding.instance.imageCache.maximumSize = 100;
+}
+
+void main() async {
+  if (!_delegateAppBootstrapped) {
+    await bootstrapDelegateAppForPatrol();
   }
 
   if (!kIsWeb) {
@@ -122,15 +135,6 @@ void main() async {
     };
   }
 
-  // مراقب BLoC لتسجيل الأخطاء والانتقالات
-  Bloc.observer = AppBlocObserver();
-
-  final sharedPreferences = results[1] as SharedPreferences;
-  await di.init(sharedPreferences: sharedPreferences);
-
-  // Providers are now registered in DI — no duplicate SharedPreferences call
-  localeProvider = di.sl<LocaleProvider>();
-
   // Set up notification tap handler for navigation
   PushNotificationService.onNotificationTap = (data) {
     final taskId = data['taskId'];
@@ -144,10 +148,6 @@ void main() async {
 
   // Note: FCM initialization is now done post-login in SplashScreen/LoginScreen
   // so we have the delegate UID for token storage.
-
-  // ضبط سعة ذاكرة التخزين المؤقت للصور (ImageCache) للحد من استهلاك الذاكرة العشوائية RAM وتفادي ضغط GC
-  PaintingBinding.instance.imageCache.maximumSizeBytes = 40 * 1024 * 1024; // 40 MB max heap for decoded bitmaps
-  PaintingBinding.instance.imageCache.maximumSize = 100; // max 100 cached images
 
   runApp(const MyApp());
 

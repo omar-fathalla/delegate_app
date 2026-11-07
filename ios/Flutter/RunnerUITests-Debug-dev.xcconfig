@@ -1,0 +1,3 @@
+// Optional overlay (simulator arch pins). RunnerUITests Debug-dev base is
+// Pods-RunnerUITests.debug-dev.xcconfig in the Xcode project.
+#include? "RunnerUITests-Debug-dev-arch.xcconfig"

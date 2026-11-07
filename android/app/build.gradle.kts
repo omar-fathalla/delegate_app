@@ -1,3 +1,6 @@
+import java.util.Base64
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -7,10 +10,6 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
-
-import java.io.FileInputStream
-import java.util.Base64
-import java.util.Properties
 
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
@@ -80,6 +79,8 @@ android {
             manifestPlaceholders["appLabel"] = "Tashil Dev"
             manifestPlaceholders["GOOGLE_MAPS_ANDROID_API_KEY"] =
                 loadDevMapsAndroidKey().orEmpty()
+            testInstrumentationRunner = "pl.leancode.patrol.PatrolJUnitRunner"
+            testInstrumentationRunnerArguments["clearPackageData"] = "true"
         }
     }
 
@@ -101,6 +102,10 @@ android {
         }
     }
 
+    testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
+    }
+
     buildTypes {
         release {
             signingConfig = if (keystorePropertiesFile.exists()) {
@@ -120,6 +125,11 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    androidTestImplementation("androidx.test:runner:1.5.1")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("junit:junit:4.13.2")
+    androidTestUtil("androidx.test:orchestrator:1.5.1")
 }
 
 flutter {
@@ -139,6 +149,18 @@ val dartEnv: String = (project.findProperty("dart-defines") as String?)
 
 gradle.taskGraph.whenReady {
     val requested = gradle.startParameter.taskNames
+    val runsProdInstrumented = requested.any {
+        Regex(
+            "(connected|device)Prod.*(AndroidTest|Test)|assembleProd.*AndroidTest",
+            RegexOption.IGNORE_CASE,
+        ).containsMatchIn(it)
+    }
+    if (runsProdInstrumented) {
+        throw GradleException(
+            "Patrol / instrumented tests are dev-flavor only. " +
+                "Use connectedDevDebugAndroidTest with --flavor dev --dart-define=ENV=dev.",
+        )
+    }
     val buildsDev = requested.any { Regex("Dev", RegexOption.IGNORE_CASE).containsMatchIn(it) }
     val buildsProd = requested.any { Regex("Prod", RegexOption.IGNORE_CASE).containsMatchIn(it) }
     if (buildsDev && dartEnv != "dev") {
@@ -151,7 +173,14 @@ gradle.taskGraph.whenReady {
         throw GradleException(
             "Flavor 'dev' requires the tashil-dev Android Maps API key. " +
                 "Set devMapsAndroidKey in android/local.properties (gitignored) or " +
-                "DEV_MAPS_ANDROID_KEY in the environment. See android/README_MAPS_KEYS.md."
+                "DEV_MAPS_ANDROID_KEY in the environment. See android/README_MAPS_KEYS.md.",
         )
+    }
+}
+
+afterEvaluate {
+    tasks.matching { it.name.matches(Regex("^assemble.+AndroidTest$")) }.configureEach {
+        val appAssembleName = name.removeSuffix("AndroidTest")
+        tasks.findByName(appAssembleName)?.let { dependsOn(it) }
     }
 }

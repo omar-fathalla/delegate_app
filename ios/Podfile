@@ -70,8 +70,14 @@ tashil_strip_dev_crashlytics_if_needed!
 
 target 'Runner' do
   use_frameworks!
+  use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  target 'RunnerUITests' do
+    inherit! :search_paths
+    pod 'patrol', :path => '.symlinks/plugins/patrol/darwin'
+  end
   target 'RunnerTests' do
     inherit! :search_paths
   end
@@ -95,4 +101,7 @@ post_install do |installer|
     success = system('/bin/sh', pod_strip, File.expand_path(__dir__))
     raise '[Tashil] tashil_strip_crashlytics_from_dev_pod_support.sh failed during pod install' unless success
   end
+
+  require_relative 'patrol_runner_ui_tests_post_install'
+  PatrolRunnerUiTestsPostInstall.apply!(installer)
 end

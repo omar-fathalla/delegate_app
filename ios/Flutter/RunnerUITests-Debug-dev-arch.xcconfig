@@ -1,0 +1,5 @@
+// Patrol / simulator (see run_flutter_xcode_backend.sh)
+ARCHS[sdk=iphonesimulator*]=arm64
+EXCLUDED_ARCHS[sdk=iphonesimulator*]=$(inherited) arm64e i386 x86_64
+ONLY_ACTIVE_ARCH[sdk=iphonesimulator*]=YES
+SDKROOT[sdk=iphonesimulator*]=iphonesimulator
