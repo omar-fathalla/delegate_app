@@ -12,6 +12,9 @@ concurrency:
   group: pr-user-test-${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
 jobs:
   signing-surface-guard:
     name: Signing & entitlements (no drift)
@@ -20,11 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - name: Entitlements unchanged vs base branch
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"
-          git diff --exit-code "$BASE" HEAD -- \
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code "$BASE" "$HEAD" -- \
             ios/Runner/Runner.entitlements \
             ios/Runner/Runner-dev.entitlements \
             ios/Flutter/Env-prod.xcconfig \
@@ -36,6 +41,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -52,7 +59,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-prod-release-${{ github.sha }}
+          name: android-prod-release-${{ env.PR_HEAD_SHA }}
           path: build/app/outputs/flutter-apk/app-prod-release.apk
           if-no-files-found: error
           retention-days: 14
@@ -63,6 +70,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.44.5"
@@ -79,7 +88,7 @@ jobs:
       - name: Upload iOS build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-prod-release-${{ github.sha }}
+          name: ios-prod-release-${{ env.PR_HEAD_SHA }}
           path: build/ios/iphoneos/Runner.app
           if-no-files-found: error
           retention-days: 14
